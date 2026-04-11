@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────
-//  CACI — Single-File Cloudflare Worker
-//  No external dependencies. No module splitting.
+//  CACI Worker v3 — Collections support
+//  Structure: dept → collection → files
 // ─────────────────────────────────────────────────────────────
 
 const CORS = {
@@ -11,8 +11,7 @@ const CORS = {
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
-    status,
-    headers: { 'Content-Type': 'application/json', ...CORS },
+    status, headers: { 'Content-Type': 'application/json', ...CORS },
   });
 }
 
@@ -22,63 +21,34 @@ function verifyToken(request, env) {
   return token && (token === env.SESSION_SECRET || token === 'dev-token');
 }
 
-// ── Main Router ───────────────────────────────────────────────
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const path = url.pathname;
     const method = request.method;
 
-    if (method === 'OPTIONS') {
-      return new Response(null, { status: 204, headers: CORS });
-    }
+    if (method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
 
-    // Login — no auth required
-    if (path === '/auth/login' && method === 'POST') {
-      return handleLogin(request, env);
-    }
+    if (path === '/auth/login' && method === 'POST') return handleLogin(request, env);
+    if (path === '/health') return json({ ok: true, version: '3.0.0' });
 
-    // Health — no auth required
-    if (path === '/health') {
-      return json({ ok: true, version: '2.0.0' });
-    }
+    if (!verifyToken(request, env)) return json({ error: 'Unauthorized' }, 401);
 
-    // All other routes require valid token
-    if (!verifyToken(request, env)) {
-      return json({ error: 'Unauthorized' }, 401);
-    }
+    // Files
+    if (path === '/upload' && method === 'POST')           return handleUpload(request, env);
+    if (path === '/files' && method === 'GET')             return handleListFiles(url, env);
+    if (path.startsWith('/files/') && method === 'DELETE') return handleDeleteFile(path.replace('/files/', ''), env);
 
-    // Upload file (text already extracted client-side)
-    if (path === '/upload' && method === 'POST') {
-      return handleUpload(request, env);
-    }
-
-    // List files for a department
-    if (path === '/files' && method === 'GET') {
-      const dept = url.searchParams.get('dept') || 'global';
-      return handleListFiles(dept, env);
-    }
-
-    // Delete a file
-    if (path.startsWith('/files/') && method === 'DELETE') {
-      const id = path.replace('/files/', '');
-      return handleDeleteFile(id, env);
-    }
+    // Collections
+    if (path === '/collections' && method === 'GET')                       return handleListCollections(url, env);
+    if (path.startsWith('/collections/') && method === 'DELETE')           return handleDeleteCollection(path.replace('/collections/', ''), url, env);
 
     // Chat
-    if (path === '/chat' && method === 'POST') {
-      return handleChat(request, env);
-    }
+    if (path === '/chat' && method === 'POST') return handleChat(request, env);
 
-    // Admin config — save API keys to KV
-    if (path === '/admin/config' && method === 'POST') {
-      return handleAdminConfigSave(request, env);
-    }
-
-    // Admin config — read current config status
-    if (path === '/admin/config' && method === 'GET') {
-      return handleAdminConfigGet(env);
-    }
+    // Admin
+    if (path === '/admin/config' && method === 'POST') return handleAdminSave(request, env);
+    if (path === '/admin/config' && method === 'GET')  return handleAdminGet(env);
 
     return json({ error: 'Not found' }, 404);
   },
@@ -93,70 +63,110 @@ async function handleLogin(request, env) {
       return json({ ok: true, token: env.SESSION_SECRET || 'dev-token' });
     }
     return json({ error: 'Invalid password' }, 401);
-  } catch {
-    return json({ error: 'Bad request' }, 400);
-  }
+  } catch { return json({ error: 'Bad request' }, 400); }
 }
 
 // ── Upload ────────────────────────────────────────────────────
-// The frontend extracts text from files before sending.
-// We receive: file (raw binary for R2), text (extracted), name, dept, type
 async function handleUpload(request, env) {
   try {
     const formData = await request.formData();
-    const file = formData.get('file');         // raw file blob
-    const text = formData.get('text') || '';   // extracted text from client
-    const name = formData.get('name') || (file ? file.name : 'unknown');
-    const dept = formData.get('dept') || 'global';
-    const type = formData.get('type') || 'unknown';
+    const file       = formData.get('file');
+    const text       = formData.get('text') || '';
+    const name       = formData.get('name') || (file ? file.name : 'unknown');
+    const dept       = formData.get('dept') || 'global';
+    const collection = (formData.get('collection') || 'General').trim();
+    const fileType   = formData.get('type') || 'unknown';
 
-    if (!file && !text) return json({ error: 'No file or text provided' }, 400);
+    if (!text && !file) return json({ error: 'No content provided' }, 400);
 
-    const id = crypto.randomUUID();
-    const uploadedAt = new Date().toISOString();
+    const id          = crypto.randomUUID();
+    const uploadedAt  = new Date().toISOString();
+    const cleanText   = text.replace(/\s+/g, ' ').trim();
+    const chunks      = chunkText(cleanText, 1500);
 
-    // 1. Store raw file in R2
+    // Store raw file in R2
     if (file && env.CACI_R2) {
       const buffer = await file.arrayBuffer();
-      await env.CACI_R2.put(`${dept}/${id}/${name}`, buffer, {
+      await env.CACI_R2.put(`${dept}/${collection}/${id}/${name}`, buffer, {
         httpMetadata: { contentType: file.type || 'application/octet-stream' },
-        customMetadata: { dept, name, uploadedAt },
+        customMetadata: { dept, collection, name, uploadedAt },
       });
     }
 
-    // 2. Store extracted text chunks in KV
-    // Chunk into ~1500 char pieces for retrieval
-    const cleanText = text.replace(/\s+/g, ' ').trim();
-    const chunks = chunkText(cleanText, 1500);
-
+    // Store text chunks in KV
     await env.CACI_KV.put(
       `file:${id}`,
-      JSON.stringify({ id, name, dept, type, uploadedAt, chunks, charCount: cleanText.length }),
-      { expirationTtl: 60 * 60 * 24 * 365 } // 1 year
+      JSON.stringify({ id, name, dept, collection, fileType, uploadedAt, chunks, charCount: cleanText.length }),
+      { expirationTtl: 60 * 60 * 24 * 365 }
     );
 
-    // 3. Update department file index
-    const indexKey = `index:${dept}`;
-    const existing = await env.CACI_KV.get(indexKey, 'json') || [];
-    existing.unshift({ id, name, dept, type, uploadedAt, charCount: cleanText.length, chunks: chunks.length });
-    // Keep index to 200 files max
-    if (existing.length > 200) existing.splice(200);
-    await env.CACI_KV.put(indexKey, JSON.stringify(existing));
+    // Update dept file index
+    const deptKey = `index:${dept}`;
+    const deptIdx = await env.CACI_KV.get(deptKey, 'json') || [];
+    deptIdx.unshift({ id, name, dept, collection, fileType, uploadedAt, charCount: cleanText.length, chunks: chunks.length });
+    if (deptIdx.length > 500) deptIdx.splice(500);
+    await env.CACI_KV.put(deptKey, JSON.stringify(deptIdx));
 
-    return json({ ok: true, id, name, chunks: chunks.length, charCount: cleanText.length });
+    // Update collection index
+    const colKey = `col:${dept}:${collection}`;
+    const colIdx = await env.CACI_KV.get(colKey, 'json') || [];
+    colIdx.unshift({ id, name, dept, collection, fileType, uploadedAt, charCount: cleanText.length, chunks: chunks.length });
+    await env.CACI_KV.put(colKey, JSON.stringify(colIdx));
+
+    // Update collection registry for this dept
+    const regKey = `colreg:${dept}`;
+    const reg    = await env.CACI_KV.get(regKey, 'json') || [];
+    if (!reg.find(c => c.name === collection)) {
+      reg.unshift({ name: collection, created: uploadedAt });
+      await env.CACI_KV.put(regKey, JSON.stringify(reg));
+    }
+
+    return json({ ok: true, id, name, collection, chunks: chunks.length, charCount: cleanText.length });
   } catch (err) {
     return json({ error: 'Upload failed: ' + err.message }, 500);
   }
 }
 
 // ── List Files ────────────────────────────────────────────────
-async function handleListFiles(dept, env) {
+// ?dept=retail               → all files in dept
+// ?dept=retail&col=Q1 Shrink → files in that collection
+// ?dept=retail&fileId=xxx    → single file meta
+async function handleListFiles(url, env) {
   try {
+    const dept   = url.searchParams.get('dept') || 'global';
+    const col    = url.searchParams.get('col');
+    const fileId = url.searchParams.get('fileId');
+
+    if (fileId) {
+      const f = await env.CACI_KV.get(`file:${fileId}`, 'json');
+      return f ? json(f) : json({ error: 'Not found' }, 404);
+    }
+
+    if (col) {
+      const files = await env.CACI_KV.get(`col:${dept}:${col}`, 'json') || [];
+      return json(files);
+    }
+
     const files = await env.CACI_KV.get(`index:${dept}`, 'json') || [];
     return json(files);
-  } catch {
-    return json([]);
-  }
+  } catch { return json([]); }
+}
+
+// ── List Collections ──────────────────────────────────────────
+// ?dept=retail → [{name, created, fileCount}]
+async function handleListCollections(url, env) {
+  try {
+    const dept = url.searchParams.get('dept') || 'global';
+    const reg  = await env.CACI_KV.get(`colreg:${dept}`, 'json') || [];
+
+    // Enrich with file counts
+    const enriched = await Promise.all(reg.map(async c => {
+      const files = await env.CACI_KV.get(`col:${dept}:${c.name}`, 'json') || [];
+      return { ...c, fileCount: files.length };
+    }));
+
+    return json(enriched);
+  } catch { return json([]); }
 }
 
 // ── Delete File ───────────────────────────────────────────────
@@ -165,17 +175,31 @@ async function handleDeleteFile(id, env) {
     const fileMeta = await env.CACI_KV.get(`file:${id}`, 'json');
     if (!fileMeta) return json({ error: 'File not found' }, 404);
 
+    const { dept, collection, name } = fileMeta;
+
     // Remove from KV
     await env.CACI_KV.delete(`file:${id}`);
 
-    // Remove from index
-    const indexKey = `index:${fileMeta.dept}`;
-    const existing = await env.CACI_KV.get(indexKey, 'json') || [];
-    await env.CACI_KV.put(indexKey, JSON.stringify(existing.filter(f => f.id !== id)));
+    // Remove from dept index
+    const deptIdx = await env.CACI_KV.get(`index:${dept}`, 'json') || [];
+    await env.CACI_KV.put(`index:${dept}`, JSON.stringify(deptIdx.filter(f => f.id !== id)));
+
+    // Remove from collection index
+    const colKey = `col:${dept}:${collection}`;
+    const colIdx = await env.CACI_KV.get(colKey, 'json') || [];
+    const newColIdx = colIdx.filter(f => f.id !== id);
+    await env.CACI_KV.put(colKey, JSON.stringify(newColIdx));
+
+    // If collection now empty, remove from registry
+    if (newColIdx.length === 0) {
+      const reg = await env.CACI_KV.get(`colreg:${dept}`, 'json') || [];
+      await env.CACI_KV.put(`colreg:${dept}`, JSON.stringify(reg.filter(c => c.name !== collection)));
+      await env.CACI_KV.delete(colKey);
+    }
 
     // Remove from R2
     if (env.CACI_R2) {
-      await env.CACI_R2.delete(`${fileMeta.dept}/${id}/${fileMeta.name}`).catch(() => {});
+      await env.CACI_R2.delete(`${dept}/${collection}/${id}/${name}`).catch(() => {});
     }
 
     return json({ ok: true });
@@ -184,50 +208,76 @@ async function handleDeleteFile(id, env) {
   }
 }
 
+// ── Delete Collection ─────────────────────────────────────────
+async function handleDeleteCollection(encodedName, url, env) {
+  try {
+    const dept = url.searchParams.get('dept') || 'global';
+    const name = decodeURIComponent(encodedName);
+
+    const colKey = `col:${dept}:${name}`;
+    const files  = await env.CACI_KV.get(colKey, 'json') || [];
+
+    // Delete all files in collection
+    for (const f of files) {
+      await env.CACI_KV.delete(`file:${f.id}`);
+      // Remove from dept index
+      const deptIdx = await env.CACI_KV.get(`index:${dept}`, 'json') || [];
+      await env.CACI_KV.put(`index:${dept}`, JSON.stringify(deptIdx.filter(x => x.id !== f.id)));
+      // R2
+      if (env.CACI_R2) await env.CACI_R2.delete(`${dept}/${name}/${f.id}/${f.name}`).catch(() => {});
+    }
+
+    // Remove collection
+    await env.CACI_KV.delete(colKey);
+    const reg = await env.CACI_KV.get(`colreg:${dept}`, 'json') || [];
+    await env.CACI_KV.put(`colreg:${dept}`, JSON.stringify(reg.filter(c => c.name !== name)));
+
+    return json({ ok: true, deleted: files.length });
+  } catch (err) {
+    return json({ error: 'Delete collection failed: ' + err.message }, 500);
+  }
+}
+
 // ── Chat ──────────────────────────────────────────────────────
+// scope: 'all' | 'collection' | 'file'
 async function handleChat(request, env) {
   try {
-    const { message, dept, model, history = [] } = await request.json();
+    const { message, dept, collection, fileId, scope = 'all', model, history = [] } = await request.json();
     if (!message) return json({ error: 'Message required' }, 400);
 
-    // Get Claude API key
     const apiKey = (await env.CACI_KV.get('config:ANTHROPIC_API_KEY')) || env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      return json({ error: 'Anthropic API key not configured. Add it in Admin settings.' }, 400);
-    }
+    if (!apiKey) return json({ error: 'Anthropic API key not configured. Go to Admin to add it.' }, 400);
 
-    // Retrieve relevant file context from KV
-    const context = await buildContext(message, dept, env);
+    // Build context based on scope
+    const context = await buildContext({ message, dept, collection, fileId, scope, env });
 
-    // Build system prompt
-    const deptLabel = dept ? dept.charAt(0).toUpperCase() + dept.slice(1) : 'General';
-    let systemPrompt = `You are CACI, an internal AI intelligence assistant for Jushi Holdings, a cannabis company. You are operating in the ${deptLabel} department.
+    // System prompt
+    const scopeLabel = scope === 'file' ? `the file "${context.focusFile || fileId}"`
+      : scope === 'collection' ? `the "${collection}" collection`
+      : `all ${dept} documents`;
 
-Your responsibilities:
-- Answer questions accurately from company documents
-- Summarize reports, data, and documents clearly
+    let system = `You are CACI, an internal AI intelligence assistant for Jushi Holdings. You are currently analyzing ${scopeLabel} in the ${dept} department.
+
+Your role:
+- Answer questions accurately from the provided company documents
+- Summarize, compare, and analyze data across multiple files when relevant
 - Generate professional internal reports when asked
-- Always cite the document name when referencing specific data
-- If data is not in the provided documents, say so clearly — never fabricate numbers`;
+- Always cite the specific document or file name when referencing data
+- If data is not in the provided documents, say so clearly — never fabricate numbers or data`;
 
     if (context.text) {
-      systemPrompt += `\n\n--- RELEVANT COMPANY DOCUMENTS ---\n${context.text}\n--- END DOCUMENTS ---\n\nAnswer based on the documents above. Cite filenames when referencing data.`;
+      system += `\n\n--- DOCUMENTS ---\n${context.text}\n--- END ---\n\nAnswer from these documents. Cite filenames when referencing specific data.`;
     } else {
-      systemPrompt += `\n\nNo documents were found for this query in the ${deptLabel} department. Let the user know they should upload relevant documents first.`;
+      system += `\n\nNo documents found for this scope. Ask the user to upload relevant files first.`;
     }
 
-    // Call Claude
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: {
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'Content-Type': 'application/json',
-      },
+      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 2048,
-        system: systemPrompt,
+        system,
         messages: [
           ...history.slice(-10).map(h => ({ role: h.role, content: h.content })),
           { role: 'user', content: message },
@@ -236,88 +286,100 @@ Your responsibilities:
     });
 
     if (!res.ok) {
-      const errText = await res.text();
-      return json({ error: `Claude API error (${res.status}): ${errText}` }, 500);
+      const err = await res.text();
+      return json({ error: `Claude API error (${res.status}): ${err}` }, 500);
     }
 
     const data = await res.json();
-    const reply = data.content?.[0]?.text || 'No response.';
-
-    return json({
-      ok: true,
-      response: reply,
-      sources: context.sources,
-      dept,
-    });
-
+    return json({ ok: true, response: data.content?.[0]?.text || 'No response.', sources: context.sources, scope });
   } catch (err) {
     return json({ error: 'Chat error: ' + err.message }, 500);
   }
 }
 
 // ── Context Builder ───────────────────────────────────────────
-// Simple keyword search across all files in the department.
-// No embeddings, no Vectorize — just reliable KV lookups.
-async function buildContext(query, dept, env) {
+async function buildContext({ message, dept, collection, fileId, scope, env }) {
   try {
-    const keywords = extractKeywords(query);
+    const keywords = extractKeywords(message);
+    let filesToSearch = [];
 
-    // Get file index for this department (+ global)
-    const deptFiles = await env.CACI_KV.get(`index:${dept}`, 'json') || [];
-    const globalFiles = dept !== 'global'
-      ? (await env.CACI_KV.get('index:global', 'json') || [])
-      : [];
-    const allFiles = [...deptFiles, ...globalFiles].slice(0, 30); // cap at 30 files to check
+    if (scope === 'file' && fileId) {
+      // Single file
+      const f = await env.CACI_KV.get(`file:${fileId}`, 'json');
+      if (f) filesToSearch = [f];
+    } else if (scope === 'collection' && collection) {
+      // All files in collection
+      const colFiles = await env.CACI_KV.get(`col:${dept}:${collection}`, 'json') || [];
+      filesToSearch = await Promise.all(colFiles.map(f => env.CACI_KV.get(`file:${f.id}`, 'json')));
+      filesToSearch = filesToSearch.filter(Boolean);
+    } else {
+      // All files in dept + global
+      const deptIdx  = await env.CACI_KV.get(`index:${dept}`, 'json') || [];
+      const globalIdx = dept !== 'global' ? (await env.CACI_KV.get('index:global', 'json') || []) : [];
+      const allMeta  = [...deptIdx, ...globalIdx].slice(0, 40);
+      filesToSearch  = (await Promise.all(allMeta.map(f => env.CACI_KV.get(`file:${f.id}`, 'json')))).filter(Boolean);
+    }
 
-    if (!allFiles.length) return { text: '', sources: [] };
+    if (!filesToSearch.length) return { text: '', sources: [], focusFile: null };
 
-    // Score each file by keyword relevance
+    // Score chunks across all files
     const scored = [];
-    for (const fileMeta of allFiles) {
-      const fileData = await env.CACI_KV.get(`file:${fileMeta.id}`, 'json');
-      if (!fileData || !fileData.chunks) continue;
-
-      // Score each chunk
-      const chunkScores = fileData.chunks.map(chunk => ({
-        chunk,
-        score: scoreChunk(chunk, keywords),
-        filename: fileMeta.name,
-      }));
-
-      const topChunks = chunkScores
-        .filter(c => c.score > 0)
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 3);
-
-      scored.push(...topChunks);
-    }
-
-    // Sort all chunks by score, take top 6
-    scored.sort((a, b) => b.score - a.score);
-    const top = scored.slice(0, 6);
-
-    if (!top.length) {
-      // No keyword matches — fall back to most recent file's first chunk
-      if (allFiles.length) {
-        const first = await env.CACI_KV.get(`file:${allFiles[0].id}`, 'json');
-        if (first && first.chunks && first.chunks.length) {
-          return {
-            text: `[From: ${allFiles[0].name}]\n${first.chunks[0]}`,
-            sources: [allFiles[0].name],
-          };
-        }
+    for (const fileData of filesToSearch) {
+      if (!fileData.chunks) continue;
+      for (const chunk of fileData.chunks) {
+        const score = scoreChunk(chunk, keywords);
+        if (score > 0) scored.push({ chunk, score, filename: fileData.name, collection: fileData.collection });
       }
-      return { text: '', sources: [] };
     }
 
-    const sources = [...new Set(top.map(t => t.filename))];
-    const text = top.map(t => `[From: ${t.filename}]\n${t.chunk}`).join('\n\n---\n\n');
+    scored.sort((a, b) => b.score - a.score);
+    const top = scored.slice(0, 8);
 
-    return { text, sources };
+    // If no keyword matches, fall back to first chunks of each file (up to 3 files)
+    if (!top.length) {
+      const fallback = filesToSearch.slice(0, 3).flatMap(f =>
+        (f.chunks || []).slice(0, 2).map(chunk => ({ chunk, filename: f.name, collection: f.collection }))
+      );
+      if (!fallback.length) return { text: '', sources: [], focusFile: null };
+      const sources = [...new Set(fallback.map(x => x.filename))];
+      const text = fallback.map(x => `[${x.collection} / ${x.filename}]\n${x.chunk}`).join('\n\n---\n\n');
+      return { text, sources, focusFile: filesToSearch[0]?.name };
+    }
+
+    const sources = [...new Set(top.map(x => x.filename))];
+    const text = top.map(x => `[${x.collection} / ${x.filename}]\n${x.chunk}`).join('\n\n---\n\n');
+    return { text, sources, focusFile: filesToSearch[0]?.name };
   } catch (err) {
     console.error('Context error:', err.message);
-    return { text: '', sources: [] };
+    return { text: '', sources: [], focusFile: null };
   }
+}
+
+// ── Admin Config ──────────────────────────────────────────────
+async function handleAdminSave(request, env) {
+  try {
+    const body = await request.json();
+    const saved = [];
+    for (const key of ['ANTHROPIC_API_KEY']) {
+      if (body[key] !== undefined) {
+        body[key] === '' ? await env.CACI_KV.delete('config:' + key) : await env.CACI_KV.put('config:' + key, body[key]);
+        saved.push(key);
+      }
+    }
+    return json({ ok: true, saved });
+  } catch (err) { return json({ error: err.message }, 500); }
+}
+
+async function handleAdminGet(env) {
+  try {
+    const kvKey = await env.CACI_KV.get('config:ANTHROPIC_API_KEY');
+    return json({
+      ANTHROPIC_API_KEY: {
+        configured: !!(kvKey || env.ANTHROPIC_API_KEY),
+        source: kvKey ? 'admin' : env.ANTHROPIC_API_KEY ? 'secret' : 'none',
+      },
+    });
+  } catch (err) { return json({ error: err.message }, 500); }
 }
 
 // ── Helpers ───────────────────────────────────────────────────
@@ -332,54 +394,12 @@ function chunkText(text, size = 1500) {
 }
 
 function extractKeywords(query) {
-  const stopWords = new Set(['a','an','the','is','are','was','were','be','been','being',
-    'have','has','had','do','does','did','will','would','could','should','may','might',
-    'shall','can','need','dare','ought','used','what','which','who','whom','this','that',
-    'these','those','i','me','my','we','our','you','your','he','she','it','they','them',
-    'his','her','its','their','and','but','or','nor','for','yet','so','at','by','in',
-    'of','on','to','up','as','if','how','when','where','why','with','about','from','into']);
-  return query.toLowerCase()
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .split(/\s+/)
-    .filter(w => w.length > 2 && !stopWords.has(w));
-}
-
-// ── Admin Config ──────────────────────────────────────────────
-async function handleAdminConfigSave(request, env) {
-  try {
-    const body = await request.json();
-    const saved = [];
-    const allowed = ['ANTHROPIC_API_KEY'];
-    for (const key of allowed) {
-      if (body[key] !== undefined) {
-        if (body[key] === '') {
-          await env.CACI_KV.delete('config:' + key);
-        } else {
-          await env.CACI_KV.put('config:' + key, body[key]);
-        }
-        saved.push(key);
-      }
-    }
-    return json({ ok: true, saved });
-  } catch (err) {
-    return json({ error: 'Config save failed: ' + err.message }, 500);
-  }
-}
-
-async function handleAdminConfigGet(env) {
-  try {
-    const kvKey = await env.CACI_KV.get('config:ANTHROPIC_API_KEY');
-    const envKey = env.ANTHROPIC_API_KEY;
-    return json({
-      ANTHROPIC_API_KEY: {
-        configured: !!(kvKey || envKey),
-        source: kvKey ? 'admin' : envKey ? 'secret' : 'none',
-        masked: kvKey ? kvKey.slice(0, 10) + '...' : envKey ? '[env secret]' : null,
-      },
-    });
-  } catch (err) {
-    return json({ error: err.message }, 500);
-  }
+  const stop = new Set(['a','an','the','is','are','was','were','be','been','have','has','had',
+    'do','does','did','will','would','could','should','may','might','what','which','who',
+    'this','that','these','those','i','me','my','we','our','you','your','he','she','it',
+    'they','them','and','but','or','for','at','by','in','of','on','to','as','if','how',
+    'when','where','why','with','about','from','into','can','tell','show','give','get']);
+  return query.toLowerCase().replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(w => w.length > 2 && !stop.has(w));
 }
 
 function scoreChunk(chunk, keywords) {
