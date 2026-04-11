@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="theme-color" content="#060a12"/>
+<title>CACI — Intelligence Platform</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+/* ── Reset & Base ─────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:        #060a12;
+  --bg2:       #0c1220;
+  --bg3:       #111827;
+  --border:    rgba(255,255,255,0.07);
+  --border2:   rgba(255,255,255,0.12);
+  --text1:     #f0f4ff;
+  --text2:     #8b95a8;
+  --text3:     #4b5563;
+  --gold:      #c9a84c;
+  --gold-dim:  rgba(201,168,76,0.12);
+  --gold-glow: rgba(201,168,76,0.25);
+  --green:     #22c55e;
+  --red:       #ef4444;
+  --sidebar-w: 200px;
+  --topbar-h:  52px;
+  --radius:    10px;
+  font-size: 14px;
+}
+html, body { height: 100%; background: var(--bg); color: var(--text1); font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; overflow: hidden; }
+
+/* ── Login ────────────────────────────────────────────── */
+#login-screen {
+  position: fixed; inset: 0; z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(ellipse at 30% 20%, rgba(201,168,76,0.06) 0%, transparent 60%),
+              radial-gradient(ellipse at 80% 80%, rgba(99,102,241,0.05) 0%, transparent 60%),
+              var(--bg);
+}
+.login-card {
+  width: 360px; padding: 40px;
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 16px;
+  box-shadow: 0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(201,168,76,0.05);
+}
+.login-logo { font-size: 28px; font-weight: 700; letter-spacing: -1px; color: var(--text1); margin-bottom: 4px; }
+.login-logo span { color: var(--gold); }
+.login-sub { font-size: 11px; color: var(--text3); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 32px; }
+.login-label { font-size: 11px; color: var(--text2); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 8px; }
+.login-input {
+  width: 100%; padding: 11px 14px; background: var(--bg3);
+  border: 1px solid var(--border2); border-radius: 8px;
+  color: var(--text1); font-size: 14px; outline: none;
+  transition: border-color 0.2s;
+  margin-bottom: 12px;
+}
+.login-input:focus { border-color: var(--gold); }
+.login-btn {
+  width: 100%; padding: 12px; background: var(--gold);
+  border: none; border-radius: 8px; color: #000;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  letter-spacing: 0.04em; transition: opacity 0.2s;
+}
+.login-btn:hover { opacity: 0.88; }
+.login-btn:disabled { opacity: 0.5; cursor: default; }
+.login-err { color: var(--red); font-size: 12px; margin-top: 10px; display: none; }
+
+/* ── App Shell ────────────────────────────────────────── */
+#app { display: none; height: 100vh; display: grid; grid-template-columns: var(--sidebar-w) 1fr; grid-template-rows: var(--topbar-h) 1fr; }
+
+/* ── Sidebar ──────────────────────────────────────────── */
+#sidebar {
+  grid-row: 1 / 3; grid-column: 1;
+  background: var(--bg2); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.sb-brand { padding: 16px 18px; border-bottom: 1px solid var(--border); }
+.sb-logo { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
+.sb-logo span { color: var(--gold); }
+.sb-tagline { font-size: 10px; color: var(--text3); letter-spacing: 0.08em; text-transform: uppercase; margin-top: 2px; }
+.sb-nav { flex: 1; padding: 10px 8px; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
+.nav-btn {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; border-radius: 8px; border: none;
+  background: transparent; color: var(--text2);
+  font-size: 13px; cursor: pointer; text-align: left; width: 100%;
+  transition: background 0.15s, color 0.15s;
+}
+.nav-btn:hover { background: var(--bg3); color: var(--text1); }
+.nav-btn.active { background: var(--gold-dim); color: var(--gold); }
+.nav-btn .ni { font-size: 15px; width: 20px; text-align: center; flex-shrink: 0; }
+.sb-dept { padding: 12px 8px; border-top: 1px solid var(--border); }
+.dept-label { font-size: 10px; color: var(--text3); letter-spacing: 0.08em; text-transform: uppercase; padding: 0 4px; margin-bottom: 6px; }
+.dept-btn {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px; border-radius: 7px; border: none;
+  background: transparent; color: var(--text2);
+  font-size: 12px; cursor: pointer; width: 100%; text-align: left;
+  transition: background 0.15s, color 0.15s;
+}
+.dept-btn:hover { background: var(--bg3); color: var(--text1); }
+.dept-btn.active { background: var(--gold-dim); color: var(--gold); }
+.dept-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+/* ── Topbar ───────────────────────────────────────────── */
+#topbar {
+  grid-column: 2; grid-row: 1;
+  background: var(--bg2); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; padding: 0 20px; gap: 12px;
+}
+.tb-module { font-size: 14px; font-weight: 600; color: var(--text1); }
+.tb-dept-chip {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 10px; background: var(--bg3);
+  border: 1px solid var(--border2); border-radius: 20px;
+  font-size: 12px; color: var(--text2); margin-left: auto;
+}
+.tb-dot { width: 7px; height: 7px; border-radius: 50%; }
+.tb-status { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text3); }
+.status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+.status-dot.warn { background: #f59e0b; }
+.status-dot.off { background: var(--text3); }
+
+/* ── Main / Panels ────────────────────────────────────── */
+#main { grid-column: 2; grid-row: 2; overflow: hidden; position: relative; }
+.panel { display: none; position: absolute; inset: 0; overflow: hidden; }
+.panel.active { display: flex; flex-direction: column; }
+
+/* ── Chat Panel ───────────────────────────────────────── */
+.chat-messages {
+  flex: 1; overflow-y: auto; padding: 24px 20px;
+  display: flex; flex-direction: column; gap: 16px;
+  scroll-behavior: smooth;
+}
+.chat-empty {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  text-align: center; gap: 12px; padding: 40px;
+  color: var(--text2);
+}
+.chat-empty-icon { font-size: 36px; }
+.chat-empty h3 { font-size: 18px; color: var(--text1); font-weight: 600; }
+.chat-empty p { font-size: 13px; color: var(--text2); max-width: 340px; line-height: 1.6; }
+.chat-hints { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 8px; }
+.chat-hint {
+  padding: 7px 14px; background: var(--bg2);
+  border: 1px solid var(--border2); border-radius: 20px;
+  color: var(--text2); font-size: 12px; cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+.chat-hint:hover { border-color: var(--gold); color: var(--gold); }
+.msg { display: flex; gap: 12px; max-width: 800px; }
+.msg.user { flex-direction: row-reverse; align-self: flex-end; }
+.msg-avatar {
+  width: 30px; height: 30px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; flex-shrink: 0;
+}
+.msg.user .msg-avatar { background: var(--gold); color: #000; }
+.msg.ai .msg-avatar { background: var(--bg3); color: var(--gold); border: 1px solid var(--border2); }
+.msg-bubble {
+  padding: 12px 16px; border-radius: 12px;
+  font-size: 13px; line-height: 1.65; max-width: calc(100% - 45px);
+}
+.msg.user .msg-bubble { background: var(--gold); color: #000; border-radius: 12px 4px 12px 12px; }
+.msg.ai .msg-bubble { background: var(--bg2); border: 1px solid var(--border); border-radius: 4px 12px 12px 12px; color: var(--text1); }
+.msg-sources { font-size: 11px; color: var(--text3); margin-top: 6px; font-style: italic; }
+.msg-sources span { color: var(--gold); }
+.typing { display: flex; align-items: center; gap: 4px; padding: 12px 16px; }
+.typing-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text3); animation: bounce 1.2s ease infinite; }
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes bounce { 0%,60%,100% { transform: translateY(0); } 30% { transform: translateY(-6px); } }
+.chat-input-area {
+  padding: 16px 20px; border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+.chat-input-row { display: flex; gap: 10px; align-items: flex-end; }
+.chat-textarea {
+  flex: 1; background: var(--bg2); border: 1px solid var(--border2);
+  border-radius: 10px; padding: 11px 14px; color: var(--text1);
+  font-size: 13px; resize: none; outline: none; min-height: 44px; max-height: 160px;
+  font-family: inherit; line-height: 1.5; transition: border-color 0.2s;
+}
+.chat-textarea:focus { border-color: var(--gold); }
+.send-btn {
+  width: 44px; height: 44px; border-radius: 10px; border: none;
+  background: var(--gold); color: #000; font-size: 18px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: opacity 0.2s; font-weight: 700;
+}
+.send-btn:hover { opacity: 0.85; }
+.send-btn:disabled { opacity: 0.4; cursor: default; }
+
+/* ── Files Panel ──────────────────────────────────────── */
+.files-layout { display: flex; height: 100%; gap: 0; }
+.files-sidebar-panel {
+  width: 280px; flex-shrink: 0; padding: 20px;
+  border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 16px;
+  overflow-y: auto;
+}
+.files-main-panel { flex: 1; padding: 20px; overflow-y: auto; }
+.section-title { font-size: 11px; color: var(--text3); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 12px; }
+.dropzone {
+  border: 2px dashed var(--border2); border-radius: 12px;
+  padding: 28px 20px; text-align: center; cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+.dropzone:hover, .dropzone.drag { border-color: var(--gold); background: var(--gold-dim); }
+.dropzone-icon { font-size: 28px; margin-bottom: 10px; }
+.dropzone-text { font-size: 13px; color: var(--text1); font-weight: 500; margin-bottom: 4px; }
+.dropzone-sub { font-size: 11px; color: var(--text3); }
+.upload-progress { display: none; }
+.upload-progress.active { display: block; }
+.progress-label { font-size: 12px; color: var(--text2); margin-bottom: 8px; }
+.progress-track { height: 4px; background: var(--bg3); border-radius: 2px; overflow: hidden; }
+.progress-fill { height: 100%; background: var(--gold); border-radius: 2px; transition: width 0.3s; width: 0%; }
+.upload-log { font-size: 11px; color: var(--text3); margin-top: 8px; line-height: 1.6; max-height: 80px; overflow-y: auto; }
+.files-list-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.files-list-title { font-size: 15px; font-weight: 600; }
+.files-count { font-size: 12px; color: var(--text3); background: var(--bg3); padding: 2px 8px; border-radius: 10px; }
+.file-card {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px; background: var(--bg2);
+  border: 1px solid var(--border); border-radius: 10px;
+  margin-bottom: 8px; transition: border-color 0.2s;
+}
+.file-card:hover { border-color: var(--border2); }
+.file-icon { font-size: 22px; flex-shrink: 0; }
+.file-info { flex: 1; min-width: 0; }
+.file-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.file-meta { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.file-del {
+  background: none; border: none; color: var(--text3); cursor: pointer;
+  font-size: 16px; padding: 4px; border-radius: 4px;
+  transition: color 0.2s; flex-shrink: 0;
+}
+.file-del:hover { color: var(--red); }
+.files-empty { text-align: center; padding: 48px 20px; color: var(--text3); font-size: 13px; }
+
+/* ── Admin Panel ──────────────────────────────────────── */
+.admin-wrap { padding: 24px; overflow-y: auto; height: 100%; max-width: 700px; }
+.admin-section { margin-bottom: 32px; }
+.admin-section-title { font-size: 13px; font-weight: 600; color: var(--text1); margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.admin-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 12px; }
+.admin-card-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+.admin-card-sub { font-size: 12px; color: var(--text3); margin-bottom: 16px; }
+.admin-input-row { display: flex; gap: 10px; }
+.admin-input {
+  flex: 1; padding: 10px 12px; background: var(--bg3);
+  border: 1px solid var(--border2); border-radius: 8px;
+  color: var(--text1); font-size: 13px; outline: none;
+  transition: border-color 0.2s;
+}
+.admin-input:focus { border-color: var(--gold); }
+.admin-save-btn {
+  padding: 10px 18px; background: var(--gold); border: none;
+  border-radius: 8px; color: #000; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: opacity 0.2s; white-space: nowrap;
+}
+.admin-save-btn:hover { opacity: 0.85; }
+.admin-feedback { font-size: 12px; margin-top: 8px; }
+.admin-feedback.ok { color: var(--green); }
+.admin-feedback.err { color: var(--red); }
+.status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.status-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+.status-card-label { font-size: 11px; color: var(--text3); margin-bottom: 4px; }
+.status-card-value { font-size: 13px; font-weight: 500; margin-bottom: 8px; }
+.status-row { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2); }
+.s-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+.s-dot.warn { background: #f59e0b; }
+.s-dot.off { background: var(--text3); }
+
+/* ── Scrollbars ───────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* ── Utility ──────────────────────────────────────────── */
+.hidden { display: none !important; }
+
+/* ── Mobile ───────────────────────────────────────────── */
+@media (max-width: 700px) {
+  :root { --sidebar-w: 0px; }
+  #sidebar { display: none; }
+  #app { grid-template-columns: 1fr; grid-template-rows: var(--topbar-h) 1fr 56px; }
+  #main { grid-row: 2; }
+  #bottombar {
+    grid-row: 3; grid-column: 1;
+    display: flex; background: var(--bg2); border-top: 1px solid var(--border);
+  }
+  .tab-btn {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 3px; border: none; background: transparent;
+    color: var(--text3); font-size: 10px; cursor: pointer; padding: 6px 0;
+    transition: color 0.15s;
+  }
+  .tab-btn.active { color: var(--gold); }
+  .tab-icon { font-size: 18px; }
+  .files-layout { flex-direction: column; }
+  .files-sidebar-panel { width: 100%; border-right: none; border-bottom: 1px solid var(--border); }
+  .status-grid { grid-template-columns: 1fr; }
+}
+@media (min-width: 701px) { #bottombar { display: none; } }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">CA<span>CI</span></div>
+    <div class="login-sub">Intelligence Platform · Jushi Holdings</div>
+    <div class="login-label">Access Code</div>
+    <input class="login-input" type="password" id="login-pw" placeholder="Enter access code" autocomplete="current-password"/>
+    <button class="login-btn" id="login-btn">Enter Platform</button>
+    <div class="login-err" id="login-err">Incorrect access code. Try again.</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+
+  <!-- Sidebar -->
+  <aside id="sidebar">
+    <div class="sb-brand">
+      <div class="sb-logo">CA<span>CI</span></div>
+      <div class="sb-tagline">Intelligence Platform</div>
+    </div>
+    <nav class="sb-nav" id="sb-nav"></nav>
+    <div class="sb-dept">
+      <div class="dept-label">Department</div>
+      <div id="dept-nav"></div>
+    </div>
+  </aside>
+
+  <!-- Topbar -->
+  <header id="topbar">
+    <div class="tb-module" id="tb-module">AI Chat</div>
+    <div class="tb-dept-chip">
+      <div class="tb-dot" id="tb-dot"></div>
+      <span id="tb-dept-label">Retail</span>
+    </div>
+    <div class="tb-status">
+      <div class="status-dot" id="api-dot"></div>
+      <span id="api-status">Connecting...</span>
+    </div>
+  </header>
+
+  <!-- Main -->
+  <main id="main">
+
+    <!-- CHAT -->
+    <div class="panel" data-panel="chat" id="panel-chat">
+      <div class="chat-messages" id="chat-messages">
+        <div class="chat-empty" id="chat-empty">
+          <div class="chat-empty-icon">◈</div>
+          <h3>Ask CACI anything</h3>
+          <p>Upload your company documents in the Documents tab, then ask questions, request summaries, or generate reports.</p>
+          <div class="chat-hints">
+            <button class="chat-hint" data-hint="Summarize the documents I've uploaded">Summarize documents</button>
+            <button class="chat-hint" data-hint="What are the key metrics from the latest report?">Key metrics</button>
+            <button class="chat-hint" data-hint="Generate a summary report of Q1 performance">Q1 summary report</button>
+            <button class="chat-hint" data-hint="What compliance issues should I be aware of?">Compliance issues</button>
+          </div>
+        </div>
+      </div>
+      <div class="chat-input-area">
+        <div class="chat-input-row">
+          <textarea class="chat-textarea" id="chat-textarea" rows="1" placeholder="Ask anything..."></textarea>
+          <button class="send-btn" id="send-btn">↑</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- FILES -->
+    <div class="panel" data-panel="files" id="panel-files">
+      <div class="files-layout">
+        <div class="files-sidebar-panel">
+          <div>
+            <div class="section-title">Upload Documents</div>
+            <div class="dropzone" id="dropzone">
+              <div class="dropzone-icon">📂</div>
+              <div class="dropzone-text">Drop files or tap to browse</div>
+              <div class="dropzone-sub">PDF · Word · Excel · CSV · TXT</div>
+            </div>
+            <input type="file" id="file-input" multiple accept=".pdf,.doc,.docx,.csv,.xlsx,.xls,.txt,.md" style="display:none"/>
+          </div>
+          <div class="upload-progress" id="upload-progress">
+            <div class="progress-label" id="progress-label">Processing...</div>
+            <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+            <div class="upload-log" id="upload-log"></div>
+          </div>
+        </div>
+        <div class="files-main-panel">
+          <div class="files-list-header">
+            <div class="files-list-title" id="files-title">Documents</div>
+            <div class="files-count" id="files-count">0</div>
+          </div>
+          <div id="files-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ADMIN -->
+    <div class="panel" data-panel="admin" id="panel-admin">
+      <div class="admin-wrap">
+
+        <div class="admin-section">
+          <div class="admin-section-title">System Status</div>
+          <div class="status-grid">
+            <div class="status-card">
+              <div class="status-card-label">Worker API</div>
+              <div class="status-card-value">CF Workers</div>
+              <div class="status-row" id="status-api"><div class="s-dot warn"></div><span>Checking...</span></div>
+            </div>
+            <div class="status-card">
+              <div class="status-card-label">File Storage</div>
+              <div class="status-card-value">KV + R2</div>
+              <div class="status-row"><div class="s-dot ok"></div><span>Active</span></div>
+            </div>
+            <div class="status-card">
+              <div class="status-card-label">AI Model</div>
+              <div class="status-card-value">Claude Sonnet</div>
+              <div class="status-row" id="status-claude"><div class="s-dot warn"></div><span>Checking key...</span></div>
+            </div>
+            <div class="status-card">
+              <div class="status-card-label">Text Extraction</div>
+              <div class="status-card-value">Client-Side</div>
+              <div class="status-row"><div class="s-dot ok"></div><span>PDF · Word · Excel</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="admin-section">
+          <div class="admin-section-title">AI Configuration</div>
+          <div class="admin-card">
+            <div class="admin-card-title">🧠 Claude (Anthropic)</div>
+            <div class="admin-card-sub">claude-sonnet-4 · Powers all AI responses and document Q&A</div>
+            <div class="admin-input-row">
+              <input class="admin-input" type="password" id="anthropic-key" placeholder="sk-ant-api03-..." autocomplete="off"/>
+              <button class="admin-save-btn" id="anthropic-save">Save Key</button>
+            </div>
+            <div class="admin-feedback" id="anthropic-feedback"></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Mobile bottom bar -->
+  <nav id="bottombar"></nav>
+
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────
+//  CACI — Frontend App
+// ─────────────────────────────────────────────────────────────
+
+const API = 'https://caci-api.timtkosuge.workers.dev';
+
+const DEPTS = [
+  { id: 'retail',     label: 'Retail',     emoji: '🛍️', color: '#6c63ff' },
+  { id: 'compliance', label: 'Compliance', emoji: '📋', color: '#f59e0b' },
+  { id: 'commercial', label: 'Commercial', emoji: '💼', color: '#10b981' },
+  { id: 'hr',         label: 'HR',         emoji: '👥', color: '#ec4899' },
+  { id: 'finance',    label: 'Finance',    emoji: '💰', color: '#3b82f6' },
+  { id: 'operations', label: 'Operations', emoji: '⚙️', color: '#f97316' },
+  { id: 'it',         label: 'IT',         emoji: '🖥️', color: '#8b5cf6' },
+  { id: 'global',     label: 'Global',     emoji: '🌐', color: '#64748b' },
+];
+
+const MODULES = [
+  { id: 'chat',  label: 'AI Chat',    icon: '◈' },
+  { id: 'files', label: 'Documents',  icon: '📂' },
+  { id: 'admin', label: 'Admin',      icon: '⚙️' },
+];
+
+// ── State ─────────────────────────────────────────────────────
+let token = sessionStorage.getItem('caci_token') || '';
+let dept = localStorage.getItem('caci_dept') || 'retail';
+let chatHistory = [];
+let currentModule = 'chat';
+
+// ── Helpers ───────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const fmt = bytes => bytes > 1048576 ? (bytes/1048576).toFixed(1)+'MB' : (bytes/1024).toFixed(0)+'KB';
+const ts = iso => new Date(iso).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+
+async function apiFetch(path, opts = {}) {
+  return fetch(API + path, {
+    ...opts,
+    headers: { ...(opts.headers || {}), 'Authorization': 'Bearer ' + token },
+  });
+}
+
+// ── Login ─────────────────────────────────────────────────────
+function setupLogin() {
+  if (token) { showApp(); return; }
+
+  async function tryLogin() {
+    const pw = $('login-pw').value.trim();
+    if (!pw) return;
+    $('login-btn').disabled = true;
+    $('login-btn').textContent = 'Authenticating...';
+    $('login-err').style.display = 'none';
+    try {
+      const res = await fetch(API + '/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pw }),
+      });
+      const data = await res.json();
+      if (data.token) {
+        token = data.token;
+        sessionStorage.setItem('caci_token', token);
+        showApp();
+      } else {
+        $('login-err').style.display = 'block';
+        $('login-pw').value = '';
+        $('login-pw').focus();
+      }
+    } catch {
+      $('login-err').textContent = 'Cannot reach server. Check Worker is deployed.';
+      $('login-err').style.display = 'block';
+    }
+    $('login-btn').disabled = false;
+    $('login-btn').textContent = 'Enter Platform';
+  }
+
+  $('login-btn').addEventListener('click', tryLogin);
+  $('login-pw').addEventListener('keydown', e => { if (e.key === 'Enter') tryLogin(); });
+}
+
+// ── App Boot ──────────────────────────────────────────────────
+function showApp() {
+  $('login-screen').style.display = 'none';
+  $('app').style.display = 'grid';
+  buildNav();
+  buildDeptNav();
+  syncDept();
+  switchModule('chat');
+  checkHealth();
+  loadAdminConfig();
+
+  // Chat
+  $('send-btn').addEventListener('click', sendChat);
+  $('chat-textarea').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+  });
+  $('chat-textarea').addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 160) + 'px';
+  });
+  document.querySelectorAll('.chat-hint').forEach(btn => {
+    btn.addEventListener('click', () => {
+      $('chat-textarea').value = btn.dataset.hint;
+      sendChat();
+    });
+  });
+
+  // Files
+  $('dropzone').addEventListener('click', () => $('file-input').click());
+  $('dropzone').addEventListener('dragover', e => { e.preventDefault(); $('dropzone').classList.add('drag'); });
+  $('dropzone').addEventListener('dragleave', () => $('dropzone').classList.remove('drag'));
+  $('dropzone').addEventListener('drop', e => {
+    e.preventDefault();
+    $('dropzone').classList.remove('drag');
+    handleFileUpload(e.dataTransfer.files);
+  });
+  $('file-input').addEventListener('change', e => handleFileUpload(e.target.files));
+
+  // Admin
+  $('anthropic-save').addEventListener('click', saveAnthropicKey);
+}
+
+// ── Navigation ────────────────────────────────────────────────
+function buildNav() {
+  $('sb-nav').innerHTML = MODULES.map(m =>
+    `<button class="nav-btn" data-mod="${m.id}">
+      <span class="ni">${m.icon}</span>${m.label}
+    </button>`
+  ).join('');
+  $('sb-nav').querySelectorAll('.nav-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchModule(btn.dataset.mod));
+  });
+
+  $('bottombar').innerHTML = MODULES.map(m =>
+    `<button class="tab-btn" data-mod="${m.id}">
+      <span class="tab-icon">${m.icon}</span>
+      <span>${m.label}</span>
+    </button>`
+  ).join('');
+  $('bottombar').querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchModule(btn.dataset.mod));
+  });
+}
+
+function switchModule(id) {
+  currentModule = id;
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.dataset.panel === id));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.mod === id));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.mod === id));
+  const mod = MODULES.find(m => m.id === id);
+  $('tb-module').textContent = mod?.label || '';
+  if (id === 'files') loadFiles();
+}
+
+// ── Department ────────────────────────────────────────────────
+function buildDeptNav() {
+  $('dept-nav').innerHTML = DEPTS.map(d =>
+    `<button class="dept-btn" data-dept="${d.id}">
+      <div class="dept-dot" style="background:${d.color}"></div>${d.emoji} ${d.label}
+    </button>`
+  ).join('');
+  $('dept-nav').querySelectorAll('.dept-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      dept = btn.dataset.dept;
+      localStorage.setItem('caci_dept', dept);
+      syncDept();
+      if (currentModule === 'files') loadFiles();
+    });
+  });
+}
+
+function syncDept() {
+  const d = DEPTS.find(x => x.id === dept) || DEPTS[0];
+  $('tb-dot').style.background = d.color;
+  $('tb-dept-label').textContent = d.label;
+  $('files-title').textContent = d.label + ' Documents';
+  document.querySelectorAll('.dept-btn').forEach(b => b.classList.toggle('active', b.dataset.dept === dept));
+}
+
+// ── Chat ──────────────────────────────────────────────────────
+async function sendChat() {
+  const ta = $('chat-textarea');
+  const msg = ta.value.trim();
+  if (!msg) return;
+
+  $('chat-empty').style.display = 'none';
+  ta.value = '';
+  ta.style.height = 'auto';
+  $('send-btn').disabled = true;
+
+  appendMsg('user', msg);
+  chatHistory.push({ role: 'user', content: msg });
+
+  const typingEl = appendTyping();
+
+  try {
+    const res = await apiFetch('/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg, dept, history: chatHistory.slice(-10) }),
+    });
+    const data = await res.json();
+    typingEl.remove();
+
+    if (data.error) {
+      appendMsg('ai', '⚠️ ' + data.error);
+    } else {
+      appendMsg('ai', data.response, data.sources);
+      chatHistory.push({ role: 'assistant', content: data.response });
+    }
+  } catch (err) {
+    typingEl.remove();
+    appendMsg('ai', '⚠️ Connection error: ' + err.message);
+  }
+
+  $('send-btn').disabled = false;
+  ta.focus();
+}
+
+function appendMsg(role, text, sources) {
+  const msgs = $('chat-messages');
+  const div = document.createElement('div');
+  div.className = 'msg ' + role;
+  const avatar = role === 'user' ? 'U' : '◈';
+  const sourcesHtml = sources && sources.length
+    ? `<div class="msg-sources">Sources: <span>${sources.join(', ')}</span></div>` : '';
+  div.innerHTML = `
+    <div class="msg-avatar">${avatar}</div>
+    <div>
+      <div class="msg-bubble">${escHtml(text)}</div>
+      ${sourcesHtml}
+    </div>`;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  return div;
+}
+
+function appendTyping() {
+  const msgs = $('chat-messages');
+  const div = document.createElement('div');
+  div.className = 'msg ai';
+  div.innerHTML = `
+    <div class="msg-avatar">◈</div>
+    <div class="msg-bubble">
+      <div class="typing">
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+      </div>
+    </div>`;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  return div;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+          .replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>');
+}
+
+// ── File Upload & Text Extraction ─────────────────────────────
+async function handleFileUpload(fileList) {
+  if (!fileList || !fileList.length) return;
+  const files = Array.from(fileList);
+
+  const prog = $('upload-progress');
+  const fill = $('progress-fill');
+  const label = $('progress-label');
+  const log = $('upload-log');
+  prog.classList.add('active');
+  log.innerHTML = '';
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const pct = Math.round((i / files.length) * 100);
+    fill.style.width = pct + '%';
+    label.textContent = `Processing ${i+1}/${files.length}: ${file.name}`;
+    logLine(log, `📄 ${file.name} (${fmt(file.size)})`);
+
+    try {
+      // Extract text client-side
+      const text = await extractText(file, log);
+      if (!text || text.length < 10) {
+        logLine(log, `⚠️ Could not extract text from ${file.name}`);
+        continue;
+      }
+      logLine(log, `✓ Extracted ${text.length.toLocaleString()} characters`);
+
+      // Send to worker
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('text', text);
+      fd.append('name', file.name);
+      fd.append('dept', dept);
+      fd.append('type', file.type || getExt(file.name));
+
+      const res = await apiFetch('/upload', { method: 'POST', body: fd });
+      const data = await res.json();
+
+      if (data.ok) {
+        logLine(log, `✅ Uploaded — ${data.chunks} chunks stored`);
+      } else {
+        logLine(log, `❌ Upload failed: ${data.error}`);
+      }
+    } catch (err) {
+      logLine(log, `❌ Error: ${err.message}`);
+    }
+  }
+
+  fill.style.width = '100%';
+  label.textContent = `Done — ${files.length} file(s) processed`;
+  $('file-input').value = '';
+
+  setTimeout(() => {
+    prog.classList.remove('active');
+    fill.style.width = '0%';
+  }, 3000);
+
+  loadFiles();
+}
+
+function logLine(el, text) {
+  el.innerHTML += text + '<br>';
+  el.scrollTop = el.scrollHeight;
+}
+
+function getExt(name) { return name.split('.').pop().toLowerCase(); }
+
+// ── Text Extraction (client-side) ─────────────────────────────
+async function extractText(file, log) {
+  const ext = getExt(file.name);
+
+  // Plain text
+  if (['txt', 'md', 'csv', 'json'].includes(ext)) {
+    return await file.text();
+  }
+
+  // CSV — parse into readable format
+  if (ext === 'csv') {
+    const raw = await file.text();
+    return parseCSV(raw);
+  }
+
+  // PDF — use PDF.js
+  if (ext === 'pdf') {
+    return await extractPDF(file, log);
+  }
+
+  // Word — use Mammoth
+  if (['doc', 'docx'].includes(ext)) {
+    return await extractWord(file, log);
+  }
+
+  // Excel — use SheetJS
+  if (['xlsx', 'xls'].includes(ext)) {
+    return await extractExcel(file, log);
+  }
+
+  // Fallback: try reading as text
+  try { return await file.text(); } catch { return ''; }
+}
+
+async function extractPDF(file, log) {
+  try {
+    if (!window.pdfjsLib) { logLine(log, '⚠️ PDF.js not loaded'); return ''; }
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    let text = '';
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      text += content.items.map(item => item.str).join(' ') + '\n';
+    }
+    return text.trim();
+  } catch (err) {
+    logLine(log, '⚠️ PDF parse error: ' + err.message);
+    return '';
+  }
+}
+
+async function extractWord(file, log) {
+  try {
+    if (!window.mammoth) { logLine(log, '⚠️ Mammoth not loaded'); return ''; }
+    const buf = await file.arrayBuffer();
+    const result = await mammoth.extractRawText({ arrayBuffer: buf });
+    return result.value || '';
+  } catch (err) {
+    logLine(log, '⚠️ Word parse error: ' + err.message);
+    return '';
+  }
+}
+
+async function extractExcel(file, log) {
+  try {
+    if (!window.XLSX) { logLine(log, '⚠️ SheetJS not loaded'); return ''; }
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array' });
+    let text = '';
+    for (const sheetName of wb.SheetNames) {
+      const sheet = wb.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+      text += `Sheet: ${sheetName}\n`;
+      text += rows.map(row =>
+        Object.entries(row).map(([k, v]) => `${k}: ${v}`).join(' | ')
+      ).join('\n');
+      text += '\n\n';
+    }
+    return text.trim();
+  } catch (err) {
+    logLine(log, '⚠️ Excel parse error: ' + err.message);
+    return '';
+  }
+}
+
+function parseCSV(raw) {
+  const lines = raw.split('\n').filter(l => l.trim());
+  if (!lines.length) return raw;
+  const headers = lines[0].split(',').map(h => h.replace(/"/g,'').trim());
+  const rows = lines.slice(1).map(line => {
+    const vals = line.split(',').map(v => v.replace(/"/g,'').trim());
+    return headers.map((h, i) => `${h}: ${vals[i] || ''}`).join(' | ');
+  });
+  return `Headers: ${headers.join(', ')}\n\n${rows.join('\n')}`;
+}
+
+// ── File List ─────────────────────────────────────────────────
+async function loadFiles() {
+  try {
+    const res = await apiFetch('/files?dept=' + dept);
+    const files = await res.json();
+    $('files-count').textContent = files.length;
+    const list = $('files-list');
+    if (!files.length) {
+      list.innerHTML = '<div class="files-empty">No documents uploaded yet.<br>Drop files above to get started.</div>';
+      return;
+    }
+    list.innerHTML = files.map(f => `
+      <div class="file-card">
+        <div class="file-icon">${fileIcon(f.name)}</div>
+        <div class="file-info">
+          <div class="file-name" title="${escHtml(f.name)}">${escHtml(f.name)}</div>
+          <div class="file-meta">${fmt(f.charCount || 0)} chars · ${f.chunks} chunks · ${ts(f.uploadedAt)}</div>
+        </div>
+        <button class="file-del" data-id="${f.id}" title="Delete">✕</button>
+      </div>`).join('');
+    list.querySelectorAll('.file-del').forEach(btn => {
+      btn.addEventListener('click', () => deleteFile(btn.dataset.id));
+    });
+  } catch (err) {
+    $('files-list').innerHTML = '<div class="files-empty">Error loading files: ' + err.message + '</div>';
+  }
+}
+
+async function deleteFile(id) {
+  if (!confirm('Delete this file? This cannot be undone.')) return;
+  try {
+    await apiFetch('/files/' + id, { method: 'DELETE' });
+    loadFiles();
+  } catch (err) {
+    alert('Delete failed: ' + err.message);
+  }
+}
+
+function fileIcon(name) {
+  const ext = getExt(name);
+  const icons = { pdf:'📕', doc:'📘', docx:'📘', xlsx:'📗', xls:'📗', csv:'📊', txt:'📄', md:'📝' };
+  return icons[ext] || '📎';
+}
+
+// ── Admin ─────────────────────────────────────────────────────
+async function saveAnthropicKey() {
+  const key = $('anthropic-key').value.trim();
+  if (!key) return;
+  $('anthropic-save').disabled = true;
+  $('anthropic-save').textContent = 'Saving...';
+  try {
+    const res = await apiFetch('/admin/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ANTHROPIC_API_KEY: key }),
+    });
+    const data = await res.json();
+    const fb = $('anthropic-feedback');
+    if (data.ok || data.saved) {
+      fb.className = 'admin-feedback ok';
+      fb.textContent = '✓ API key saved. Claude is now active.';
+      $('anthropic-key').value = '';
+      $('status-claude').innerHTML = '<div class="s-dot"></div><span>Active</span>';
+    } else {
+      fb.className = 'admin-feedback err';
+      fb.textContent = '✗ ' + (data.error || 'Save failed');
+    }
+  } catch (err) {
+    $('anthropic-feedback').className = 'admin-feedback err';
+    $('anthropic-feedback').textContent = '✗ ' + err.message;
+  }
+  $('anthropic-save').disabled = false;
+  $('anthropic-save').textContent = 'Save Key';
+}
+
+async function loadAdminConfig() {
+  try {
+    const res = await apiFetch('/admin/config');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.ANTHROPIC_API_KEY?.configured) {
+      $('status-claude').innerHTML = '<div class="s-dot"></div><span>Configured (' + data.ANTHROPIC_API_KEY.source + ')</span>';
+    } else {
+      $('status-claude').innerHTML = '<div class="s-dot off"></div><span>Not configured</span>';
+    }
+  } catch {}
+}
+
+// ── Health Check ──────────────────────────────────────────────
+async function checkHealth() {
+  try {
+    const res = await fetch(API + '/health');
+    const ok = res.ok;
+    $('api-dot').className = 'status-dot' + (ok ? '' : ' warn');
+    $('api-status').textContent = ok ? 'Connected' : 'Error';
+    $('status-api').innerHTML = `<div class="s-dot${ok ? '' : ' warn'}"></div><span>${ok ? 'Online' : 'Offline'}</span>`;
+  } catch {
+    $('api-dot').className = 'status-dot off';
+    $('api-status').textContent = 'Offline';
+    $('status-api').innerHTML = '<div class="s-dot off"></div><span>Offline — check Worker</span>';
+  }
+}
+
+// ── Boot ──────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  // PDF.js worker path
+  if (window.pdfjsLib) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+  setupLogin();
+});
+</script>
+</body>
+</html>
