@@ -1667,6 +1667,47 @@ body::before {
 }
 .report-generating.show { display: flex; }
 
+/* ── Period picker ─────────────────────────────────────── */
+.um-period-tabs {
+  display: flex; gap: 4px; margin-bottom: 10px;
+}
+.um-ptab {
+  flex: 1; padding: 6px 0;
+  background: var(--ink3); border: 1px solid var(--line);
+  border-radius: var(--r); color: var(--smoke3);
+  font-family: var(--f-mono); font-size: 9px;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  cursor: pointer; transition: all 0.15s;
+}
+.um-ptab:hover { border-color: var(--line2); color: var(--smoke); }
+.um-ptab.active { background: var(--gold-dim); border-color: var(--gold); color: var(--gold-lt); }
+.um-period-mode { margin-bottom: 4px; }
+.um-date-row {
+  display: flex; align-items: center; gap: 10px;
+}
+.um-date-group { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.um-date-label {
+  font-family: var(--f-mono); font-size: 8px;
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--smoke4);
+}
+.um-date-sep {
+  color: var(--smoke4); font-size: 16px; flex-shrink: 0;
+  padding-top: 18px;
+}
+.um-date-input {
+  color-scheme: dark;
+  padding: 9px 10px !important;
+}
+.um-period-preview {
+  font-family: var(--f-mono); font-size: 10px;
+  color: var(--gold-lt); letter-spacing: 0.06em;
+  min-height: 16px; margin-top: 6px;
+}
+.um-input-err {
+  border-color: var(--red-lt) !important;
+  box-shadow: 0 0 0 2px rgba(192,57,43,0.18) !important;
+}
+
 /* ── Integrations & Connectors ─────────────────────────── */
 .asec-sub-title {
   font-size: 11px;
@@ -2367,8 +2408,8 @@ const dstr = iso => iso ? new Date(iso).toLocaleDateString('en-US',{month:'short
 
 function esc(s) {
   if (s == null) return '';
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>');
+  return String(s).replace(/&/g,'&amp;').replace(/\x3C/g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\n/g,'\x3Cbr>').replace(/\*\*(.*?)\*\*/g,'\x3Cstrong>$1\x3C/strong>');
 }
 
 async function apiFetch(path, opts = {}) {
@@ -2809,6 +2850,89 @@ document.addEventListener('DOMContentLoaded', () => {
    UPLOAD MODAL
 ═══════════════════════════════════════════════════════════ */
 
+let _umPeriodMode = 'range';
+
+function getUmPeriod() {
+  if (_umPeriodMode === 'range') {
+    const from = $('um-date-from')?.value;
+    const to   = $('um-date-to')?.value;
+    if (!from && !to) return '';
+    if (from && to)   return from + ' to ' + to;
+    return from || to;
+  }
+  if (_umPeriodMode === 'month') {
+    const m = $('um-month-month')?.value;
+    const y = $('um-month-year')?.value;
+    if (!m || !y) return '';
+    return m + ' ' + y;
+  }
+  if (_umPeriodMode === 'year') {
+    return $('um-year-select')?.value || '';
+  }
+  if (_umPeriodMode === 'custom') {
+    return ($('um-period-custom')?.value || '').trim();
+  }
+  return '';
+}
+
+function updatePeriodPreview() {
+  const val = getUmPeriod();
+  const el  = $('um-period-preview');
+  if (el) el.textContent = val ? '→ ' + val : '';
+}
+
+function initPeriodPicker() {
+  const now = new Date();
+  const yr  = now.getFullYear();
+
+  // Populate year selects
+  const ySelects = ['um-month-year', 'um-year-select'];
+  ySelects.forEach(sid => {
+    const sel = $(sid);
+    if (!sel || sel.dataset.built) return;
+    sel.dataset.built = '1';
+    for (let y = yr + 1; y >= yr - 10; y--) {
+      const o = document.createElement('option');
+      o.value = String(y); o.textContent = String(y);
+      sel.appendChild(o);
+    }
+  });
+
+  // Default date-from to start of current month, date-to to today
+  const fromEl = $('um-date-from');
+  const toEl   = $('um-date-to');
+  if (fromEl && !fromEl.value) fromEl.value = yr + '-' + String(now.getMonth()+1).padStart(2,'0') + '-01';
+  if (toEl   && !toEl.value)   toEl.value   = now.toISOString().slice(0,10);
+
+  // Tab switching
+  const tabs = document.getElementById('um-period-tabs');
+  if (tabs && !tabs.dataset.built) {
+    tabs.dataset.built = '1';
+    tabs.addEventListener('click', e => {
+      const tab = e.target.closest('.um-ptab');
+      if (!tab) return;
+      _umPeriodMode = tab.dataset.mode;
+      tabs.querySelectorAll('.um-ptab').forEach(t => t.classList.toggle('active', t === tab));
+      ['range','month','year','custom'].forEach(m => {
+        const el = $('um-pmode-' + m);
+        if (el) el.style.display = m === _umPeriodMode ? '' : 'none';
+      });
+      updatePeriodPreview();
+    });
+  }
+
+  // Live preview updates
+  ['um-date-from','um-date-to','um-month-month','um-month-year','um-year-select','um-period-custom'].forEach(id => {
+    const el = $(id);
+    if (el && !el.dataset.previewBound) {
+      el.dataset.previewBound = '1';
+      el.addEventListener('change', updatePeriodPreview);
+      el.addEventListener('input',  updatePeriodPreview);
+    }
+  });
+  updatePeriodPreview();
+}
+
 const UM_CATEGORIES = [
   'Sales','Inventory','Compliance','Finance','HR','Operations',
   'Marketing','Customer','Product','Legal','Technology','Other'
@@ -2867,9 +2991,13 @@ function openUploadModal(fileList) {
     UM_REPORT_TYPES.forEach(t => { const o = document.createElement('option'); o.value=t; o.textContent=t; rt.appendChild(o); });
   }
   const per = $('um-period');
-  if (per && per.options.length <= 1) {
+  if (per && per.options && per.options.length <= 1) {
     UM_PERIODS.forEach(p => { const o = document.createElement('option'); o.value=p; o.textContent=p; per.appendChild(o); });
   }
+
+  // Period picker
+  _umPeriodMode = 'range';
+  initPeriodPicker();
 
   // States chips
   const statesEl = $('um-states');
@@ -2892,11 +3020,16 @@ function openUploadModal(fileList) {
   if ($('um-report-name'))  $('um-report-name').value  = '';
   if ($('um-category'))     $('um-category').value     = '';
   if ($('um-report-type'))  $('um-report-type').value  = '';
-  if ($('um-period'))       $('um-period').value       = '';
   if ($('um-store'))        $('um-store').value        = '';
   if ($('um-dup-warning'))  $('um-dup-warning').classList.remove('show');
   if ($('um-store-wrap'))   $('um-store-wrap').classList.remove('visible');
   statesEl && statesEl.querySelectorAll('.um-state-chip.selected').forEach(c => c.classList.remove('selected'));
+  // Reset period tabs to range
+  document.querySelectorAll('.um-ptab').forEach(t => t.classList.toggle('active', t.dataset.mode === 'range'));
+  ['range','month','year','custom'].forEach(m => {
+    const el = $('um-pmode-' + m);
+    if (el) el.style.display = m === 'range' ? '' : 'none';
+  });
 
   $('upload-modal-bg').classList.add('open');
 }
@@ -2915,49 +3048,57 @@ function initUploadModal() {
   });
 
   $('um-submit').addEventListener('click', async () => {
-    if (!_umFiles || !_umFiles.length) return;
+    if (!_umFiles || !_umFiles.length) { console.warn('CACI: no files to upload'); return; }
 
     const reportName = ($('um-report-name')?.value || '').trim();
     const category   = ($('um-category')?.value   || '').trim();
-    const period     = ($('um-period')?.value      || '').trim();
+    const period     = getUmPeriod() || 'Unspecified';
     const reportType = ($('um-report-type')?.value || '').trim();
     const stateChips = $('um-states')?.querySelectorAll('.um-state-chip.selected') || [];
-    const states     = Array.from(stateChips).map(c => c.dataset.s).join(',');
+    const states     = Array.from(stateChips).map(s => s.dataset.s).join(',');
     const store      = ($('um-store')?.value || '').trim();
 
-    if (!reportName) { $('um-report-name')?.focus(); return; }
-    if (!category)   { $('um-category')?.focus();    return; }
-    if (!period)     { $('um-period')?.focus();       return; }
+    if (!reportName) {
+      $('um-report-name')?.focus();
+      $('um-report-name')?.classList.add('um-input-err');
+      setTimeout(() => $('um-report-name')?.classList.remove('um-input-err'), 1500);
+      return;
+    }
+    if (!category) {
+      $('um-category')?.focus();
+      return;
+    }
 
-    // Duplicate check before upload
+    // Duplicate check — skip silently if worker unreachable
     if (!_umDupConfirm) {
       try {
-        const res  = await apiFetch('/duplicate-check', {
+        const res = await apiFetch('/duplicate-check', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ reportName, period, dept }),
         });
-        const data = await res.json();
-        if (data.duplicates && data.duplicates.length) {
-          const dupList = $('um-dup-list');
-          if (dupList) dupList.innerHTML = data.duplicates.map(d =>
-            `<div>↳ ${esc(d.name)} &nbsp;·&nbsp; ${dstr(d.uploadedAt)}</div>`
-          ).join('');
-          $('um-dup-warning')?.classList.add('show');
-          $('um-submit').textContent = 'Upload Anyway';
-          _umDupConfirm = true;
-          return;
+        if (res.ok) {
+          const data = await res.json();
+          if (data.duplicates && data.duplicates.length) {
+            const dl = $('um-dup-list');
+            if (dl) dl.innerHTML = data.duplicates.map(d => `<div>↳ ${esc(d.name)} · ${dstr(d.uploadedAt)}</div>`).join('');
+            $('um-dup-warning')?.classList.add('show');
+            $('um-submit').textContent = 'Upload Anyway';
+            _umDupConfirm = true;
+            return;
+          }
         }
-      } catch(e) { /* no dup check available — proceed */ }
+      } catch(e) { /* skip */ }
     }
 
-    // Build collection name from modal fields
-    const colName = [category, period, reportName].filter(Boolean).join(' — ');
-
+    const colParts = [category, period !== 'Unspecified' ? period : '', reportName].filter(Boolean);
+    const colName  = colParts.join(' — ') || 'General';
+    const files    = _umFiles.slice();
     closeUploadModal();
-    await handleFiles(_umFiles, colName, { reportName, category, period, reportType, states, store });
+    await handleFiles(files, colName, { reportName, category, period, reportType, states, store });
   });
 }
+
 
 /* ── Updated handleFiles to accept colName + metadata ── */
 async function handleFiles(fileList, colName, meta = {}) {
@@ -3262,12 +3403,51 @@ function disconnectConnector(id) {
         </div>
       </div>
 
-      <!-- Period -->
+      <!-- Period / Date Range -->
       <div class="um-field">
         <div class="um-label">Period <span class="um-required">*</span></div>
-        <select class="um-select" id="um-period">
-          <option value="">Select period...</option>
-        </select>
+        <div class="um-period-tabs" id="um-period-tabs">
+          <button type="button" class="um-ptab active" data-mode="range">Date Range</button>
+          <button type="button" class="um-ptab" data-mode="month">Month</button>
+          <button type="button" class="um-ptab" data-mode="year">Year</button>
+          <button type="button" class="um-ptab" data-mode="custom">Custom</button>
+        </div>
+        <div class="um-period-mode" id="um-pmode-range">
+          <div class="um-date-row">
+            <div class="um-date-group">
+              <div class="um-date-label">From</div>
+              <input type="date" class="um-input um-date-input" id="um-date-from"/>
+            </div>
+            <div class="um-date-sep">&rarr;</div>
+            <div class="um-date-group">
+              <div class="um-date-label">To</div>
+              <input type="date" class="um-input um-date-input" id="um-date-to"/>
+            </div>
+          </div>
+        </div>
+        <div class="um-period-mode" id="um-pmode-month" style="display:none">
+          <div class="um-date-row">
+            <select class="um-select" id="um-month-month" style="flex:1">
+              <option value="">Month...</option>
+              <option>January</option><option>February</option><option>March</option>
+              <option>April</option><option>May</option><option>June</option>
+              <option>July</option><option>August</option><option>September</option>
+              <option>October</option><option>November</option><option>December</option>
+            </select>
+            <select class="um-select" id="um-month-year" style="flex:1">
+              <option value="">Year...</option>
+            </select>
+          </div>
+        </div>
+        <div class="um-period-mode" id="um-pmode-year" style="display:none">
+          <select class="um-select" id="um-year-select">
+            <option value="">Select year...</option>
+          </select>
+        </div>
+        <div class="um-period-mode" id="um-pmode-custom" style="display:none">
+          <input class="um-input" id="um-period-custom" placeholder="e.g. Q1 2026, FY2025, Week 14, Ad Hoc"/>
+        </div>
+        <div class="um-period-preview" id="um-period-preview"></div>
       </div>
 
       <!-- States -->
