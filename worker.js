@@ -70,6 +70,16 @@ export default {
       return handleChat(request, env);
     }
 
+    // Admin config — save API keys to KV
+    if (path === '/admin/config' && method === 'POST') {
+      return handleAdminConfigSave(request, env);
+    }
+
+    // Admin config — read current config status
+    if (path === '/admin/config' && method === 'GET') {
+      return handleAdminConfigGet(env);
+    }
+
     return json({ error: 'Not found' }, 404);
   },
 };
@@ -332,6 +342,44 @@ function extractKeywords(query) {
     .replace(/[^a-z0-9\s]/g, ' ')
     .split(/\s+/)
     .filter(w => w.length > 2 && !stopWords.has(w));
+}
+
+// ── Admin Config ──────────────────────────────────────────────
+async function handleAdminConfigSave(request, env) {
+  try {
+    const body = await request.json();
+    const saved = [];
+    const allowed = ['ANTHROPIC_API_KEY'];
+    for (const key of allowed) {
+      if (body[key] !== undefined) {
+        if (body[key] === '') {
+          await env.CACI_KV.delete('config:' + key);
+        } else {
+          await env.CACI_KV.put('config:' + key, body[key]);
+        }
+        saved.push(key);
+      }
+    }
+    return json({ ok: true, saved });
+  } catch (err) {
+    return json({ error: 'Config save failed: ' + err.message }, 500);
+  }
+}
+
+async function handleAdminConfigGet(env) {
+  try {
+    const kvKey = await env.CACI_KV.get('config:ANTHROPIC_API_KEY');
+    const envKey = env.ANTHROPIC_API_KEY;
+    return json({
+      ANTHROPIC_API_KEY: {
+        configured: !!(kvKey || envKey),
+        source: kvKey ? 'admin' : envKey ? 'secret' : 'none',
+        masked: kvKey ? kvKey.slice(0, 10) + '...' : envKey ? '[env secret]' : null,
+      },
+    });
+  } catch (err) {
+    return json({ error: err.message }, 500);
+  }
 }
 
 function scoreChunk(chunk, keywords) {
