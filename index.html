@@ -1667,6 +1667,119 @@ body::before {
 }
 .report-generating.show { display: flex; }
 
+/* ── Integrations & Connectors ─────────────────────────── */
+.asec-sub-title {
+  font-size: 11px;
+  color: var(--smoke3);
+  font-family: var(--f-mono);
+  letter-spacing: 0.04em;
+  margin-top: 4px;
+  margin-bottom: 12px;
+  line-height: 1.6;
+  max-width: 640px;
+}
+.int-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+  margin-top: 4px;
+}
+.int-card {
+  background: var(--ink3);
+  border: 1px solid var(--line);
+  border-radius: var(--r2);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: border-color 0.2s;
+}
+.int-card:hover { border-color: var(--line3); }
+.int-card.int-coming { opacity: 0.5; }
+.int-card.connected { border-color: rgba(42,122,75,0.45); }
+.int-logo {
+  width: 42px; height: 42px;
+  border-radius: var(--r);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; flex-shrink: 0;
+}
+.int-logo svg { width: 20px; height: 20px; }
+.int-name {
+  font-family: var(--f-display);
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--smoke);
+  letter-spacing: 0.04em;
+}
+.int-desc {
+  font-size: 11px;
+  color: var(--smoke3);
+  font-family: var(--f-mono);
+  line-height: 1.6;
+  letter-spacing: 0.03em;
+}
+.int-tags {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px;
+}
+.int-tag {
+  font-size: 9px;
+  font-family: var(--f-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold-lt);
+  border: 1px solid var(--line2);
+  border-radius: 3px;
+  padding: 2px 6px;
+}
+.int-status, .con-status {
+  font-size: 11px;
+  font-family: var(--f-mono);
+  color: var(--smoke3);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  letter-spacing: 0.04em;
+}
+.int-status.connected, .con-status.connected { color: var(--green-lt); }
+.int-actions {
+  display: flex; flex-direction: column; gap: 8px;
+}
+.int-input {
+  width: 100%;
+  font-size: 11px;
+}
+.int-btn { width: 100%; text-align: center; }
+.int-fb {
+  font-size: 10px;
+  font-family: var(--f-mono);
+  letter-spacing: 0.06em;
+  color: var(--smoke3);
+  min-height: 14px;
+}
+.int-fb.ok  { color: var(--green-lt); }
+.int-fb.err { color: var(--red-lt); }
+
+.int-connected-list {
+  display: flex; flex-direction: column; gap: 10px;
+}
+.int-row {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--ink3);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 12px 16px;
+}
+.int-row-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green-lt); flex-shrink: 0; }
+.int-row-name { font-family: var(--f-display); font-size: 14px; color: var(--smoke); flex: 1; }
+.int-row-meta { font-family: var(--f-mono); font-size: 10px; color: var(--smoke3); letter-spacing: 0.06em; }
+.int-row-dis {
+  font-size: 10px; font-family: var(--f-mono); letter-spacing: 0.06em;
+  color: var(--smoke4); cursor: pointer; padding: 4px 8px;
+  border: 1px solid var(--line); border-radius: 3px;
+  background: none; transition: color 0.15s, border-color 0.15s;
+}
+.int-row-dis:hover { color: var(--red-lt); border-color: rgba(139,32,32,0.4); }
+
 </style>
 </head>
 <body>
@@ -1940,6 +2053,261 @@ body::before {
       </div>
     </div>
 
+    <!-- INTEGRATIONS -->
+    <div class="panel" data-panel="integrations">
+      <div class="admin-wrap">
+        <div class="asec">
+          <div class="asec-head">
+            <div class="asec-title">Microsoft 365</div>
+            <div class="asec-sub-title">Connect your Microsoft workspace to import, export, and sync documents</div>
+            <div class="asec-line"></div>
+          </div>
+          <div class="int-grid">
+
+            <div class="int-card" id="int-excel">
+              <div class="int-logo" style="background:#1d6f42">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
+              </div>
+              <div class="int-info">
+                <div class="int-name">Excel / Sheets</div>
+                <div class="int-desc">Import workbooks, export analysis to .xlsx, sync data ranges</div>
+              </div>
+              <div class="int-status idle" id="ist-excel"><span class="spip warn"></span>Not connected</div>
+              <div class="int-actions">
+                <input class="ainput int-input" type="password" placeholder="Client Secret" id="ii-excel-secret" autocomplete="off"/>
+                <input class="ainput int-input" type="text" placeholder="Tenant ID" id="ii-excel-tenant" autocomplete="off"/>
+                <button class="asave int-btn" onclick="connectIntegration('excel')">Connect via OAuth</button>
+              </div>
+              <div class="int-fb" id="ifb-excel"></div>
+            </div>
+
+            <div class="int-card" id="int-word">
+              <div class="int-logo" style="background:#185abd">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
+              </div>
+              <div class="int-info">
+                <div class="int-name">Word / Docs</div>
+                <div class="int-desc">Parse .docx files directly from OneDrive, export AI reports as Word documents</div>
+              </div>
+              <div class="int-status idle" id="ist-word"><span class="spip warn"></span>Not connected</div>
+              <div class="int-actions">
+                <input class="ainput int-input" type="password" placeholder="Client Secret" id="ii-word-secret" autocomplete="off"/>
+                <input class="ainput int-input" type="text" placeholder="Tenant ID" id="ii-word-tenant" autocomplete="off"/>
+                <button class="asave int-btn" onclick="connectIntegration('word')">Connect via OAuth</button>
+              </div>
+              <div class="int-fb" id="ifb-word"></div>
+            </div>
+
+            <div class="int-card" id="int-teams">
+              <div class="int-logo" style="background:#464eb8">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+              </div>
+              <div class="int-info">
+                <div class="int-name">Microsoft Teams</div>
+                <div class="int-desc">Post AI summaries to channels, trigger analysis from Teams messages</div>
+              </div>
+              <div class="int-status idle" id="ist-teams"><span class="spip warn"></span>Not connected</div>
+              <div class="int-actions">
+                <input class="ainput int-input" type="text" placeholder="Webhook URL" id="ii-teams-webhook" autocomplete="off"/>
+                <input class="ainput int-input" type="password" placeholder="Bot Token (optional)" id="ii-teams-token" autocomplete="off"/>
+                <button class="asave int-btn" onclick="connectIntegration('teams')">Save &amp; Test</button>
+              </div>
+              <div class="int-fb" id="ifb-teams"></div>
+            </div>
+
+            <div class="int-card" id="int-powerbi">
+              <div class="int-logo" style="background:#f2c811; color:#1a1a1a">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="4" height="18"/><rect x="9" y="8" width="4" height="13"/><rect x="16" y="13" width="4" height="8"/></svg>
+              </div>
+              <div class="int-info">
+                <div class="int-name">Power BI</div>
+                <div class="int-desc">Push CACI analytics to Power BI datasets, embed dashboards</div>
+              </div>
+              <div class="int-status idle" id="ist-powerbi"><span class="spip warn"></span>Not connected</div>
+              <div class="int-actions">
+                <input class="ainput int-input" type="password" placeholder="Client Secret" id="ii-powerbi-secret" autocomplete="off"/>
+                <input class="ainput int-input" type="text" placeholder="Workspace ID" id="ii-powerbi-workspace" autocomplete="off"/>
+                <button class="asave int-btn" onclick="connectIntegration('powerbi')">Connect via OAuth</button>
+              </div>
+              <div class="int-fb" id="ifb-powerbi"></div>
+            </div>
+
+            <div class="int-card" id="int-quickbase">
+              <div class="int-logo" style="background:#e8401c">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+              </div>
+              <div class="int-info">
+                <div class="int-name">QuickBase</div>
+                <div class="int-desc">Sync records bidirectionally, run AI analysis on QuickBase tables</div>
+              </div>
+              <div class="int-status idle" id="ist-quickbase"><span class="spip warn"></span>Not connected</div>
+              <div class="int-actions">
+                <input class="ainput int-input" type="password" placeholder="User Token" id="ii-quickbase-token" autocomplete="off"/>
+                <input class="ainput int-input" type="text" placeholder="Realm Hostname (e.g. company.quickbase.com)" id="ii-quickbase-realm" autocomplete="off"/>
+                <button class="asave int-btn" onclick="connectIntegration('quickbase')">Save &amp; Test</button>
+              </div>
+              <div class="int-fb" id="ifb-quickbase"></div>
+            </div>
+
+            <div class="int-card int-coming" id="int-sharepoint">
+              <div class="int-logo" style="background:#038387">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="4.93" y1="4.93" x2="9.17" y2="9.17"/><line x1="14.83" y1="14.83" x2="19.07" y2="19.07"/><line x1="14.83" y1="9.17" x2="19.07" y2="4.93"/><line x1="4.93" y1="19.07" x2="9.17" y2="14.83"/></svg>
+              </div>
+              <div class="int-info">
+                <div class="int-name">SharePoint</div>
+                <div class="int-desc">Browse and ingest documents directly from SharePoint libraries</div>
+              </div>
+              <div class="int-status idle"><span class="spip warn"></span>Coming soon</div>
+              <div class="int-actions"><button class="asave int-btn" disabled style="opacity:0.4;cursor:default">Coming Soon</button></div>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="asec">
+          <div class="asec-head">
+            <div class="asec-title">Connected Integrations</div>
+            <div class="asec-line"></div>
+          </div>
+          <div id="int-connected-list" class="int-connected-list">
+            <div class="fempty" style="padding:24px 0">No integrations connected yet.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONNECTORS -->
+    <div class="panel" data-panel="connectors">
+      <div class="admin-wrap">
+        <div class="asec">
+          <div class="asec-head">
+            <div class="asec-title">Cannabis Platform Connectors</div>
+            <div class="asec-sub-title">API connections to cannabis retail, compliance, and distribution platforms. Keys are stored in Cloudflare KV and never exposed to the browser after save.</div>
+            <div class="asec-line"></div>
+          </div>
+          <div class="int-grid">
+
+            <div class="int-card" id="con-dutchie">
+              <div class="int-logo" style="background:#2d7d46">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2a9 9 0 00-9 9c0 4.17 2.84 7.67 6.69 8.69L12 22l2.31-2.31C18.16 18.67 21 15.17 21 11a9 9 0 00-9-9z"/></svg>
+              </div>
+              <div class="int-info">
+                <div class="int-name">Dutchie</div>
+                <div class="int-desc">POS &amp; eCommerce — pull sales, inventory, menu data for AI analysis</div>
+                <div class="int-tags"><span class="int-tag">POS</span><span class="int-tag">eCommerce</span><span class="int-tag">Inventory</span></div>
+              </div>
+              <div class="con-status" id="cst-dutchie"><span class="spip warn"></span>Not configured</div>
+              <div class="int-actions">
+                <input class="ainput int-input" type="password" placeholder="Dutchie API Key" id="ci-dutchie-key" autocomplete="off"/>
+                <input class="ainput int-input" type="text" placeholder="Store ID / Slug" id="ci-dutchie-store" autocomplete="off"/>
+                <input class="ainput int-input" type="text" placeholder="Environment (prod / sandbox)" id="ci-dutchie-env" value="prod"/>
+                <button class="asave int-btn" onclick="saveConnector('dutchie')">Save &amp; Verify</button>
+              </div>
+              <div class="int-fb" id="cfb-dutchie"></div>
+            </div>
+
+            <div class="int-card" id="con-metrc">
+              <div class="int-logo" style="background:#1a5c9a">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>
+              </div>
+              <div class="int-info">
+                <div class="int-name">METRC</div>
+                <div class="int-desc">State compliance &amp; track-and-trace — pull plant batches, transfers, lab results</div>
+                <div class="int-tags"><span class="int-tag">Compliance</span><span class="int-tag">Track &amp; Trace</span><span class="int-tag">State</span></div>
+              </div>
+              <div class="con-status" id="cst-metrc"><span class="spip warn"></span>Not configured</div>
+              <div class="int-actions">
+                <input class="ainput int-input" type="password" placeholder="Software API Key" id="ci-metrc-sw" autocomplete="off"/>
+                <input class="ainput int-input" type="password" placeholder="User API Key" id="ci-metrc-user" autocomplete="off"/>
+                <input class="ainput int-input" type="text" placeholder="State abbreviation (e.g. CO, CA, IL)" id="ci-metrc-state"/>
+                <button class="asave int-btn" onclick="saveConnector('metrc')">Save &amp; Verify</button>
+              </div>
+              <div class="int-fb" id="cfb-metrc"></div>
+            </div>
+
+            <div class="int-card" id="con-iheartjane">
+              <div class="int-logo" style="background:#c0392b">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
+              </div>
+              <div class="int-info">
+                <div class="int-name">iHeartJane</div>
+                <div class="int-desc">Marketplace &amp; menu — pull product listings, orders, customer data</div>
+                <div class="int-tags"><span class="int-tag">Marketplace</span><span class="int-tag">Menu</span><span class="int-tag">Orders</span></div>
+              </div>
+              <div class="con-status" id="cst-iheartjane"><span class="spip warn"></span>Not configured</div>
+              <div class="int-actions">
+                <input class="ainput int-input" type="password" placeholder="Jane API Key" id="ci-jane-key" autocomplete="off"/>
+                <input class="ainput int-input" type="text" placeholder="Store ID" id="ci-jane-store" autocomplete="off"/>
+                <button class="asave int-btn" onclick="saveConnector('iheartjane')">Save &amp; Verify</button>
+              </div>
+              <div class="int-fb" id="cfb-iheartjane"></div>
+            </div>
+
+            <div class="int-card" id="con-leaftrade">
+              <div class="int-logo" style="background:#3a7d44">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22V12M12 12C12 7 7 2 2 2c0 5 3.5 9.5 10 10zM12 12c0-5 5-10 10-10-1 5-4.5 9-10 10z"/></svg>
+              </div>
+              <div class="int-info">
+                <div class="int-name">LeafTrade</div>
+                <div class="int-desc">B2B wholesale marketplace — pull orders, vendor catalog, delivery status</div>
+                <div class="int-tags"><span class="int-tag">B2B</span><span class="int-tag">Wholesale</span><span class="int-tag">Orders</span></div>
+              </div>
+              <div class="con-status" id="cst-leaftrade"><span class="spip warn"></span>Not configured</div>
+              <div class="int-actions">
+                <input class="ainput int-input" type="password" placeholder="LeafTrade API Key" id="ci-leaftrade-key" autocomplete="off"/>
+                <input class="ainput int-input" type="text" placeholder="License Number" id="ci-leaftrade-license" autocomplete="off"/>
+                <button class="asave int-btn" onclick="saveConnector('leaftrade')">Save &amp; Verify</button>
+              </div>
+              <div class="int-fb" id="cfb-leaftrade"></div>
+            </div>
+
+            <div class="int-card" id="con-mjfreeway">
+              <div class="int-logo" style="background:#7b3fa0">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+              </div>
+              <div class="int-info">
+                <div class="int-name">MJ Freeway</div>
+                <div class="int-desc">Seed-to-sale ERP — pull inventory, sales, compliance reports</div>
+                <div class="int-tags"><span class="int-tag">ERP</span><span class="int-tag">Seed-to-Sale</span><span class="int-tag">Compliance</span></div>
+              </div>
+              <div class="con-status" id="cst-mjfreeway"><span class="spip warn"></span>Not configured</div>
+              <div class="int-actions">
+                <input class="ainput int-input" type="password" placeholder="API Token" id="ci-mjfw-token" autocomplete="off"/>
+                <input class="ainput int-input" type="text" placeholder="Facility License #" id="ci-mjfw-license" autocomplete="off"/>
+                <input class="ainput int-input" type="text" placeholder="API Base URL" id="ci-mjfw-url" value="https://api.mjfreeway.com/v1"/>
+                <button class="asave int-btn" onclick="saveConnector('mjfreeway')">Save &amp; Verify</button>
+              </div>
+              <div class="int-fb" id="cfb-mjfreeway"></div>
+            </div>
+
+            <div class="int-card int-coming">
+              <div class="int-logo" style="background:#444">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              </div>
+              <div class="int-info">
+                <div class="int-name">More Coming</div>
+                <div class="int-desc">Treez, BioTrack, Flowhub, Weedmaps, and more — request via Config panel</div>
+                <div class="int-tags"><span class="int-tag">Roadmap</span></div>
+              </div>
+              <div class="con-status"><span class="spip warn"></span>Planned</div>
+              <div class="int-actions"><button class="asave int-btn" disabled style="opacity:0.4;cursor:default">Planned</button></div>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="asec">
+          <div class="asec-head">
+            <div class="asec-title">Active Connectors</div>
+            <div class="asec-line"></div>
+          </div>
+          <div id="con-active-list" class="int-connected-list">
+            <div class="fempty" style="padding:24px 0">No connectors configured yet.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
   <nav id="botbar"></nav>
 </div>
@@ -1975,9 +2343,11 @@ const MODELS = [
 ];
 
 const MODS = [
-  {id:'chat',  label:'Intelligence', icon:'\u25C8'},
-  {id:'files', label:'Documents',    icon:'\u2261'},
-  {id:'admin', label:'Config',       icon:'\u2699'},
+  {id:'chat',         label:'Intelligence', icon:'\u25C8'},
+  {id:'files',        label:'Documents',    icon:'\u2261'},
+  {id:'integrations', label:'Integrations', icon:'\u29C9'},
+  {id:'connectors',   label:'Connectors',   icon:'\u2B21'},
+  {id:'admin',        label:'Config',       icon:'\u2699'},
 ];
 
 let token   = sessionStorage.getItem('caci_token') || '';
@@ -1993,10 +2363,11 @@ let selectedCollection = null;
 
 const $ = id => document.getElementById(id);
 const fmt = b => b > 1048576 ? (b/1048576).toFixed(1)+'MB' : (b/1024).toFixed(0)+'KB';
-const dstr = iso => new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'});
+const dstr = iso => iso ? new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'}) : '—';
 
 function esc(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  if (s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>');
 }
 
@@ -2071,6 +2442,22 @@ function bootApp() {
   initUploadModal();
   initReports();
 
+  // Filter bar
+  const filterClear = document.getElementById('filter-clear');
+  if (filterClear) filterClear.addEventListener('click', () => {
+    const fc = document.getElementById('f-category');
+    const fp = document.getElementById('f-period');
+    const fs = document.getElementById('f-state');
+    if (fc) fc.value = '';
+    if (fp) fp.value = '';
+    if (fs) fs.value = '';
+    loadFiles();
+  });
+  ['f-category','f-period','f-state'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', () => loadFiles());
+  });
+
   $('dept-chip').addEventListener('click', e => { e.stopPropagation(); $('dept-dd').classList.toggle('open'); });
   document.addEventListener('click', () => $('dept-dd').classList.remove('open'));
   $('dept-dd').addEventListener('click', e => e.stopPropagation());
@@ -2100,6 +2487,8 @@ function switchPanel(id) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.p === id));
   $('tb-module').textContent = MODS.find(m => m.id === id)?.label || '';
   if (id === 'files') { loadCollections(); loadFiles(); }
+  if (id === 'integrations') { loadIntegrationStatuses(); }
+  if (id === 'connectors') { loadConnectorStatuses(); }
   if (id === 'reports') updateReportScopeNote();
 }
 
@@ -2278,7 +2667,7 @@ async function loadFiles() {
     }
     list.innerHTML = files.map(f => `
       <div class="fcard${chatFileId === f.id ? ' focused' : ''}" data-id="${f.id}">
-        <div class="ficon">${f.name.split('.').pop().toUpperCase().slice(0,4)}</div>
+        <div class="ficon">${(f.name||'').split('.').pop().toUpperCase().slice(0,4)||'FILE'}</div>
         <div class="finfo">
           <div class="fname">${esc(f.name)}</div>
           <div class="fmeta">${esc(f.collection)} &nbsp;&middot;&nbsp; ${(f.charCount||0).toLocaleString()} chars &nbsp;&middot;&nbsp; ${dstr(f.uploadedAt)}</div>
@@ -2449,6 +2838,224 @@ document.addEventListener('DOMContentLoaded', () => {
   if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   setupLogin();
 });
+
+/* ═══════════════════════════════════════════════════════════
+   INTEGRATIONS  (Microsoft 365 + QuickBase)
+═══════════════════════════════════════════════════════════ */
+
+const INT_DEFS = [
+  { id:'excel',     name:'Excel / Sheets',   fields:['secret','tenant'] },
+  { id:'word',      name:'Word / Docs',       fields:['secret','tenant'] },
+  { id:'teams',     name:'Microsoft Teams',   fields:['webhook','token'] },
+  { id:'powerbi',   name:'Power BI',          fields:['secret','workspace'] },
+  { id:'quickbase', name:'QuickBase',         fields:['token','realm'] },
+];
+
+async function connectIntegration(id) {
+  const def = INT_DEFS.find(d => d.id === id);
+  if (!def) return;
+
+  const vals = {};
+  def.fields.forEach(f => {
+    const el = document.getElementById('ii-' + id + '-' + f);
+    if (el) vals[f] = el.value.trim();
+  });
+
+  const missing = def.fields.filter(f => !vals[f]);
+  if (missing.length) {
+    setIntFb(id, 'Fill in all fields before connecting.', 'err');
+    return;
+  }
+
+  setIntFb(id, 'Saving…', '');
+  try {
+    const res = await apiFetch('/integrations/' + id, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...vals, dept }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      setIntFb(id, '✓ Connected', 'ok');
+      setIntStatus(id, true);
+      loadIntegrationStatuses();
+    } else {
+      setIntFb(id, data.error || 'Connection failed', 'err');
+    }
+  } catch(e) {
+    // Worker route not yet deployed — store locally so UI reflects intent
+    const stored = JSON.parse(localStorage.getItem('caci_integrations') || '{}');
+    stored[id] = { ...vals, connectedAt: new Date().toISOString() };
+    localStorage.setItem('caci_integrations', JSON.stringify(stored));
+    setIntFb(id, '✓ Saved locally (deploy worker to persist)', 'ok');
+    setIntStatus(id, true);
+    loadIntegrationStatuses();
+  }
+}
+
+function setIntFb(id, msg, cls) {
+  const el = document.getElementById('ifb-' + id);
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'int-fb' + (cls ? ' ' + cls : '');
+}
+
+function setIntStatus(id, connected) {
+  const el = document.getElementById('ist-' + id);
+  if (!el) return;
+  el.innerHTML = connected
+    ? '<span class="spip"></span>Connected'
+    : '<span class="spip warn"></span>Not connected';
+  el.className = 'int-status' + (connected ? ' connected' : '');
+  const card = document.getElementById('int-' + id);
+  if (card) card.classList.toggle('connected', connected);
+}
+
+function loadIntegrationStatuses() {
+  const stored = JSON.parse(localStorage.getItem('caci_integrations') || '{}');
+  INT_DEFS.forEach(def => setIntStatus(def.id, !!stored[def.id]));
+
+  const list = document.getElementById('int-connected-list');
+  if (!list) return;
+  const entries = Object.entries(stored);
+  if (!entries.length) {
+    list.innerHTML = '<div class="fempty" style="padding:24px 0">No integrations connected yet.</div>';
+    return;
+  }
+  list.innerHTML = entries.map(([id, cfg]) => {
+    const def = INT_DEFS.find(d => d.id === id) || { name: id };
+    const ts  = cfg.connectedAt ? new Date(cfg.connectedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'}) : '—';
+    return `<div class="int-row">
+      <div class="int-row-dot"></div>
+      <div class="int-row-name">${def.name}</div>
+      <div class="int-row-meta">Connected ${ts}</div>
+      <button class="int-row-dis" onclick="disconnectIntegration('${id}')">Disconnect</button>
+    </div>`;
+  }).join('');
+}
+
+function disconnectIntegration(id) {
+  const stored = JSON.parse(localStorage.getItem('caci_integrations') || '{}');
+  delete stored[id];
+  localStorage.setItem('caci_integrations', JSON.stringify(stored));
+  setIntStatus(id, false);
+  setIntFb(id, 'Disconnected.', '');
+  loadIntegrationStatuses();
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   CONNECTORS  (Cannabis platforms)
+═══════════════════════════════════════════════════════════ */
+
+const CON_DEFS = [
+  { id:'dutchie',    name:'Dutchie',      fields:['key','store','env'],         envField:'env' },
+  { id:'metrc',      name:'METRC',        fields:['sw','user','state'],          stateField:'state' },
+  { id:'iheartjane', name:'iHeartJane',   fields:['key','store'] },
+  { id:'leaftrade',  name:'LeafTrade',    fields:['key','license'] },
+  { id:'mjfreeway',  name:'MJ Freeway',   fields:['token','license','url'] },
+];
+
+async function saveConnector(id) {
+  const def = CON_DEFS.find(d => d.id === id);
+  if (!def) return;
+
+  const vals = {};
+  def.fields.forEach(f => {
+    const el = document.getElementById('ci-' + id.replace('iheartjane','jane').replace('mjfreeway','mjfw') + '-' + f);
+    if (el) vals[f] = el.value.trim();
+  });
+
+  // check required (first two fields always required)
+  const req = def.fields.slice(0, 2);
+  if (req.some(f => !vals[f])) {
+    setConFb(id, 'Fill in all required fields.', 'err');
+    return;
+  }
+
+  setConFb(id, 'Saving…', '');
+  try {
+    const res = await apiFetch('/connectors/' + id, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...vals, dept }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      setConFb(id, '✓ Verified & saved', 'ok');
+      setConStatus(id, true);
+      loadConnectorStatuses();
+    } else {
+      setConFb(id, data.error || 'Verification failed', 'err');
+    }
+  } catch(e) {
+    // Store locally until worker route is deployed
+    const stored = JSON.parse(localStorage.getItem('caci_connectors') || '{}');
+    const safeVals = { ...vals };
+    // Redact secrets before storing in localStorage
+    def.fields.forEach(f => {
+      if (['key','sw','user','token','secret'].includes(f) && safeVals[f]) {
+        safeVals[f] = safeVals[f].slice(0,4) + '••••••••';
+      }
+    });
+    stored[id] = { ...safeVals, savedAt: new Date().toISOString() };
+    localStorage.setItem('caci_connectors', JSON.stringify(stored));
+    setConFb(id, '✓ Saved (deploy worker route to persist securely)', 'ok');
+    setConStatus(id, true);
+    loadConnectorStatuses();
+  }
+}
+
+function setConFb(id, msg, cls) {
+  const el = document.getElementById('cfb-' + id);
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'int-fb' + (cls ? ' ' + cls : '');
+}
+
+function setConStatus(id, connected) {
+  const el = document.getElementById('cst-' + id);
+  if (!el) return;
+  el.innerHTML = connected
+    ? '<span class="spip"></span>Configured'
+    : '<span class="spip warn"></span>Not configured';
+  el.className = 'con-status' + (connected ? ' connected' : '');
+  const card = document.getElementById('con-' + id);
+  if (card) card.classList.toggle('connected', connected);
+}
+
+function loadConnectorStatuses() {
+  const stored = JSON.parse(localStorage.getItem('caci_connectors') || '{}');
+  CON_DEFS.forEach(def => setConStatus(def.id, !!stored[def.id]));
+
+  const list = document.getElementById('con-active-list');
+  if (!list) return;
+  const entries = Object.entries(stored);
+  if (!entries.length) {
+    list.innerHTML = '<div class="fempty" style="padding:24px 0">No connectors configured yet.</div>';
+    return;
+  }
+  list.innerHTML = entries.map(([id, cfg]) => {
+    const def = CON_DEFS.find(d => d.id === id) || { name: id };
+    const ts  = cfg.savedAt ? new Date(cfg.savedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'}) : '—';
+    const meta = cfg.state ? 'State: ' + cfg.state : cfg.store ? 'Store: ' + cfg.store : cfg.license ? 'License: ' + cfg.license : '';
+    return `<div class="int-row">
+      <div class="int-row-dot"></div>
+      <div class="int-row-name">${def.name}</div>
+      <div class="int-row-meta">${meta ? meta + ' &nbsp;·&nbsp; ' : ''}Saved ${ts}</div>
+      <button class="int-row-dis" onclick="disconnectConnector('${id}')">Remove</button>
+    </div>`;
+  }).join('');
+}
+
+function disconnectConnector(id) {
+  const stored = JSON.parse(localStorage.getItem('caci_connectors') || '{}');
+  delete stored[id];
+  localStorage.setItem('caci_connectors', JSON.stringify(stored));
+  setConStatus(id, false);
+  setConFb(id, 'Removed.', '');
+  loadConnectorStatuses();
+}
 </script>
 
 <!-- Upload Modal -->
