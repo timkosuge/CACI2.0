@@ -1,0 +1,21 @@
+name = "caci-api"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+account_id = "016d247a084680e8a2120eebfcdeeb9d"
+
+[[r2_buckets]]
+binding = "CACI_R2"
+bucket_name = "caci-files"
+
+[[kv_namespaces]]
+binding = "CACI_KV"
+id = "6d06975deb194f66aef11dc4498731cf"
+
+[vars]
+ENVIRONMENT = "production"
+
+# Secrets (set via Cloudflare dashboard → Settings → Variables and Secrets):
+# CACI_PASSWORD       — login password
+# SESSION_SECRET      — any random string (used as session token)
+# ANTHROPIC_API_KEY   — your Anthropic key (or set it in the Admin UI)
