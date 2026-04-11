@@ -44,6 +44,17 @@ export default {
     if (path === '/admin/config' && method === 'POST') return handleAdminSave(request, env);
     if (path === '/admin/config' && method === 'GET')  return handleAdminGet(env);
 
+    // ── Integrations (Microsoft 365 / QuickBase) ──────────
+    if (path.startsWith('/integrations/') && method === 'POST')   return handleIntegrationSave(path, request, env);
+    if (path.startsWith('/integrations/') && method === 'GET')    return handleIntegrationGet(path, url, env);
+    if (path.startsWith('/integrations/') && method === 'DELETE') return handleIntegrationDelete(path, env);
+
+    // ── Connectors (Cannabis platforms) ───────────────────
+    if (path.startsWith('/connectors/') && method === 'POST')   return handleConnectorSave(path, request, env);
+    if (path.startsWith('/connectors/') && method === 'GET')    return handleConnectorGet(path, url, env);
+    if (path.startsWith('/connectors/') && method === 'DELETE') return handleConnectorDelete(path, env);
+    if (path.startsWith('/connectors/') && method === 'POST' && path.endsWith('/fetch')) return handleConnectorFetch(path, request, env);
+
     return json({ error: 'Not found' }, 404);
   },
 };
@@ -492,4 +503,222 @@ function scoreChunk(chunk, keywords) {
     score += count;
   }
   return score;
+}
+
+// ─────────────────────────────────────────────────────────────
+//  INTEGRATIONS  (Microsoft 365, QuickBase)
+//  Keys stored in KV under  integ:{id}  as JSON
+//  Secrets stored in KV under  integ-secret:{id}
+// ─────────────────────────────────────────────────────────────
+
+const ALLOWED_INTEGRATIONS = ['excel','word','teams','powerbi','quickbase'];
+
+async function handleIntegrationSave(path, request, env) {
+  const id = path.replace('/integrations/', '').split('/')[0];
+  if (!ALLOWED_INTEGRATIONS.includes(id)) return json({ error: 'Unknown integration' }, 400);
+  try {
+    const body = await request.json();
+    // Separate secrets from metadata
+    const secrets = {};
+    const meta    = { id, connectedAt: new Date().toISOString(), dept: body.dept || 'global' };
+
+    if (id === 'excel' || id === 'word') {
+      secrets.clientSecret = body.secret || '';
+      meta.tenantId        = body.tenant ? body.tenant.slice(0,8) + '…' : '';
+    } else if (id === 'teams') {
+      secrets.webhookUrl   = body.webhook || '';
+      secrets.botToken     = body.token   || '';
+      meta.hasWebhook      = !!body.webhook;
+    } else if (id === 'powerbi') {
+      secrets.clientSecret = body.secret    || '';
+      meta.workspaceId     = body.workspace || '';
+    } else if (id === 'quickbase') {
+      secrets.userToken = body.token || '';
+      meta.realm        = body.realm || '';
+    }
+
+    await env.CACI_KV.put('integ:' + id,        JSON.stringify(meta));
+    await env.CACI_KV.put('integ-secret:' + id, JSON.stringify(secrets));
+    return json({ ok: true, id });
+  } catch(e) { return json({ error: e.message }, 500); }
+}
+
+async function handleIntegrationGet(path, url, env) {
+  const id = path.replace('/integrations/', '').split('/')[0];
+  if (id === '' || id === undefined) {
+    // list all
+    const all = [];
+    for (const iid of ALLOWED_INTEGRATIONS) {
+      const m = await env.CACI_KV.get('integ:' + iid, 'json');
+      if (m) all.push(m);
+    }
+    return json(all);
+  }
+  const meta = await env.CACI_KV.get('integ:' + id, 'json');
+  if (!meta) return json({ error: 'Not found' }, 404);
+  return json(meta);
+}
+
+async function handleIntegrationDelete(path, env) {
+  const id = path.replace('/integrations/', '').split('/')[0];
+  await env.CACI_KV.delete('integ:' + id);
+  await env.CACI_KV.delete('integ-secret:' + id);
+  return json({ ok: true });
+}
+
+// ─────────────────────────────────────────────────────────────
+//  CONNECTORS  (Cannabis platforms)
+//  Keys stored in KV under  con:{id}  /  con-secret:{id}
+//  Live data fetch proxied to avoid CORS / exposing keys
+// ─────────────────────────────────────────────────────────────
+
+const ALLOWED_CONNECTORS = ['dutchie','metrc','iheartjane','leaftrade','mjfreeway'];
+
+const CONNECTOR_ENDPOINTS = {
+  dutchie:    { base: 'https://api.dutchie.com/v1',              verify: '/store' },
+  metrc:      { base: 'https://api-{state}.metrc.com/v3',         verify: '/facilities' },
+  iheartjane: { base: 'https://api.iheartjane.com/v1',            verify: '/stores/{store}' },
+  leaftrade:  { base: 'https://api.leaftrade.com/api/v1',         verify: '/company/profile/' },
+  mjfreeway:  { base: null /* dynamic */,                          verify: '/company' },
+};
+
+async function handleConnectorSave(path, request, env) {
+  const parts = path.replace('/connectors/', '').split('/');
+  const id    = parts[0];
+  if (!ALLOWED_CONNECTORS.includes(id)) return json({ error: 'Unknown connector' }, 400);
+
+  try {
+    const body    = await request.json();
+    const secrets = {};
+    const meta    = { id, savedAt: new Date().toISOString(), dept: body.dept || 'global' };
+
+    if (id === 'dutchie') {
+      secrets.apiKey  = body.key   || '';
+      meta.storeId    = body.store || '';
+      meta.env        = body.env   || 'prod';
+    } else if (id === 'metrc') {
+      secrets.swKey   = body.sw   || '';
+      secrets.userKey = body.user || '';
+      meta.state      = (body.state || '').toUpperCase();
+    } else if (id === 'iheartjane') {
+      secrets.apiKey  = body.key   || '';
+      meta.storeId    = body.store || '';
+    } else if (id === 'leaftrade') {
+      secrets.apiKey  = body.key     || '';
+      meta.license    = body.license || '';
+    } else if (id === 'mjfreeway') {
+      secrets.token   = body.token   || '';
+      meta.license    = body.license || '';
+      meta.baseUrl    = body.url     || 'https://api.mjfreeway.com/v1';
+    }
+
+    await env.CACI_KV.put('con:' + id,        JSON.stringify(meta));
+    await env.CACI_KV.put('con-secret:' + id, JSON.stringify(secrets));
+
+    // Optionally attempt a verify ping
+    const verified = await verifyConnector(id, meta, secrets);
+    return json({ ok: true, id, verified });
+  } catch(e) { return json({ error: e.message }, 500); }
+}
+
+async function verifyConnector(id, meta, secrets) {
+  try {
+    if (id === 'dutchie') {
+      const r = await fetch('https://api.dutchie.com/v1/store', {
+        headers: { Authorization: 'Bearer ' + secrets.apiKey }
+      });
+      return r.ok;
+    }
+    if (id === 'metrc') {
+      const state = (meta.state || 'co').toLowerCase();
+      const creds = btoa(secrets.swKey + ':' + secrets.userKey);
+      const r = await fetch('https://api-' + state + '.metrc.com/v3/facilities', {
+        headers: { Authorization: 'Basic ' + creds }
+      });
+      return r.ok;
+    }
+    if (id === 'iheartjane') {
+      const r = await fetch('https://api.iheartjane.com/v1/stores/' + meta.storeId, {
+        headers: { Authorization: 'Bearer ' + secrets.apiKey }
+      });
+      return r.ok;
+    }
+    if (id === 'leaftrade') {
+      const r = await fetch('https://api.leaftrade.com/api/v1/company/profile/', {
+        headers: { Authorization: 'Token ' + secrets.apiKey }
+      });
+      return r.ok;
+    }
+    if (id === 'mjfreeway') {
+      const r = await fetch((meta.baseUrl || 'https://api.mjfreeway.com/v1') + '/company', {
+        headers: { Authorization: 'Bearer ' + secrets.token }
+      });
+      return r.ok;
+    }
+  } catch { return false; }
+  return false;
+}
+
+async function handleConnectorGet(path, url, env) {
+  const id = path.replace('/connectors/', '').split('/')[0];
+  if (!id) {
+    const all = [];
+    for (const cid of ALLOWED_CONNECTORS) {
+      const m = await env.CACI_KV.get('con:' + cid, 'json');
+      if (m) all.push(m);
+    }
+    return json(all);
+  }
+  const meta = await env.CACI_KV.get('con:' + id, 'json');
+  if (!meta) return json({ error: 'Not configured' }, 404);
+  return json(meta);  // never returns secrets
+}
+
+async function handleConnectorDelete(path, env) {
+  const id = path.replace('/connectors/', '').split('/')[0];
+  await env.CACI_KV.delete('con:' + id);
+  await env.CACI_KV.delete('con-secret:' + id);
+  return json({ ok: true });
+}
+
+// Proxy live data from connector to avoid exposing API keys to browser
+async function handleConnectorFetch(path, request, env) {
+  const id = path.replace('/connectors/', '').split('/fetch')[0];
+  const meta    = await env.CACI_KV.get('con:' + id, 'json');
+  const secrets = await env.CACI_KV.get('con-secret:' + id, 'json');
+  if (!meta || !secrets) return json({ error: 'Connector not configured' }, 404);
+
+  const body     = await request.json().catch(() => ({}));
+  const endpoint = body.endpoint || '';  // e.g. "/inventory", "/sales"
+  let   apiUrl   = '';
+  const headers  = {};
+
+  if (id === 'dutchie') {
+    apiUrl = 'https://api.dutchie.com/v1' + endpoint;
+    headers['Authorization'] = 'Bearer ' + secrets.apiKey;
+  } else if (id === 'metrc') {
+    const state = (meta.state || 'co').toLowerCase();
+    const creds = btoa(secrets.swKey + ':' + secrets.userKey);
+    apiUrl = 'https://api-' + state + '.metrc.com/v3' + endpoint;
+    headers['Authorization'] = 'Basic ' + creds;
+  } else if (id === 'iheartjane') {
+    apiUrl = 'https://api.iheartjane.com/v1' + endpoint;
+    headers['Authorization'] = 'Bearer ' + secrets.apiKey;
+  } else if (id === 'leaftrade') {
+    apiUrl = 'https://api.leaftrade.com/api/v1' + endpoint;
+    headers['Authorization'] = 'Token ' + secrets.apiKey;
+  } else if (id === 'mjfreeway') {
+    apiUrl = (meta.baseUrl || 'https://api.mjfreeway.com/v1') + endpoint;
+    headers['Authorization'] = 'Bearer ' + secrets.token;
+  } else {
+    return json({ error: 'Unknown connector' }, 400);
+  }
+
+  try {
+    const r    = await fetch(apiUrl, { headers });
+    const data = await r.json();
+    return json({ ok: r.ok, status: r.status, data });
+  } catch(e) {
+    return json({ error: e.message }, 502);
+  }
 }
