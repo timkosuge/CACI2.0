@@ -160,7 +160,16 @@ async function handleUpload(request, env) {
       await env.CACI_KV.put(regKey, JSON.stringify(reg));
     }
 
-    return json({ ok: true, id, name, collection, chunks: chunks.length, charCount: cleanText.length });
+    const isContext = formData.get('isContext') === 'true';
+    if (isContext) {
+      // Store in context index for this collection
+      const ctxKey = `ctx:${dept}:${collection}`;
+      const ctxIdx = await env.CACI_KV.get(ctxKey, 'json') || [];
+      ctxIdx.unshift({ ...fileRecord, isContext: true });
+      await env.CACI_KV.put(ctxKey, JSON.stringify(ctxIdx));
+    }
+
+    return json({ ok: true, id, name, collection, chunks: chunks.length, charCount: cleanText.length, isContext });
   } catch (err) {
     return json({ error: 'Upload failed: ' + err.message }, 500);
   }
@@ -181,11 +190,17 @@ async function handleListFiles(url, env) {
       return f ? json(f) : json({ error: 'Not found' }, 404);
     }
 
+    const isContext = url.searchParams.get('context') === 'true';
+
     let files;
-    if (col) {
+    if (isContext && col) {
+      files = await env.CACI_KV.get(`ctx:${dept}:${col}`, 'json') || [];
+    } else if (col) {
       files = await env.CACI_KV.get(`col:${dept}:${col}`, 'json') || [];
+      files = files.filter(f => !f.isContext);
     } else {
       files = await env.CACI_KV.get(`index:${dept}`, 'json') || [];
+      files = files.filter(f => !f.isContext);
     }
 
     // Apply filters
@@ -271,6 +286,20 @@ async function handleChat(request, env) {
 
     const context = await buildContext({ message, dept, collection, fileId, scope, env });
 
+    // Load collection context docs (SOPs, rules, calendars)
+    let contextDocs = '';
+    if (collection) {
+      const ctxFiles = await env.CACI_KV.get(`ctx:${dept}:${collection}`, 'json') || [];
+      if (ctxFiles.length) {
+        const ctxTexts = [];
+        for (const f of ctxFiles.slice(0, 5)) {
+          const full = await env.CACI_KV.get(`file:${f.id}`, 'json');
+          if (full?.chunks) ctxTexts.push(`[Context: ${f.name}]\n${full.chunks.join(' ')}`);
+        }
+        if (ctxTexts.length) contextDocs = ctxTexts.join('\n\n');
+      }
+    }
+
     const scopeLabel = scope === 'file' ? `the document "${context.focusFile}"`
       : scope === 'collection' ? `the "${collection}" collection`
       : `all ${dept} documents`;
@@ -289,6 +318,10 @@ When analyzing data, note the metadata context (period, location, category) to g
 
     if (context.statsContext) {
       system += `\n\nCOMPUTED DATA SUMMARIES (pre-calculated, use these for precise numbers):\n${context.statsContext}`;
+    }
+
+    if (contextDocs) {
+      system += `\n\nCOLLECTION CONTEXT (SOPs, rules, calendars — read these first and use them to interpret all data):\n${contextDocs}`;
     }
 
     if (context.text) {
