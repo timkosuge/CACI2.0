@@ -2694,41 +2694,7 @@ async function deleteFile(id) {
 }
 
 /* UPLOAD */
-async function handleFiles(fileList) {
-  if (!fileList || !fileList.length) return;
-  const colName = ($('col-name-input').value.trim()) || 'General';
-  const files = Array.from(fileList);
-  const prog = $('uprog'), fill = $('pfill'), label = $('plabel'), log = $('plog');
-  prog.classList.add('on'); log.innerHTML = '';
-
-  for (let i = 0; i < files.length; i++) {
-    const f = files[i];
-    fill.style.width = Math.round(i / files.length * 90) + '%';
-    label.textContent = `[${i+1}/${files.length}] ${f.name}`;
-    addLog(log, `\u2192 ${f.name}`);
-    try {
-      const text = await extractText(f, log);
-      if (!text || text.length < 5) { addLog(log, '\u26A0 No text extracted'); continue; }
-      addLog(log, `\u2713 ${text.length.toLocaleString()} chars`);
-      const fd = new FormData();
-      fd.append('file', f); fd.append('text', text); fd.append('name', f.name);
-      fd.append('dept', dept); fd.append('collection', colName);
-      fd.append('type', f.type || f.name.split('.').pop());
-      const res = await apiFetch('/upload', {method:'POST', body:fd});
-      const d = await res.json();
-      if (d.ok) addLog(log, `\u2713 Stored \u2014 ${d.chunks} segments`);
-      else addLog(log, `\u2717 ${d.error}`);
-    } catch(e) { addLog(log, '\u2717 ' + e.message); }
-  }
-
-  fill.style.width = '100%';
-  label.textContent = `Complete \u2014 ${files.length} file${files.length !== 1 ? 's' : ''} processed`;
-  $('file-input').value = '';
-  setTimeout(() => { prog.classList.remove('on'); fill.style.width = '0%'; }, 4000);
-  loadCollections(); loadFiles();
-}
-
-function addLog(el, t) { el.innerHTML += t + '<br>'; el.scrollTop = 9999; }
+function addLog(el, t) { if(el){ el.innerHTML += t + '<br>'; el.scrollTop = 9999; } }
 
 /* TEXT EXTRACTION */
 async function extractText(file, log) {
@@ -2838,6 +2804,205 @@ document.addEventListener('DOMContentLoaded', () => {
   if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   setupLogin();
 });
+
+/* ═══════════════════════════════════════════════════════════
+   UPLOAD MODAL
+═══════════════════════════════════════════════════════════ */
+
+const UM_CATEGORIES = [
+  'Sales','Inventory','Compliance','Finance','HR','Operations',
+  'Marketing','Customer','Product','Legal','Technology','Other'
+];
+const UM_REPORT_TYPES = [
+  'Summary Report','Detail Report','Audit','Survey','Invoice',
+  'Contract','Policy','Presentation','Spreadsheet','Other'
+];
+const UM_PERIODS = (()=>{
+  const out = [];
+  const now = new Date();
+  // Quarters
+  for (let y = now.getFullYear(); y >= now.getFullYear()-2; y--) {
+    ['Q4','Q3','Q2','Q1'].forEach(q => out.push(q+' '+y));
+  }
+  // Months
+  const months = ['January','February','March','April','May','June',
+                   'July','August','September','October','November','December'];
+  for (let y = now.getFullYear(); y >= now.getFullYear()-1; y--) {
+    for (let m = 11; m >= 0; m--) out.push(months[m]+' '+y);
+  }
+  out.push('Annual '+now.getFullYear(), 'Annual '+(now.getFullYear()-1), 'Ad Hoc');
+  return out;
+})();
+const UM_STATES = [
+  'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA',
+  'KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ',
+  'NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT',
+  'VA','WA','WV','WI','WY','DC'
+];
+
+let _umFiles      = null;
+let _umDupConfirm = false;
+
+function openUploadModal(fileList) {
+  _umFiles      = Array.from(fileList);
+  _umDupConfirm = false;
+
+  // File preview
+  const preview = $('um-files-preview');
+  if (preview) {
+    preview.innerHTML = _umFiles.map(f => {
+      const ext = (f.name.split('.').pop()||'').toUpperCase().slice(0,4);
+      const size = f.size > 1048576 ? (f.size/1048576).toFixed(1)+'MB' : Math.round(f.size/1024)+'KB';
+      return `<div class="um-file-item"><span class="um-file-ext">${ext}</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.name)}</span><span style="color:var(--smoke4);flex-shrink:0">${size}</span></div>`;
+    }).join('');
+  }
+
+  // Populate dropdowns
+  const cat = $('um-category');
+  if (cat && cat.options.length <= 1) {
+    UM_CATEGORIES.forEach(c => { const o = document.createElement('option'); o.value=c; o.textContent=c; cat.appendChild(o); });
+  }
+  const rt = $('um-report-type');
+  if (rt && rt.options.length <= 1) {
+    UM_REPORT_TYPES.forEach(t => { const o = document.createElement('option'); o.value=t; o.textContent=t; rt.appendChild(o); });
+  }
+  const per = $('um-period');
+  if (per && per.options.length <= 1) {
+    UM_PERIODS.forEach(p => { const o = document.createElement('option'); o.value=p; o.textContent=p; per.appendChild(o); });
+  }
+
+  // States chips
+  const statesEl = $('um-states');
+  if (statesEl && !statesEl.dataset.built) {
+    statesEl.dataset.built = '1';
+    statesEl.innerHTML = UM_STATES.map(s =>
+      `<button type="button" class="um-state-chip" data-s="${s}">${s}</button>`
+    ).join('');
+    statesEl.addEventListener('click', e => {
+      const chip = e.target.closest('.um-state-chip');
+      if (!chip) return;
+      chip.classList.toggle('selected');
+      const sel = statesEl.querySelectorAll('.um-state-chip.selected');
+      const wrap = $('um-store-wrap');
+      if (wrap) wrap.classList.toggle('visible', sel.length === 1);
+    });
+  }
+
+  // Reset form state
+  if ($('um-report-name'))  $('um-report-name').value  = '';
+  if ($('um-category'))     $('um-category').value     = '';
+  if ($('um-report-type'))  $('um-report-type').value  = '';
+  if ($('um-period'))       $('um-period').value       = '';
+  if ($('um-store'))        $('um-store').value        = '';
+  if ($('um-dup-warning'))  $('um-dup-warning').classList.remove('show');
+  if ($('um-store-wrap'))   $('um-store-wrap').classList.remove('visible');
+  statesEl && statesEl.querySelectorAll('.um-state-chip.selected').forEach(c => c.classList.remove('selected'));
+
+  $('upload-modal-bg').classList.add('open');
+}
+
+function closeUploadModal() {
+  $('upload-modal-bg').classList.remove('open');
+  $('file-input').value = '';
+  _umFiles = null;
+}
+
+function initUploadModal() {
+  $('um-close').addEventListener('click',  closeUploadModal);
+  $('um-cancel').addEventListener('click', closeUploadModal);
+  $('upload-modal-bg').addEventListener('click', e => {
+    if (e.target === $('upload-modal-bg')) closeUploadModal();
+  });
+
+  $('um-submit').addEventListener('click', async () => {
+    if (!_umFiles || !_umFiles.length) return;
+
+    const reportName = ($('um-report-name')?.value || '').trim();
+    const category   = ($('um-category')?.value   || '').trim();
+    const period     = ($('um-period')?.value      || '').trim();
+    const reportType = ($('um-report-type')?.value || '').trim();
+    const stateChips = $('um-states')?.querySelectorAll('.um-state-chip.selected') || [];
+    const states     = Array.from(stateChips).map(c => c.dataset.s).join(',');
+    const store      = ($('um-store')?.value || '').trim();
+
+    if (!reportName) { $('um-report-name')?.focus(); return; }
+    if (!category)   { $('um-category')?.focus();    return; }
+    if (!period)     { $('um-period')?.focus();       return; }
+
+    // Duplicate check before upload
+    if (!_umDupConfirm) {
+      try {
+        const res  = await apiFetch('/duplicate-check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reportName, period, dept }),
+        });
+        const data = await res.json();
+        if (data.duplicates && data.duplicates.length) {
+          const dupList = $('um-dup-list');
+          if (dupList) dupList.innerHTML = data.duplicates.map(d =>
+            `<div>↳ ${esc(d.name)} &nbsp;·&nbsp; ${dstr(d.uploadedAt)}</div>`
+          ).join('');
+          $('um-dup-warning')?.classList.add('show');
+          $('um-submit').textContent = 'Upload Anyway';
+          _umDupConfirm = true;
+          return;
+        }
+      } catch(e) { /* no dup check available — proceed */ }
+    }
+
+    // Build collection name from modal fields
+    const colName = [category, period, reportName].filter(Boolean).join(' — ');
+
+    closeUploadModal();
+    await handleFiles(_umFiles, colName, { reportName, category, period, reportType, states, store });
+  });
+}
+
+/* ── Updated handleFiles to accept colName + metadata ── */
+async function handleFiles(fileList, colName, meta = {}) {
+  if (!fileList || !fileList.length) return;
+  colName = colName || 'General';
+  const files = Array.isArray(fileList) ? fileList : Array.from(fileList);
+  const prog = $('uprog'), fill = $('pfill'), label = $('plabel'), log = $('plog');
+  if (prog) prog.classList.add('on');
+  if (log)  log.innerHTML = '';
+
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
+    if (fill)  fill.style.width  = Math.round(i / files.length * 90) + '%';
+    if (label) label.textContent = `[${i+1}/${files.length}] ${f.name}`;
+    addLog(log, `\u2192 ${f.name}`);
+    try {
+      const text = await extractText(f, log);
+      if (!text || text.length < 5) { addLog(log, '\u26A0 No text extracted'); continue; }
+      addLog(log, `\u2713 ${text.length.toLocaleString()} chars`);
+      const fd = new FormData();
+      fd.append('file',       f);
+      fd.append('text',       text);
+      fd.append('name',       f.name);
+      fd.append('dept',       dept);
+      fd.append('collection', colName);
+      fd.append('type',       f.type || f.name.split('.').pop());
+      if (meta.category)   fd.append('category',   meta.category);
+      if (meta.period)     fd.append('period',     meta.period);
+      if (meta.reportName) fd.append('reportName', meta.reportName);
+      if (meta.reportType) fd.append('reportType', meta.reportType);
+      if (meta.states)     fd.append('states',     meta.states);
+      if (meta.store)      fd.append('store',      meta.store);
+      const res = await apiFetch('/upload', { method: 'POST', body: fd });
+      const d   = await res.json();
+      if (d.ok) addLog(log, `\u2713 Stored \u2014 ${d.chunks} segments`);
+      else      addLog(log, `\u2717 ${d.error}`);
+    } catch(e) { addLog(log, '\u2717 ' + e.message); }
+  }
+
+  if (fill)  fill.style.width  = '100%';
+  if (label) label.textContent = `Complete \u2014 ${files.length} file${files.length !== 1 ? 's' : ''} processed`;
+  $('file-input').value = '';
+  setTimeout(() => { if (prog) prog.classList.remove('on'); if (fill) fill.style.width = '0%'; }, 4000);
+  loadCollections(); loadFiles();
+}
 
 /* ═══════════════════════════════════════════════════════════
    INTEGRATIONS  (Microsoft 365 + QuickBase)
