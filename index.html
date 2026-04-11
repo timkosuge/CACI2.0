@@ -1708,7 +1708,130 @@ body::before {
   box-shadow: 0 0 0 2px rgba(192,57,43,0.18) !important;
 }
 
-/* ── Integrations & Connectors ─────────────────────────── */
+/* ── Context tab ───────────────────────────────────────── */
+.files-tab-bar {
+  display: flex; gap: 2px;
+  padding: 0 0 12px 0;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 14px;
+}
+.ftab {
+  padding: 6px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--smoke3);
+  font-family: var(--f-mono);
+  font-size: 10px; letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.ftab:hover { border-color: var(--line2); color: var(--smoke); }
+.ftab.active { background: var(--gold-dim); border-color: var(--gold); color: var(--gold-lt); }
+.ctx-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px;
+  background: var(--gold); color: var(--ink);
+  border-radius: 50%;
+  font-size: 8px; font-weight: 600;
+  margin-left: 6px; vertical-align: middle;
+}
+.ctx-upload-btn {
+  background: rgba(184,150,12,0.08) !important;
+  border-color: rgba(184,150,12,0.3) !important;
+  color: var(--gold-lt) !important;
+}
+.ctx-explain {
+  display: flex; gap: 14px; align-items: flex-start;
+  padding: 20px;
+  background: var(--ink3);
+  border: 1px solid var(--line);
+  border-radius: var(--r2);
+  margin-bottom: 16px;
+}
+.ctx-explain-icon { font-size: 20px; color: var(--gold-dim); flex-shrink: 0; padding-top: 2px; }
+.ctx-explain-title { font-family: var(--f-display); font-size: 15px; color: var(--smoke2); letter-spacing: 0.04em; margin-bottom: 4px; }
+.ctx-explain-sub { font-family: var(--f-mono); font-size: 10px; color: var(--smoke4); letter-spacing: 0.04em; line-height: 1.7; }
+.ctx-card {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px;
+  background: rgba(184,150,12,0.04);
+  border: 1px solid rgba(184,150,12,0.15);
+  border-radius: var(--r);
+  margin-bottom: 8px;
+}
+.ctx-card:hover { border-color: rgba(184,150,12,0.3); }
+.ctx-icon {
+  width: 32px; height: 32px; border-radius: 4px;
+  background: var(--gold-dim); border: 1px solid rgba(184,150,12,0.2);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--f-mono); font-size: 8px;
+  color: var(--gold-lt); letter-spacing: 0.08em; flex-shrink: 0;
+}
+.ctx-info { flex: 1; min-width: 0; }
+.ctx-name { font-family: var(--f-mono); font-size: 11px; color: var(--smoke2); letter-spacing: 0.04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ctx-meta { font-family: var(--f-mono); font-size: 9px; color: var(--smoke4); letter-spacing: 0.06em; margin-top: 2px; }
+.ctx-del { background: none; border: 1px solid transparent; color: var(--smoke4); cursor: pointer; font-size: 14px; padding: 4px 8px; border-radius: 4px; transition: all 0.15s; flex-shrink: 0; }
+.ctx-del:hover { color: var(--red-lt); border-color: rgba(139,32,32,0.3); }
+.ctx-active-note {
+  font-family: var(--f-mono); font-size: 9px; color: var(--gold-lt); letter-spacing: 0.06em;
+  padding: 8px 12px; background: var(--gold-dim); border: 1px solid rgba(184,150,12,0.2);
+  border-radius: var(--r); margin-bottom: 12px;
+  display: flex; align-items: center; gap: 8px;
+}
+
+/* ── Voice UI ──────────────────────────────────────────── */
+.chat-row { display: flex; align-items: flex-end; gap: 8px; }
+.mic-btn {
+  width: 38px; height: 38px; flex-shrink: 0;
+  border-radius: 50%;
+  border: 1px solid var(--line2);
+  background: var(--ink3);
+  color: var(--smoke3);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+  transition: all 0.2s;
+}
+.mic-btn svg { width: 16px; height: 16px; }
+.mic-btn:hover { border-color: var(--gold); color: var(--gold-lt); }
+.mic-btn.listening { border-color: var(--red-lt); color: var(--red-lt); background: rgba(139,32,32,0.12); }
+.mic-btn.speaking  { border-color: var(--gold); color: var(--gold-lt); background: var(--gold-dim); }
+.mic-pulse {
+  position: absolute; inset: -4px;
+  border-radius: 50%;
+  border: 2px solid var(--red-lt);
+  opacity: 0; pointer-events: none;
+  animation: none;
+}
+.mic-btn.listening .mic-pulse {
+  animation: micPulse 1.2s ease-out infinite;
+}
+@keyframes micPulse {
+  0%   { transform: scale(1);   opacity: 0.7; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+.voice-status {
+  font-family: var(--f-mono); font-size: 9px;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--smoke4); min-height: 14px;
+  padding: 0 2px; margin-top: 4px;
+  transition: color 0.2s;
+}
+.voice-status.active { color: var(--gold-lt); }
+.spk-btn {
+  width: 24px; height: 24px;
+  border: none; background: none;
+  color: var(--smoke4); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 4px; margin-top: 6px;
+  transition: color 0.15s;
+  vertical-align: middle;
+}
+.spk-btn svg { width: 14px; height: 14px; }
+.spk-btn:hover { color: var(--gold-lt); }
+.spk-btn.playing { color: var(--gold-lt); }
 .asec-sub-title {
   font-size: 11px;
   color: var(--smoke3);
@@ -1991,9 +2114,14 @@ body::before {
       </div>
       <div class="chat-bar">
         <div class="chat-row">
+          <button class="mic-btn" id="mic-btn" title="Voice input">
+            <svg id="mic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0014 0"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg>
+            <div class="mic-pulse" id="mic-pulse"></div>
+          </button>
           <textarea class="chat-ta" id="chat-ta" rows="1" placeholder="Ask anything..."></textarea>
           <button class="send-btn" id="send-btn">&#8593;</button>
         </div>
+        <div class="voice-status" id="voice-status"></div>
       </div>
     </div>
 
@@ -2024,10 +2152,19 @@ body::before {
         </div>
         <div class="files-main">
           <div class="files-top">
+            <div class="files-tab-bar" id="files-tab-bar">
+              <button class="ftab active" data-ft="docs" id="ftab-docs">Documents</button>
+              <button class="ftab" data-ft="ctx" id="ftab-ctx">
+                Context
+                <span class="ctx-badge" id="ctx-badge" style="display:none"></span>
+              </button>
+            </div>
             <div class="upload-area">
               <button class="upload-btn" id="upload-btn">&#8593; Upload &amp; Classify</button>
+              <button class="upload-btn ctx-upload-btn" id="ctx-upload-btn" style="display:none">&#8593; Add Context Doc</button>
             </div>
             <input type="file" id="file-input" multiple accept=".pdf,.doc,.docx,.csv,.xlsx,.xls,.txt,.md" style="display:none"/>
+            <input type="file" id="ctx-file-input" multiple accept=".pdf,.doc,.docx,.csv,.xlsx,.xls,.txt,.md" style="display:none"/>
             <div class="uprog" id="uprog">
               <div class="plabel" id="plabel">Initializing...</div>
               <div class="ptrack"><div class="pfill" id="pfill" style="width:0%"></div></div>
@@ -2035,11 +2172,29 @@ body::before {
             </div>
           </div>
           <div class="files-body">
-            <div class="fhead">
-              <div class="ftitle" id="ftitle">All Documents</div>
-              <div class="fbadge" id="fbadge">0 files</div>
+            <!-- Documents tab -->
+            <div id="files-tab-docs">
+              <div class="fhead">
+                <div class="ftitle" id="ftitle">All Documents</div>
+                <div class="fbadge" id="fbadge">0 files</div>
+              </div>
+              <div id="flist"></div>
             </div>
-            <div id="flist"></div>
+            <!-- Context tab -->
+            <div id="files-tab-ctx" style="display:none">
+              <div class="fhead">
+                <div class="ftitle">Collection Context</div>
+                <div class="fbadge" id="ctx-count">0 docs</div>
+              </div>
+              <div class="ctx-explain" id="ctx-explain">
+                <div class="ctx-explain-icon">&#9670;</div>
+                <div>
+                  <div class="ctx-explain-title">No collection selected</div>
+                  <div class="ctx-explain-sub">Select a collection from the sidebar, then add context documents — SOPs, calendars, rules, and process guides. The AI reads these first before answering any question scoped to this collection.</div>
+                </div>
+              </div>
+              <div id="ctx-list"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -2089,6 +2244,38 @@ body::before {
               <button class="asave" id="ant-save">Save Key</button>
             </div>
             <div class="afb" id="ant-fb"></div>
+          </div>
+          <div class="acard">
+            <div class="acard-title">Voice &mdash; Google Cloud TTS</div>
+            <div class="acard-sub">WaveNet neural voices &nbsp;&middot;&nbsp; 1M characters free/month &nbsp;&middot;&nbsp; <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:var(--gold-lt)">Get free API key &rarr;</a></div>
+            <div class="arow">
+              <input class="ainput" type="password" id="gtts-key" placeholder="AIza..." autocomplete="off"/>
+              <button class="asave" id="gtts-save">Save Key</button>
+            </div>
+            <div class="afb" id="gtts-fb"></div>
+            <div class="arow" style="margin-top:10px;flex-wrap:wrap;gap:8px">
+              <select class="ainput" id="gtts-voice" style="flex:1">
+                <option value="en-US-Wavenet-F">WaveNet F — Professional Female (recommended)</option>
+                <option value="en-US-Wavenet-C">WaveNet C — Warm Female</option>
+                <option value="en-US-Wavenet-E">WaveNet E — Soft Female</option>
+                <option value="en-US-Wavenet-D">WaveNet D — Deep Male</option>
+                <option value="en-US-Wavenet-B">WaveNet B — Professional Male</option>
+                <option value="en-US-Neural2-F">Neural2 F — Natural Female</option>
+                <option value="en-US-Neural2-C">Neural2 C — Conversational Female</option>
+              </select>
+              <select class="ainput" id="gtts-speed" style="flex:0 0 120px">
+                <option value="0.9">Slower</option>
+                <option value="1.0" selected>Normal</option>
+                <option value="1.1">Faster</option>
+                <option value="1.2">Fast</option>
+              </select>
+            </div>
+            <div class="arow" style="margin-top:8px;align-items:center;gap:12px">
+              <label style="display:flex;align-items:center;gap:6px;font-family:var(--f-mono);font-size:10px;color:var(--smoke3);letter-spacing:.06em;cursor:pointer">
+                <input type="checkbox" id="gtts-auto" style="accent-color:var(--gold)"/> Auto-speak AI responses
+              </label>
+              <button class="asave" id="gtts-test" style="flex-shrink:0">Test Voice</button>
+            </div>
           </div>
         </div>
       </div>
@@ -2482,6 +2669,9 @@ function bootApp() {
   $('file-input').addEventListener('change', e => { if(e.target.files.length) openUploadModal(e.target.files); });
   initUploadModal();
   initReports();
+  initContextTab();
+  initVoiceInput();
+  initVoiceSettings();
 
   // Filter bar
   const filterClear = document.getElementById('filter-clear');
@@ -2527,7 +2717,7 @@ function switchPanel(id) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.p === id));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.p === id));
   $('tb-module').textContent = MODS.find(m => m.id === id)?.label || '';
-  if (id === 'files') { loadCollections(); loadFiles(); }
+  if (id === 'files') { loadCollections(); loadFiles(); loadContextDocs(); }
   if (id === 'integrations') { loadIntegrationStatuses(); }
   if (id === 'connectors') { loadConnectorStatuses(); }
   if (id === 'reports') updateReportScopeNote();
@@ -2632,11 +2822,13 @@ function appendMsg(role, text, sources, scope) {
   const el = document.createElement('div');
   el.className = 'msg ' + role;
   const av = role === 'user' ? 'YOU' : 'CACI';
-  const src = sources && sources.length ? `<div class="msg-sources">Sources &mdash; <b>${sources.join(' &middot; ')}</b></div>` : '';
+  const src = sources && sources.length ? `<div class="msg-sources">Sources &mdash; <b>${sources.join(' \u00b7 ')}</b></div>` : '';
   const sc = scope && scope !== 'all' ? `<div class="msg-scope">Scope: ${scope === 'file' ? chatFileName : scope === 'collection' ? chatCollection : 'all'}</div>` : '';
-  el.innerHTML = `<div class="msg-av">${av}</div><div class="msg-body">${sc}<div class="msg-bubble">${esc(text)}</div>${src}</div>`;
+  const spk = role === 'ai' ? `<button class="spk-btn" title="Read aloud" onclick="speakText(this, ${JSON.stringify(text)})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 010 7.07"/><path d="M19.07 4.93a10 10 0 010 14.14"/></svg></button>` : '';
+  el.innerHTML = `<div class="msg-av">${av}</div><div class="msg-body">${sc}\x3Cdiv class="msg-bubble">${esc(text)}\x3C/div>${src}${spk}\x3C/div>`;
   $('chat-msgs').appendChild(el);
   $('chat-msgs').scrollTop = 999999;
+  if (role === 'ai' && voiceAutoSpeak) speakText(null, text);
 }
 function appendTyping() {
   const el = document.createElement('div');
@@ -2672,7 +2864,7 @@ async function loadCollections() {
     list.innerHTML = html;
     $('col-all-btn').addEventListener('click', () => { selectedCollection = null; loadCollections(); loadFiles(); });
     list.querySelectorAll('.col-item').forEach(el => {
-      el.addEventListener('click', e => { if (e.target.classList.contains('col-del')) return; selectedCollection = el.dataset.col; loadCollections(); loadFiles(); });
+      el.addEventListener('click', e => { if (e.target.classList.contains('col-del')) return; selectedCollection = el.dataset.col; loadCollections(); loadFiles(); loadContextDocs(); });
     });
     list.querySelectorAll('.col-del').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); deleteCollection(b.dataset.col); }));
   } catch(e) { console.error(e); }
@@ -3146,8 +3338,332 @@ async function handleFiles(fileList, colName, meta = {}) {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   INTEGRATIONS  (Microsoft 365 + QuickBase)
+   CONTEXT DOCS
 ═══════════════════════════════════════════════════════════ */
+
+let _activeFilesTab = 'docs';
+
+function initContextTab() {
+  // Tab switching
+  document.querySelectorAll('.ftab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      _activeFilesTab = btn.dataset.ft;
+      document.querySelectorAll('.ftab').forEach(b => b.classList.toggle('active', b === btn));
+      $('files-tab-docs').style.display = _activeFilesTab === 'docs' ? '' : 'none';
+      $('files-tab-ctx').style.display  = _activeFilesTab === 'ctx'  ? '' : 'none';
+      $('upload-btn').style.display     = _activeFilesTab === 'docs' ? '' : 'none';
+      $('ctx-upload-btn').style.display = _activeFilesTab === 'ctx'  ? '' : 'none';
+      if (_activeFilesTab === 'ctx') loadContextDocs();
+    });
+  });
+
+  // Context upload button
+  const ctxBtn = $('ctx-upload-btn');
+  const ctxInput = $('ctx-file-input');
+  if (ctxBtn && ctxInput) {
+    ctxBtn.addEventListener('click', () => {
+      if (!selectedCollection) { alert('Select a collection first.'); return; }
+      ctxInput.click();
+    });
+    ctxInput.addEventListener('change', async e => {
+      if (!e.target.files.length || !selectedCollection) return;
+      const files = Array.from(e.target.files);
+      ctxBtn.disabled = true; ctxBtn.textContent = 'Uploading\u2026';
+      for (const f of files) {
+        try {
+          const text = await extractText(f, null);
+          const fd = new FormData();
+          fd.append('file', f); fd.append('text', text || ''); fd.append('name', f.name);
+          fd.append('dept', dept); fd.append('collection', selectedCollection);
+          fd.append('type', f.type || f.name.split('.').pop());
+          fd.append('isContext', 'true');
+          const res = await apiFetch('/upload', { method: 'POST', body: fd });
+          await res.json();
+        } catch(e) { console.warn('Context upload error:', e.message); }
+      }
+      ctxInput.value = '';
+      ctxBtn.disabled = false; ctxBtn.textContent = '\u2191 Add Context Doc';
+      loadContextDocs();
+    });
+  }
+}
+
+async function loadContextDocs() {
+  const list  = $('ctx-list');
+  const expl  = $('ctx-explain');
+  const badge = $('ctx-badge');
+  const count = $('ctx-count');
+  if (!list) return;
+
+  if (!selectedCollection) {
+    list.innerHTML = '';
+    if (expl) { expl.style.display = 'flex'; expl.querySelector('.ctx-explain-title').textContent = 'No collection selected'; }
+    if (badge) badge.style.display = 'none';
+    return;
+  }
+
+  try {
+    const res  = await apiFetch(`/files?dept=${dept}&col=${encodeURIComponent(selectedCollection)}&context=true`);
+    const docs = await res.json();
+
+    if (expl) expl.style.display = docs.length ? 'none' : 'flex';
+    if (expl && !docs.length) {
+      expl.querySelector('.ctx-explain-title').textContent = 'No context docs yet';
+      expl.querySelector('.ctx-explain-sub').textContent   = 'Upload SOPs, calendars, rules, and process guides. The AI reads these before answering questions about \u201c' + selectedCollection + '\u201d.';
+    }
+
+    if (badge) { badge.textContent = docs.length || ''; badge.style.display = docs.length ? 'inline-flex' : 'none'; }
+    if (count) count.textContent = docs.length + ' doc' + (docs.length !== 1 ? 's' : '');
+
+    if (!docs.length) { list.innerHTML = ''; return; }
+
+    const note = docs.length
+      ? `\x3Cdiv class="ctx-active-note">\u25C8 ${docs.length} context doc${docs.length!==1?'s':''} active \u2014 AI reads these first for this collection\x3C/div>`
+      : '';
+
+    list.innerHTML = note + docs.map(f => `
+      \x3Cdiv class="ctx-card" data-id="${f.id}">
+        \x3Cdiv class="ctx-icon">${(f.name||'').split('.').pop().toUpperCase().slice(0,4)||'DOC'}\x3C/div>
+        \x3Cdiv class="ctx-info">
+          \x3Cdiv class="ctx-name">${esc(f.name)}\x3C/div>
+          \x3Cdiv class="ctx-meta">${(f.charCount||0).toLocaleString()} chars \u00b7 ${dstr(f.uploadedAt)}\x3C/div>
+        \x3C/div>
+        \x3Cbutton class="ctx-del" data-id="${f.id}" title="Remove">\u00d7\x3C/button>
+      \x3C/div>`).join('');
+
+    list.querySelectorAll('.ctx-del').forEach(b => b.addEventListener('click', async () => {
+      await apiFetch('/files/' + b.dataset.id, { method: 'DELETE' });
+      loadContextDocs();
+    }));
+  } catch(e) { list.innerHTML = `\x3Cdiv class="fempty">${e.message}\x3C/div>`; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   VOICE  — STT (Web Speech API) + TTS (Google Cloud WaveNet)
+═══════════════════════════════════════════════════════════ */
+
+let voiceAutoSpeak  = localStorage.getItem('caci_voice_auto') === 'true';
+let _currentAudio   = null;
+let _currentSpkBtn  = null;
+let _recognition    = null;
+let _listening      = false;
+
+/* ── Google TTS ─────────────────────────────────────────── */
+async function speakText(btn, text) {
+  // Stop any current playback
+  if (_currentAudio) {
+    _currentAudio.pause();
+    _currentAudio = null;
+    if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
+  }
+  if (!text || !text.trim()) return;
+
+  // Strip markdown for cleaner speech
+  const clean = text
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g,     '$1')
+    .replace(/#{1,6}\s/g,      '')
+    .replace(/`{1,3}[^`]*`{1,3}/g, '')
+    .replace(/\n+/g, ' ')
+    .trim()
+    .slice(0, 4500); // Google TTS limit per request
+
+  const gttsKey   = localStorage.getItem('caci_gtts_key') || '';
+  const voiceId   = localStorage.getItem('caci_gtts_voice') || 'en-US-Wavenet-F';
+  const speed     = parseFloat(localStorage.getItem('caci_gtts_speed') || '1.0');
+
+  setVoiceStatus('Speaking\u2026', true);
+  if (btn) { btn.classList.add('playing'); _currentSpkBtn = btn; }
+
+  try {
+    if (gttsKey) {
+      // Google Cloud TTS
+      const res = await fetch(
+        'https://texttospeech.googleapis.com/v1/text:synthesize?key=' + gttsKey,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            input: { text: clean },
+            voice: { languageCode: 'en-US', name: voiceId },
+            audioConfig: { audioEncoding: 'MP3', speakingRate: speed, pitch: 0 }
+          })
+        }
+      );
+      const data = await res.json();
+      if (data.audioContent) {
+        const audio = new Audio('data:audio/mp3;base64,' + data.audioContent);
+        _currentAudio = audio;
+        audio.onended = () => {
+          _currentAudio = null;
+          if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
+          setVoiceStatus('');
+        };
+        audio.play();
+        return;
+      }
+      throw new Error(data.error?.message || 'TTS failed');
+    } else {
+      // Fallback: Web Speech API
+      const utt = new SpeechSynthesisUtterance(clean);
+      utt.rate  = speed;
+      utt.pitch = 1;
+      // Pick best available female voice
+      const voices = speechSynthesis.getVoices();
+      const preferred = voices.find(v => /google.*us.*female|samantha|aria|zira/i.test(v.name))
+                     || voices.find(v => v.lang === 'en-US' && v.name.toLowerCase().includes('female'))
+                     || voices.find(v => v.lang === 'en-US')
+                     || voices[0];
+      if (preferred) utt.voice = preferred;
+      utt.onend = () => {
+        if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
+        setVoiceStatus('');
+      };
+      speechSynthesis.cancel();
+      speechSynthesis.speak(utt);
+    }
+  } catch(e) {
+    console.warn('TTS error:', e.message);
+    setVoiceStatus('Voice error: ' + e.message.slice(0,40));
+    if (btn) btn.classList.remove('playing');
+    setTimeout(() => setVoiceStatus(''), 3000);
+  }
+}
+
+function stopSpeaking() {
+  if (_currentAudio) { _currentAudio.pause(); _currentAudio = null; }
+  speechSynthesis.cancel();
+  if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
+  setVoiceStatus('');
+}
+
+function setVoiceStatus(msg, active) {
+  const el = $('voice-status');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'voice-status' + (active ? ' active' : '');
+}
+
+/* ── Web Speech API — STT ───────────────────────────────── */
+function initVoiceInput() {
+  const btn = $('mic-btn');
+  if (!btn) return;
+
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    btn.title = 'Voice input not supported in this browser';
+    btn.style.opacity = '0.3';
+    btn.style.cursor  = 'not-allowed';
+    return;
+  }
+
+  btn.addEventListener('click', () => {
+    if (_listening) {
+      stopListening();
+    } else {
+      startListening();
+    }
+  });
+}
+
+function startListening() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return;
+
+  stopSpeaking(); // stop TTS if playing
+
+  _recognition = new SR();
+  _recognition.lang = 'en-US';
+  _recognition.interimResults = true;
+  _recognition.maxAlternatives = 1;
+  _recognition.continuous = false;
+
+  _recognition.onstart = () => {
+    _listening = true;
+    const btn = $('mic-btn');
+    if (btn) btn.classList.add('listening');
+    setVoiceStatus('Listening\u2026', true);
+  };
+
+  _recognition.onresult = (e) => {
+    const transcript = Array.from(e.results)
+      .map(r => r[0].transcript).join('');
+    const ta = $('chat-ta');
+    if (ta) ta.value = transcript;
+  };
+
+  _recognition.onend = () => {
+    _listening = false;
+    const btn = $('mic-btn');
+    if (btn) btn.classList.remove('listening');
+    setVoiceStatus('');
+    // Auto-send if we got text
+    const ta = $('chat-ta');
+    if (ta && ta.value.trim()) sendChat();
+  };
+
+  _recognition.onerror = (e) => {
+    _listening = false;
+    const btn = $('mic-btn');
+    if (btn) btn.classList.remove('listening');
+    if (e.error !== 'no-speech') setVoiceStatus('Mic error: ' + e.error);
+    setTimeout(() => setVoiceStatus(''), 2000);
+  };
+
+  _recognition.start();
+}
+
+function stopListening() {
+  if (_recognition) { _recognition.stop(); _recognition = null; }
+  _listening = false;
+  const btn = $('mic-btn');
+  if (btn) btn.classList.remove('listening');
+  setVoiceStatus('');
+}
+
+/* ── Voice settings in Config panel ────────────────────── */
+function initVoiceSettings() {
+  // Google TTS key
+  const gttsKey = $('gtts-key');
+  if (gttsKey) gttsKey.value = localStorage.getItem('caci_gtts_key') || '';
+
+  const gttsSave = $('gtts-save');
+  if (gttsSave) gttsSave.addEventListener('click', () => {
+    const key = $('gtts-key')?.value.trim() || '';
+    localStorage.setItem('caci_gtts_key', key);
+    const fb = $('gtts-fb');
+    if (fb) { fb.textContent = key ? '\u2713 Key saved' : 'Key cleared'; fb.className = 'afb ok'; setTimeout(() => { fb.textContent = ''; fb.className = 'afb'; }, 2000); }
+  });
+
+  // Voice select
+  const gttsVoice = $('gtts-voice');
+  if (gttsVoice) {
+    gttsVoice.value = localStorage.getItem('caci_gtts_voice') || 'en-US-Wavenet-F';
+    gttsVoice.addEventListener('change', () => localStorage.setItem('caci_gtts_voice', gttsVoice.value));
+  }
+
+  // Speed select
+  const gttsSpeed = $('gtts-speed');
+  if (gttsSpeed) {
+    gttsSpeed.value = localStorage.getItem('caci_gtts_speed') || '1.0';
+    gttsSpeed.addEventListener('change', () => localStorage.setItem('caci_gtts_speed', gttsSpeed.value));
+  }
+
+  // Auto-speak toggle
+  const gttsAuto = $('gtts-auto');
+  if (gttsAuto) {
+    gttsAuto.checked = voiceAutoSpeak;
+    gttsAuto.addEventListener('change', () => {
+      voiceAutoSpeak = gttsAuto.checked;
+      localStorage.setItem('caci_voice_auto', voiceAutoSpeak);
+    });
+  }
+
+  // Test button
+  const gttsTest = $('gtts-test');
+  if (gttsTest) gttsTest.addEventListener('click', () => speakText(gttsTest, 'CACI Intelligence Platform ready. Voice output is working correctly.'));
+}
+
 
 const INT_DEFS = [
   { id:'excel',     name:'Excel / Sheets',   fields:['secret','tenant'] },
