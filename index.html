@@ -481,14 +481,14 @@ body::before {
 #sidebar::before {
   content: '';
   position: absolute; top: 0; right: 0; bottom: 0;
-  width: 2px;
+  width: 1px;
   background: linear-gradient(180deg,
     transparent 0%,
-    rgba(184,150,12,0.2) 10%,
-    rgba(212,168,50,0.5) 35%,
-    rgba(245,227,152,0.85) 50%,
-    rgba(212,168,50,0.5) 65%,
-    rgba(184,150,12,0.2) 90%,
+    rgba(184,150,12,0.15) 15%,
+    rgba(212,168,50,0.45) 40%,
+    rgba(245,227,152,0.7) 50%,
+    rgba(212,168,50,0.45) 60%,
+    rgba(184,150,12,0.15) 85%,
     transparent 100%
   );
   z-index: 1;
@@ -504,27 +504,26 @@ body::before {
   top: 50%;
   transform: translateY(-50%);
   left: var(--sidebar);
-  width: 20px; height: 68px;
-  background: rgba(8,12,22,0.95);
-  border: 1px solid rgba(184,150,12,0.45);
+  width: 14px; height: 48px;
+  background: rgba(8,12,22,0.92);
+  border: 1px solid rgba(184,150,12,0.3);
   border-left: none;
-  border-radius: 0 6px 6px 0;
+  border-radius: 0 4px 4px 0;
   cursor: pointer;
   z-index: 201;
   display: flex; align-items: center; justify-content: center;
-  color: rgba(184,150,12,0.65);
-  transition: left 0.35s cubic-bezier(0.4, 0, 0.2, 1), color 0.2s, background 0.2s, border-color 0.2s;
+  color: rgba(184,150,12,0.6);
+  font-size: 8px;
+  transition: left 0.35s cubic-bezier(0.4, 0, 0.2, 1), color 0.2s, background 0.2s;
   padding: 0;
-  box-shadow: 3px 0 12px rgba(0,0,0,0.4), inset -1px 0 0 rgba(245,227,152,0.06);
+  box-shadow: 2px 0 8px rgba(0,0,0,0.3);
 }
 #sb-toggle:hover {
-  color: rgba(245,227,152,0.95);
-  background: rgba(14,20,36,0.99);
-  border-color: rgba(212,168,50,0.7);
-  box-shadow: 3px 0 16px rgba(184,150,12,0.15);
+  color: rgba(245,227,152,0.9);
+  background: rgba(12,18,32,0.98);
 }
 #sb-toggle.collapsed { left: 0; }
-#sb-toggle svg { width: 10px; height: 10px; transition: transform 0.35s ease; }
+#sb-toggle svg { width: 8px; height: 8px; transition: transform 0.35s ease; }
 #sb-toggle.collapsed svg { transform: scaleX(-1); }
 /* Scanline texture on sidebar */
 #sidebar::after {
@@ -1243,7 +1242,7 @@ body::before {
 .chat-ta {
   flex: 1;
   background: var(--ink3);
-  border: 1px solid rgba(184,150,12,0.22);
+  border: 1px solid var(--line2);
   border-radius: var(--r);
   padding: 12px 16px;
   color: var(--smoke);
@@ -1300,12 +1299,11 @@ body::before {
 }
 /* Greeting strip — sits just above the input bar */
 #discovery-greeting-strip {
-  padding: 12px 24px 20px;
+  padding: 12px 80px 0;
   text-align: center;
   animation: dg-in 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s both;
-  width: 100%;
-  box-sizing: border-box;
-  flex-shrink: 0;
+  position: relative;
+  z-index: 2;
 }
 #discovery-greeting-strip::before {
   content: '';
@@ -1321,17 +1319,23 @@ body::before {
   font-weight: 300;
   letter-spacing: 0.1em;
   line-height: 1.9;
-  max-width: 560px;
-  width: calc(100% - 32px);
+  max-width: 640px;
   margin: 0 auto;
   white-space: normal;
-  box-sizing: border-box;
-  color: rgba(212,168,50,0.5);
-  animation: dgsShimmer 4s ease-in-out 1.2s infinite;
-}
-@keyframes dgsShimmer {
-  0%, 100% { color: rgba(184,150,12,0.38); }
-  50%       { color: rgba(245,227,152,0.65); }
+  overflow: visible;
+  text-overflow: unset;
+  background: linear-gradient(105deg,
+    rgba(184,150,12,0.35) 0%,
+    rgba(212,168,50,0.5) 30%,
+    rgba(245,227,152,0.75) 50%,
+    rgba(212,168,50,0.5) 70%,
+    rgba(184,150,12,0.35) 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: nameShimmer 4s ease-in-out 1.2s infinite;
 }
 .dg-eyebrow {
   font-family: var(--f-display);
@@ -1903,12 +1907,10 @@ body::before {
 .admin-wrap {
   overflow-y: auto;
   padding: 24px;
-  flex: 1;
-  min-height: 0;
-  box-sizing: border-box;
+  height: 100%;
   scrollbar-width: thin;
   scrollbar-color: var(--ink5) transparent;
-  max-width: 760px;
+  max-width: 700px;
 }
 .admin-wrap::-webkit-scrollbar { width: 3px; }
 .admin-wrap::-webkit-scrollbar-thumb { background: var(--ink5); }
@@ -2187,10 +2189,6 @@ body::before {
   .col-name { font-size: 11px; }
   .upload-area { flex-direction: column; }
   .upload-btn { width: 100%; }
-  /* ── Mobile-only overrides for new UI features ── */
-  #sb-toggle { display: none; }
-  #discovery-greeting-strip { padding: 10px 20px 0; }
-  .login-frame-box { inset: 20px 16px; }
 }
 
 /* ── Upload Modal ──────────────────────────────────────────── */
@@ -3324,7 +3322,6 @@ body::before {
               </label>
               <button class="asave" id="gtts-test" style="flex-shrink:0">Test Voice</button>
             </div>
-            <div class="afb" id="gtts-fb"></div>
           </div>
         </div>
 
@@ -3717,7 +3714,7 @@ function bootApp() {
   initContextTab();
   initNewCollectionModal();
   initVoiceInput();
-  if ($('ant-save')) $('ant-save').addEventListener('click', saveKey);
+  initVoiceSettings();
 
   // Filter bar
   const filterClear = document.getElementById('filter-clear');
@@ -3743,6 +3740,7 @@ function bootApp() {
     const el = $(id); if (el) el.addEventListener('click', () => { buildModelList(); $('model-modal').classList.add('open'); });
   });
   $('model-modal').addEventListener('click', e => { if (e.target === $('model-modal')) $('model-modal').classList.remove('open'); });
+  $('ant-save').addEventListener('click', saveKey);
 }
 
 /* NAV */
@@ -3979,27 +3977,32 @@ function setScope(scope, col, fileId, fileName) {
 /* CHAT */
 // Renders the discovery greeting (centered hero, not a chat bubble)
 function renderDiscoveryGreeting(text, collections) {
+  // Remove any existing discovery elements
   ['discovery-name', 'discovery-greeting-strip'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.remove();
   });
 
+  // Strip emoji, collapse to single line for the strip
   const cleanText = text
     .replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u{2B50}\u{1F300}-\u{1F9FF}]/gu, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 
+  // Keep CACI name centered in the messages area (already there from dg-name-above-bar in HTML)
   const msgs = $('chat-msgs');
   const nameEl = document.createElement('div');
   nameEl.id = 'discovery-name';
   nameEl.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;text-align:center;';
-  nameEl.innerHTML = '<div class="dg-eyebrow" style="margin-bottom:8px">Intelligence Assistant</div><div class="dg-name">CACI</div>';
+  nameEl.innerHTML = `<div class="dg-eyebrow" style="margin-bottom:8px">Intelligence Assistant</div><div class="dg-name">CACI</div>`;
   msgs.appendChild(nameEl);
 
+  // Greeting strip injected just above the chat bar
   const bar = $('chat-bar');
   const strip = document.createElement('div');
   strip.id = 'discovery-greeting-strip';
-  strip.innerHTML = '<div class="dgs-text">' + esc(cleanText).replace(/\n/g, '<br>') + '</div>';
+  const stripHtml = esc(cleanText).replace(/\n/g, '<br>');
+  strip.innerHTML = `<div class="dgs-text">${stripHtml}</div>`;
   bar.parentNode.insertBefore(strip, bar);
 
   $('chat-empty').style.display = 'none';
@@ -4016,11 +4019,13 @@ function selectDiscoveryCollection(colName) {
   $('chat-ta').placeholder = 'Ask about ' + colName + '...';
 }
 
-function transitionToChat() {}
+function transitionToChat() {
+  // bar is always docked — nothing to do
+}
 
 // Sends the CACI greeting on first load (discovery mode)
 async function initChatGreeting() {
-  if (chatHistory.length > 0) return;
+  if (chatHistory.length > 0) return; // already greeted
   const ty = appendTyping();
   try {
     const body = {message: 'hello', dept, model: modelId, scope: 'all', history: []};
@@ -4031,13 +4036,8 @@ async function initChatGreeting() {
       renderDiscoveryGreeting(d.response, d.collections);
       chatHistory.push({role:'assistant', content:d.response});
       if (d.collections) window._caciCollections = d.collections;
-    } else {
-      console.warn('Greeting error:', d.error);
     }
-  } catch(e) {
-    ty.remove();
-    console.warn('Greeting failed:', e.message);
-  }
+  } catch(e) { ty.remove(); }
 }
 
 async function sendChat() {
@@ -4092,7 +4092,7 @@ function appendMsg(role, text, sources, scope) {
   const av = role === 'user' ? 'YOU' : 'CACI';
   const src = sources && sources.length ? `<div class="msg-sources">Sources &mdash; <b>${sources.join(' \u00b7 ')}</b></div>` : '';
   const sc = scope && scope !== 'all' ? `<div class="msg-scope">Scope: ${scope === 'file' ? chatFileName : scope === 'collection' ? chatCollection : 'all'}</div>` : '';
-  const modelLabel = (role === 'ai' && sources !== undefined) ? `<div class="msg-model-label">${modelId === 'grok' ? 'Grok · xAI' : modelId === 'cloudflare' ? 'Cloudflare AI' : modelId === 'ollama' ? 'Ollama · Local' : 'Claude · Anthropic'}</div>` : '';
+  const modelLabel = (role === 'ai' && sources !== undefined) ? '<div class="msg-model-label">' + (modelId === 'grok' ? 'Grok · xAI' : modelId === 'cloudflare' ? 'Cloudflare AI' : modelId === 'ollama' ? 'Ollama · Local' : 'Claude · Anthropic') + '</div>' : '';
   const spk = role === 'ai' ? `<button class="spk-btn" title="Read aloud" data-spk="1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 010 7.07"/><path d="M19.07 4.93a10 10 0 010 14.14"/></svg></button>` : '';
   const actions = role === 'ai' ? `<div class="msg-actions">
     <button class="msg-action-btn dl-btn" title="Download as .md file">
@@ -4425,46 +4425,46 @@ let _adminListenersAttached = false;
 async function loadAdminConfig() {
   if (!_adminListenersAttached) {
     _adminListenersAttached = true;
-    const ttsProvider = $('tts-provider');
-    const ttsVoice    = $('tts-grok-voice');
-    const gttsAuto    = $('gtts-auto');
-    if (ttsProvider) ttsProvider.addEventListener('change', () => {
-      localStorage.setItem('caci_tts_provider', ttsProvider.value);
-      if (ttsVoice) ttsVoice.style.display = (ttsProvider.value === 'grok' || ttsProvider.value === 'claude') ? '' : 'none';
+    const ttsProvider = document.getElementById('tts-provider');
+    const ttsVoice    = document.getElementById('tts-grok-voice');
+    const gttsAuto    = document.getElementById('gtts-auto');
+    const testBtn     = document.getElementById('gtts-test');
+    const xaiSave     = document.getElementById('xai-save');
+    if (ttsProvider) ttsProvider.addEventListener('change', function() {
+      localStorage.setItem('caci_tts_provider', this.value);
+      if (ttsVoice) ttsVoice.style.display = (this.value === 'grok' || this.value === 'claude') ? '' : 'none';
     });
-    if (ttsVoice) ttsVoice.addEventListener('change', () => localStorage.setItem('caci_tts_grok_voice', ttsVoice.value));
-    if (gttsAuto) gttsAuto.addEventListener('change', () => {
-      voiceAutoSpeak = gttsAuto.checked;
-      localStorage.setItem('caci_voice_auto', gttsAuto.checked ? 'true' : 'false');
+    if (ttsVoice) ttsVoice.addEventListener('change', function() { localStorage.setItem('caci_tts_grok_voice', this.value); });
+    if (gttsAuto) gttsAuto.addEventListener('change', function() {
+      voiceAutoSpeak = this.checked;
+      localStorage.setItem('caci_voice_auto', this.checked ? 'true' : 'false');
     });
-    const testBtn = $('gtts-test');
-    if (testBtn) testBtn.addEventListener('click', () => speakText(null, "Hey. I'm Caci. Let me know what you're looking for and we'll dig in."));
-    const xaiSave = $('xai-save');
-    if (xaiSave) xaiSave.addEventListener('click', async () => {
-      const key = $('xai-key').value.trim();
+    if (testBtn) testBtn.addEventListener('click', function() {
+      speakText(null, "Hey. I'm Caci. Let me know what you're looking for and we'll dig in.");
+    });
+    if (xaiSave) xaiSave.addEventListener('click', async function() {
+      const key = document.getElementById('xai-key').value.trim();
       const res = await apiFetch('/admin/config', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({XAI_API_KEY:key})});
       const d = await res.json();
-      $('xai-fb').textContent = d.ok ? 'Saved.' : (d.error||'Error');
-      setTimeout(() => { $('xai-fb').textContent=''; }, 2500);
+      document.getElementById('xai-fb').textContent = d.ok ? 'Saved.' : (d.error||'Error');
+      setTimeout(function() { document.getElementById('xai-fb').textContent = ''; }, 2500);
     });
   }
-
   // Sync values on every visit
-  const ttsProvider = $('tts-provider');
-  const ttsVoice    = $('tts-grok-voice');
-  const gttsAuto    = $('gtts-auto');
+  const ttsProvider = document.getElementById('tts-provider');
+  const ttsVoice    = document.getElementById('tts-grok-voice');
+  const gttsAuto    = document.getElementById('gtts-auto');
   if (ttsProvider) ttsProvider.value = localStorage.getItem('caci_tts_provider') || 'grok';
   if (ttsVoice) {
     ttsVoice.value = localStorage.getItem('caci_tts_grok_voice') || 'eve';
     ttsVoice.style.display = (!ttsProvider || ttsProvider.value==='grok' || ttsProvider.value==='claude') ? '' : 'none';
   }
   if (gttsAuto) gttsAuto.checked = localStorage.getItem('caci_voice_auto') === 'true';
-
   try {
     const res = await apiFetch('/admin/config'); if (!res.ok) return;
     const d = await res.json();
     if (d.ANTHROPIC_API_KEY?.configured) {
-      $('stat-claude').innerHTML = '<div class="spip"></div><span class="srow-text">Configured — ' + d.ANTHROPIC_API_KEY.source + '</span>';
+      $('stat-claude').innerHTML = `<div class="spip"></div><span class="srow-text">Configured \u2014 ${d.ANTHROPIC_API_KEY.source}</span>`;
       $('scard-claude').classList.add('ok');
     } else {
       $('stat-claude').innerHTML = '<div class="spip off"></div><span class="srow-text">Not configured</span>';
@@ -5083,68 +5083,62 @@ let _listening      = false;
 
 /* ── Grok TTS ───────────────────────────────────────────── */
 async function speakText(btn, text) {
-  // Stop any current playback
   if (_currentAudio) {
     _currentAudio.pause();
     _currentAudio = null;
     if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
     setVoiceStatus('');
-    const tog = $('spk-toggle-btn');
+    const tog = document.getElementById('spk-toggle-btn');
     if (tog) tog.classList.toggle('active', voiceAutoSpeak);
-    return; // toggle off if already playing
+    return;
   }
   if (!text || !text.trim()) return;
-
   setVoiceStatus('Speaking…', true);
   if (btn) { btn.classList.add('playing'); _currentSpkBtn = btn; }
-  const tog = $('spk-toggle-btn');
+  const tog = document.getElementById('spk-toggle-btn');
   if (tog) tog.classList.add('active');
-
   try {
     const provider = localStorage.getItem('caci_tts_provider') || 'grok';
     const grokVoice = localStorage.getItem('caci_tts_grok_voice') || 'eve';
     const res = await apiFetch('/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, provider, voice: grokVoice }),
+      body: JSON.stringify({ text: text, provider: provider, voice: grokVoice }),
     });
-
     if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: 'TTS failed' }));
+      const err = await res.json().catch(function() { return { error: 'TTS failed' }; });
       throw new Error(err.error || 'TTS request failed');
     }
-
     const blob = await res.blob();
-    const url  = URL.createObjectURL(blob);
+    const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
     _currentAudio = audio;
-
-    audio.onended = () => {
+    audio.onended = function() {
       URL.revokeObjectURL(url);
       _currentAudio = null;
       if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
-      const tog = $('spk-toggle-btn');
-      if (tog) tog.classList.toggle('active', voiceAutoSpeak);
+      const tog2 = document.getElementById('spk-toggle-btn');
+      if (tog2) tog2.classList.toggle('active', voiceAutoSpeak);
       setVoiceStatus('');
     };
-    audio.onerror = () => {
+    audio.onerror = function() {
       URL.revokeObjectURL(url);
       _currentAudio = null;
       if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
       setVoiceStatus('');
     };
     audio.play();
-
   } catch(e) {
     console.warn('TTS error:', e.message);
     setVoiceStatus('Voice unavailable');
     if (btn) btn.classList.remove('playing');
     if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
-    const tog = $('spk-toggle-btn');
-    if (tog) tog.classList.toggle('active', voiceAutoSpeak);
-    setTimeout(() => setVoiceStatus(''), 3000);
+    const tog3 = document.getElementById('spk-toggle-btn');
+    if (tog3) tog3.classList.toggle('active', voiceAutoSpeak);
+    setTimeout(function() { setVoiceStatus(''); }, 3000);
   }
 }
+
 function stopSpeaking() {
   if (_currentAudio) { _currentAudio.pause(); _currentAudio = null; }
   speechSynthesis.cancel();
