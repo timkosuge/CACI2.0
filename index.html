@@ -3989,8 +3989,22 @@ async function loadContextDocs() {
     list.querySelectorAll('.edit-meta').forEach(b => b.addEventListener('click', () => openEditFileModal(b.dataset)));
     list.querySelectorAll('.ctx-del').forEach(b => b.addEventListener('click', async () => {
       if (!confirm('Remove this context document?')) return;
-      await apiFetch('/files/' + b.dataset.id, { method: 'DELETE' });
+      const fileId = b.dataset.id;
+      try {
+        const res = await apiFetch('/files/' + fileId, { method: 'DELETE' });
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}));
+          console.error('Delete failed:', res.status, d);
+          alert('Delete failed: ' + (d.error || res.status) + '. Check console for details.');
+          return;
+        }
+      } catch(e) {
+        console.error('Delete error:', e);
+        alert('Delete error: ' + e.message);
+        return;
+      }
       loadContextDocs();
+      loadCollections();
     }));
   } catch(e) { list.innerHTML = `\x3Cdiv class="fempty">${e.message}\x3C/div>`; }
 }
