@@ -467,12 +467,64 @@ body::before {
   position: fixed; top: 0; left: 0; bottom: 0;
   width: var(--sidebar);
   background: var(--ink2);
-  border-right: 1px solid rgba(184,150,12,0.12);
+  border-right: none;
   display: flex; flex-direction: column;
   z-index: 200;
   overflow: hidden;
+  transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 1px 0 0 0 rgba(245,227,152,0.04);
 }
+#sidebar.collapsed {
+  width: 0;
+}
+/* Gold glimmering right edge */
+#sidebar::before {
+  content: '';
+  position: absolute; top: 0; right: 0; bottom: 0;
+  width: 1px;
+  background: linear-gradient(180deg,
+    transparent 0%,
+    rgba(184,150,12,0.15) 15%,
+    rgba(212,168,50,0.45) 40%,
+    rgba(245,227,152,0.7) 50%,
+    rgba(212,168,50,0.45) 60%,
+    rgba(184,150,12,0.15) 85%,
+    transparent 100%
+  );
+  z-index: 1;
+  animation: edgeGlimmer 4s ease-in-out 1s infinite;
+}
+@keyframes edgeGlimmer {
+  0%, 100% { opacity: 0.6; }
+  50%       { opacity: 1; }
+}
+/* Sidebar toggle button */
+#sb-toggle {
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  left: var(--sidebar);
+  width: 14px; height: 48px;
+  background: rgba(8,12,22,0.92);
+  border: 1px solid rgba(184,150,12,0.3);
+  border-left: none;
+  border-radius: 0 4px 4px 0;
+  cursor: pointer;
+  z-index: 201;
+  display: flex; align-items: center; justify-content: center;
+  color: rgba(184,150,12,0.6);
+  font-size: 8px;
+  transition: left 0.35s cubic-bezier(0.4, 0, 0.2, 1), color 0.2s, background 0.2s;
+  padding: 0;
+  box-shadow: 2px 0 8px rgba(0,0,0,0.3);
+}
+#sb-toggle:hover {
+  color: rgba(245,227,152,0.9);
+  background: rgba(12,18,32,0.98);
+}
+#sb-toggle.collapsed { left: 0; }
+#sb-toggle svg { width: 8px; height: 8px; transition: transform 0.35s ease; }
+#sb-toggle.collapsed svg { transform: scaleX(-1); }
 /* Scanline texture on sidebar */
 #sidebar::after {
   content: '';
@@ -1256,7 +1308,6 @@ body::before {
   font-family: var(--f-mono);
   font-size: 10px;
   font-weight: 300;
-  color: rgba(212,168,50,0.38);
   letter-spacing: 0.1em;
   line-height: 1.9;
   max-width: 640px;
@@ -1264,6 +1315,18 @@ body::before {
   white-space: normal;
   overflow: visible;
   text-overflow: unset;
+  background: linear-gradient(105deg,
+    rgba(184,150,12,0.35) 0%,
+    rgba(212,168,50,0.5) 30%,
+    rgba(245,227,152,0.75) 50%,
+    rgba(212,168,50,0.5) 70%,
+    rgba(184,150,12,0.35) 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: nameShimmer 4s ease-in-out 1.2s infinite;
 }
 .dg-eyebrow {
   font-family: var(--f-display);
@@ -1280,11 +1343,25 @@ body::before {
   font-weight: 300;
   letter-spacing: 0.1em;
   line-height: 1;
-  background: linear-gradient(150deg, var(--gold-metal-1) 0%, var(--gold-metal-3) 45%, var(--gold-metal-2) 100%);
+  background: linear-gradient(105deg,
+    var(--gold-metal-3) 0%,
+    var(--gold-metal-2) 25%,
+    var(--gold-metal-1) 40%,
+    rgba(255,248,210,1) 50%,
+    var(--gold-metal-1) 60%,
+    var(--gold-metal-2) 75%,
+    var(--gold-metal-3) 100%
+  );
+  background-size: 200% 100%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  filter: drop-shadow(0 0 16px rgba(184,150,12,0.25));
+  filter: drop-shadow(0 0 20px rgba(184,150,12,0.3));
+  animation: nameShimmer 3.5s ease-in-out 0.5s infinite;
+}
+@keyframes nameShimmer {
+  0%, 100% { background-position: 100% 0; }
+  50%       { background-position: 0% 0; }
 }
 /* Greeting text floats below the bar */
 .dg-text-below-bar {
@@ -2084,7 +2161,8 @@ body::before {
   #botbar { display: none; }
   .tb-logo { display: block; }
   .tb-model-chip { display: none !important; }
-  #content { left: var(--sidebar); top: var(--topbar); bottom: 0; }
+  #content { left: var(--sidebar); top: var(--topbar); bottom: 0; transition: left 0.35s cubic-bezier(0.4, 0, 0.2, 1); }
+  #content.sb-collapsed { left: 0; }
   .chat-messages { padding: 28px 32px; }
   .chat-bar { padding: 14px 32px; padding-bottom: 14px; }
   .files-top { padding: 16px 24px; }
@@ -2881,6 +2959,9 @@ body::before {
 
   <!-- Sidebar -->
   <aside id="sidebar">
+  <button id="sb-toggle" title="Toggle sidebar" aria-label="Toggle sidebar">
+    <svg viewBox="0 0 8 12" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="6,1 2,6 6,11"/></svg>
+  </button>
     <div class="sb-header">
       <div class="sb-wordmark">CACI</div>
       <div class="sb-tagline">Intelligence Platform</div>
@@ -3580,6 +3661,23 @@ function bootApp() {
   $('app').style.display = 'block';
   buildNav(); buildDepts(); buildDeptDD(); buildModelList();
   syncDept(); syncModel(); switchPanel('chat');
+
+  // Sidebar collapse toggle
+  const sbToggle = $('sb-toggle');
+  const sidebar  = $('sidebar');
+  const contentEl = $('content');
+  sbToggle.addEventListener('click', () => {
+    const collapsed = sidebar.classList.toggle('collapsed');
+    sbToggle.classList.toggle('collapsed', collapsed);
+    if (contentEl) contentEl.classList.toggle('sb-collapsed', collapsed);
+    localStorage.setItem('caci_sb_collapsed', collapsed ? '1' : '0');
+  });
+  // Restore state
+  if (localStorage.getItem('caci_sb_collapsed') === '1') {
+    sidebar.classList.add('collapsed');
+    sbToggle.classList.add('collapsed');
+    if (contentEl) contentEl.classList.add('sb-collapsed');
+  }
   checkHealth(); loadAdminConfig();
 
   if (window.innerWidth < 768) $('tb-model-chip').style.display = 'flex';
