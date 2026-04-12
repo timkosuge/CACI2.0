@@ -4427,53 +4427,58 @@ async function saveKey() {
   } catch(e) { $('ant-fb').className = 'afb err'; $('ant-fb').textContent = '\u2717 ' + e.message; }
   $('ant-save').disabled = false; $('ant-save').textContent = 'Save Key';
 }
+let _adminListenersAttached = false;
 async function loadAdminConfig() {
-  // TTS provider state
-  const ttsProvider = $('tts-provider');
-  const ttsVoice    = $('tts-grok-voice');
-  const gttsAuto    = $('gtts-auto');
-  if (ttsProvider) {
-    ttsProvider.value = localStorage.getItem('caci_tts_provider') || 'grok';
-    ttsProvider.addEventListener('change', () => {
+  if (!_adminListenersAttached) {
+    _adminListenersAttached = true;
+    const ttsProvider = $('tts-provider');
+    const ttsVoice    = $('tts-grok-voice');
+    const gttsAuto    = $('gtts-auto');
+    if (ttsProvider) ttsProvider.addEventListener('change', () => {
       localStorage.setItem('caci_tts_provider', ttsProvider.value);
-      // Show/hide grok voice selector
-      if (ttsVoice) ttsVoice.style.display = ttsProvider.value === 'grok' || ttsProvider.value === 'claude' ? '' : 'none';
+      if (ttsVoice) ttsVoice.style.display = (ttsProvider.value === 'grok' || ttsProvider.value === 'claude') ? '' : 'none';
     });
-    // Init visibility
-    if (ttsVoice) ttsVoice.style.display = (ttsProvider.value === 'grok' || ttsProvider.value === 'claude') ? '' : 'none';
-  }
-  if (ttsVoice) {
-    ttsVoice.value = localStorage.getItem('caci_tts_grok_voice') || 'eve';
-    ttsVoice.addEventListener('change', () => localStorage.setItem('caci_tts_grok_voice', ttsVoice.value));
-  }
-  if (gttsAuto) {
-    gttsAuto.checked = localStorage.getItem('caci_voice_auto') === 'true';
-    gttsAuto.addEventListener('change', () => {
+    if (ttsVoice) ttsVoice.addEventListener('change', () => localStorage.setItem('caci_tts_grok_voice', ttsVoice.value));
+    if (gttsAuto) gttsAuto.addEventListener('change', () => {
       voiceAutoSpeak = gttsAuto.checked;
       localStorage.setItem('caci_voice_auto', gttsAuto.checked ? 'true' : 'false');
     });
-  }
-  const testBtn = $('gtts-test');
-  if (testBtn) {
-    testBtn.addEventListener('click', () => speakText(null, "Hey. I'm Caci. Let me know what you're looking for and we'll dig in."));
-  }
-  // xAI key
-  const xaiSave = $('xai-save');
-  if (xaiSave) {
-    xaiSave.addEventListener('click', async () => {
-      const key = $('xai-key').value.trim();
-      const res = await apiFetch('/admin/config', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ XAI_API_KEY: key }) });
+    const testBtn = $('gtts-test');
+    if (testBtn) testBtn.addEventListener('click', () => speakText(null, "Hey. I'm Caci. Let me know what you're looking for and we'll dig in."));
+    const antSave = $('ant-save');
+    if (antSave) antSave.addEventListener('click', async () => {
+      const key = $('ant-key').value.trim();
+      const res = await apiFetch('/admin/config', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ANTHROPIC_API_KEY:key})});
       const d = await res.json();
-      $('xai-fb').textContent = d.ok ? 'Saved.' : (d.error || 'Error');
-      setTimeout(() => { $('xai-fb').textContent = ''; }, 2500);
+      $('ant-fb').textContent = d.ok ? 'Saved.' : (d.error||'Error');
+      setTimeout(() => { $('ant-fb').textContent=''; }, 2500);
+    });
+    const xaiSave = $('xai-save');
+    if (xaiSave) xaiSave.addEventListener('click', async () => {
+      const key = $('xai-key').value.trim();
+      const res = await apiFetch('/admin/config', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({XAI_API_KEY:key})});
+      const d = await res.json();
+      $('xai-fb').textContent = d.ok ? 'Saved.' : (d.error||'Error');
+      setTimeout(() => { $('xai-fb').textContent=''; }, 2500);
     });
   }
+
+  // Sync values on every visit
+  const ttsProvider = $('tts-provider');
+  const ttsVoice    = $('tts-grok-voice');
+  const gttsAuto    = $('gtts-auto');
+  if (ttsProvider) ttsProvider.value = localStorage.getItem('caci_tts_provider') || 'grok';
+  if (ttsVoice) {
+    ttsVoice.value = localStorage.getItem('caci_tts_grok_voice') || 'eve';
+    ttsVoice.style.display = (!ttsProvider || ttsProvider.value==='grok' || ttsProvider.value==='claude') ? '' : 'none';
+  }
+  if (gttsAuto) gttsAuto.checked = localStorage.getItem('caci_voice_auto') === 'true';
 
   try {
     const res = await apiFetch('/admin/config'); if (!res.ok) return;
     const d = await res.json();
     if (d.ANTHROPIC_API_KEY?.configured) {
-      $('stat-claude').innerHTML = `<div class="spip"></div><span class="srow-text">Configured \u2014 ${d.ANTHROPIC_API_KEY.source}</span>`;
+      $('stat-claude').innerHTML = '<div class="spip"></div><span class="srow-text">Configured — ' + d.ANTHROPIC_API_KEY.source + '</span>';
       $('scard-claude').classList.add('ok');
     } else {
       $('stat-claude').innerHTML = '<div class="spip off"></div><span class="srow-text">Not configured</span>';
