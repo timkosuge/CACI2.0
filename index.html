@@ -766,17 +766,7 @@ body::before {
 .scope-chevron { color: var(--smoke4); font-size: 9px; flex-shrink: 0; }
 
 /* ── Chat ──────────────────────────────────────────────── */
-.chat-messages {
-  flex: 1; overflow-y: auto;
-  padding: 24px 20px;
-  display: flex; flex-direction: column; gap: 16px;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
-  scrollbar-color: var(--ink5) transparent;
-  position: relative; z-index: 1;
-}
-.chat-messages::-webkit-scrollbar { width: 3px; }
-.chat-messages::-webkit-scrollbar-thumb { background: var(--ink5); border-radius: 2px; }
+/* .chat-messages moved to discovery section below */
 
 .chat-empty {
   flex: 1;
@@ -1024,13 +1014,23 @@ body::before {
 @keyframes pulse { 0%,60%,100% { opacity: 0.3; transform: scale(1); } 30% { opacity: 1; transform: scale(1.3); } }
 
 .chat-bar {
-  padding: 12px 16px;
-  padding-bottom: max(12px, env(safe-area-inset-bottom));
-  border-top: 1px solid rgba(184,150,12,0.1);
+  padding: 0 16px max(16px, env(safe-area-inset-bottom));
+  background: transparent;
+  flex-shrink: 0;
+  position: absolute;
+  left: 0; right: 0;
+  bottom: 0;
+  z-index: 10;
+  transition: bottom 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: none;
+}
+.chat-bar.has-messages {
+  position: relative;
+  bottom: auto;
+  padding: 12px 16px max(12px, env(safe-area-inset-bottom));
   background: rgba(5,8,16,0.82);
   backdrop-filter: blur(10px);
-  flex-shrink: 0;
-  position: relative; z-index: 1;
+  border-top: 1px solid rgba(184,150,12,0.1);
 }
 .chat-bar::before {
   content: '';
@@ -1038,8 +1038,31 @@ body::before {
   height: 1px;
   background: linear-gradient(90deg, transparent, rgba(212,168,50,0.25) 20%, rgba(245,227,152,0.4) 50%, rgba(212,168,50,0.25) 80%, transparent);
   pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
 }
-.chat-row { display: flex; gap: 8px; align-items: flex-end; }
+.chat-bar.has-messages::before { opacity: 1; }
+.chat-row { display: flex; gap: 8px; align-items: flex-end; pointer-events: all; }
+.chat-bar-inner {
+  max-width: 680px;
+  margin: 0 auto;
+  background: rgba(5,8,16,0.88);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(184,150,12,0.22);
+  border-radius: 16px;
+  padding: 10px 10px 10px 14px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(184,150,12,0.06), inset 0 1px 0 rgba(245,227,152,0.07);
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: all;
+}
+.chat-bar.has-messages .chat-bar-inner {
+  max-width: none;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+}
 .chat-ta {
   flex: 1;
   background: var(--ink3);
@@ -1088,6 +1111,111 @@ body::before {
   box-shadow: 0 2px 16px rgba(184,150,12,0.3), inset 0 1px 0 rgba(245,227,152,0.3);
 }
 .send-btn:disabled { opacity: 0.25; cursor: default; }
+
+
+/* ── Discovery Greeting ────────────────────────────────── */
+.discovery-greeting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0 32px 60px;
+  flex: 1;
+  animation: dg-in 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes dg-in {
+  from { opacity: 0; transform: translateY(18px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.discovery-greeting.collapsing {
+  animation: dg-out 0.4s cubic-bezier(0.4, 0, 1, 1) both;
+}
+@keyframes dg-out {
+  from { opacity: 1; transform: translateY(0) scale(1); max-height: 400px; }
+  to   { opacity: 0; transform: translateY(-12px) scale(0.97); max-height: 0; padding: 0; overflow: hidden; }
+}
+.dg-eyebrow {
+  font-family: var(--f-display);
+  font-size: 10px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--gold);
+  opacity: 0.6;
+  margin-bottom: 14px;
+}
+.dg-name {
+  font-family: var(--f-display);
+  font-size: clamp(36px, 6vw, 56px);
+  font-weight: 300;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  background: linear-gradient(150deg, var(--gold-metal-1) 0%, var(--gold-metal-3) 45%, var(--gold-metal-2) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 0 20px rgba(184,150,12,0.3));
+  margin-bottom: 20px;
+}
+.dg-text {
+  font-size: 14px;
+  font-weight: 300;
+  color: var(--smoke3);
+  line-height: 1.7;
+  max-width: 460px;
+  white-space: pre-line;
+  margin-bottom: 28px;
+}
+.dg-collections {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  max-width: 520px;
+}
+.dg-col-btn {
+  padding: 8px 18px;
+  border: 1px solid rgba(184,150,12,0.28);
+  background: rgba(184,150,12,0.06);
+  border-radius: 100px;
+  color: var(--gold-metal-2);
+  font-family: var(--f-body);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+.dg-col-btn:hover {
+  background: rgba(184,150,12,0.14);
+  border-color: rgba(184,150,12,0.5);
+  color: var(--gold-metal-1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(184,150,12,0.15);
+}
+
+/* ── Chat panel layout adjustment when floating bar ───── */
+.panel[data-panel="chat"] {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 20px 140px; /* extra bottom pad for floating bar */
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ink5) transparent;
+  position: relative;
+  z-index: 1;
+  transition: padding-bottom 0.4s ease;
+}
+.chat-messages.has-messages {
+  padding-bottom: 16px;
+}
 
 /* ── Files Panel ───────────────────────────────────────── */
 .files-outer { display: flex; height: 100%; overflow: hidden; }
@@ -2837,19 +2965,21 @@ body::before {
           </div>
         </div>
       </div>
-      <div class="chat-bar">
-        <div class="chat-row">
-          <button class="mic-btn" id="mic-btn" title="Voice input">
-            <svg id="mic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0014 0"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg>
-            <div class="mic-pulse" id="mic-pulse"></div>
-          </button>
-          <button class="mic-btn spk-toggle-btn" id="spk-toggle-btn" title="Toggle auto-speak responses">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 010 7.07"/><path d="M19.07 4.93a10 10 0 010 14.14"/></svg>
-          </button>
-          <textarea class="chat-ta" id="chat-ta" rows="1" placeholder="Ask anything..."></textarea>
-          <button class="send-btn" id="send-btn">&#8593;</button>
+      <div class="chat-bar" id="chat-bar">
+        <div class="chat-bar-inner">
+          <div class="chat-row">
+            <button class="mic-btn" id="mic-btn" title="Voice input">
+              <svg id="mic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0014 0"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg>
+              <div class="mic-pulse" id="mic-pulse"></div>
+            </button>
+            <button class="mic-btn spk-toggle-btn" id="spk-toggle-btn" title="Toggle auto-speak responses">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 010 7.07"/><path d="M19.07 4.93a10 10 0 010 14.14"/></svg>
+            </button>
+            <textarea class="chat-ta" id="chat-ta" rows="1" placeholder="Ask anything..."></textarea>
+            <button class="send-btn" id="send-btn">&#8593;</button>
+          </div>
+          <div class="voice-status" id="voice-status"></div>
         </div>
-        <div class="voice-status" id="voice-status"></div>
       </div>
     </div>
 
@@ -3556,8 +3686,16 @@ function setDept(id) {
   dept = id; localStorage.setItem('caci_dept', dept);
   selectedCollection = null; chatCollection = null; chatFileId = null; chatFileName = null;
   _colView = 'all';
+  // Reset chat bar to floating state and clear history for new dept
+  chatHistory = [];
+  window._caciCollections = null;
+  const bar = $('chat-bar'), msgs = $('chat-msgs');
+  if (bar) bar.classList.remove('has-messages');
+  if (msgs) { msgs.classList.remove('has-messages'); msgs.innerHTML = ''; }
+  $('chat-empty').style.display = 'none';
   setScope('all'); syncDept();
   if (curPanel === 'files') { loadCollections(); loadFiles(); }
+  if (curPanel === 'chat') initChatGreeting();
 }
 function syncDept() {
   const d = DEPTS.find(x => x.id === dept) || DEPTS[0];
@@ -3612,6 +3750,59 @@ function setScope(scope, col, fileId, fileName) {
 }
 
 /* CHAT */
+// Renders the discovery greeting (centered hero, not a chat bubble)
+function renderDiscoveryGreeting(text, collections) {
+  const msgs = $('chat-msgs');
+  // Remove any existing discovery greeting
+  const old = msgs.querySelector('.discovery-greeting');
+  if (old) old.remove();
+
+  // Parse text into intro + collection names (collections come from API)
+  const colBtns = (collections || []).map(c =>
+    `<button class="dg-col-btn" onclick="selectDiscoveryCollection('${c.name.replace(/'/g,"\\'")}')">
+      ${c.name}${c.fileCount ? ' <span style="opacity:0.5;font-size:10px">('+c.fileCount+')</span>' : ''}
+    </button>`
+  ).join('');
+
+  // Use text as-is; pill buttons handle collection display
+  const cleanText = text.trim();
+
+  const el = document.createElement('div');
+  el.className = 'discovery-greeting';
+  el.id = 'discovery-greeting';
+  el.innerHTML = `
+    <div class="dg-eyebrow">Intelligence Assistant</div>
+    <div class="dg-name">CACI</div>
+    <div class="dg-text">${esc(cleanText)}</div>
+    ${colBtns ? `<div class="dg-collections">${colBtns}</div>` : ''}
+  `;
+  msgs.appendChild(el);
+  $('chat-empty').style.display = 'none';
+}
+
+function selectDiscoveryCollection(colName) {
+  // Collapse greeting, set scope, focus textarea
+  const greet = $('discovery-greeting');
+  if (greet) {
+    greet.classList.add('collapsing');
+    setTimeout(() => greet.remove(), 400);
+  }
+  setScope('collection', colName);
+  transitionToChat();
+  $('chat-ta').focus();
+  $('chat-ta').placeholder = 'Ask about ' + colName + '...';
+}
+
+function transitionToChat() {
+  // Move input bar to bottom-docked mode
+  const bar = $('chat-bar');
+  const msgs = $('chat-msgs');
+  if (bar && !bar.classList.contains('has-messages')) {
+    bar.classList.add('has-messages');
+    msgs.classList.add('has-messages');
+  }
+}
+
 // Sends the CACI greeting on first load (discovery mode)
 async function initChatGreeting() {
   if (chatHistory.length > 0) return; // already greeted
@@ -3621,11 +3812,9 @@ async function initChatGreeting() {
     const res = await apiFetch('/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
     const d = await res.json();
     ty.remove();
-    $('chat-empty').style.display = 'none';
     if (!d.error) {
-      appendMsg('ai', d.response, [], 'discovery');
+      renderDiscoveryGreeting(d.response, d.collections);
       chatHistory.push({role:'assistant', content:d.response});
-      // Store available collections returned from discovery
       if (d.collections) window._caciCollections = d.collections;
     }
   } catch(e) { ty.remove(); }
@@ -3637,6 +3826,10 @@ async function sendChat() {
   $('chat-empty').style.display = 'none';
   ta.value = ''; ta.style.height = 'auto';
   $('send-btn').disabled = true;
+  // Collapse discovery greeting and dock the bar on first user message
+  const greet = $('discovery-greeting');
+  if (greet) { greet.classList.add('collapsing'); setTimeout(() => greet.remove(), 400); }
+  transitionToChat();
   appendMsg('user', msg);
   chatHistory.push({role:'user', content:msg});
   const ty = appendTyping();
