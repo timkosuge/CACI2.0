@@ -38,6 +38,7 @@ export default {
     if (path === '/files'     && method === 'GET')    return handleListFiles(url, env);
     if (path.startsWith('/files/') && method === 'DELETE') return handleDeleteFile(path.replace('/files/', ''), env);
     if (path === '/collections' && method === 'GET')  return handleListCollections(url, env);
+    if (path === '/collections/create' && method === 'POST') return handleCreateCollection(request, env);
     if (path.startsWith('/collections/') && method === 'DELETE') return handleDeleteCollection(path.replace('/collections/', ''), url, env);
     if (path === '/chat'      && method === 'POST')   return handleChat(request, env);
     if (path === '/report'    && method === 'POST')   return handleReport(request, env);
@@ -155,8 +156,9 @@ async function handleUpload(request, env) {
     // Update collection registry
     const regKey = `colreg:${dept}`;
     const reg    = await env.CACI_KV.get(regKey, 'json') || [];
+    const fileDeptMeta = formData.get('fileDept') || dept;
     if (!reg.find(c => c.name === collection)) {
-      reg.unshift({ name: collection, category, period, created: uploadedAt });
+      reg.unshift({ name: collection, dept: fileDeptMeta, category, period, created: uploadedAt });
       await env.CACI_KV.put(regKey, JSON.stringify(reg));
     }
 
@@ -210,6 +212,21 @@ async function handleListFiles(url, env) {
 
     return json(files);
   } catch { return json([]); }
+}
+
+// ── Create Collection ────────────────────────────────────────
+async function handleCreateCollection(request, env) {
+  try {
+    const { name, dept, category, description } = await request.json();
+    if (!name) return json({ error: 'Name required' }, 400);
+    const deptKey = dept || 'global';
+    const regKey  = `colreg:${deptKey}`;
+    const reg     = await env.CACI_KV.get(regKey, 'json') || [];
+    if (reg.find(c => c.name === name)) return json({ ok: true, existing: true });
+    reg.unshift({ name, dept: deptKey, category: category || '', description: description || '', created: new Date().toISOString(), fileCount: 0 });
+    await env.CACI_KV.put(regKey, JSON.stringify(reg));
+    return json({ ok: true });
+  } catch(e) { return json({ error: e.message }, 500); }
 }
 
 // ── List Collections ──────────────────────────────────────────
