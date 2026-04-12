@@ -900,6 +900,108 @@ body::before {
   background: linear-gradient(180deg, var(--gold), transparent);
   opacity: 0.3;
 }
+/* ── Message action bar ─────────────────────────────────── */
+.msg-actions {
+  display: flex; gap: 6px; align-items: center;
+  margin-top: 6px; padding-left: 2px;
+  opacity: 0; transition: opacity 0.15s;
+}
+.msg.ai:hover .msg-actions { opacity: 1; }
+.msg-action-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: 3px;
+  border: 1px solid var(--line2);
+  background: none; color: var(--smoke4);
+  font-family: var(--f-mono); font-size: 9px;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  cursor: pointer; transition: all 0.15s;
+}
+.msg-action-btn:hover { border-color: var(--gold); color: var(--gold-lt); background: var(--gold-dim); }
+.msg-action-btn svg { width: 11px; height: 11px; flex-shrink: 0; }
+.msg-action-btn.saved { border-color: var(--green-lt); color: var(--green-lt); }
+
+/* ── Responses panel ────────────────────────────────────── */
+.resp-wrap { height: 100%; display: flex; flex-direction: column; overflow: hidden; }
+.resp-top {
+  padding: 20px 24px 14px;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+  background: var(--ink2);
+}
+.resp-title {
+  font-family: var(--f-display); font-size: 20px;
+  color: var(--smoke); letter-spacing: 0.06em; margin-bottom: 4px;
+}
+.resp-sub {
+  font-family: var(--f-mono); font-size: 10px;
+  color: var(--smoke4); letter-spacing: 0.06em; line-height: 1.6;
+}
+.resp-body { flex: 1; overflow-y: auto; padding: 20px 24px; }
+.resp-empty {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; height: 200px;
+  font-family: var(--f-mono); font-size: 11px;
+  color: var(--smoke4); letter-spacing: 0.06em; gap: 10px; text-align: center;
+}
+.resp-empty-icon { font-size: 28px; opacity: 0.3; }
+.resp-card {
+  background: var(--ink3);
+  border: 1px solid var(--line);
+  border-radius: var(--r2);
+  margin-bottom: 14px;
+  overflow: hidden;
+  position: relative;
+}
+.resp-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, rgba(212,168,50,0.25), transparent 60%);
+}
+.resp-card-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  padding: 12px 14px 10px; gap: 12px;
+}
+.resp-card-meta {
+  font-family: var(--f-mono); font-size: 9px;
+  color: var(--smoke4); letter-spacing: 0.08em; text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.resp-card-prompt {
+  font-family: var(--f-mono); font-size: 11px;
+  color: var(--gold-lt); letter-spacing: 0.03em;
+  line-height: 1.5; max-width: 600px;
+}
+.resp-card-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.resp-card-btn {
+  padding: 4px 10px; border-radius: 3px;
+  border: 1px solid var(--line2); background: none;
+  color: var(--smoke4); font-family: var(--f-mono); font-size: 9px;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  cursor: pointer; transition: all 0.15s; white-space: nowrap;
+}
+.resp-card-btn:hover { border-color: var(--gold); color: var(--gold-lt); background: var(--gold-dim); }
+.resp-card-btn.del:hover { border-color: var(--red-lt); color: var(--red-lt); background: rgba(139,32,32,0.08); }
+.resp-preview {
+  padding: 0 14px 14px;
+  font-size: 12px; color: var(--smoke3);
+  line-height: 1.7; letter-spacing: 0.01em;
+  max-height: 120px; overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+  mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+}
+.resp-preview.expanded {
+  max-height: none;
+  -webkit-mask-image: none; mask-image: none;
+}
+.resp-expand-btn {
+  display: block; width: 100%; padding: 8px 14px;
+  background: none; border: none; border-top: 1px solid var(--line);
+  color: var(--smoke4); font-family: var(--f-mono); font-size: 9px;
+  letter-spacing: 0.08em; text-transform: uppercase; text-align: center;
+  cursor: pointer; transition: all 0.15s;
+}
+.resp-expand-btn:hover { color: var(--gold-lt); background: var(--gold-dim); }
+
 .msg-sources {
   font-family: var(--f-mono);
   font-size: 9px;
@@ -2593,409 +2695,58 @@ body::before {
       <div class="chat-bg-overlay" aria-hidden="true"><svg viewBox="0 0 1200 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <radialGradient id="vignette" cx="50%" cy="50%" r="70%">
-      <stop offset="0%" stop-color="#050810" stop-opacity="0"/>
+      <stop offset="0%"   stop-color="#050810" stop-opacity="0"/>
       <stop offset="100%" stop-color="#050810" stop-opacity="0.92"/>
     </radialGradient>
 
-    <!-- Gold shimmer gradient that travels along letter edges -->
-    <linearGradient id="goldShimmer" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%"   stop-color="#b8960c" stop-opacity="0"/>
-      <stop offset="35%"  stop-color="#d4a832" stop-opacity="0.3"/>
-      <stop offset="50%"  stop-color="#f5e398" stop-opacity="0.7"/>
-      <stop offset="65%"  stop-color="#d4a832" stop-opacity="0.3"/>
+    <!-- Soft orb glows — warm gold light, large and feathered -->
+    <radialGradient id="orb1" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#f5e398" stop-opacity="0.38"/>
+      <stop offset="40%"  stop-color="#d4a832" stop-opacity="0.18"/>
       <stop offset="100%" stop-color="#b8960c" stop-opacity="0"/>
-    </linearGradient>
-    <linearGradient id="goldShimmer2" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%"   stop-color="#b8960c" stop-opacity="0"/>
-      <stop offset="40%"  stop-color="#d4a832" stop-opacity="0.25"/>
-      <stop offset="50%"  stop-color="#f5e398" stop-opacity="0.55"/>
-      <stop offset="60%"  stop-color="#d4a832" stop-opacity="0.25"/>
+    </radialGradient>
+    <radialGradient id="orb2" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#f5e398" stop-opacity="0.28"/>
+      <stop offset="45%"  stop-color="#d4a832" stop-opacity="0.12"/>
       <stop offset="100%" stop-color="#b8960c" stop-opacity="0"/>
-    </linearGradient>
+    </radialGradient>
+    <radialGradient id="orb3" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#fff8d6" stop-opacity="0.22"/>
+      <stop offset="50%"  stop-color="#d4a832" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#b8960c" stop-opacity="0"/>
+    </radialGradient>
 
-    <!-- Clip to letter region so glows stay within the letterforms -->
-    <filter id="letterGlow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="3" result="blur"/>
-      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    <!-- Blur filter to keep orbs ultra-soft -->
+    <filter id="orbBlur" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="38"/>
     </filter>
-    <filter id="softGlow" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur stdDeviation="6" result="blur"/>
-      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    <filter id="orbBlur2" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="52"/>
     </filter>
   </defs>
 
-  <!-- LAYER 1: Fine grid baseline -->
-  <g stroke="#b8960c" stroke-width="0.3" opacity="0.03">
-    <line x1="0" y1="75" x2="1200" y2="75"/><line x1="0" y1="150" x2="1200" y2="150"/>
-    <line x1="0" y1="225" x2="1200" y2="225"/><line x1="0" y1="300" x2="1200" y2="300"/>
-    <line x1="0" y1="375" x2="1200" y2="375"/><line x1="0" y1="450" x2="1200" y2="450"/>
-    <line x1="0" y1="525" x2="1200" y2="525"/><line x1="0" y1="600" x2="1200" y2="600"/>
-    <line x1="0" y1="675" x2="1200" y2="675"/><line x1="0" y1="750" x2="1200" y2="750"/>
-    <line x1="0" y1="825" x2="1200" y2="825"/>
-    <line x1="75" y1="0" x2="75" y2="900"/><line x1="150" y1="0" x2="150" y2="900"/>
-    <line x1="225" y1="0" x2="225" y2="900"/><line x1="300" y1="0" x2="300" y2="900"/>
-    <line x1="375" y1="0" x2="375" y2="900"/><line x1="450" y1="0" x2="450" y2="900"/>
-    <line x1="525" y1="0" x2="525" y2="900"/><line x1="600" y1="0" x2="600" y2="900"/>
-    <line x1="675" y1="0" x2="675" y2="900"/><line x1="750" y1="0" x2="750" y2="900"/>
-    <line x1="825" y1="0" x2="825" y2="900"/><line x1="900" y1="0" x2="900" y2="900"/>
-    <line x1="975" y1="0" x2="975" y2="900"/><line x1="1050" y1="0" x2="1050" y2="900"/>
-    <line x1="1125" y1="0" x2="1125" y2="900"/>
-  </g>
+  <!-- Shimmer orb 1 — drifts slowly left to right across the text zone -->
+  <ellipse cx="0" cy="450" rx="260" ry="180" fill="url(#orb1)" filter="url(#orbBlur)" opacity="0">
+    <animate attributeName="cx" values="-100;1300" dur="14s" begin="0s" repeatCount="indefinite"/>
+    <animate attributeName="cy" values="480;420;460;440;480" dur="14s" begin="0s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0;0.55;0.7;0.65;0.5;0.6;0.55;0" keyTimes="0;0.08;0.25;0.5;0.65;0.8;0.92;1" dur="14s" begin="0s" repeatCount="indefinite"/>
+  </ellipse>
 
-  <!-- LAYER 2: Topographic elevation rings — left cluster -->
-  <g fill="none" stroke="#b8960c" opacity="0.045">
-    <ellipse cx="220" cy="480" rx="340" ry="190" stroke-width="0.6"/>
-    <ellipse cx="220" cy="480" rx="275" ry="152" stroke-width="0.5"/>
-    <ellipse cx="220" cy="480" rx="210" ry="116" stroke-width="0.5"/>
-    <ellipse cx="220" cy="480" rx="150" ry="83" stroke-width="0.6"/>
-    <ellipse cx="220" cy="480" rx="96" ry="53" stroke-width="0.7"/>
-    <ellipse cx="220" cy="480" rx="50" ry="28" stroke-width="0.8"/>
-  </g>
+  <!-- Shimmer orb 2 — starts mid-journey, offset phase -->
+  <ellipse cx="0" cy="430" rx="220" ry="150" fill="url(#orb2)" filter="url(#orbBlur)" opacity="0">
+    <animate attributeName="cx" values="-100;1300" dur="14s" begin="7s" repeatCount="indefinite"/>
+    <animate attributeName="cy" values="450;480;440;470;450" dur="14s" begin="7s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0;0.45;0.6;0.55;0.45;0.5;0.45;0" keyTimes="0;0.08;0.25;0.5;0.65;0.8;0.92;1" dur="14s" begin="7s" repeatCount="indefinite"/>
+  </ellipse>
 
-  <!-- LAYER 3: Topographic elevation rings — right cluster -->
-  <g fill="none" stroke="#b8960c" opacity="0.032">
-    <ellipse cx="970" cy="310" rx="310" ry="200" stroke-width="0.6"/>
-    <ellipse cx="970" cy="310" rx="248" ry="160" stroke-width="0.5"/>
-    <ellipse cx="970" cy="310" rx="190" ry="122" stroke-width="0.5"/>
-    <ellipse cx="970" cy="310" rx="135" ry="87" stroke-width="0.6"/>
-    <ellipse cx="970" cy="310" rx="85" ry="55" stroke-width="0.7"/>
-    <ellipse cx="970" cy="310" rx="40" ry="26" stroke-width="0.8"/>
-  </g>
+  <!-- Shimmer orb 3 — larger, softer, slightly higher — feels like ambient light shift -->
+  <ellipse cx="600" cy="430" rx="380" ry="220" fill="url(#orb3)" filter="url(#orbBlur2)" opacity="0">
+    <animate attributeName="cx" values="200;1000;200" dur="22s" begin="2s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>
+    <animate attributeName="cy" values="460;410;460" dur="22s" begin="2s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>
+    <animate attributeName="opacity" values="0;0.35;0.5;0.35;0" keyTimes="0;0.15;0.5;0.85;1" dur="22s" begin="2s" repeatCount="indefinite"/>
+  </ellipse>
 
-  <!-- LAYER 4: Main radar/targeting reticle — center -->
-  <g fill="none" stroke="#b8960c" opacity="0.042" transform="translate(600,430)">
-    <circle r="280" stroke-width="0.4"/>
-    <circle r="220" stroke-width="0.4"/>
-    <circle r="160" stroke-width="0.5"/>
-    <circle r="108" stroke-width="0.5"/>
-    <circle r="62" stroke-width="0.6"/>
-    <circle r="28" stroke-width="0.8"/>
-    <circle r="8" stroke-width="1.2" opacity="1.4"/>
-    <line x1="-280" y1="0" x2="280" y2="0" stroke-width="0.4"/>
-    <line x1="0" y1="-280" x2="0" y2="280" stroke-width="0.4"/>
-    <line x1="-198" y1="-198" x2="198" y2="198" stroke-width="0.25" opacity="0.6"/>
-    <line x1="198" y1="-198" x2="-198" y2="198" stroke-width="0.25" opacity="0.6"/>
-    <line x1="158" y1="0" x2="162" y2="0" stroke-width="1.2"/>
-    <line x1="-158" y1="0" x2="-162" y2="0" stroke-width="1.2"/>
-    <line x1="0" y1="158" x2="0" y2="162" stroke-width="1.2"/>
-    <line x1="0" y1="-158" x2="0" y2="-162" stroke-width="1.2"/>
-    <polygon points="0,-62 62,0 0,62 -62,0" stroke-width="0.5" opacity="0.7"/>
-    <path d="M -196,-82 A 212,212 0 0,1 -82,-196" stroke-width="0.7" opacity="0.8"/>
-    <path d="M 82,-196 A 212,212 0 0,1 196,-82" stroke-width="0.7" opacity="0.8"/>
-    <path d="M 196,82 A 212,212 0 0,1 82,196" stroke-width="0.7" opacity="0.8"/>
-    <path d="M -82,196 A 212,212 0 0,1 -196,82" stroke-width="0.7" opacity="0.8"/>
-  </g>
-
-  <!-- LAYER 5: Data node network -->
-  <g fill="none" stroke="#b8960c" opacity="0.07">
-    <circle cx="128" cy="142" r="3" fill="#b8960c" stroke="none"/>
-    <circle cx="340" cy="88" r="2.5" fill="#b8960c" stroke="none"/>
-    <circle cx="510" cy="175" r="2" fill="#b8960c" stroke="none"/>
-    <circle cx="760" cy="108" r="3" fill="#b8960c" stroke="none"/>
-    <circle cx="920" cy="190" r="2" fill="#b8960c" stroke="none"/>
-    <circle cx="1080" cy="120" r="2.5" fill="#b8960c" stroke="none"/>
-    <circle cx="88" cy="310" r="2" fill="#b8960c" stroke="none"/>
-    <circle cx="440" cy="265" r="3.5" fill="#b8960c" stroke="none"/>
-    <circle cx="680" cy="240" r="2" fill="#b8960c" stroke="none"/>
-    <circle cx="850" cy="580" r="3" fill="#b8960c" stroke="none"/>
-    <circle cx="1050" cy="520" r="2" fill="#b8960c" stroke="none"/>
-    <circle cx="150" cy="720" r="2.5" fill="#b8960c" stroke="none"/>
-    <circle cx="380" cy="780" r="2" fill="#b8960c" stroke="none"/>
-    <circle cx="1130" cy="740" r="3" fill="#b8960c" stroke="none"/>
-    <circle cx="70" cy="600" r="2" fill="#b8960c" stroke="none"/>
-    <line x1="128" y1="142" x2="340" y2="88" stroke-width="0.4"/>
-    <line x1="340" y1="88" x2="510" y2="175" stroke-width="0.35"/>
-    <line x1="510" y1="175" x2="760" y2="108" stroke-width="0.3"/>
-    <line x1="760" y1="108" x2="920" y2="190" stroke-width="0.35"/>
-    <line x1="920" y1="190" x2="1080" y2="120" stroke-width="0.3"/>
-    <line x1="128" y1="142" x2="88" y2="310" stroke-width="0.3"/>
-    <line x1="340" y1="88" x2="440" y2="265" stroke-width="0.4"/>
-    <line x1="440" y1="265" x2="680" y2="240" stroke-width="0.3"/>
-    <line x1="760" y1="108" x2="680" y2="240" stroke-width="0.3"/>
-    <line x1="850" y1="580" x2="1050" y2="520" stroke-width="0.35"/>
-    <line x1="1080" y1="120" x2="1050" y2="520" stroke-width="0.25"/>
-    <line x1="70" y1="600" x2="150" y2="720" stroke-width="0.3"/>
-    <line x1="150" y1="720" x2="380" y2="780" stroke-width="0.3"/>
-    <line x1="1050" y1="520" x2="1130" y2="740" stroke-width="0.3"/>
-    <line x1="88" y1="310" x2="70" y2="600" stroke-width="0.25"/>
-  </g>
-
-  <!-- LAYER 6: Corner registration marks -->
-  <g stroke="#b8960c" stroke-width="0.8" opacity="0.18">
-    <line x1="28" y1="28" x2="72" y2="28"/><line x1="28" y1="28" x2="28" y2="72"/>
-    <line x1="1172" y1="28" x2="1128" y2="28"/><line x1="1172" y1="28" x2="1172" y2="72"/>
-    <line x1="28" y1="872" x2="72" y2="872"/><line x1="28" y1="872" x2="28" y2="828"/>
-    <line x1="1172" y1="872" x2="1128" y2="872"/><line x1="1172" y1="872" x2="1172" y2="828"/>
-    <rect x="24" y="24" width="4" height="4" fill="#b8960c" stroke="none" opacity="0.5"/>
-    <rect x="1172" y="24" width="4" height="4" fill="#b8960c" stroke="none" opacity="0.5"/>
-    <rect x="24" y="872" width="4" height="4" fill="#b8960c" stroke="none" opacity="0.5"/>
-    <rect x="1172" y="872" width="4" height="4" fill="#b8960c" stroke="none" opacity="0.5"/>
-  </g>
-
-  <!-- LAYER 7 & 8: Circuit traces -->
-  <g stroke="#b8960c" stroke-width="0.5" opacity="0.055" fill="none">
-    <polyline points="30,820 30,860 90,860 90,840 130,840"/>
-    <polyline points="130,840 170,840 170,870 220,870"/>
-    <circle cx="90" cy="860" r="3" fill="#b8960c" stroke="none" opacity="0.8"/>
-    <circle cx="130" cy="840" r="2.5" fill="#b8960c" stroke="none" opacity="0.8"/>
-    <polyline points="220,870 260,870 260,850 310,850 310,870 360,870"/>
-    <polyline points="1170,80 1170,40 1110,40 1110,60 1070,60"/>
-    <polyline points="1070,60 1030,60 1030,30 980,30"/>
-    <circle cx="1110" cy="40" r="3" fill="#b8960c" stroke="none" opacity="0.8"/>
-    <circle cx="1070" cy="60" r="2.5" fill="#b8960c" stroke="none" opacity="0.8"/>
-    <polyline points="980,30 940,30 940,50 890,50 890,30 840,30"/>
-  </g>
-
-  <!-- ═══════════════════════════════════════════════════
-       LAYER 9: JUSHI LETTERFORM GOLD EDGE GLOW
-       Letters span approximately x:55-1155, y:168-732
-       J≈55-255  U≈280-490  S≈510-700  H≈720-930  I≈955-1155
-  ═══════════════════════════════════════════════════ -->
-
-  <!-- Static base glow — very faint warm haze sitting behind each letter -->
-  <g opacity="0.06" filter="url(#softGlow)">
-    <!-- J -->
-    <path d="M 100,185 L 240,185 L 240,205 L 175,205 L 175,590 Q 175,680 130,710 Q 85,740 55,720 L 65,700 Q 88,715 110,695 Q 140,670 140,590 L 140,205 L 100,205 Z" fill="none" stroke="#d4a832" stroke-width="3"/>
-    <!-- U -->
-    <path d="M 290,185 L 290,600 Q 290,700 385,715 Q 480,700 480,600 L 480,185" fill="none" stroke="#d4a832" stroke-width="3"/>
-    <!-- S -->
-    <path d="M 690,270 Q 640,185 555,185 Q 490,185 510,260 Q 525,310 600,340 Q 680,370 700,430 Q 720,500 660,560 Q 610,620 530,625 Q 470,625 510,700" fill="none" stroke="#d4a832" stroke-width="3"/>
-    <!-- H -->
-    <path d="M 730,185 L 730,715 M 920,185 L 920,715 M 730,440 L 920,440" fill="none" stroke="#d4a832" stroke-width="3"/>
-    <!-- I -->
-    <path d="M 955,185 L 1155,185 M 1055,185 L 1055,715 M 955,715 L 1155,715" fill="none" stroke="#d4a832" stroke-width="3"/>
-  </g>
-
-  <!-- Animated shimmer lines — travel along letter outlines -->
-  <!-- The shimmer is achieved by a moving bright stroke-dasharray overlay -->
-  <style>
-    @keyframes shimmerJ {
-      0%   { stroke-dashoffset: 2400; opacity: 0; }
-      5%   { opacity: 1; }
-      80%  { opacity: 0.9; }
-      100% { stroke-dashoffset: 0; opacity: 0; }
-    }
-    @keyframes shimmerU {
-      0%   { stroke-dashoffset: 1600; opacity: 0; }
-      8%   { opacity: 0.9; }
-      85%  { opacity: 0.8; }
-      100% { stroke-dashoffset: 0; opacity: 0; }
-    }
-    @keyframes shimmerS {
-      0%   { stroke-dashoffset: 1400; opacity: 0; }
-      8%   { opacity: 0.85; }
-      85%  { opacity: 0.75; }
-      100% { stroke-dashoffset: 0; opacity: 0; }
-    }
-    @keyframes shimmerH {
-      0%   { stroke-dashoffset: 2000; opacity: 0; }
-      8%   { opacity: 0.9; }
-      85%  { opacity: 0.8; }
-      100% { stroke-dashoffset: 0; opacity: 0; }
-    }
-    @keyframes shimmerI {
-      0%   { stroke-dashoffset: 1200; opacity: 0; }
-      8%   { opacity: 0.9; }
-      85%  { opacity: 0.8; }
-      100% { stroke-dashoffset: 0; opacity: 0; }
-    }
-    .ltr-j { stroke-dasharray: 120 2280; animation: shimmerJ 9s ease-in-out 0.5s infinite; }
-    .ltr-u { stroke-dasharray: 100 1500; animation: shimmerU 9s ease-in-out 2s infinite; }
-    .ltr-s { stroke-dasharray: 90 1310; animation: shimmerS 9s ease-in-out 3.5s infinite; }
-    .ltr-h { stroke-dasharray: 110 1890; animation: shimmerH 9s ease-in-out 5s infinite; }
-    .ltr-i { stroke-dasharray: 80 1120; animation: shimmerI 9s ease-in-out 6.5s infinite; }
-  </style>
-
-  <!-- J letterform shimmer path — serif J with descender curl -->
-  <path class="ltr-j"
-    d="M 108,190 L 232,190 Q 240,190 240,198 L 240,590 Q 240,650 220,690 Q 196,730 155,738 Q 110,742 78,718 Q 58,703 52,682 L 72,672 Q 84,700 118,706 Q 152,710 172,680 Q 190,650 190,590 L 190,218 Q 190,210 182,210 L 108,210 Z"
-    fill="none" stroke="#f5e398" stroke-width="1.5"
-    filter="url(#letterGlow)" opacity="0"/>
-
-  <!-- U letterform shimmer path — rounded bottom bowl -->
-  <path class="ltr-u"
-    d="M 295,190 L 295,598 Q 295,660 340,700 Q 375,728 385,730 Q 395,732 385,730 Q 430,732 460,700 Q 480,660 480,598 L 480,190"
-    fill="none" stroke="#f5e398" stroke-width="1.5"
-    filter="url(#letterGlow)" opacity="0"/>
-
-  <!-- S letterform shimmer path — flowing S curve -->
-  <path class="ltr-s"
-    d="M 688,258 Q 660,210 615,196 Q 570,182 530,192 Q 488,204 500,252 Q 512,292 555,318 Q 598,344 628,368 Q 672,402 685,448 Q 700,502 670,548 Q 645,588 600,610 Q 556,630 518,622 Q 482,614 510,700"
-    fill="none" stroke="#f5e398" stroke-width="1.5"
-    filter="url(#letterGlow)" opacity="0"/>
-
-  <!-- H letterform shimmer path — two uprights + crossbar -->
-  <path class="ltr-h"
-    d="M 738,190 L 738,718 M 912,190 L 912,718 M 738,448 L 912,448"
-    fill="none" stroke="#f5e398" stroke-width="1.5"
-    filter="url(#letterGlow)" opacity="0"/>
-
-  <!-- I letterform shimmer path — serifs top bottom + stem -->
-  <path class="ltr-i"
-    d="M 962,194 L 1148,194 M 1055,194 L 1055,706 M 962,706 L 1148,706"
-    fill="none" stroke="#f5e398" stroke-width="1.5"
-    filter="url(#letterGlow)" opacity="0"/>
-
-  <!-- Subtle constant warm haze along letter zone — always visible, very faint -->
-  <rect x="50" y="170" width="1110" height="570" fill="none"
-    stroke="url(#goldShimmer)" stroke-width="0.5" opacity="0.12"/>
-
-  <!-- LAYER 9: Vignette -->
-  <rect width="1200" height="900" fill="url(#vignette)"/>
-</svg></div>
-    <line x1="0" y1="75" x2="1200" y2="75"/><line x1="0" y1="150" x2="1200" y2="150"/>
-    <line x1="0" y1="225" x2="1200" y2="225"/><line x1="0" y1="300" x2="1200" y2="300"/>
-    <line x1="0" y1="375" x2="1200" y2="375"/><line x1="0" y1="450" x2="1200" y2="450"/>
-    <line x1="0" y1="525" x2="1200" y2="525"/><line x1="0" y1="600" x2="1200" y2="600"/>
-    <line x1="0" y1="675" x2="1200" y2="675"/><line x1="0" y1="750" x2="1200" y2="750"/>
-    <line x1="0" y1="825" x2="1200" y2="825"/>
-    <line x1="75" y1="0" x2="75" y2="900"/><line x1="150" y1="0" x2="150" y2="900"/>
-    <line x1="225" y1="0" x2="225" y2="900"/><line x1="300" y1="0" x2="300" y2="900"/>
-    <line x1="375" y1="0" x2="375" y2="900"/><line x1="450" y1="0" x2="450" y2="900"/>
-    <line x1="525" y1="0" x2="525" y2="900"/><line x1="600" y1="0" x2="600" y2="900"/>
-    <line x1="675" y1="0" x2="675" y2="900"/><line x1="750" y1="0" x2="750" y2="900"/>
-    <line x1="825" y1="0" x2="825" y2="900"/><line x1="900" y1="0" x2="900" y2="900"/>
-    <line x1="975" y1="0" x2="975" y2="900"/><line x1="1050" y1="0" x2="1050" y2="900"/>
-    <line x1="1125" y1="0" x2="1125" y2="900"/>
-  </g>
-
-  <!-- LAYER 2: Topographic elevation rings — left cluster -->
-  <g fill="none" stroke="#b8960c" opacity="0.055">
-    <ellipse cx="220" cy="480" rx="340" ry="190" stroke-width="0.6"/>
-    <ellipse cx="220" cy="480" rx="275" ry="152" stroke-width="0.5"/>
-    <ellipse cx="220" cy="480" rx="210" ry="116" stroke-width="0.5"/>
-    <ellipse cx="220" cy="480" rx="150" ry="83" stroke-width="0.6"/>
-    <ellipse cx="220" cy="480" rx="96" ry="53" stroke-width="0.7"/>
-    <ellipse cx="220" cy="480" rx="50" ry="28" stroke-width="0.8"/>
-    <ellipse cx="220" cy="480" rx="18" ry="10" stroke-width="1" opacity="1.5"/>
-  </g>
-
-  <!-- LAYER 3: Topographic elevation rings — right cluster -->
-  <g fill="none" stroke="#b8960c" opacity="0.04">
-    <ellipse cx="970" cy="310" rx="310" ry="200" stroke-width="0.6"/>
-    <ellipse cx="970" cy="310" rx="248" ry="160" stroke-width="0.5"/>
-    <ellipse cx="970" cy="310" rx="190" ry="122" stroke-width="0.5"/>
-    <ellipse cx="970" cy="310" rx="135" ry="87" stroke-width="0.6"/>
-    <ellipse cx="970" cy="310" rx="85" ry="55" stroke-width="0.7"/>
-    <ellipse cx="970" cy="310" rx="40" ry="26" stroke-width="0.8"/>
-    <ellipse cx="970" cy="310" rx="14" ry="9" stroke-width="1"/>
-  </g>
-
-  <!-- LAYER 4: Main radar/targeting reticle — center -->
-  <g fill="none" stroke="#b8960c" opacity="0.055" transform="translate(600,430)">
-    <circle r="280" stroke-width="0.4"/>
-    <circle r="220" stroke-width="0.4"/>
-    <circle r="160" stroke-width="0.5"/>
-    <circle r="108" stroke-width="0.5"/>
-    <circle r="62" stroke-width="0.6"/>
-    <circle r="28" stroke-width="0.8"/>
-    <circle r="8" stroke-width="1.2" opacity="1.4"/>
-    <!-- Crosshairs -->
-    <line x1="-280" y1="0" x2="280" y2="0" stroke-width="0.4"/>
-    <line x1="0" y1="-280" x2="0" y2="280" stroke-width="0.4"/>
-    <!-- 45° diagonal hairs -->
-    <line x1="-198" y1="-198" x2="198" y2="198" stroke-width="0.25" opacity="0.6"/>
-    <line x1="198" y1="-198" x2="-198" y2="198" stroke-width="0.25" opacity="0.6"/>
-    <!-- Tick marks on main ring -->
-    <line x1="158" y1="0" x2="162" y2="0" stroke-width="1.2"/>
-    <line x1="-158" y1="0" x2="-162" y2="0" stroke-width="1.2"/>
-    <line x1="0" y1="158" x2="0" y2="162" stroke-width="1.2"/>
-    <line x1="0" y1="-158" x2="0" y2="-162" stroke-width="1.2"/>
-    <line x1="112" y1="0" x2="116" y2="0" stroke-width="0.8"/>
-    <line x1="-112" y1="0" x2="-116" y2="0" stroke-width="0.8"/>
-    <line x1="0" y1="112" x2="0" y2="116" stroke-width="0.8"/>
-    <line x1="0" y1="-112" x2="0" y2="-116" stroke-width="0.8"/>
-    <!-- Diamond inner -->
-    <polygon points="0,-62 62,0 0,62 -62,0" stroke-width="0.5" opacity="0.7"/>
-    <!-- Outer arc brackets -->
-    <path d="M -196,-82 A 212,212 0 0,1 -82,-196" stroke-width="0.7" opacity="0.8"/>
-    <path d="M 82,-196 A 212,212 0 0,1 196,-82" stroke-width="0.7" opacity="0.8"/>
-    <path d="M 196,82 A 212,212 0 0,1 82,196" stroke-width="0.7" opacity="0.8"/>
-    <path d="M -82,196 A 212,212 0 0,1 -196,82" stroke-width="0.7" opacity="0.8"/>
-  </g>
-
-  <!-- LAYER 5: Data node network — scattered intelligence nodes -->
-  <g fill="none" stroke="#b8960c" opacity="0.09">
-    <!-- Node dots -->
-    <circle cx="128" cy="142" r="3" fill="#b8960c" stroke="none"/>
-    <circle cx="340" cy="88" r="2.5" fill="#b8960c" stroke="none"/>
-    <circle cx="510" cy="175" r="2" fill="#b8960c" stroke="none"/>
-    <circle cx="760" cy="108" r="3" fill="#b8960c" stroke="none"/>
-    <circle cx="920" cy="190" r="2" fill="#b8960c" stroke="none"/>
-    <circle cx="1080" cy="120" r="2.5" fill="#b8960c" stroke="none"/>
-    <circle cx="88" cy="310" r="2" fill="#b8960c" stroke="none"/>
-    <circle cx="440" cy="265" r="3.5" fill="#b8960c" stroke="none"/>
-    <circle cx="680" cy="240" r="2" fill="#b8960c" stroke="none"/>
-    <circle cx="850" cy="580" r="3" fill="#b8960c" stroke="none"/>
-    <circle cx="1050" cy="520" r="2" fill="#b8960c" stroke="none"/>
-    <circle cx="150" cy="720" r="2.5" fill="#b8960c" stroke="none"/>
-    <circle cx="380" cy="780" r="2" fill="#b8960c" stroke="none"/>
-    <circle cx="1130" cy="740" r="3" fill="#b8960c" stroke="none"/>
-    <circle cx="70" cy="600" r="2" fill="#b8960c" stroke="none"/>
-    <!-- Connection lines between nodes -->
-    <line x1="128" y1="142" x2="340" y2="88" stroke-width="0.4"/>
-    <line x1="340" y1="88" x2="510" y2="175" stroke-width="0.35"/>
-    <line x1="510" y1="175" x2="760" y2="108" stroke-width="0.3"/>
-    <line x1="760" y1="108" x2="920" y2="190" stroke-width="0.35"/>
-    <line x1="920" y1="190" x2="1080" y2="120" stroke-width="0.3"/>
-    <line x1="128" y1="142" x2="88" y2="310" stroke-width="0.3"/>
-    <line x1="340" y1="88" x2="440" y2="265" stroke-width="0.4"/>
-    <line x1="440" y1="265" x2="680" y2="240" stroke-width="0.3"/>
-    <line x1="760" y1="108" x2="680" y2="240" stroke-width="0.3"/>
-    <line x1="850" y1="580" x2="1050" y2="520" stroke-width="0.35"/>
-    <line x1="1080" y1="120" x2="1050" y2="520" stroke-width="0.25"/>
-    <line x1="70" y1="600" x2="150" y2="720" stroke-width="0.3"/>
-    <line x1="150" y1="720" x2="380" y2="780" stroke-width="0.3"/>
-    <line x1="1050" y1="520" x2="1130" y2="740" stroke-width="0.3"/>
-    <line x1="88" y1="310" x2="70" y2="600" stroke-width="0.25"/>
-    <line x1="440" y1="265" x2="380" y2="780" stroke-width="0.2" stroke-dasharray="4 6"/>
-    <line x1="850" y1="580" x2="380" y2="780" stroke-width="0.2" stroke-dasharray="4 6"/>
-  </g>
-
-  <!-- LAYER 6: Corner registration marks — all four corners -->
-  <g stroke="#b8960c" stroke-width="0.8" opacity="0.18">
-    <line x1="28" y1="28" x2="72" y2="28"/><line x1="28" y1="28" x2="28" y2="72"/>
-    <line x1="1172" y1="28" x2="1128" y2="28"/><line x1="1172" y1="28" x2="1172" y2="72"/>
-    <line x1="28" y1="872" x2="72" y2="872"/><line x1="28" y1="872" x2="28" y2="828"/>
-    <line x1="1172" y1="872" x2="1128" y2="872"/><line x1="1172" y1="872" x2="1172" y2="828"/>
-    <!-- Corner inner pips -->
-    <rect x="24" y="24" width="4" height="4" fill="#b8960c" stroke="none" opacity="0.5"/>
-    <rect x="1172" y="24" width="4" height="4" fill="#b8960c" stroke="none" opacity="0.5"/>
-    <rect x="24" y="872" width="4" height="4" fill="#b8960c" stroke="none" opacity="0.5"/>
-    <rect x="1172" y="872" width="4" height="4" fill="#b8960c" stroke="none" opacity="0.5"/>
-  </g>
-
-  <!-- LAYER 7: Micro circuit trace details — bottom left panel -->
-  <g stroke="#b8960c" stroke-width="0.5" opacity="0.065" fill="none">
-    <polyline points="30,820 30,860 90,860 90,840 130,840"/>
-    <polyline points="130,840 170,840 170,870 220,870"/>
-    <circle cx="90" cy="860" r="3" fill="#b8960c" stroke="none" opacity="0.8"/>
-    <circle cx="130" cy="840" r="2.5" fill="#b8960c" stroke="none" opacity="0.8"/>
-    <circle cx="170" cy="840" r="2" fill="#b8960c" stroke="none" opacity="0.6"/>
-    <polyline points="30,790 30,820"/>
-    <polyline points="60,820 60,850 100,850"/>
-    <circle cx="60" cy="820" r="2" fill="#b8960c" stroke="none" opacity="0.6"/>
-    <polyline points="220,870 260,870 260,850 310,850 310,870 360,870"/>
-    <circle cx="260" cy="850" r="2" fill="#b8960c" stroke="none" opacity="0.5"/>
-    <circle cx="310" cy="850" r="2" fill="#b8960c" stroke="none" opacity="0.5"/>
-  </g>
-
-  <!-- LAYER 8: Micro circuit trace details — top right panel -->
-  <g stroke="#b8960c" stroke-width="0.5" opacity="0.065" fill="none">
-    <polyline points="1170,80 1170,40 1110,40 1110,60 1070,60"/>
-    <polyline points="1070,60 1030,60 1030,30 980,30"/>
-    <circle cx="1110" cy="40" r="3" fill="#b8960c" stroke="none" opacity="0.8"/>
-    <circle cx="1070" cy="60" r="2.5" fill="#b8960c" stroke="none" opacity="0.8"/>
-    <circle cx="1030" cy="60" r="2" fill="#b8960c" stroke="none" opacity="0.6"/>
-    <polyline points="1170,110 1170,80"/>
-    <polyline points="1140,80 1140,50 1100,50"/>
-    <circle cx="1140" cy="80" r="2" fill="#b8960c" stroke="none" opacity="0.6"/>
-    <polyline points="980,30 940,30 940,50 890,50 890,30 840,30"/>
-    <circle cx="940" cy="50" r="2" fill="#b8960c" stroke="none" opacity="0.5"/>
-    <circle cx="890" cy="50" r="2" fill="#b8960c" stroke="none" opacity="0.5"/>
-  </g>
-
-  <!-- LAYER 9: Vignette — pulls focus center, hides edges -->
+  <!-- Vignette to keep edges dark and focus on center -->
   <rect width="1200" height="900" fill="url(#vignette)"/>
 </svg></div>
       <div class="scope-bar" id="scope-bar">
@@ -3108,6 +2859,17 @@ body::before {
             </div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- RESPONSES -->
+    <div class="panel" data-panel="responses">
+      <div class="resp-wrap">
+        <div class="resp-top">
+          <div class="resp-title">Saved Responses</div>
+          <div class="resp-sub">Overviews, summaries, and key intelligence saved from chat. Download any response as a Markdown file.</div>
+        </div>
+        <div class="resp-body" id="resp-body"></div>
       </div>
     </div>
 
@@ -3430,9 +3192,10 @@ const MODELS = [
 ];
 
 const MODS = [
-  {id:'chat',  label:'Intelligence', icon:'\u25C8'},
-  {id:'files', label:'Documents',    icon:'\u2261'},
-  {id:'admin', label:'Config',       icon:'\u2699'},
+  {id:'chat',      label:'Intelligence', icon:'\u25C8'},
+  {id:'files',     label:'Documents',    icon:'\u2261'},
+  {id:'responses', label:'Responses',    icon:'\u2193'},
+  {id:'admin',     label:'Config',       icon:'\u2699'},
 ];
 
 let token   = sessionStorage.getItem('caci_token') || '';
@@ -3576,9 +3339,9 @@ function switchPanel(id) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.p === id));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.p === id));
   $('tb-module').textContent = MODS.find(m => m.id === id)?.label || '';
+  if (id === 'responses') loadResponses();
   if (id === 'files') { loadCollections(); loadFiles(); loadContextDocs(); }
   if (id === 'admin') { loadAdminConfig(); loadIntegrationStatuses(); loadConnectorStatuses(); }
-  if (id === 'reports') updateReportScopeNote();
 }
 
 /* DEPT */
@@ -3810,24 +3573,120 @@ function appendMsg(role, text, sources, scope) {
   const src = sources && sources.length ? `<div class="msg-sources">Sources &mdash; <b>${sources.join(' \u00b7 ')}</b></div>` : '';
   const sc = scope && scope !== 'all' ? `<div class="msg-scope">Scope: ${scope === 'file' ? chatFileName : scope === 'collection' ? chatCollection : 'all'}</div>` : '';
   const spk = role === 'ai' ? `<button class="spk-btn" title="Read aloud" data-spk="1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 010 7.07"/><path d="M19.07 4.93a10 10 0 010 14.14"/></svg></button>` : '';
-  el.innerHTML = `<div class="msg-av">${av}</div><div class="msg-body">${sc}\x3Cdiv class="msg-bubble">${esc(text)}\x3C/div>${src}${spk}\x3C/div>`;
+  const actions = role === 'ai' ? `<div class="msg-actions">
+    <button class="msg-action-btn dl-btn" title="Download as .md file">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download
+    </button>
+    <button class="msg-action-btn save-btn" title="Save to Responses folder">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+      Save
+    </button>
+  </div>` : '';
+  el.innerHTML = `<div class="msg-av">${av}</div><div class="msg-body">${sc}\x3Cdiv class="msg-bubble">${esc(text)}\x3C/div>${src}${spk}${actions}\x3C/div>`;
   if (role === 'ai') {
     const spkBtn = el.querySelector('.spk-btn');
     if (spkBtn) {
       spkBtn._spkText = text;
       spkBtn.addEventListener('click', function() { speakText(this, this._spkText); });
     }
+    const dlBtn = el.querySelector('.dl-btn');
+    if (dlBtn) {
+      dlBtn.addEventListener('click', () => downloadResponse(text));
+    }
+    const saveBtn = el.querySelector('.save-btn');
+    if (saveBtn) {
+      saveBtn._respText = text;
+      // find the last user message as the prompt label
+      const msgs = $('chat-msgs').querySelectorAll('.msg.user .msg-bubble');
+      saveBtn._prompt = msgs.length ? msgs[msgs.length - 1].textContent.trim() : 'Response';
+      saveBtn.addEventListener('click', function() {
+        saveResponse(this._prompt, this._respText);
+        this.classList.add('saved');
+        this.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Saved`;
+        this.disabled = true;
+      });
+    }
   }
   $('chat-msgs').appendChild(el);
-  $('chat-msgs').scrollTop = 999999;
+  // Reliable scroll: use scrollIntoView on a sentinel element
+  el.scrollIntoView({block:'end', behavior:'smooth'});
   if (role === 'ai' && voiceAutoSpeak) speakText(null, text);
+}
+
+function downloadResponse(text) {
+  const ts = new Date().toISOString().slice(0,19).replace('T','_').replace(/:/g,'-');
+  const filename = `caci-response-${ts}.md`;
+  const blob = new Blob([text], {type: 'text/markdown;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function saveResponse(prompt, text) {
+  const stored = JSON.parse(localStorage.getItem('caci_saved_responses') || '[]');
+  stored.unshift({
+    id: Date.now(),
+    prompt: prompt.slice(0, 200),
+    text,
+    dept,
+    savedAt: new Date().toISOString()
+  });
+  // Keep max 100 saved responses
+  if (stored.length > 100) stored.splice(100);
+  localStorage.setItem('caci_saved_responses', JSON.stringify(stored));
+}
+
+function loadResponses() {
+  const stored = JSON.parse(localStorage.getItem('caci_saved_responses') || '[]');
+  const body = $('resp-body');
+  if (!body) return;
+  if (!stored.length) {
+    body.innerHTML = `<div class="resp-empty"><div class="resp-empty-icon">\u2193</div><div>No saved responses yet.<br>Use the <strong style="color:var(--smoke2)">Save</strong> button on any AI message.</div></div>`;
+    return;
+  }
+  body.innerHTML = stored.map(r => {
+    const ts = new Date(r.savedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit',hour:'2-digit',minute:'2-digit'});
+    const preview = esc(r.text);
+    return `<div class="resp-card" data-rid="${r.id}">
+      <div class="resp-card-head">
+        <div>
+          <div class="resp-card-meta">${ts}${r.dept ? ' &middot; ' + r.dept.toUpperCase() : ''}</div>
+          <div class="resp-card-prompt">${esc(r.prompt)}</div>
+        </div>
+        <div class="resp-card-actions">
+          <button class="resp-card-btn" onclick="downloadResponse(${JSON.stringify(r.text)})">&#8595; Download</button>
+          <button class="resp-card-btn del" onclick="deleteResponse(${r.id})">Delete</button>
+        </div>
+      </div>
+      <div class="resp-preview" id="rprev-${r.id}">${preview}</div>
+      <button class="resp-expand-btn" onclick="toggleRespExpand(${r.id}, this)">Show full response &darr;</button>
+    </div>`;
+  }).join('');
+}
+
+function toggleRespExpand(id, btn) {
+  const prev = $('rprev-' + id);
+  if (!prev) return;
+  prev.classList.toggle('expanded');
+  btn.textContent = prev.classList.contains('expanded') ? 'Collapse \u2191' : 'Show full response \u2193';
+}
+
+function deleteResponse(id) {
+  let stored = JSON.parse(localStorage.getItem('caci_saved_responses') || '[]');
+  stored = stored.filter(r => r.id !== id);
+  localStorage.setItem('caci_saved_responses', JSON.stringify(stored));
+  loadResponses();
 }
 function appendTyping() {
   const el = document.createElement('div');
   el.className = 'msg ai';
   el.innerHTML = `<div class="msg-av">CACI</div><div class="msg-body"><div class="msg-bubble"><div class="typing-wrap"><div class="td"></div><div class="td"></div><div class="td"></div></div></div></div>`;
   $('chat-msgs').appendChild(el);
-  $('chat-msgs').scrollTop = 999999;
+  el.scrollIntoView({block:'end', behavior:'smooth'});
   return el;
 }
 
