@@ -128,6 +128,61 @@ body::before {
   width: 100%; max-width: 380px;
   animation: fadeUp 0.9s var(--ease) both;
 }
+/* Gold rectangle frame — wraps the entire login content area */
+.login-frame-box {
+  position: fixed;
+  top: 12vh; bottom: 12vh;
+  left: 8vw; right: 8vw;
+  border: 1px solid rgba(184,150,12,0.35);
+  pointer-events: none;
+  z-index: 8999;
+  box-shadow: 0 0 40px rgba(184,150,12,0.04), inset 0 0 0 1px rgba(245,227,152,0.03);
+  animation: fadeUp 1.1s var(--ease) both;
+}
+/* Top bright edge */
+.login-frame-box::before {
+  content: '';
+  position: absolute; top: 0; left: 8%; right: 8%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(245,227,152,0.5) 25%, rgba(255,248,200,0.9) 50%, rgba(245,227,152,0.5) 75%, transparent);
+}
+/* Bottom dim edge */
+.login-frame-box::after {
+  content: '';
+  position: absolute; bottom: 0; left: 8%; right: 8%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(184,150,12,0.25) 25%, rgba(212,168,50,0.45) 50%, rgba(184,150,12,0.25) 75%, transparent);
+}
+/* Shimmer sweep */
+.login-frame-shimmer {
+  position: absolute; inset: 0;
+  background: linear-gradient(108deg,
+    transparent 0%, transparent 30%,
+    rgba(245,227,152,0.04) 42%, rgba(255,248,200,0.08) 50%,
+    rgba(245,227,152,0.04) 58%, transparent 70%, transparent 100%
+  );
+  background-size: 300% 100%;
+  background-position: 140% 0;
+  animation: frameShimmer 3.4s ease 0.8s both;
+  pointer-events: none;
+}
+@keyframes frameShimmer {
+  0%   { background-position: 140% 0; opacity: 0; }
+  6%   { opacity: 1; }
+  100% { background-position: -60% 0; opacity: 0.8; }
+}
+/* Corner dots */
+.login-frame-box .fc {
+  position: absolute;
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: rgba(212,168,50,0.55);
+  box-shadow: 0 0 8px rgba(184,150,12,0.5);
+}
+.login-frame-box .fc.tl { top: -2.5px; left: -2.5px; }
+.login-frame-box .fc.tr { top: -2.5px; right: -2.5px; }
+.login-frame-box .fc.bl { bottom: -2.5px; left: -2.5px; }
+.login-frame-box .fc.br { bottom: -2.5px; right: -2.5px; }
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(28px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -1192,7 +1247,7 @@ body::before {
 }
 .dg-name {
   font-family: var(--f-display);
-  font-size: clamp(28px, 4vw, 42px);
+  font-size: clamp(38px, 5vw, 58px);
   font-weight: 300;
   letter-spacing: 0.1em;
   line-height: 1;
@@ -2765,6 +2820,11 @@ body::before {
 
 <!-- LOGIN -->
 <div id="login-screen">
+  <div class="login-frame-box" aria-hidden="true">
+    <div class="fc tl"></div><div class="fc tr"></div>
+    <div class="fc bl"></div><div class="fc br"></div>
+    <div class="login-frame-shimmer"></div>
+  </div>
   <div class="login-wrap">
     <div class="login-mark">
       <div class="login-wordmark">CACI</div>
