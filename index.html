@@ -309,11 +309,10 @@ body::before {
 .linput {
   width: 100%;
   padding: 14px 20px;
-  background: rgba(4,6,14,0.75);
-  border: none;
-  border-bottom: 1px solid rgba(184,150,12,0.28);
-  border-radius: 0;
-  color: rgba(245,227,152,0.82);
+  background: rgba(8,12,24,0.6);
+  border: 1px solid rgba(184,150,12,0.28);
+  border-radius: 3px;
+  color: rgba(245,227,152,0.75);
   font-family: var(--f-mono);
   font-size: 15px;
   font-weight: 300;
@@ -324,14 +323,22 @@ body::before {
   text-align: center;
   caret-color: rgba(212,168,50,0.8);
 }
+/* Kill browser autofill white background */
+.linput:-webkit-autofill,
+.linput:-webkit-autofill:hover,
+.linput:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 100px rgba(8,12,24,1) inset;
+  -webkit-text-fill-color: rgba(245,227,152,0.75);
+  caret-color: rgba(212,168,50,0.8);
+}
 .linput::placeholder {
-  color: rgba(184,150,12,0.18);
+  color: rgba(184,150,12,0.15);
   letter-spacing: 0.15em;
 }
 .linput:focus {
-  border-color: rgba(212,168,50,0.65);
-  box-shadow: 0 4px 16px -4px rgba(184,150,12,0.12);
-  color: rgba(255,240,180,0.95);
+  border-color: rgba(212,168,50,0.6);
+  box-shadow: 0 0 0 1px rgba(184,150,12,0.12);
+  color: rgba(245,227,152,0.9);
 }
 /* Thin bottom glow line on focus */
 .linput:focus + .linput-glow {
