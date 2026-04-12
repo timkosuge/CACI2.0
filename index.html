@@ -869,8 +869,9 @@ body::before {
 .tmc-name { font-family: var(--f-mono); font-size: 9px; letter-spacing: 0.12em; color: var(--smoke3); text-transform: uppercase; }
 
 /* ── Content ───────────────────────────────────────────── */
-#content { position: fixed; right: 0; overflow: hidden; }
-.panel { display: none; position: absolute; inset: 0; flex-direction: column; }
+#content { position: fixed; right: 0; overflow: hidden; pointer-events: all; }
+.panel { display: none; position: absolute; inset: 0; flex-direction: column; pointer-events: none; }
+.panel.active { pointer-events: all; }
 .panel.active { display: flex; }
 
 /* ── Chat background ghost overlay ─────────────────────── */
@@ -3580,8 +3581,7 @@ const DEPTS = [
 
 const MODELS = [
   {id:'claude',     name:'Claude Sonnet',   sub:'Anthropic \u00b7 Best reasoning',  dot:'#22c55e'},
-  {id:'grok',       name:'Grok',            sub:'xAI \u00b7 Fast & sharp',          dot:'#d4a017'},
-  {id:'cloudflare', name:'Cloudflare AI',   sub:'Llama 4 \u00b7 Fast & free',      dot:'#f97316'},
+  {id:'cloudflare', name:'Cloudflare AI',   sub:'Llama 3.1 \u00b7 Fast & free',    dot:'#d4a017'},
   {id:'ollama',     name:'Ollama',          sub:'Local \u00b7 Fully private',       dot:'#8e44ad'},
 ];
 
@@ -3983,7 +3983,7 @@ function renderDiscoveryGreeting(text, collections) {
   const msgs = $('chat-msgs');
   const nameEl = document.createElement('div');
   nameEl.id = 'discovery-name';
-  nameEl.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;text-align:center;pointer-events:none;';
+  nameEl.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;text-align:center;';
   nameEl.innerHTML = `<div class="dg-eyebrow" style="margin-bottom:8px">Intelligence Assistant</div><div class="dg-name">CACI</div>`;
   msgs.appendChild(nameEl);
 
