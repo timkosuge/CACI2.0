@@ -3991,11 +3991,11 @@ async function loadContextDocs() {
       if (!confirm('Remove this context document?')) return;
       const fileId = b.dataset.id;
       try {
-        const res = await apiFetch('/files/' + fileId, { method: 'DELETE' });
+        const res = await apiFetch('/files/' + fileId + '?dept=' + encodeURIComponent(dept) + '&col=' + encodeURIComponent(selectedCollection || '') + '&ctx=true', { method: 'DELETE' });
         if (!res.ok) {
           const d = await res.json().catch(() => ({}));
           console.error('Delete failed:', res.status, d);
-          alert('Delete failed: ' + (d.error || res.status) + '. Check console for details.');
+          alert('Delete failed: ' + (d.error || res.status));
           return;
         }
       } catch(e) {
