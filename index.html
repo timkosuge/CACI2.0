@@ -3908,7 +3908,7 @@ function setDept(id) {
   const bar = $('chat-bar'), msgs = $('chat-msgs');
   if (bar) bar.classList.remove('has-messages');
   if (msgs) { msgs.classList.remove('has-messages'); msgs.innerHTML = ''; }
-  $('chat-empty').style.display = 'none';
+  const chatEmpty = $('chat-empty'); if (chatEmpty) chatEmpty.style.display = 'none';
   setScope('all'); syncDept();
   if (curPanel === 'files') { loadCollections(); loadFiles(); }
   if (curPanel === 'chat') initChatGreeting();
