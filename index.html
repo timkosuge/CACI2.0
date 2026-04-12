@@ -2968,9 +2968,11 @@ body::before {
 
   <!-- Sidebar -->
   <aside id="sidebar">
+  <!-- sb-toggle disabled for testing
   <button id="sb-toggle" title="Toggle sidebar" aria-label="Toggle sidebar">
     <svg viewBox="0 0 8 12" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="6,1 2,6 6,11"/></svg>
   </button>
+  -->
     <div class="sb-header">
       <div class="sb-wordmark">CACI</div>
       <div class="sb-tagline">Intelligence Platform</div>
@@ -3677,7 +3679,7 @@ function bootApp() {
   const sbToggle = $('sb-toggle');
   const sidebar  = $('sidebar');
   const contentEl = $('content');
-  sbToggle.addEventListener('click', () => {
+  if (sbToggle) sbToggle.addEventListener('click', () => {
     const collapsed = sidebar.classList.toggle('collapsed');
     sbToggle.classList.toggle('collapsed', collapsed);
     if (contentEl) contentEl.classList.toggle('sb-collapsed', collapsed);
