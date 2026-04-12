@@ -1703,6 +1703,12 @@ body::before {
   color: var(--gold-lt); letter-spacing: 0.06em;
   min-height: 16px; margin-top: 6px;
 }
+.um-col-pick-meta {
+  font-family: var(--f-mono); font-size: 9px;
+  color: var(--gold-lt); letter-spacing: 0.06em;
+  min-height: 14px; margin-top: 4px;
+}
+
 .um-input-err {
   border-color: var(--red-lt) !important;
   box-shadow: 0 0 0 2px rgba(192,57,43,0.18) !important;
@@ -2881,9 +2887,21 @@ async function loadCollections() {
       html += '<div style="padding:12px;font-family:var(--f-mono);font-size:9px;color:var(--smoke4);letter-spacing:.08em;line-height:1.8">No collections yet. Click + New Collection to get started.</div>';
     }
     list.innerHTML = html;
-    $('col-all-btn').addEventListener('click', () => { selectedCollection = null; loadCollections(); loadFiles(); });
+    $('col-all-btn').addEventListener('click', () => {
+      selectedCollection = null;
+      loadCollections(); loadFiles();
+      const ub = $('upload-btn');
+      if (ub) ub.textContent = '↑ Upload & Classify';
+    });
     list.querySelectorAll('.col-item').forEach(el => {
-      el.addEventListener('click', e => { if (e.target.classList.contains('col-del')) return; selectedCollection = el.dataset.col; loadCollections(); loadFiles(); loadContextDocs(); });
+      el.addEventListener('click', e => {
+        if (e.target.classList.contains('col-del')) return;
+        selectedCollection = el.dataset.col;
+        loadCollections(); loadFiles(); loadContextDocs();
+        // Update upload button label
+        const ub = $('upload-btn');
+        if (ub) ub.textContent = selectedCollection ? '↑ Add Files to “' + selectedCollection.slice(0,20) + (selectedCollection.length>20?'…':'') + '”' : '↑ Upload & Classify';
+      });
     });
     list.querySelectorAll('.col-del').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); deleteCollection(b.dataset.col); }));
   } catch(e) { console.error(e); }
@@ -3063,6 +3081,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
 let _umPeriodMode = 'range';
 
+function updateColPickMeta() {
+  const colPick = $('um-collection-pick');
+  const meta    = $('um-col-pick-meta');
+  if (!colPick || !meta) return;
+  const sel = colPick.options[colPick.selectedIndex];
+  if (!sel || !sel.value) {
+    meta.textContent = 'Fields below will create a new collection';
+    meta.style.color = 'var(--smoke4)';
+  } else {
+    meta.textContent = '→ Files will be added to “' + sel.value + '”';
+    meta.style.color = 'var(--gold-lt)';
+    // Auto-fill dept if available
+    if (sel.dataset.dept && $('um-dept-select')) $('um-dept-select').value = sel.dataset.dept;
+    if (sel.dataset.category && $('um-category')) $('um-category').value = sel.dataset.category;
+  }
+}
+
 function getUmPeriod() {
   if (_umPeriodMode === 'range') {
     const from = $('um-date-from')?.value;
@@ -3178,7 +3213,7 @@ const UM_STATES = [
 let _umFiles      = null;
 let _umDupConfirm = false;
 
-function openUploadModal(fileList) {
+async function openUploadModal(fileList) {
   _umFiles      = Array.from(fileList);
   _umDupConfirm = false;
 
@@ -3202,6 +3237,30 @@ function openUploadModal(fileList) {
     DEPTS.forEach(d => { const o = document.createElement('option'); o.value=d.id; o.textContent=d.label; umDeptSel.appendChild(o); });
   }
   if (umDeptSel) umDeptSel.value = dept;
+
+  // Populate collection picker with existing collections
+  const colPick = $('um-collection-pick');
+  if (colPick) {
+    // Remove all except first option
+    while (colPick.options.length > 1) colPick.remove(1);
+    // Pre-select current collection if one is active
+    try {
+      const res  = await apiFetch('/collections?dept=' + dept);
+      const cols = await res.json();
+      cols.forEach(col => {
+        const o = document.createElement('option');
+        o.value = col.name;
+        o.textContent = col.name + (col.dept ? ' · ' + col.dept : '');
+        o.dataset.dept     = col.dept     || '';
+        o.dataset.category = col.category || '';
+        colPick.appendChild(o);
+      });
+    } catch(_) {}
+    // Pre-select if a collection is already active
+    if (selectedCollection) colPick.value = selectedCollection;
+    updateColPickMeta();
+    colPick.onchange = updateColPickMeta;
+  }
   const rt = $('um-report-type');
   if (rt && rt.options.length <= 1) {
     UM_REPORT_TYPES.forEach(t => { const o = document.createElement('option'); o.value=t; o.textContent=t; rt.appendChild(o); });
@@ -3237,6 +3296,11 @@ function openUploadModal(fileList) {
   if ($('um-category'))     $('um-category').value     = '';
   if ($('um-report-type'))  $('um-report-type').value  = '';
   if ($('um-store'))        $('um-store').value        = '';
+  if ($('um-collection-pick')) {
+    const cp = $('um-collection-pick');
+    cp.value = selectedCollection || '';
+    updateColPickMeta();
+  }
   if ($('um-dup-warning'))  $('um-dup-warning').classList.remove('show');
   if ($('um-store-wrap'))   $('um-store-wrap').classList.remove('visible');
   statesEl && statesEl.querySelectorAll('.um-state-chip.selected').forEach(c => c.classList.remove('selected'));
@@ -3308,8 +3372,9 @@ function initUploadModal() {
       } catch(e) { /* skip */ }
     }
 
-    const colParts = [category, period !== 'Unspecified' ? period : '', reportName].filter(Boolean);
-    const colName  = colParts.join(' — ') || 'General';
+    const pickedCol = ($('um-collection-pick')?.value || '').trim();
+    const colParts  = [category, period !== 'Unspecified' ? period : '', reportName].filter(Boolean);
+    const colName   = pickedCol || colParts.join(' — ') || 'General';
     const files    = _umFiles.slice();
     closeUploadModal();
     await handleFiles(files, colName, { reportName, category, period, reportType, states, store, fileDept });
@@ -4068,6 +4133,15 @@ function disconnectConnector(id) {
       <div>
         <div class="um-files-label">Selected Files</div>
         <div class="um-files-preview" id="um-files-preview"></div>
+      </div>
+
+      <!-- Collection picker -->
+      <div class="um-field">
+        <div class="um-label">Add to Collection</div>
+        <select class="um-select" id="um-collection-pick">
+          <option value="">+ Create new collection from fields below</option>
+        </select>
+        <div class="um-col-pick-meta" id="um-col-pick-meta"></div>
       </div>
 
       <!-- Report Name -->
