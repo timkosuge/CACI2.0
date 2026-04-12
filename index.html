@@ -1238,24 +1238,32 @@ body::before {
 }
 /* Greeting strip — sits just above the input bar */
 #discovery-greeting-strip {
-  padding: 10px 24px 0;
+  padding: 12px 80px 0;
   text-align: center;
   animation: dg-in 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s both;
   position: relative;
   z-index: 2;
 }
+#discovery-greeting-strip::before {
+  content: '';
+  display: block;
+  width: 120px;
+  height: 1px;
+  margin: 0 auto 10px;
+  background: linear-gradient(90deg, transparent, rgba(184,150,12,0.3) 50%, transparent);
+}
 #discovery-greeting-strip .dgs-text {
   font-family: var(--f-mono);
   font-size: 10px;
   font-weight: 300;
-  color: rgba(212,168,50,0.45);
-  letter-spacing: 0.12em;
-  line-height: 1.7;
-  max-width: 560px;
+  color: rgba(212,168,50,0.38);
+  letter-spacing: 0.1em;
+  line-height: 1.9;
+  max-width: 640px;
   margin: 0 auto;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
 }
 .dg-eyebrow {
   font-family: var(--f-display);
@@ -3869,8 +3877,7 @@ function renderDiscoveryGreeting(text, collections) {
   // Strip emoji, collapse to single line for the strip
   const cleanText = text
     .replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u{2B50}\u{1F300}-\u{1F9FF}]/gu, '')
-    .replace(/\n+/g, ' · ')
-    .replace(/\s{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
     .trim();
 
   // Keep CACI name centered in the messages area (already there from dg-name-above-bar in HTML)
@@ -3885,7 +3892,8 @@ function renderDiscoveryGreeting(text, collections) {
   const bar = $('chat-bar');
   const strip = document.createElement('div');
   strip.id = 'discovery-greeting-strip';
-  strip.innerHTML = `<div class="dgs-text">${esc(cleanText)}</div>`;
+  const stripHtml = esc(cleanText).replace(/\n/g, '<br>');
+  strip.innerHTML = `<div class="dgs-text">${stripHtml}</div>`;
   bar.parentNode.insertBefore(strip, bar);
 
   $('chat-empty').style.display = 'none';
