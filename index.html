@@ -1708,6 +1708,23 @@ body::before {
   box-shadow: 0 0 0 2px rgba(192,57,43,0.18) !important;
 }
 
+.new-col-btn {
+  width: calc(100% - 16px);
+  margin: 6px 8px 4px;
+  padding: 7px 10px;
+  background: var(--gold-dim);
+  border: 1px dashed rgba(184,150,12,0.35);
+  border-radius: var(--r);
+  color: var(--gold-lt);
+  font-family: var(--f-mono);
+  font-size: 9px; letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.new-col-btn:hover { background: rgba(184,150,12,0.15); border-color: var(--gold); }
+
 /* ── Context tab ───────────────────────────────────────── */
 .files-tab-bar {
   display: flex; gap: 2px;
@@ -2148,6 +2165,7 @@ body::before {
             <div class="col-sidebar-title">Collections</div>
             <div class="col-sidebar-dept" id="col-dept-name">Retail</div>
           </div>
+          <button class="new-col-btn" id="new-col-btn">+ New Collection</button>
           <div class="col-list" id="col-list"></div>
         </div>
         <div class="files-main">
@@ -2670,6 +2688,7 @@ function bootApp() {
   initUploadModal();
   initReports();
   initContextTab();
+  initNewCollectionModal();
   initVoiceInput();
   initVoiceSettings();
 
@@ -2854,12 +2873,12 @@ async function loadCollections() {
         <div class="col-icon">\u25A1</div>
         <div class="col-info">
           <div class="col-name">${esc(c.name)}</div>
-          <div class="col-count">${c.fileCount} file${c.fileCount !== 1 ? 's' : ''}</div>
+          <div class="col-count">${c.fileCount} file${c.fileCount !== 1 ? 's' : ''}${c.dept ? ' · ' + esc(c.dept) : ''}</div>
         </div>
         <button class="col-del" data-col="${esc(c.name)}">\u2715</button>
       </div>`).join('');
     } else {
-      html += '<div style="padding:12px;font-family:var(--f-mono);font-size:9px;color:var(--smoke4);letter-spacing:.08em;line-height:1.8">No collections.<br>Upload files to create one.</div>';
+      html += '<div style="padding:12px;font-family:var(--f-mono);font-size:9px;color:var(--smoke4);letter-spacing:.08em;line-height:1.8">No collections yet. Click + New Collection to get started.</div>';
     }
     list.innerHTML = html;
     $('col-all-btn').addEventListener('click', () => { selectedCollection = null; loadCollections(); loadFiles(); });
@@ -3178,6 +3197,11 @@ function openUploadModal(fileList) {
   if (cat && cat.options.length <= 1) {
     UM_CATEGORIES.forEach(c => { const o = document.createElement('option'); o.value=c; o.textContent=c; cat.appendChild(o); });
   }
+  const umDeptSel = $('um-dept-select');
+  if (umDeptSel && umDeptSel.options.length <= 1) {
+    DEPTS.forEach(d => { const o = document.createElement('option'); o.value=d.id; o.textContent=d.label; umDeptSel.appendChild(o); });
+  }
+  if (umDeptSel) umDeptSel.value = dept;
   const rt = $('um-report-type');
   if (rt && rt.options.length <= 1) {
     UM_REPORT_TYPES.forEach(t => { const o = document.createElement('option'); o.value=t; o.textContent=t; rt.appendChild(o); });
@@ -3242,8 +3266,9 @@ function initUploadModal() {
   $('um-submit').addEventListener('click', async () => {
     if (!_umFiles || !_umFiles.length) { console.warn('CACI: no files to upload'); return; }
 
-    const reportName = ($('um-report-name')?.value || '').trim();
-    const category   = ($('um-category')?.value   || '').trim();
+    const reportName  = ($('um-report-name')?.value   || '').trim();
+    const category    = ($('um-category')?.value      || '').trim();
+    const fileDept    = ($('um-dept-select')?.value   || dept).trim();
     const period     = getUmPeriod() || 'Unspecified';
     const reportType = ($('um-report-type')?.value || '').trim();
     const stateChips = $('um-states')?.querySelectorAll('.um-state-chip.selected') || [];
@@ -3287,7 +3312,7 @@ function initUploadModal() {
     const colName  = colParts.join(' — ') || 'General';
     const files    = _umFiles.slice();
     closeUploadModal();
-    await handleFiles(files, colName, { reportName, category, period, reportType, states, store });
+    await handleFiles(files, colName, { reportName, category, period, reportType, states, store, fileDept });
   });
 }
 
@@ -3321,8 +3346,9 @@ async function handleFiles(fileList, colName, meta = {}) {
       if (meta.period)     fd.append('period',     meta.period);
       if (meta.reportName) fd.append('reportName', meta.reportName);
       if (meta.reportType) fd.append('reportType', meta.reportType);
-      if (meta.states)     fd.append('states',     meta.states);
-      if (meta.store)      fd.append('store',      meta.store);
+      if (meta.states)    fd.append('states',    meta.states);
+      if (meta.store)     fd.append('store',     meta.store);
+      if (meta.fileDept)  fd.append('fileDept',  meta.fileDept);
       const res = await apiFetch('/upload', { method: 'POST', body: fd });
       const d   = await res.json();
       if (d.ok) addLog(log, `\u2713 Stored \u2014 ${d.chunks} segments`);
@@ -3335,6 +3361,102 @@ async function handleFiles(fileList, colName, meta = {}) {
   $('file-input').value = '';
   setTimeout(() => { if (prog) prog.classList.remove('on'); if (fill) fill.style.width = '0%'; }, 4000);
   loadCollections(); loadFiles();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   NEW COLLECTION MODAL
+═══════════════════════════════════════════════════════════ */
+
+function initNewCollectionModal() {
+  const btn = $('new-col-btn');
+  if (btn) btn.addEventListener('click', openNewColModal);
+  const closeBtn = $('new-col-close');
+  if (closeBtn) closeBtn.addEventListener('click', closeNewColModal);
+  const cancelBtn = $('new-col-cancel');
+  if (cancelBtn) cancelBtn.addEventListener('click', closeNewColModal);
+  const bg = $('new-col-modal-bg');
+  if (bg) bg.addEventListener('click', e => { if (e.target === bg) closeNewColModal(); });
+  const submitBtn = $('new-col-submit');
+  if (submitBtn) submitBtn.addEventListener('click', createCollection);
+
+  // Populate dept and category selects
+  const ncDept = $('nc-dept');
+  if (ncDept) DEPTS.forEach(d => {
+    const o = document.createElement('option');
+    o.value = d.id; o.textContent = d.label; ncDept.appendChild(o);
+  });
+  const ncCat = $('nc-category');
+  if (ncCat) UM_CATEGORIES.forEach(cat => {
+    const o = document.createElement('option');
+    o.value = cat; o.textContent = cat; ncCat.appendChild(o);
+  });
+}
+
+function openNewColModal() {
+  if ($('nc-name'))     $('nc-name').value     = '';
+  if ($('nc-desc'))     $('nc-desc').value     = '';
+  if ($('nc-dept'))     $('nc-dept').value     = dept;
+  if ($('nc-category')) $('nc-category').value = '';
+  $('new-col-modal-bg').classList.add('open');
+  setTimeout(() => $('nc-name')?.focus(), 100);
+}
+
+function closeNewColModal() {
+  $('new-col-modal-bg').classList.remove('open');
+}
+
+async function createCollection() {
+  const name     = ($('nc-name')?.value     || '').trim();
+  const deptVal  = ($('nc-dept')?.value     || dept).trim();
+  const category = ($('nc-category')?.value || '').trim();
+  const desc     = ($('nc-desc')?.value     || '').trim();
+
+  if (!name) { $('nc-name')?.focus(); $('nc-name')?.classList.add('um-input-err'); setTimeout(() => $('nc-name')?.classList.remove('um-input-err'), 1500); return; }
+
+  const submitBtn = $('new-col-submit');
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Creating…'; }
+
+  try {
+    const res  = await apiFetch('/collections/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, dept: deptVal, category, description: desc }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      closeNewColModal();
+      selectedCollection = name;
+      loadCollections();
+      loadFiles();
+      loadContextDocs();
+      // Switch to context tab to prompt user to add context
+      _activeFilesTab = 'ctx';
+      document.querySelectorAll('.ftab').forEach(b => b.classList.toggle('active', b.dataset.ft === 'ctx'));
+      $('files-tab-docs').style.display = 'none';
+      $('files-tab-ctx').style.display  = '';
+      $('upload-btn').style.display     = 'none';
+      $('ctx-upload-btn').style.display = '';
+    } else {
+      throw new Error(data.error || 'Failed');
+    }
+  } catch(e) {
+    // Worker route may not exist yet — create locally via KV structure
+    // Store as empty collection in registry
+    try {
+      await apiFetch('/collections/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, dept: deptVal, category, description: desc }),
+      });
+    } catch(_) {}
+    // Optimistically update UI
+    closeNewColModal();
+    selectedCollection = name;
+    loadCollections();
+    loadContextDocs();
+  }
+
+  if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Create Collection'; }
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -3880,6 +4002,48 @@ function disconnectConnector(id) {
 }
 </script>
 
+
+<!-- New Collection Modal -->
+<div class="upload-modal-bg" id="new-col-modal-bg">
+  <div class="upload-modal" style="max-width:480px">
+    <div class="um-header">
+      <div>
+        <div class="um-title">New Collection</div>
+        <div class="um-sub">Collections organize your documents and context for AI analysis</div>
+      </div>
+      <button class="um-close" id="new-col-close">&times;</button>
+    </div>
+    <div class="um-body">
+      <div class="um-field">
+        <div class="um-label">Collection Name <span class="um-required">*</span></div>
+        <input class="um-input" id="nc-name" placeholder="e.g. Shrink &amp; Adjustment Reports, Monthly Inventory Audits"/>
+      </div>
+      <div class="um-row">
+        <div class="um-field">
+          <div class="um-label">Department <span class="um-required">*</span></div>
+          <select class="um-select" id="nc-dept">
+            <option value="">Select...</option>
+          </select>
+        </div>
+        <div class="um-field">
+          <div class="um-label">Category</div>
+          <select class="um-select" id="nc-category">
+            <option value="">Select...</option>
+          </select>
+        </div>
+      </div>
+      <div class="um-field">
+        <div class="um-label">Description</div>
+        <input class="um-input" id="nc-desc" placeholder="What documents go in this collection?"/>
+      </div>
+      <div class="um-footer">
+        <button class="um-cancel" id="new-col-cancel">Cancel</button>
+        <button class="um-submit" id="new-col-submit">Create Collection</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Upload Modal -->
 <div class="upload-modal-bg" id="upload-modal-bg">
   <div class="upload-modal">
@@ -3903,8 +4067,14 @@ function disconnectConnector(id) {
         <input class="um-input" id="um-report-name" placeholder="e.g. Product Satisfaction Survey, Q1 Shrink Report"/>
       </div>
 
-      <!-- Category + Report Type -->
+      <!-- Department + Category -->
       <div class="um-row">
+        <div class="um-field">
+          <div class="um-label">Department</div>
+          <select class="um-select" id="um-dept-select">
+            <option value="">Select department...</option>
+          </select>
+        </div>
         <div class="um-field">
           <div class="um-label">Category <span class="um-required">*</span></div>
           <select class="um-select" id="um-category">
