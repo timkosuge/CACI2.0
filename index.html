@@ -873,6 +873,7 @@ body::before {
 .panel { display: none; position: absolute; inset: 0; flex-direction: column; pointer-events: none; }
 .panel.active { pointer-events: all; }
 .panel.active { display: flex; }
+.panel:not([data-panel="chat"]) { background: var(--ink); }
 
 /* ── Chat background ghost overlay ─────────────────────── */
 .chat-bg-overlay {
