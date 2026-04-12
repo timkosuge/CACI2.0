@@ -41,6 +41,7 @@ export default {
     if (path === '/collections' && method === 'GET')  return handleListCollections(url, env);
     if (path === '/collections/create' && method === 'POST') return handleCreateCollection(request, env);
     if (path.startsWith('/collections/') && method === 'DELETE') return handleDeleteCollection(path.replace('/collections/', ''), url, env);
+    if (path === '/tts'       && method === 'POST')   return handleTTS(request, env);
     if (path === '/chat'      && method === 'POST')   return handleChat(request, env);
     if (path === '/report'    && method === 'POST')   return handleReport(request, env);
     if (path === '/admin/config' && method === 'POST') return handleAdminSave(request, env);
@@ -427,6 +428,59 @@ HARD RULES:
 - Always cite the source document and period when referencing specific data.
 - Keep responses tight. She respects people's time.
 - She is not a chatbot. She is Caci.`;
+
+// ── TTS — Multi-provider voice proxy ─────────────────────────
+function cleanForSpeech(text) {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g,     '$1')
+    .replace(/#{1,6}\s/g,      '')
+    .replace(/`{1,3}[^`]*`{1,3}/g, '')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/\n+/g, ' ')
+    .trim()
+    .slice(0, 4500);
+}
+
+async function handleTTS(request, env) {
+  try {
+    const { text, provider = 'grok', voice = 'eve' } = await request.json();
+    if (!text) return json({ error: 'No text provided' }, 400);
+    const clean = cleanForSpeech(text);
+
+    // ── Grok (xAI) ──────────────────────────────────────────
+    if (provider === 'grok' || provider === 'claude') {
+      const apiKey = env.XAI_API_KEY;
+      if (!apiKey) return json({ error: 'XAI_API_KEY not configured' }, 400);
+      const res = await fetch('https://api.x.ai/v1/tts', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: clean, voice_id: voice, language: 'en' }),
+      });
+      if (!res.ok) { const e = await res.text(); return json({ error: `Grok TTS error (${res.status}): ${e}` }, 500); }
+      const buf = await res.arrayBuffer();
+      return new Response(buf, { status: 200, headers: { 'Content-Type': 'audio/mpeg', 'Content-Length': buf.byteLength.toString(), 'Access-Control-Allow-Origin': '*' } });
+    }
+
+    // ── Cloudflare Deepgram Aura 2 ───────────────────────────
+    if (provider === 'cloudflare') {
+      if (!env.AI) return json({ error: 'Cloudflare AI binding not available' }, 400);
+      // Aura 2 returns audio/wav
+      const result = await env.AI.run('@cf/deepgram/aura-2-en', { text: clean });
+      const buf = result instanceof ArrayBuffer ? result : await result.arrayBuffer?.() || result;
+      return new Response(buf, { status: 200, headers: { 'Content-Type': 'audio/wav', 'Access-Control-Allow-Origin': '*' } });
+    }
+
+    // ── Ollama (local) — not yet implemented ─────────────────
+    if (provider === 'ollama') {
+      return json({ error: 'Ollama TTS not yet configured — coming soon' }, 400);
+    }
+
+    return json({ error: 'Unknown TTS provider: ' + provider }, 400);
+  } catch (err) {
+    return json({ error: 'TTS error: ' + err.message }, 500);
+  }
+}
 
 // ── Chat ──────────────────────────────────────────────────────
 async function handleChat(request, env) {
