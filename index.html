@@ -1181,15 +1181,6 @@ body::before {
 }
 .resp-expand-btn:hover { color: var(--gold-lt); background: var(--gold-dim); }
 
-.msg-model-label {
-  font-family: var(--f-mono);
-  font-size: 8.5px;
-  letter-spacing: 0.12em;
-  color: rgba(184,150,12,0.35);
-  text-transform: uppercase;
-  margin-top: 4px;
-  padding-left: 2px;
-}
 .msg-sources {
   font-family: var(--f-mono);
   font-size: 9px;
@@ -2968,11 +2959,9 @@ body::before {
 
   <!-- Sidebar -->
   <aside id="sidebar">
-  <!-- sb-toggle disabled for testing
   <button id="sb-toggle" title="Toggle sidebar" aria-label="Toggle sidebar">
     <svg viewBox="0 0 8 12" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="6,1 2,6 6,11"/></svg>
   </button>
-  -->
     <div class="sb-header">
       <div class="sb-wordmark">CACI</div>
       <div class="sb-tagline">Intelligence Platform</div>
@@ -3298,24 +3287,23 @@ body::before {
             <div class="afb" id="ant-fb"></div>
           </div>
           <div class="acard">
-            <div class="acard-title">Voice &mdash; Caci&apos;s Voice Engine</div>
-            <div class="acard-sub">Select the TTS provider &nbsp;&middot;&nbsp; Each sounds different &nbsp;&middot;&nbsp; Switch anytime</div>
-            <div class="acard-sub" style="margin-top:8px;color:rgba(184,150,12,0.5)">xAI API Key &mdash; required for Grok voice</div>
-            <div class="arow" style="margin-top:6px"><input class="ainput" type="password" id="xai-key" placeholder="xai-..." autocomplete="off"/><button class="asave" id="xai-save">Save Key</button></div>
-            <div class="afb" id="xai-fb"></div>
-            <div class="arow" style="margin-top:14px;flex-wrap:wrap;gap:8px">
-              <select class="ainput" id="tts-provider" style="flex:1">
-                <option value="grok">Grok (xAI) &mdash; Eve &mdash; Best quality</option>
-                <option value="cloudflare">Cloudflare &mdash; Deepgram Aura 2 &mdash; Enterprise</option>
-                <option value="claude">Claude &mdash; via Grok voice</option>
-                <option value="ollama" disabled>Ollama (Local) &mdash; Coming soon</option>
+            <div class="acard-title">Voice &mdash; Google Cloud TTS</div>
+            <div class="acard-sub">WaveNet neural voices &nbsp;&middot;&nbsp; 1M characters free/month &nbsp;&middot;&nbsp; <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:var(--gold-lt)">Get free API key &rarr;</a></div>
+            <div class="arow"><input class="ainput" type="password" id="gtts-key" placeholder="AIza..." autocomplete="off"/><button class="asave" id="gtts-save">Save Key</button></div>
+            <div class="afb" id="gtts-fb"></div>
+            <div class="arow" style="margin-top:10px;flex-wrap:wrap;gap:8px">
+              <select class="ainput" id="gtts-voice" style="flex:1">
+                <option value="en-US-Wavenet-F">WaveNet F — Professional Female (recommended)</option>
+                <option value="en-US-Wavenet-C">WaveNet C — Warm Female</option>
+                <option value="en-US-Wavenet-E">WaveNet E — Soft Female</option>
+                <option value="en-US-Wavenet-D">WaveNet D — Deep Male</option>
+                <option value="en-US-Wavenet-B">WaveNet B — Professional Male</option>
+                <option value="en-US-Neural2-F">Neural2 F — Natural Female</option>
+                <option value="en-US-Neural2-C">Neural2 C — Conversational Female</option>
               </select>
-              <select class="ainput" id="tts-grok-voice" style="flex:0 0 140px">
-                <option value="eve">Eve &mdash; Expressive</option>
-                <option value="ara">Ara &mdash; Warm</option>
-                <option value="sal">Sal &mdash; Clear</option>
-                <option value="leo">Leo &mdash; Deep</option>
-                <option value="rex">Rex &mdash; Authoritative</option>
+              <select class="ainput" id="gtts-speed" style="flex:0 0 120px">
+                <option value="0.9">Slower</option><option value="1.0" selected>Normal</option>
+                <option value="1.1">Faster</option><option value="1.2">Fast</option>
               </select>
             </div>
             <div class="arow" style="margin-top:8px;align-items:center;gap:12px">
@@ -3592,8 +3580,7 @@ const DEPTS = [
 
 const MODELS = [
   {id:'claude',     name:'Claude Sonnet',   sub:'Anthropic \u00b7 Best reasoning',  dot:'#22c55e'},
-  {id:'grok',       name:'Grok',            sub:'xAI \u00b7 Fast & sharp',          dot:'#d4a017'},
-  {id:'cloudflare', name:'Cloudflare AI',   sub:'Llama 4 \u00b7 Fast & free',      dot:'#f97316'},
+  {id:'cloudflare', name:'Cloudflare AI',   sub:'Llama 3.1 \u00b7 Fast & free',    dot:'#d4a017'},
   {id:'ollama',     name:'Ollama',          sub:'Local \u00b7 Fully private',       dot:'#8e44ad'},
 ];
 
@@ -3679,7 +3666,7 @@ function bootApp() {
   const sbToggle = $('sb-toggle');
   const sidebar  = $('sidebar');
   const contentEl = $('content');
-  if (sbToggle) sbToggle.addEventListener('click', () => {
+  sbToggle.addEventListener('click', () => {
     const collapsed = sidebar.classList.toggle('collapsed');
     sbToggle.classList.toggle('collapsed', collapsed);
     if (contentEl) contentEl.classList.toggle('sb-collapsed', collapsed);
@@ -4094,7 +4081,6 @@ function appendMsg(role, text, sources, scope) {
   const av = role === 'user' ? 'YOU' : 'CACI';
   const src = sources && sources.length ? `<div class="msg-sources">Sources &mdash; <b>${sources.join(' \u00b7 ')}</b></div>` : '';
   const sc = scope && scope !== 'all' ? `<div class="msg-scope">Scope: ${scope === 'file' ? chatFileName : scope === 'collection' ? chatCollection : 'all'}</div>` : '';
-  const modelLabel = (role === 'ai' && sources !== undefined) ? '<div class="msg-model-label">' + (modelId === 'grok' ? 'Grok · xAI' : modelId === 'cloudflare' ? 'Cloudflare AI' : modelId === 'ollama' ? 'Ollama · Local' : 'Claude · Anthropic') + '</div>' : '';
   const spk = role === 'ai' ? `<button class="spk-btn" title="Read aloud" data-spk="1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 010 7.07"/><path d="M19.07 4.93a10 10 0 010 14.14"/></svg></button>` : '';
   const actions = role === 'ai' ? `<div class="msg-actions">
     <button class="msg-action-btn dl-btn" title="Download as .md file">
@@ -4106,7 +4092,7 @@ function appendMsg(role, text, sources, scope) {
       Save
     </button>
   </div>` : '';
-  el.innerHTML = `<div class="msg-av">${av}</div><div class="msg-body">${sc}${modelLabel}\x3Cdiv class="msg-bubble">${esc(text)}\x3C/div>${src}${spk}${actions}\x3C/div>`;
+  el.innerHTML = `<div class="msg-av">${av}</div><div class="msg-body">${sc}\x3Cdiv class="msg-bubble">${esc(text)}\x3C/div>${src}${spk}${actions}\x3C/div>`;
   if (role === 'ai') {
     const spkBtn = el.querySelector('.spk-btn');
     if (spkBtn) {
@@ -4423,45 +4409,7 @@ async function saveKey() {
   } catch(e) { $('ant-fb').className = 'afb err'; $('ant-fb').textContent = '\u2717 ' + e.message; }
   $('ant-save').disabled = false; $('ant-save').textContent = 'Save Key';
 }
-let _adminListenersAttached = false;
 async function loadAdminConfig() {
-  if (!_adminListenersAttached) {
-    _adminListenersAttached = true;
-    const ttsProvider = document.getElementById('tts-provider');
-    const ttsVoice    = document.getElementById('tts-grok-voice');
-    const gttsAuto    = document.getElementById('gtts-auto');
-    const testBtn     = document.getElementById('gtts-test');
-    const xaiSave     = document.getElementById('xai-save');
-    if (ttsProvider) ttsProvider.addEventListener('change', function() {
-      localStorage.setItem('caci_tts_provider', this.value);
-      if (ttsVoice) ttsVoice.style.display = (this.value === 'grok' || this.value === 'claude') ? '' : 'none';
-    });
-    if (ttsVoice) ttsVoice.addEventListener('change', function() { localStorage.setItem('caci_tts_grok_voice', this.value); });
-    if (gttsAuto) gttsAuto.addEventListener('change', function() {
-      voiceAutoSpeak = this.checked;
-      localStorage.setItem('caci_voice_auto', this.checked ? 'true' : 'false');
-    });
-    if (testBtn) testBtn.addEventListener('click', function() {
-      speakText(null, "Hey. I'm Caci. Let me know what you're looking for and we'll dig in.");
-    });
-    if (xaiSave) xaiSave.addEventListener('click', async function() {
-      const key = document.getElementById('xai-key').value.trim();
-      const res = await apiFetch('/admin/config', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({XAI_API_KEY:key})});
-      const d = await res.json();
-      document.getElementById('xai-fb').textContent = d.ok ? 'Saved.' : (d.error||'Error');
-      setTimeout(function() { document.getElementById('xai-fb').textContent = ''; }, 2500);
-    });
-  }
-  // Sync values on every visit
-  const ttsProvider = document.getElementById('tts-provider');
-  const ttsVoice    = document.getElementById('tts-grok-voice');
-  const gttsAuto    = document.getElementById('gtts-auto');
-  if (ttsProvider) ttsProvider.value = localStorage.getItem('caci_tts_provider') || 'grok';
-  if (ttsVoice) {
-    ttsVoice.value = localStorage.getItem('caci_tts_grok_voice') || 'eve';
-    ttsVoice.style.display = (!ttsProvider || ttsProvider.value==='grok' || ttsProvider.value==='claude') ? '' : 'none';
-  }
-  if (gttsAuto) gttsAuto.checked = localStorage.getItem('caci_voice_auto') === 'true';
   try {
     const res = await apiFetch('/admin/config'); if (!res.ok) return;
     const d = await res.json();
@@ -5083,61 +5031,104 @@ let _currentSpkBtn  = null;
 let _recognition    = null;
 let _listening      = false;
 
-/* ── Grok TTS ───────────────────────────────────────────── */
+/* ── Google TTS ─────────────────────────────────────────── */
 async function speakText(btn, text) {
+  // Stop any current playback
   if (_currentAudio) {
     _currentAudio.pause();
     _currentAudio = null;
     if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
-    setVoiceStatus('');
-    const tog = document.getElementById('spk-toggle-btn');
-    if (tog) tog.classList.toggle('active', voiceAutoSpeak);
-    return;
   }
   if (!text || !text.trim()) return;
-  setVoiceStatus('Speaking…', true);
+
+  // Strip markdown for cleaner speech
+  const clean = text
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g,     '$1')
+    .replace(/#{1,6}\s/g,      '')
+    .replace(/`{1,3}[^`]*`{1,3}/g, '')
+    .replace(/\n+/g, ' ')
+    .trim()
+    .slice(0, 4500); // Google TTS limit per request
+
+  const gttsKey   = localStorage.getItem('caci_gtts_key') || '';
+  const voiceId   = localStorage.getItem('caci_gtts_voice') || 'en-US-Wavenet-F';
+  const speed     = parseFloat(localStorage.getItem('caci_gtts_speed') || '1.0');
+
+  setVoiceStatus('Speaking\u2026', true);
   if (btn) { btn.classList.add('playing'); _currentSpkBtn = btn; }
-  const tog = document.getElementById('spk-toggle-btn');
+  // Also light up the toggle button while speaking
+  const tog = $('spk-toggle-btn');
   if (tog) tog.classList.add('active');
+
   try {
-    const provider = localStorage.getItem('caci_tts_provider') || 'grok';
-    const grokVoice = localStorage.getItem('caci_tts_grok_voice') || 'eve';
-    const res = await apiFetch('/tts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: text, provider: provider, voice: grokVoice }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(function() { return { error: 'TTS failed' }; });
-      throw new Error(err.error || 'TTS request failed');
+    if (gttsKey) {
+      // Google Cloud TTS
+      const res = await fetch(
+        'https://texttospeech.googleapis.com/v1/text:synthesize?key=' + gttsKey,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            input: { text: clean },
+            voice: { languageCode: 'en-US', name: voiceId },
+            audioConfig: { audioEncoding: 'MP3', speakingRate: speed, pitch: 0 }
+          })
+        }
+      );
+      const data = await res.json();
+      if (data.audioContent) {
+        const audio = new Audio('data:audio/mp3;base64,' + data.audioContent);
+        _currentAudio = audio;
+        audio.onended = () => {
+          _currentAudio = null;
+          if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
+          const tog = $('spk-toggle-btn');
+          if (tog) tog.classList.toggle('active', voiceAutoSpeak);
+          setVoiceStatus('');
+        };
+        audio.play();
+        return;
+      }
+      throw new Error(data.error?.message || 'TTS failed');
+    } else {
+      // Fallback: Web Speech API — must cancel first then speak in same gesture tick
+      speechSynthesis.cancel();
+      const utt = new SpeechSynthesisUtterance(clean);
+      utt.rate  = speed;
+      utt.pitch = 1;
+      // Pick best available voice — wait for voices to load if needed
+      const trySpeak = () => {
+        const voices = speechSynthesis.getVoices();
+        const preferred = voices.find(v => /samantha|aria|zira|google.*us.*female/i.test(v.name))
+                       || voices.find(v => v.lang === 'en-US' && v.name.toLowerCase().includes('female'))
+                       || voices.find(v => v.lang === 'en-US')
+                       || voices[0];
+        if (preferred) utt.voice = preferred;
+        utt.onend = () => {
+          if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
+          const tog = $('spk-toggle-btn');
+          if (tog) tog.classList.toggle('active', voiceAutoSpeak);
+          setVoiceStatus('');
+        };
+        utt.onerror = (e) => {
+          console.warn('SpeechSynthesis error:', e.error);
+          if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
+          setVoiceStatus('');
+        };
+        speechSynthesis.speak(utt);
+      };
+      if (speechSynthesis.getVoices().length) {
+        trySpeak();
+      } else {
+        speechSynthesis.onvoiceschanged = () => { speechSynthesis.onvoiceschanged = null; trySpeak(); };
+      }
     }
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const audio = new Audio(url);
-    _currentAudio = audio;
-    audio.onended = function() {
-      URL.revokeObjectURL(url);
-      _currentAudio = null;
-      if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
-      const tog2 = document.getElementById('spk-toggle-btn');
-      if (tog2) tog2.classList.toggle('active', voiceAutoSpeak);
-      setVoiceStatus('');
-    };
-    audio.onerror = function() {
-      URL.revokeObjectURL(url);
-      _currentAudio = null;
-      if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
-      setVoiceStatus('');
-    };
-    audio.play();
   } catch(e) {
     console.warn('TTS error:', e.message);
-    setVoiceStatus('Voice unavailable');
+    setVoiceStatus('Voice error: ' + e.message.slice(0,40));
     if (btn) btn.classList.remove('playing');
-    if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
-    const tog3 = document.getElementById('spk-toggle-btn');
-    if (tog3) tog3.classList.toggle('active', voiceAutoSpeak);
-    setTimeout(function() { setVoiceStatus(''); }, 3000);
+    setTimeout(() => setVoiceStatus(''), 3000);
   }
 }
 
