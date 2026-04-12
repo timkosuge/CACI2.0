@@ -1291,13 +1291,12 @@ body::before {
 }
 /* Greeting strip — sits just above the input bar */
 #discovery-greeting-strip {
-  padding: 12px 0 0;
+  padding: 12px 24px 20px;
   text-align: center;
   animation: dg-in 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s both;
-  position: relative;
-  z-index: 2;
   width: 100%;
   box-sizing: border-box;
+  flex-shrink: 0;
 }
 #discovery-greeting-strip::before {
   content: '';
@@ -4033,12 +4032,13 @@ function renderGreetingStrip(text) {
     .replace(/[\u{1F000}-\u{1FFFF}]/gu, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
-  const bar = $('chat-bar');
-  if (!bar) return;
+  // Inject strip at bottom of chat-msgs so it scrolls with content and isn't clipped
+  const msgs = $('chat-msgs');
+  if (!msgs) return;
   const strip = document.createElement('div');
   strip.id = 'discovery-greeting-strip';
   strip.innerHTML = '<div class="dgs-text">' + esc(clean).replace(/\n/g, '<br>') + '</div>';
-  bar.parentNode.insertBefore(strip, bar);
+  msgs.appendChild(strip);
 }
 
 async function sendChat() {
