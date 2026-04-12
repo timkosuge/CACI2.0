@@ -3731,6 +3731,7 @@ function bootApp() {
   });
   $('model-modal').addEventListener('click', e => { if (e.target === $('model-modal')) $('model-modal').classList.remove('open'); });
   $('ant-save').addEventListener('click', saveKey);
+  if ($('xai-save')) $('xai-save').addEventListener('click', saveXaiKey);
 }
 
 /* NAV */
@@ -4409,6 +4410,24 @@ async function saveKey() {
     }
   } catch(e) { $('ant-fb').className = 'afb err'; $('ant-fb').textContent = '\u2717 ' + e.message; }
   $('ant-save').disabled = false; $('ant-save').textContent = 'Save Key';
+}
+async function saveXaiKey() {
+  const key = $('xai-key').value.trim(); if (!key) return;
+  $('xai-save').disabled = true; $('xai-save').textContent = 'Saving…';
+  try {
+    const res = await apiFetch('/admin/config', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({XAI_API_KEY: key}),
+    });
+    const d = await res.json(); const fb = $('xai-fb');
+    if (d.ok || d.saved) {
+      fb.className = 'afb ok'; fb.textContent = '✓ Key saved';
+      $('xai-key').value = '';
+    } else {
+      fb.className = 'afb err'; fb.textContent = '✗ ' + (d.error || 'Save failed');
+    }
+  } catch(e) { $('xai-fb').className = 'afb err'; $('xai-fb').textContent = '✗ ' + e.message; }
+  $('xai-save').disabled = false; $('xai-save').textContent = 'Save Key';
 }
 async function loadAdminConfig() {
   try {
