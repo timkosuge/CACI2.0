@@ -3971,8 +3971,29 @@ function setScope(scope, col, fileId, fileName) {
 /* CHAT */
 // Renders the discovery greeting (centered hero, not a chat bubble)
 function renderDiscoveryGreeting(text, collections) {
-  // Name already rendered by initChatGreeting — just update the strip
-  renderGreetingStrip(text);
+  ['discovery-name', 'discovery-greeting-strip'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.remove();
+  });
+
+  const cleanText = text
+    .replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u{2B50}\u{1F300}-\u{1F9FF}]/gu, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  const msgs = $('chat-msgs');
+  const nameEl = document.createElement('div');
+  nameEl.id = 'discovery-name';
+  nameEl.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;text-align:center;';
+  nameEl.innerHTML = '<div class="dg-eyebrow" style="margin-bottom:8px">Intelligence Assistant</div><div class="dg-name">CACI</div>';
+  msgs.appendChild(nameEl);
+
+  const bar = $('chat-bar');
+  const strip = document.createElement('div');
+  strip.id = 'discovery-greeting-strip';
+  strip.innerHTML = '<div class="dgs-text">' + esc(cleanText).replace(/\n/g, '<br>') + '</div>';
+  bar.parentNode.insertBefore(strip, bar);
+
   $('chat-empty').style.display = 'none';
 }
 
@@ -3987,62 +4008,28 @@ function selectDiscoveryCollection(colName) {
   $('chat-ta').placeholder = 'Ask about ' + colName + '...';
 }
 
-function transitionToChat() {
-  // bar is always docked — nothing to do
-}
+function transitionToChat() {}
 
 // Sends the CACI greeting on first load (discovery mode)
 async function initChatGreeting() {
   if (chatHistory.length > 0) return;
-  // Render CACI name immediately — no waiting for API
-  const msgs = $('chat-msgs');
-  if (!document.getElementById('discovery-name')) {
-    const nameEl = document.createElement('div');
-    nameEl.id = 'discovery-name';
-    nameEl.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;text-align:center;';
-    nameEl.innerHTML = '<div class="dg-eyebrow" style="margin-bottom:8px">Intelligence Assistant</div><div class="dg-name">CACI</div>';
-    msgs.appendChild(nameEl);
-    $('chat-empty').style.display = 'none';
-  }
   const ty = appendTyping();
   try {
     const body = {message: 'hello', dept, model: modelId, scope: 'all', history: []};
     const res = await apiFetch('/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
-    const raw = await res.text();
-    console.log('GREETING RAW RESPONSE:', raw);
+    const d = await res.json();
     ty.remove();
-    let d;
-    try { d = JSON.parse(raw); } catch(pe) { console.error('JSON parse error:', pe); renderGreetingStrip("I'm here whenever you're ready."); return; }
-    console.log('GREETING PARSED:', d);
-    if (d.error) {
-      console.warn('Greeting error from worker:', d.error);
-      renderGreetingStrip("I'm here. Select a collection and ask me anything.");
-    } else {
-      renderGreetingStrip(d.response);
+    if (!d.error) {
+      renderDiscoveryGreeting(d.response, d.collections);
       chatHistory.push({role:'assistant', content:d.response});
       if (d.collections) window._caciCollections = d.collections;
+    } else {
+      console.warn('Greeting error:', d.error);
     }
   } catch(e) {
     ty.remove();
-    console.error('Greeting fetch failed:', e.message, e.stack);
-    renderGreetingStrip("I'm here whenever you're ready.");
+    console.warn('Greeting failed:', e.message);
   }
-}
-
-function renderGreetingStrip(text) {
-  const existing = document.getElementById('discovery-greeting-strip');
-  if (existing) existing.remove();
-  const clean = text
-    .replace(/[\u{1F000}-\u{1FFFF}]/gu, '')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-  // Inject strip at bottom of chat-msgs so it scrolls with content and isn't clipped
-  const msgs = $('chat-msgs');
-  if (!msgs) return;
-  const strip = document.createElement('div');
-  strip.id = 'discovery-greeting-strip';
-  strip.innerHTML = '<div class="dgs-text">' + esc(clean).replace(/\n/g, '<br>') + '</div>';
-  msgs.appendChild(strip);
 }
 
 async function sendChat() {
