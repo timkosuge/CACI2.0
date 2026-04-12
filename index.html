@@ -3409,6 +3409,7 @@ function switchPanel(id) {
   if (id === 'responses') loadResponses();
   if (id === 'files') { loadCollections(); loadFiles(); loadContextDocs(); }
   if (id === 'admin') { loadAdminConfig(); loadIntegrationStatuses(); loadConnectorStatuses(); }
+  if (id === 'chat') initChatGreeting();
 }
 
 /* DEPT */
@@ -3611,6 +3612,25 @@ function setScope(scope, col, fileId, fileName) {
 }
 
 /* CHAT */
+// Sends the CACI greeting on first load (discovery mode)
+async function initChatGreeting() {
+  if (chatHistory.length > 0) return; // already greeted
+  const ty = appendTyping();
+  try {
+    const body = {message: 'hello', dept, model: modelId, scope: 'all', history: []};
+    const res = await apiFetch('/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    const d = await res.json();
+    ty.remove();
+    $('chat-empty').style.display = 'none';
+    if (!d.error) {
+      appendMsg('ai', d.response, [], 'discovery');
+      chatHistory.push({role:'assistant', content:d.response});
+      // Store available collections returned from discovery
+      if (d.collections) window._caciCollections = d.collections;
+    }
+  } catch(e) { ty.remove(); }
+}
+
 async function sendChat() {
   const ta = $('chat-ta'), msg = ta.value.trim();
   if (!msg) return;
@@ -3624,11 +3644,29 @@ async function sendChat() {
     const body = {message:msg, dept, model:modelId, scope:chatScope, history:chatHistory.slice(-10)};
     if (chatScope === 'collection' && chatCollection) body.collection = chatCollection;
     if (chatScope === 'file' && chatFileId) { body.fileId = chatFileId; body.scope = 'file'; }
+
+    // Auto-detect collection from user message if we are still in discovery (no collection locked)
+    if (chatScope === 'all' && !chatCollection && window._caciCollections && window._caciCollections.length) {
+      const msgLower = msg.toLowerCase();
+      const match = window._caciCollections.find(c => msgLower.includes(c.name.toLowerCase()) ||
+        (c.category && msgLower.includes(c.category.toLowerCase())));
+      if (match) {
+        setScope('collection', match.name);
+        body.scope = 'collection';
+        body.collection = match.name;
+      }
+    }
+
     const res = await apiFetch('/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
     const d = await res.json();
     ty.remove();
     if (d.error) appendMsg('ai', '\u26A0  ' + d.error);
-    else { appendMsg('ai', d.response, d.sources, d.scope); chatHistory.push({role:'assistant', content:d.response}); }
+    else {
+      appendMsg('ai', d.response, d.sources, d.scope);
+      chatHistory.push({role:'assistant', content:d.response});
+      // If discovery returned collections, cache them
+      if (d.collections) window._caciCollections = d.collections;
+    }
   } catch(e) { ty.remove(); appendMsg('ai', '\u26A0  ' + e.message); }
   $('send-btn').disabled = false;
 }
