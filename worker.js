@@ -450,8 +450,8 @@ async function handleTTS(request, env) {
 
     // ── Grok (xAI) ──────────────────────────────────────────
     if (provider === 'grok' || provider === 'claude') {
-      const apiKey = env.XAI_API_KEY;
-      if (!apiKey) return json({ error: 'XAI_API_KEY not configured' }, 400);
+      const apiKey = (await env.CACI_KV.get('config:XAI_API_KEY')) || env.XAI_API_KEY;
+      if (!apiKey) return json({ error: 'XAI API key not configured — add it in Config' }, 400);
       const res = await fetch('https://api.x.ai/v1/tts', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
@@ -482,14 +482,77 @@ async function handleTTS(request, env) {
   }
 }
 
+// ── LLM Router — calls the right provider based on model ─────
+async function callLLM({ model, system, messages, maxTokens = 2000, env, anthropicKey, xaiKey }) {
+
+  // ── Claude (Anthropic) ────────────────────────────────────
+  if (!model || model === 'claude') {
+    if (!anthropicKey) throw new Error('Anthropic API key not configured. Go to Config to add it.');
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: maxTokens, system, messages }),
+    });
+    if (!res.ok) { const e = await res.text(); throw new Error(`Claude API error (${res.status}): ${e}`); }
+    const d = await res.json();
+    return d.content?.[0]?.text || '';
+  }
+
+  // ── Grok (xAI) ───────────────────────────────────────────
+  if (model === 'grok') {
+    if (!xaiKey) throw new Error('xAI API key not configured. Go to Config to add it.');
+    const grokMessages = [{ role: 'system', content: system }, ...messages];
+    const res = await fetch('https://api.x.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${xaiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'grok-3-mini-fast-beta', max_tokens: maxTokens, messages: grokMessages }),
+    });
+    if (!res.ok) { const e = await res.text(); throw new Error(`Grok API error (${res.status}): ${e}`); }
+    const d = await res.json();
+    return d.choices?.[0]?.message?.content || '';
+  }
+
+  // ── Cloudflare AI (Llama 4) ───────────────────────────────
+  if (model === 'cloudflare') {
+    if (!env.AI) throw new Error('Cloudflare AI binding not available');
+    const cfMessages = [{ role: 'system', content: system }, ...messages];
+    const result = await env.AI.run('@cf/meta/llama-4-scout-17b-16e-instruct', {
+      messages: cfMessages,
+      max_tokens: maxTokens,
+    });
+    return result?.response || result?.choices?.[0]?.message?.content || '';
+  }
+
+  // ── Ollama (local) ────────────────────────────────────────
+  if (model === 'ollama') {
+    const ollamaUrl = 'http://localhost:11434/api/chat';
+    const res = await fetch(ollamaUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'llama3.2',
+        messages: [{ role: 'system', content: system }, ...messages],
+        stream: false,
+      }),
+    }).catch(() => null);
+    if (!res || !res.ok) throw new Error('Ollama not reachable — is it running locally?');
+    const d = await res.json();
+    return d.message?.content || '';
+  }
+
+  throw new Error('Unknown model: ' + model);
+}
+
 // ── Chat ──────────────────────────────────────────────────────
 async function handleChat(request, env) {
   try {
     const { message, dept, collection, fileId, scope = 'all', model, history = [] } = await request.json();
     if (!message) return json({ error: 'Message required' }, 400);
 
-    const apiKey = (await env.CACI_KV.get('config:ANTHROPIC_API_KEY')) || env.ANTHROPIC_API_KEY;
-    if (!apiKey) return json({ error: 'Anthropic API key not configured. Go to Admin to add it.' }, 400);
+    // ── Resolve API keys for all providers ──────────────────
+    const anthropicKey  = (await env.CACI_KV.get('config:ANTHROPIC_API_KEY')) || env.ANTHROPIC_API_KEY;
+    const xaiKey        = (await env.CACI_KV.get('config:XAI_API_KEY'))       || env.XAI_API_KEY;
+    const activeModel   = model || 'claude';
 
     // ── Discovery mode: first message with no collection scoped ──
     const isFirstMessage = history.length === 0;
@@ -509,23 +572,8 @@ Do not use any emoji. Do not use bullet points for the greeting itself.
 AVAILABLE COLLECTIONS:
 ${discovery.collectionList}`;
 
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 400,
-          system,
-          messages: [{ role: 'user', content: message }],
-        }),
-      });
-
-      if (!res.ok) {
-        const err = await res.text();
-        return json({ error: `Claude API error (${res.status}): ${err}` }, 500);
-      }
-      const data = await res.json();
-      return json({ ok: true, response: data.content?.[0]?.text || 'No response.', sources: [], scope: 'discovery', collections: discovery.rawCollections });
+      const discoveryText = await callLLM({ model: activeModel, system, messages: [{ role: 'user', content: message }], maxTokens: 400, env, anthropicKey, xaiKey });
+      return json({ ok: true, response: discoveryText, sources: [], scope: 'discovery', collections: discovery.rawCollections });
     }
 
     // ── Normal mode: scoped to collection or file ─────────────
@@ -575,27 +623,12 @@ When working with data:
       system += `\n\nNo documents found for this scope. Ask the user to upload relevant files first.`;
     }
 
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 3000,
-        system,
-        messages: [
-          ...history.slice(-10).map(h => ({ role: h.role, content: h.content })),
-          { role: 'user', content: message },
-        ],
-      }),
-    });
-
-    if (!res.ok) {
-      const err = await res.text();
-      return json({ error: `Claude API error (${res.status}): ${err}` }, 500);
-    }
-
-    const data = await res.json();
-    return json({ ok: true, response: data.content?.[0]?.text || 'No response.', sources: context.sources, scope });
+    const messages = [
+      ...history.slice(-10).map(h => ({ role: h.role, content: h.content })),
+      { role: 'user', content: message },
+    ];
+    const responseText = await callLLM({ model: activeModel, system, messages, maxTokens: 3000, env, anthropicKey, xaiKey });
+    return json({ ok: true, response: responseText, sources: context.sources, scope });
   } catch (err) { return json({ error: 'Chat error: ' + err.message }, 500); }
 }
 
@@ -619,48 +652,27 @@ async function buildDiscoveryContext({ dept, env }) {
 // ── Report Generation ─────────────────────────────────────────
 async function handleReport(request, env) {
   try {
-    const { prompt, dept, collection, fileId, scope = 'all', format = 'markdown' } = await request.json();
+    const { prompt, dept, collection, fileId, scope = 'all', format = 'markdown', model } = await request.json();
 
-    const apiKey = (await env.CACI_KV.get('config:ANTHROPIC_API_KEY')) || env.ANTHROPIC_API_KEY;
-    if (!apiKey) return json({ error: 'Anthropic API key not configured.' }, 400);
+    const anthropicKey = (await env.CACI_KV.get('config:ANTHROPIC_API_KEY')) || env.ANTHROPIC_API_KEY;
+    const xaiKey       = (await env.CACI_KV.get('config:XAI_API_KEY'))       || env.XAI_API_KEY;
+    const activeModel  = model || 'claude';
 
     const context = await buildContext({ message: prompt, dept, collection, fileId, scope, env });
 
-    const reportPrompt = `You are generating a professional internal business report for Jushi Holdings executive team.
+    const system = `You are generating a professional internal business report for the Jushi Holdings executive team. Be precise, cite sources, use clean Markdown formatting.`;
+    const reportPrompt = `Report request: ${prompt}
 
-Report request: ${prompt}
+${context.statsContext ? `COMPUTED DATA SUMMARIES:
+${context.statsContext}
+` : ''}
+${context.text ? `SOURCE DOCUMENTS:
+${context.text}
+` : ''}
 
-${context.statsContext ? `COMPUTED DATA SUMMARIES:\n${context.statsContext}\n` : ''}
-${context.text ? `SOURCE DOCUMENTS:\n${context.text}\n` : ''}
+Generate a comprehensive report with: Executive Summary, Key Findings, Detailed Analysis, Period-over-Period Comparison, State/Store Breakdown if applicable, Recommendations, and Data Sources. Use ## headers, **bold** for metrics, tables where helpful.`;
 
-Generate a comprehensive, well-structured professional report. Include:
-1. Executive Summary (2-3 sentences)
-2. Key Findings (bullet points with specific numbers)
-3. Detailed Analysis (organized by relevant categories)
-4. Period-over-Period Comparison (if multiple periods present)
-5. State/Store Breakdown (if location data present)
-6. Recommendations
-7. Data Sources
-
-Format the report in clean Markdown. Use ## for sections, **bold** for key metrics, tables where appropriate. Be precise with numbers. Cite source files.`;
-
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 4000,
-        messages: [{ role: 'user', content: reportPrompt }],
-      }),
-    });
-
-    if (!res.ok) {
-      const err = await res.text();
-      return json({ error: `Report generation error (${res.status}): ${err}` }, 500);
-    }
-
-    const data = await res.json();
-    const reportText = data.content?.[0]?.text || '';
+    const reportText = await callLLM({ model: activeModel, system, messages: [{ role: 'user', content: reportPrompt }], maxTokens: 4000, env, anthropicKey, xaiKey });
     return json({ ok: true, report: reportText, sources: context.sources, format });
   } catch (err) { return json({ error: 'Report error: ' + err.message }, 500); }
 }
@@ -748,7 +760,7 @@ async function handleAdminSave(request, env) {
   try {
     const body = await request.json();
     const saved = [];
-    for (const key of ['ANTHROPIC_API_KEY']) {
+    for (const key of ['ANTHROPIC_API_KEY', 'XAI_API_KEY']) {
       if (body[key] !== undefined) {
         body[key] === '' ? await env.CACI_KV.delete('config:' + key) : await env.CACI_KV.put('config:' + key, body[key]);
         saved.push(key);
