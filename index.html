@@ -873,7 +873,6 @@ body::before {
 .panel { display: none; position: absolute; inset: 0; flex-direction: column; pointer-events: none; }
 .panel.active { pointer-events: all; }
 .panel.active { display: flex; }
-.panel:not([data-panel="chat"]) { background: var(--ink); }
 
 /* ── Chat background ghost overlay ─────────────────────── */
 .chat-bg-overlay {
@@ -1380,7 +1379,7 @@ body::before {
 .dg-collections { display: none; }
 
 /* ── Chat panel layout adjustment when floating bar ───── */
-.panel[data-panel="chat"] {
+.panel.active[data-panel="chat"] {
   display: flex;
   flex-direction: column;
 }
