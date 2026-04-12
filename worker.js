@@ -546,25 +546,8 @@ async function buildContext({ message, dept, collection, fileId, scope, env }) {
     } else {
       const deptIdx   = await env.CACI_KV.get(`index:${dept}`, 'json') || [];
       const globalIdx = dept !== 'global' ? (await env.CACI_KV.get('index:global', 'json') || []) : [];
-      const allMeta   = [...deptIdx, ...globalIdx];
-
-      // Group by collection so every collection gets representation,
-      // not just the 40 most-recently-uploaded files (which biases toward the newest collection).
-      const PER_COLLECTION = 8;
-      const MAX_TOTAL      = 80;
-      const byCollection   = {};
-      for (const f of allMeta) {
-        const key = f.collection || '__uncollected__';
-        if (!byCollection[key]) byCollection[key] = [];
-        byCollection[key].push(f);
-      }
-      const sampled = [];
-      for (const files of Object.values(byCollection)) {
-        sampled.push(...files.slice(0, PER_COLLECTION));
-        if (sampled.length >= MAX_TOTAL) break;
-      }
-
-      filesToSearch = (await Promise.all(sampled.map(f => env.CACI_KV.get(`file:${f.id}`, 'json')))).filter(Boolean);
+      const allMeta   = [...deptIdx, ...globalIdx].slice(0, 40);
+      filesToSearch   = (await Promise.all(allMeta.map(f => env.CACI_KV.get(`file:${f.id}`, 'json')))).filter(Boolean);
     }
 
     if (!filesToSearch.length) return { text: '', sources: [], statsContext: '', focusFile: null };
