@@ -429,7 +429,7 @@ Your job right now:
 3. Present the available collections as clear options.
 4. Optionally ask if they have a specific time period in mind.
 
-Keep it short — 5 to 8 lines max. Be friendly and direct.
+Keep it short — 5 to 8 lines max. Be friendly and direct. Do not use any emoji.
 
 AVAILABLE COLLECTIONS:
 ${discovery.collectionList}`;
