@@ -2686,7 +2686,7 @@ function bootApp() {
   $('upload-btn').addEventListener('click', () => $('file-input').click());
   $('file-input').addEventListener('change', e => { if(e.target.files.length) openUploadModal(e.target.files); });
   initUploadModal();
-  initReports();
+  if (typeof initReports === "function") initReports();
   initContextTab();
   initNewCollectionModal();
   initVoiceInput();
