@@ -2747,59 +2747,71 @@ body::before {
     .i1 { stroke-dasharray: 5 160; animation: sI1 8s linear 2.4s infinite; }
     .i2 { stroke-dasharray: 3 120; animation: sI2 11s linear 4.7s infinite; }
     .i3 { stroke-dasharray: 7 210; animation: sI3 14s linear 1.3s infinite; }
+
+    @keyframes fJ { 0%{opacity:1} 18%{opacity:0.12} 22%{opacity:0.9} 44%{opacity:0.55} 47%{opacity:1} 68%{opacity:0.18} 72%{opacity:0.85} 100%{opacity:1} }
+    @keyframes fU { 0%{opacity:0.7} 13%{opacity:1} 30%{opacity:0.08} 34%{opacity:0.95} 56%{opacity:0.65} 59%{opacity:0.04} 63%{opacity:1} 100%{opacity:0.7} }
+    @keyframes fS { 0%{opacity:1} 9%{opacity:0.25} 12%{opacity:1} 38%{opacity:0.75} 41%{opacity:0.04} 45%{opacity:0.9} 74%{opacity:0.18} 78%{opacity:1} 100%{opacity:1} }
+    @keyframes fH { 0%{opacity:0.6} 16%{opacity:1} 20%{opacity:0.35} 24%{opacity:0.95} 50%{opacity:1} 53%{opacity:0.08} 57%{opacity:0.8} 85%{opacity:0.45} 89%{opacity:1} 100%{opacity:0.6} }
+    @keyframes fI { 0%{opacity:1} 23%{opacity:0.65} 27%{opacity:0.04} 31%{opacity:1} 55%{opacity:0.85} 58%{opacity:0.15} 62%{opacity:1} 80%{opacity:0.38} 84%{opacity:1} 100%{opacity:1} }
+
+    .flick-j { animation: fJ 3.7s ease-in-out 0s infinite; }
+    .flick-u { animation: fU 4.9s ease-in-out 0.8s infinite; }
+    .flick-s { animation: fS 3.2s ease-in-out 1.6s infinite; }
+    .flick-h { animation: fH 5.5s ease-in-out 0.4s infinite; }
+    .flick-i { animation: fI 4.1s ease-in-out 2.1s infinite; }
   </style>
 
   <!-- Letter paths — approximate outlines matching JUSHI.jpg chrome letters -->
   <!-- Shared stroke properties via g elements -->
 
   <!-- J -->
-  <g fill="none" filter="url(#sf)">
+  <g class="flick-j" fill="none" filter="url(#sf)">
     <path class="j1" d="M 108,210 L 232,210 L 232,590 Q 232,660 196,695 Q 158,732 110,720 Q 72,708 58,680"
-      stroke="#f5e8a0" stroke-width="0.8" opacity="0.45"/>
+      stroke="#f5e8a0" stroke-width="0.8" opacity="0.56"/>
     <path class="j2" d="M 108,210 L 232,210 L 232,590 Q 232,660 196,695 Q 158,732 110,720 Q 72,708 58,680"
-      stroke="#ffffff" stroke-width="0.5" opacity="0.28"/>
+      stroke="#ffffff" stroke-width="0.5" opacity="0.35"/>
     <path class="j3" d="M 108,210 L 232,210 L 232,590 Q 232,660 196,695 Q 158,732 110,720 Q 72,708 58,680"
-      stroke="#d4a832" stroke-width="1.2" opacity="0.18"/>
+      stroke="#d4a832" stroke-width="1.2" opacity="0.22"/>
   </g>
 
   <!-- U -->
-  <g fill="none" filter="url(#sf)">
+  <g class="flick-u" fill="none" filter="url(#sf)">
     <path class="u1" d="M 290,210 L 290,600 Q 290,700 385,718 Q 480,700 480,600 L 480,210"
-      stroke="#f5e8a0" stroke-width="0.8" opacity="0.45"/>
+      stroke="#f5e8a0" stroke-width="0.8" opacity="0.56"/>
     <path class="u2" d="M 290,210 L 290,600 Q 290,700 385,718 Q 480,700 480,600 L 480,210"
-      stroke="#ffffff" stroke-width="0.5" opacity="0.28"/>
+      stroke="#ffffff" stroke-width="0.5" opacity="0.35"/>
     <path class="u3" d="M 290,210 L 290,600 Q 290,700 385,718 Q 480,700 480,600 L 480,210"
-      stroke="#d4a832" stroke-width="1.2" opacity="0.18"/>
+      stroke="#d4a832" stroke-width="1.2" opacity="0.22"/>
   </g>
 
   <!-- S -->
-  <g fill="none" filter="url(#sf)">
+  <g class="flick-s" fill="none" filter="url(#sf)">
     <path class="s1" d="M 688,268 Q 650,210 600,200 Q 540,188 512,232 Q 492,268 540,308 Q 590,344 630,372 Q 678,408 686,454 Q 696,508 658,552 Q 620,596 568,608 Q 516,618 510,700"
-      stroke="#f5e8a0" stroke-width="0.8" opacity="0.45"/>
+      stroke="#f5e8a0" stroke-width="0.8" opacity="0.56"/>
     <path class="s2" d="M 688,268 Q 650,210 600,200 Q 540,188 512,232 Q 492,268 540,308 Q 590,344 630,372 Q 678,408 686,454 Q 696,508 658,552 Q 620,596 568,608 Q 516,618 510,700"
-      stroke="#ffffff" stroke-width="0.5" opacity="0.28"/>
+      stroke="#ffffff" stroke-width="0.5" opacity="0.35"/>
     <path class="s3" d="M 688,268 Q 650,210 600,200 Q 540,188 512,232 Q 492,268 540,308 Q 590,344 630,372 Q 678,408 686,454 Q 696,508 658,552 Q 620,596 568,608 Q 516,618 510,700"
-      stroke="#d4a832" stroke-width="1.2" opacity="0.18"/>
+      stroke="#d4a832" stroke-width="1.2" opacity="0.22"/>
   </g>
 
   <!-- H -->
-  <g fill="none" filter="url(#sf)">
+  <g class="flick-h" fill="none" filter="url(#sf)">
     <path class="h1" d="M 732,210 L 732,710 M 922,210 L 922,710 M 732,452 L 922,452"
-      stroke="#f5e8a0" stroke-width="0.8" opacity="0.45"/>
+      stroke="#f5e8a0" stroke-width="0.8" opacity="0.56"/>
     <path class="h2" d="M 732,210 L 732,710 M 922,210 L 922,710 M 732,452 L 922,452"
-      stroke="#ffffff" stroke-width="0.5" opacity="0.28"/>
+      stroke="#ffffff" stroke-width="0.5" opacity="0.35"/>
     <path class="h3" d="M 732,210 L 732,710 M 922,210 L 922,710 M 732,452 L 922,452"
-      stroke="#d4a832" stroke-width="1.2" opacity="0.18"/>
+      stroke="#d4a832" stroke-width="1.2" opacity="0.22"/>
   </g>
 
   <!-- I -->
-  <g fill="none" filter="url(#sf)">
+  <g class="flick-i" fill="none" filter="url(#sf)">
     <path class="i1" d="M 958,210 L 1148,210 M 1053,210 L 1053,710 M 958,710 L 1148,710"
-      stroke="#f5e8a0" stroke-width="0.8" opacity="0.45"/>
+      stroke="#f5e8a0" stroke-width="0.8" opacity="0.56"/>
     <path class="i2" d="M 958,210 L 1148,210 M 1053,210 L 1053,710 M 958,710 L 1148,710"
-      stroke="#ffffff" stroke-width="0.5" opacity="0.28"/>
+      stroke="#ffffff" stroke-width="0.5" opacity="0.35"/>
     <path class="i3" d="M 958,210 L 1148,210 M 1053,210 L 1053,710 M 958,710 L 1148,710"
-      stroke="#d4a832" stroke-width="1.2" opacity="0.18"/>
+      stroke="#d4a832" stroke-width="1.2" opacity="0.22"/>
   </g>
 
   <rect width="1200" height="900" fill="url(#vignette)"/>
