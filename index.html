@@ -2696,57 +2696,91 @@ body::before {
   <defs>
     <radialGradient id="vignette" cx="50%" cy="50%" r="70%">
       <stop offset="0%"   stop-color="#050810" stop-opacity="0"/>
-      <stop offset="100%" stop-color="#050810" stop-opacity="0.92"/>
+      <stop offset="100%" stop-color="#050810" stop-opacity="0.90"/>
     </radialGradient>
 
-    <!-- Soft orb glows — warm gold light, large and feathered -->
-    <radialGradient id="orb1" cx="50%" cy="50%" r="50%">
-      <stop offset="0%"   stop-color="#f5e398" stop-opacity="0.38"/>
-      <stop offset="40%"  stop-color="#d4a832" stop-opacity="0.18"/>
-      <stop offset="100%" stop-color="#b8960c" stop-opacity="0"/>
-    </radialGradient>
-    <radialGradient id="orb2" cx="50%" cy="50%" r="50%">
-      <stop offset="0%"   stop-color="#f5e398" stop-opacity="0.28"/>
-      <stop offset="45%"  stop-color="#d4a832" stop-opacity="0.12"/>
-      <stop offset="100%" stop-color="#b8960c" stop-opacity="0"/>
-    </radialGradient>
-    <radialGradient id="orb3" cx="50%" cy="50%" r="50%">
-      <stop offset="0%"   stop-color="#fff8d6" stop-opacity="0.22"/>
-      <stop offset="50%"  stop-color="#d4a832" stop-opacity="0.08"/>
-      <stop offset="100%" stop-color="#b8960c" stop-opacity="0"/>
-    </radialGradient>
+    <!-- The specular glint stripe — bright white-gold core, sharp falloff -->
+    <!-- Horizontal gradient: fully transparent → bright core → transparent again -->
+    <!-- The stripe itself is a tall thin rect; we rotate the whole group -->
+    <linearGradient id="glint1" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%"    stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="46%"   stop-color="#d4a832" stop-opacity="0.12"/>
+      <stop offset="48.5%" stop-color="#fff8d0" stop-opacity="0.72"/>
+      <stop offset="50%"   stop-color="#ffffff"  stop-opacity="0.95"/>
+      <stop offset="51.5%" stop-color="#fff8d0" stop-opacity="0.72"/>
+      <stop offset="54%"   stop-color="#d4a832" stop-opacity="0.12"/>
+      <stop offset="100%"  stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
 
-    <!-- Blur filter to keep orbs ultra-soft -->
-    <filter id="orbBlur" x="-60%" y="-60%" width="220%" height="220%">
-      <feGaussianBlur stdDeviation="38"/>
-    </filter>
-    <filter id="orbBlur2" x="-60%" y="-60%" width="220%" height="220%">
-      <feGaussianBlur stdDeviation="52"/>
+    <!-- Softer secondary glint — slightly wider, lower opacity -->
+    <linearGradient id="glint2" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%"    stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="44%"   stop-color="#c49a16" stop-opacity="0.06"/>
+      <stop offset="48%"   stop-color="#f5e398" stop-opacity="0.45"/>
+      <stop offset="50%"   stop-color="#ffffff"  stop-opacity="0.60"/>
+      <stop offset="52%"   stop-color="#f5e398" stop-opacity="0.45"/>
+      <stop offset="56%"   stop-color="#c49a16" stop-opacity="0.06"/>
+      <stop offset="100%"  stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- Clip to the letter zone only so glint doesn't bleed into background -->
+    <clipPath id="letterZone">
+      <rect x="55" y="195" width="1090" height="510" rx="8"/>
+    </clipPath>
+
+    <!-- Slight blur on the glint rect to soften the very edge of the beam -->
+    <filter id="glintBlur" x="-5%" y="-5%" width="110%" height="110%">
+      <feGaussianBlur stdDeviation="2.5"/>
     </filter>
   </defs>
 
-  <!-- Shimmer orb 1 — drifts slowly left to right across the text zone -->
-  <ellipse cx="0" cy="450" rx="260" ry="180" fill="url(#orb1)" filter="url(#orbBlur)" opacity="0">
-    <animate attributeName="cx" values="-100;1300" dur="14s" begin="0s" repeatCount="indefinite"/>
-    <animate attributeName="cy" values="480;420;460;440;480" dur="14s" begin="0s" repeatCount="indefinite"/>
-    <animate attributeName="opacity" values="0;0.55;0.7;0.65;0.5;0.6;0.55;0" keyTimes="0;0.08;0.25;0.5;0.65;0.8;0.92;1" dur="14s" begin="0s" repeatCount="indefinite"/>
-  </ellipse>
+  <!-- 
+    GLINT SWEEP TECHNIQUE:
+    Each glint is a full-height rect filled with the gradient.
+    The gradient's bright center point is at 50% of the rect width.
+    We animate translateX from -1400 to +2600 (total travel 4000px across a 1200px canvas)
+    so the glint enters from far left, crosses the whole letter zone, exits right.
+    The rect is rotated ~12deg around center to give a diagonal specular angle.
+    clip-path keeps it locked to the letter zone.
+  -->
 
-  <!-- Shimmer orb 2 — starts mid-journey, offset phase -->
-  <ellipse cx="0" cy="430" rx="220" ry="150" fill="url(#orb2)" filter="url(#orbBlur)" opacity="0">
-    <animate attributeName="cx" values="-100;1300" dur="14s" begin="7s" repeatCount="indefinite"/>
-    <animate attributeName="cy" values="450;480;440;470;450" dur="14s" begin="7s" repeatCount="indefinite"/>
-    <animate attributeName="opacity" values="0;0.45;0.6;0.55;0.45;0.5;0.45;0" keyTimes="0;0.08;0.25;0.5;0.65;0.8;0.92;1" dur="14s" begin="7s" repeatCount="indefinite"/>
-  </ellipse>
+  <!-- Primary glint — sweeps every 9s, pauses 5s between passes -->
+  <g clip-path="url(#letterZone)" filter="url(#glintBlur)">
+    <rect id="g1" x="-1400" y="-200" width="4000" height="1300"
+          fill="url(#glint1)"
+          transform="rotate(12, 600, 450)"
+          opacity="0">
+      <animateTransform attributeName="transform" type="translate"
+        values="-1400,0; 2600,0; 2600,0"
+        keyTimes="0; 0.48; 1"
+        dur="14s" begin="0s" repeatCount="indefinite"
+        additive="sum"/>
+      <animate attributeName="opacity"
+        values="0; 0; 1; 1; 0; 0"
+        keyTimes="0; 0.01; 0.05; 0.44; 0.48; 1"
+        dur="14s" begin="0s" repeatCount="indefinite"/>
+    </rect>
+  </g>
 
-  <!-- Shimmer orb 3 — larger, softer, slightly higher — feels like ambient light shift -->
-  <ellipse cx="600" cy="430" rx="380" ry="220" fill="url(#orb3)" filter="url(#orbBlur2)" opacity="0">
-    <animate attributeName="cx" values="200;1000;200" dur="22s" begin="2s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>
-    <animate attributeName="cy" values="460;410;460" dur="22s" begin="2s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>
-    <animate attributeName="opacity" values="0;0.35;0.5;0.35;0" keyTimes="0;0.15;0.5;0.85;1" dur="22s" begin="2s" repeatCount="indefinite"/>
-  </ellipse>
+  <!-- Secondary glint — slightly offset timing, softer -->
+  <g clip-path="url(#letterZone)" filter="url(#glintBlur)">
+    <rect x="-1400" y="-200" width="4000" height="1300"
+          fill="url(#glint2)"
+          transform="rotate(12, 600, 450)"
+          opacity="0">
+      <animateTransform attributeName="transform" type="translate"
+        values="-1400,0; 2600,0; 2600,0"
+        keyTimes="0; 0.55; 1"
+        dur="18s" begin="6s" repeatCount="indefinite"
+        additive="sum"/>
+      <animate attributeName="opacity"
+        values="0; 0; 1; 1; 0; 0"
+        keyTimes="0; 0.01; 0.04; 0.52; 0.55; 1"
+        dur="18s" begin="6s" repeatCount="indefinite"/>
+    </rect>
+  </g>
 
-  <!-- Vignette to keep edges dark and focus on center -->
+  <!-- Vignette -->
   <rect width="1200" height="900" fill="url(#vignette)"/>
 </svg></div>
       <div class="scope-bar" id="scope-bar">
