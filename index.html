@@ -717,55 +717,6 @@ body::before {
   .chat-bg-overlay svg { width: 140%; left: -20%; }
 }
 
-/* Glint sweep — same technique as login card but with mix-blend-mode:screen
-   so it only brightens the chrome letters, vanishes on dark leather */
-.chat-glint {
-  position: absolute; inset: 0; z-index: 2;
-  pointer-events: none;
-  mix-blend-mode: screen;
-  background: linear-gradient(
-    108deg,
-    transparent 0%,
-    transparent 35%,
-    rgba(200,170,80,0.03) 43%,
-    rgba(230,200,120,0.07) 48%,
-    rgba(255,240,180,0.11) 50%,
-    rgba(230,200,120,0.07) 52%,
-    rgba(200,170,80,0.03) 57%,
-    transparent 65%,
-    transparent 100%
-  );
-  background-size: 300% 100%;
-  background-position: 150% 0;
-  animation: chatGlint 14s ease-in-out 2s infinite;
-}
-.chat-glint::after {
-  content: '';
-  position: absolute; inset: 0;
-  mix-blend-mode: screen;
-  background: linear-gradient(
-    108deg,
-    transparent 0%,
-    transparent 38%,
-    rgba(180,150,60,0.02) 45%,
-    rgba(220,190,100,0.05) 49%,
-    rgba(255,235,160,0.08) 50%,
-    rgba(220,190,100,0.05) 51%,
-    rgba(180,150,60,0.02) 55%,
-    transparent 62%,
-    transparent 100%
-  );
-  background-size: 300% 100%;
-  background-position: 150% 0;
-  animation: chatGlint 18s ease-in-out 9s infinite;
-}
-@keyframes chatGlint {
-  0%   { background-position: 150% 0; opacity: 0; }
-  4%   { opacity: 1; }
-  48%  { background-position: -50% 0; opacity: 0.85; }
-  54%  { opacity: 0; }
-  100% { background-position: -50% 0; opacity: 0; }
-}
 
 /* ── Scope bar ─────────────────────────────────────────── */
 .scope-bar {
@@ -2742,18 +2693,119 @@ body::before {
 
     <!-- CHAT -->
     <div class="panel active" data-panel="chat">
-      <div class="chat-bg-overlay" aria-hidden="true">
-        <div class="chat-glint"></div>
-        <svg viewBox="0 0 1200 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <radialGradient id="vignette" cx="50%" cy="50%" r="70%">
-              <stop offset="0%"   stop-color="#050810" stop-opacity="0"/>
-              <stop offset="100%" stop-color="#050810" stop-opacity="0.88"/>
-            </radialGradient>
-          </defs>
-          <rect width="1200" height="900" fill="url(#vignette)"/>
-        </svg>
-      </div>
+      <div class="chat-bg-overlay" aria-hidden="true"><svg viewBox="0 0 1200 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="vignette" cx="50%" cy="50%" r="70%">
+      <stop offset="0%"   stop-color="#050810" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#050810" stop-opacity="0.88"/>
+    </radialGradient>
+    <filter id="sf" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="1.8"/>
+    </filter>
+  </defs>
+
+  <style>
+    /* Many short dashes with large gaps = scattered sparks, not a worm */
+    /* stroke-dasharray: dash_len gap_len — keep dash short (8-18px), gap large (80-200px) */
+
+    /* J paths — 3 layers, staggered */
+    @keyframes sJ1 { from { stroke-dashoffset: 2200; } to { stroke-dashoffset: 0; } }
+    @keyframes sJ2 { from { stroke-dashoffset: 1800; } to { stroke-dashoffset: 0; } }
+    @keyframes sJ3 { from { stroke-dashoffset: 2600; } to { stroke-dashoffset: 0; } }
+
+    @keyframes sU1 { from { stroke-dashoffset: 1800; } to { stroke-dashoffset: 0; } }
+    @keyframes sU2 { from { stroke-dashoffset: 1400; } to { stroke-dashoffset: 0; } }
+    @keyframes sU3 { from { stroke-dashoffset: 2200; } to { stroke-dashoffset: 0; } }
+
+    @keyframes sS1 { from { stroke-dashoffset: 1600; } to { stroke-dashoffset: 0; } }
+    @keyframes sS2 { from { stroke-dashoffset: 1200; } to { stroke-dashoffset: 0; } }
+    @keyframes sS3 { from { stroke-dashoffset: 2000; } to { stroke-dashoffset: 0; } }
+
+    @keyframes sH1 { from { stroke-dashoffset: 2000; } to { stroke-dashoffset: 0; } }
+    @keyframes sH2 { from { stroke-dashoffset: 1600; } to { stroke-dashoffset: 0; } }
+    @keyframes sH3 { from { stroke-dashoffset: 2400; } to { stroke-dashoffset: 0; } }
+
+    @keyframes sI1 { from { stroke-dashoffset: 1400; } to { stroke-dashoffset: 0; } }
+    @keyframes sI2 { from { stroke-dashoffset: 1000; } to { stroke-dashoffset: 0; } }
+    @keyframes sI3 { from { stroke-dashoffset: 1800; } to { stroke-dashoffset: 0; } }
+
+    /* Layer 1: bright short sparks, fast */
+    .j1 { stroke-dasharray: 10 120; animation: sJ1 5s linear 0s infinite; }
+    .j2 { stroke-dasharray: 6  90;  animation: sJ2 7s linear 1.8s infinite; }
+    .j3 { stroke-dasharray: 14 160; animation: sJ3 9s linear 3.5s infinite; }
+
+    .u1 { stroke-dasharray: 10 120; animation: sU1 5s linear 0.6s infinite; }
+    .u2 { stroke-dasharray: 6  90;  animation: sU2 7s linear 2.4s infinite; }
+    .u3 { stroke-dasharray: 14 160; animation: sU3 9s linear 4.1s infinite; }
+
+    .s1 { stroke-dasharray: 10 120; animation: sS1 5s linear 1.2s infinite; }
+    .s2 { stroke-dasharray: 6  90;  animation: sS2 7s linear 3.0s infinite; }
+    .s3 { stroke-dasharray: 14 160; animation: sS3 9s linear 0.7s infinite; }
+
+    .h1 { stroke-dasharray: 10 120; animation: sH1 5s linear 1.8s infinite; }
+    .h2 { stroke-dasharray: 6  90;  animation: sH2 7s linear 0.3s infinite; }
+    .h3 { stroke-dasharray: 14 160; animation: sH3 9s linear 5.2s infinite; }
+
+    .i1 { stroke-dasharray: 10 120; animation: sI1 5s linear 2.4s infinite; }
+    .i2 { stroke-dasharray: 6  90;  animation: sI2 7s linear 4.7s infinite; }
+    .i3 { stroke-dasharray: 14 160; animation: sI3 9s linear 1.3s infinite; }
+  </style>
+
+  <!-- Letter paths — approximate outlines matching JUSHI.jpg chrome letters -->
+  <!-- Shared stroke properties via g elements -->
+
+  <!-- J -->
+  <g fill="none" filter="url(#sf)">
+    <path class="j1" d="M 108,210 L 232,210 L 232,590 Q 232,660 196,695 Q 158,732 110,720 Q 72,708 58,680"
+      stroke="#f5e8a0" stroke-width="1.5" opacity="0.55"/>
+    <path class="j2" d="M 108,210 L 232,210 L 232,590 Q 232,660 196,695 Q 158,732 110,720 Q 72,708 58,680"
+      stroke="#ffffff" stroke-width="0.8" opacity="0.35"/>
+    <path class="j3" d="M 108,210 L 232,210 L 232,590 Q 232,660 196,695 Q 158,732 110,720 Q 72,708 58,680"
+      stroke="#d4a832" stroke-width="2.5" opacity="0.22"/>
+  </g>
+
+  <!-- U -->
+  <g fill="none" filter="url(#sf)">
+    <path class="u1" d="M 290,210 L 290,600 Q 290,700 385,718 Q 480,700 480,600 L 480,210"
+      stroke="#f5e8a0" stroke-width="1.5" opacity="0.55"/>
+    <path class="u2" d="M 290,210 L 290,600 Q 290,700 385,718 Q 480,700 480,600 L 480,210"
+      stroke="#ffffff" stroke-width="0.8" opacity="0.35"/>
+    <path class="u3" d="M 290,210 L 290,600 Q 290,700 385,718 Q 480,700 480,600 L 480,210"
+      stroke="#d4a832" stroke-width="2.5" opacity="0.22"/>
+  </g>
+
+  <!-- S -->
+  <g fill="none" filter="url(#sf)">
+    <path class="s1" d="M 688,268 Q 650,210 600,200 Q 540,188 512,232 Q 492,268 540,308 Q 590,344 630,372 Q 678,408 686,454 Q 696,508 658,552 Q 620,596 568,608 Q 516,618 510,700"
+      stroke="#f5e8a0" stroke-width="1.5" opacity="0.55"/>
+    <path class="s2" d="M 688,268 Q 650,210 600,200 Q 540,188 512,232 Q 492,268 540,308 Q 590,344 630,372 Q 678,408 686,454 Q 696,508 658,552 Q 620,596 568,608 Q 516,618 510,700"
+      stroke="#ffffff" stroke-width="0.8" opacity="0.35"/>
+    <path class="s3" d="M 688,268 Q 650,210 600,200 Q 540,188 512,232 Q 492,268 540,308 Q 590,344 630,372 Q 678,408 686,454 Q 696,508 658,552 Q 620,596 568,608 Q 516,618 510,700"
+      stroke="#d4a832" stroke-width="2.5" opacity="0.22"/>
+  </g>
+
+  <!-- H -->
+  <g fill="none" filter="url(#sf)">
+    <path class="h1" d="M 732,210 L 732,710 M 922,210 L 922,710 M 732,452 L 922,452"
+      stroke="#f5e8a0" stroke-width="1.5" opacity="0.55"/>
+    <path class="h2" d="M 732,210 L 732,710 M 922,210 L 922,710 M 732,452 L 922,452"
+      stroke="#ffffff" stroke-width="0.8" opacity="0.35"/>
+    <path class="h3" d="M 732,210 L 732,710 M 922,210 L 922,710 M 732,452 L 922,452"
+      stroke="#d4a832" stroke-width="2.5" opacity="0.22"/>
+  </g>
+
+  <!-- I -->
+  <g fill="none" filter="url(#sf)">
+    <path class="i1" d="M 958,210 L 1148,210 M 1053,210 L 1053,710 M 958,710 L 1148,710"
+      stroke="#f5e8a0" stroke-width="1.5" opacity="0.55"/>
+    <path class="i2" d="M 958,210 L 1148,210 M 1053,210 L 1053,710 M 958,710 L 1148,710"
+      stroke="#ffffff" stroke-width="0.8" opacity="0.35"/>
+    <path class="i3" d="M 958,210 L 1148,210 M 1053,210 L 1053,710 M 958,710 L 1148,710"
+      stroke="#d4a832" stroke-width="2.5" opacity="0.22"/>
+  </g>
+
+  <rect width="1200" height="900" fill="url(#vignette)"/>
+</svg>      </div>
       <div class="scope-bar" id="scope-bar">
         <span class="scope-label">Context</span>
         <button class="scope-btn active" data-scope="all" id="scope-all">All Files</button>
