@@ -1090,6 +1090,163 @@ body::before {
   margin-bottom: 8px;
 }
 
+/* ── App Launcher ──────────────────────────────────────── */
+.app-launcher {
+  position: fixed;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  z-index: 300;
+  display: flex;
+  align-items: center;
+}
+.app-launcher-toggle {
+  width: 32px;
+  height: 56px;
+  background: var(--ink3);
+  border: 1px solid var(--line2);
+  border-right: none;
+  border-radius: 8px 0 0 8px;
+  color: var(--smoke3);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+.app-launcher-toggle:hover { background: var(--ink4); color: var(--gold-lt); border-color: var(--line3); }
+.app-launcher.open .app-launcher-toggle { background: var(--ink4); color: var(--gold-lt); border-color: var(--line3); }
+
+.app-launcher-panel {
+  width: 0;
+  overflow: hidden;
+  transition: width 0.28s cubic-bezier(0.22, 0.61, 0.36, 1);
+  background: var(--ink2);
+  border: 1px solid var(--line2);
+  border-right: none;
+  border-radius: 12px 0 0 12px;
+  box-shadow: -8px 0 40px rgba(0,0,0,0.5), 0 0 0 1px var(--line);
+  display: flex;
+  flex-direction: column;
+}
+.app-launcher.open .app-launcher-panel { width: 220px; }
+
+.alp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.alp-title {
+  font-family: var(--f-mono);
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--smoke3);
+  white-space: nowrap;
+}
+.alp-close {
+  background: none;
+  border: none;
+  color: var(--smoke4);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  transition: color 0.15s;
+  flex-shrink: 0;
+}
+.alp-close:hover { color: var(--smoke); }
+
+.alp-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 10px;
+  overflow-y: auto;
+  flex: 1;
+  scrollbar-width: none;
+}
+.alp-grid::-webkit-scrollbar { display: none; }
+
+.alp-app {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 6px;
+  border-radius: var(--r);
+  border: 1px solid transparent;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  position: relative;
+  white-space: nowrap;
+}
+.alp-app:hover { background: var(--gold-dim); border-color: var(--line2); }
+
+.alp-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  overflow: hidden;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+.alp-icon svg { width: 44px; height: 44px; display: block; }
+
+.alp-name {
+  font-family: var(--f-body);
+  font-size: 10px;
+  font-weight: 300;
+  color: var(--smoke2);
+  letter-spacing: 0.02em;
+  text-align: center;
+  white-space: nowrap;
+}
+.alp-app:hover .alp-name { color: var(--smoke); }
+
+.alp-status {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--smoke4);
+}
+.alp-status.connected { background: var(--green-lt); box-shadow: 0 0 5px var(--green-lt); }
+
+.alp-footer {
+  padding: 8px 10px 10px;
+  border-top: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.alp-settings-btn {
+  width: 100%;
+  padding: 7px 10px;
+  background: var(--gold-dim);
+  border: 1px solid var(--line2);
+  border-radius: var(--r);
+  color: var(--gold-lt);
+  font-family: var(--f-mono);
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.alp-settings-btn:hover { background: rgba(184,150,12,0.15); border-color: var(--gold); }
+
+/* Adjust content area when launcher is open */
+@media (min-width: 769px) {
+  .app-launcher.open ~ * { margin-right: 0; }
+}
+
 /* ── Admin ─────────────────────────────────────────────── */
 .admin-wrap {
   overflow-y: auto;
@@ -2454,54 +2611,26 @@ body::before {
     <div class="panel" data-panel="admin">
       <div class="admin-wrap">
         <div class="asec">
-          <div class="asec-head">
-            <div class="asec-title">System Status</div>
-            <div class="asec-line"></div>
-          </div>
+          <div class="asec-head"><div class="asec-title">System Status</div><div class="asec-line"></div></div>
           <div class="sgrid">
-            <div class="scard" id="scard-api">
-              <div class="scard-label">Worker API</div>
-              <div class="scard-val">CF Workers</div>
-              <div class="srow" id="stat-api"><div class="spip warn"></div><span class="srow-text">Checking...</span></div>
-            </div>
-            <div class="scard" id="scard-claude">
-              <div class="scard-label">AI Engine</div>
-              <div class="scard-val" id="stat-model-val">Claude</div>
-              <div class="srow" id="stat-claude"><div class="spip warn"></div><span class="srow-text">Checking key...</span></div>
-            </div>
-            <div class="scard ok">
-              <div class="scard-label">File Storage</div>
-              <div class="scard-val">KV + R2</div>
-              <div class="srow"><div class="spip"></div><span class="srow-text">Active</span></div>
-            </div>
-            <div class="scard ok">
-              <div class="scard-label">Extraction</div>
-              <div class="scard-val">Client-Side</div>
-              <div class="srow"><div class="spip"></div><span class="srow-text">PDF &middot; Word &middot; Excel</span></div>
-            </div>
+            <div class="scard" id="scard-api"><div class="scard-label">Worker API</div><div class="scard-val">CF Workers</div><div class="srow" id="stat-api"><div class="spip warn"></div><span class="srow-text">Checking...</span></div></div>
+            <div class="scard" id="scard-claude"><div class="scard-label">AI Engine</div><div class="scard-val" id="stat-model-val">Claude</div><div class="srow" id="stat-claude"><div class="spip warn"></div><span class="srow-text">Checking key...</span></div></div>
+            <div class="scard ok"><div class="scard-label">File Storage</div><div class="scard-val">KV + R2</div><div class="srow"><div class="spip"></div><span class="srow-text">Active</span></div></div>
+            <div class="scard ok"><div class="scard-label">Extraction</div><div class="scard-val">Client-Side</div><div class="srow"><div class="spip"></div><span class="srow-text">PDF &middot; Word &middot; Excel</span></div></div>
           </div>
         </div>
         <div class="asec">
-          <div class="asec-head">
-            <div class="asec-title">AI Configuration</div>
-            <div class="asec-line"></div>
-          </div>
+          <div class="asec-head"><div class="asec-title">AI Configuration</div><div class="asec-line"></div></div>
           <div class="acard">
             <div class="acard-title">Claude &mdash; Anthropic</div>
             <div class="acard-sub">claude-sonnet-4 &nbsp;&middot;&nbsp; Powers all document Q&A and report generation</div>
-            <div class="arow">
-              <input class="ainput" type="password" id="ant-key" placeholder="sk-ant-api03-..." autocomplete="off"/>
-              <button class="asave" id="ant-save">Save Key</button>
-            </div>
+            <div class="arow"><input class="ainput" type="password" id="ant-key" placeholder="sk-ant-api03-..." autocomplete="off"/><button class="asave" id="ant-save">Save Key</button></div>
             <div class="afb" id="ant-fb"></div>
           </div>
           <div class="acard">
             <div class="acard-title">Voice &mdash; Google Cloud TTS</div>
             <div class="acard-sub">WaveNet neural voices &nbsp;&middot;&nbsp; 1M characters free/month &nbsp;&middot;&nbsp; <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:var(--gold-lt)">Get free API key &rarr;</a></div>
-            <div class="arow">
-              <input class="ainput" type="password" id="gtts-key" placeholder="AIza..." autocomplete="off"/>
-              <button class="asave" id="gtts-save">Save Key</button>
-            </div>
+            <div class="arow"><input class="ainput" type="password" id="gtts-key" placeholder="AIza..." autocomplete="off"/><button class="asave" id="gtts-save">Save Key</button></div>
             <div class="afb" id="gtts-fb"></div>
             <div class="arow" style="margin-top:10px;flex-wrap:wrap;gap:8px">
               <select class="ainput" id="gtts-voice" style="flex:1">
@@ -2514,10 +2643,8 @@ body::before {
                 <option value="en-US-Neural2-C">Neural2 C — Conversational Female</option>
               </select>
               <select class="ainput" id="gtts-speed" style="flex:0 0 120px">
-                <option value="0.9">Slower</option>
-                <option value="1.0" selected>Normal</option>
-                <option value="1.1">Faster</option>
-                <option value="1.2">Fast</option>
+                <option value="0.9">Slower</option><option value="1.0" selected>Normal</option>
+                <option value="1.1">Faster</option><option value="1.2">Fast</option>
               </select>
             </div>
             <div class="arow" style="margin-top:8px;align-items:center;gap:12px">
@@ -2528,266 +2655,244 @@ body::before {
             </div>
           </div>
         </div>
-      </div>
-    </div>
 
-    <!-- INTEGRATIONS -->
-    <div class="panel" data-panel="integrations">
-      <div class="admin-wrap">
+        <!-- INTEGRATIONS — Microsoft 365 -->
         <div class="asec">
-          <div class="asec-head">
-            <div class="asec-title">Microsoft 365</div>
-            <div class="asec-sub-title">Connect your Microsoft workspace to import, export, and sync documents</div>
-            <div class="asec-line"></div>
-          </div>
+          <div class="asec-head"><div class="asec-title">Microsoft 365 Integrations</div><div class="asec-line"></div></div>
+          <div class="asec-sub-title" style="margin:-8px 0 14px">Connect your Microsoft workspace to import, export, and sync documents</div>
           <div class="int-grid">
-
             <div class="int-card" id="int-excel">
-              <div class="int-logo" style="background:#1d6f42">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
-              </div>
-              <div class="int-info">
-                <div class="int-name">Excel / Sheets</div>
-                <div class="int-desc">Import workbooks, export analysis to .xlsx, sync data ranges</div>
-              </div>
+              <div class="int-logo" style="background:#1d6f42"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg></div>
+              <div class="int-info"><div class="int-name">Excel / Sheets</div><div class="int-desc">Import workbooks, export analysis to .xlsx, sync data ranges</div></div>
               <div class="int-status idle" id="ist-excel"><span class="spip warn"></span>Not connected</div>
-              <div class="int-actions">
-                <input class="ainput int-input" type="password" placeholder="Client Secret" id="ii-excel-secret" autocomplete="off"/>
-                <input class="ainput int-input" type="text" placeholder="Tenant ID" id="ii-excel-tenant" autocomplete="off"/>
-                <button class="asave int-btn" onclick="connectIntegration('excel')">Connect via OAuth</button>
-              </div>
+              <div class="int-actions"><input class="ainput int-input" type="password" placeholder="Client Secret" id="ii-excel-secret" autocomplete="off"/><input class="ainput int-input" type="text" placeholder="Tenant ID" id="ii-excel-tenant" autocomplete="off"/><button class="asave int-btn" onclick="connectIntegration('excel')">Connect via OAuth</button></div>
               <div class="int-fb" id="ifb-excel"></div>
             </div>
-
             <div class="int-card" id="int-word">
-              <div class="int-logo" style="background:#185abd">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
-              </div>
-              <div class="int-info">
-                <div class="int-name">Word / Docs</div>
-                <div class="int-desc">Parse .docx files directly from OneDrive, export AI reports as Word documents</div>
-              </div>
+              <div class="int-logo" style="background:#185abd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg></div>
+              <div class="int-info"><div class="int-name">Word / Docs</div><div class="int-desc">Parse .docx files from OneDrive, export AI reports as Word documents</div></div>
               <div class="int-status idle" id="ist-word"><span class="spip warn"></span>Not connected</div>
-              <div class="int-actions">
-                <input class="ainput int-input" type="password" placeholder="Client Secret" id="ii-word-secret" autocomplete="off"/>
-                <input class="ainput int-input" type="text" placeholder="Tenant ID" id="ii-word-tenant" autocomplete="off"/>
-                <button class="asave int-btn" onclick="connectIntegration('word')">Connect via OAuth</button>
-              </div>
+              <div class="int-actions"><input class="ainput int-input" type="password" placeholder="Client Secret" id="ii-word-secret" autocomplete="off"/><input class="ainput int-input" type="text" placeholder="Tenant ID" id="ii-word-tenant" autocomplete="off"/><button class="asave int-btn" onclick="connectIntegration('word')">Connect via OAuth</button></div>
               <div class="int-fb" id="ifb-word"></div>
             </div>
-
             <div class="int-card" id="int-teams">
-              <div class="int-logo" style="background:#464eb8">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
-              </div>
-              <div class="int-info">
-                <div class="int-name">Microsoft Teams</div>
-                <div class="int-desc">Post AI summaries to channels, trigger analysis from Teams messages</div>
-              </div>
+              <div class="int-logo" style="background:#464eb8"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg></div>
+              <div class="int-info"><div class="int-name">Microsoft Teams</div><div class="int-desc">Post AI summaries to channels, trigger analysis from Teams messages</div></div>
               <div class="int-status idle" id="ist-teams"><span class="spip warn"></span>Not connected</div>
-              <div class="int-actions">
-                <input class="ainput int-input" type="text" placeholder="Webhook URL" id="ii-teams-webhook" autocomplete="off"/>
-                <input class="ainput int-input" type="password" placeholder="Bot Token (optional)" id="ii-teams-token" autocomplete="off"/>
-                <button class="asave int-btn" onclick="connectIntegration('teams')">Save &amp; Test</button>
-              </div>
+              <div class="int-actions"><input class="ainput int-input" type="text" placeholder="Webhook URL" id="ii-teams-webhook" autocomplete="off"/><input class="ainput int-input" type="password" placeholder="Bot Token (optional)" id="ii-teams-token" autocomplete="off"/><button class="asave int-btn" onclick="connectIntegration('teams')">Save &amp; Test</button></div>
               <div class="int-fb" id="ifb-teams"></div>
             </div>
-
             <div class="int-card" id="int-powerbi">
-              <div class="int-logo" style="background:#f2c811; color:#1a1a1a">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="4" height="18"/><rect x="9" y="8" width="4" height="13"/><rect x="16" y="13" width="4" height="8"/></svg>
-              </div>
-              <div class="int-info">
-                <div class="int-name">Power BI</div>
-                <div class="int-desc">Push CACI analytics to Power BI datasets, embed dashboards</div>
-              </div>
+              <div class="int-logo" style="background:#f2c811;color:#1a1a1a"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="4" height="18"/><rect x="9" y="8" width="4" height="13"/><rect x="16" y="13" width="4" height="8"/></svg></div>
+              <div class="int-info"><div class="int-name">Power BI</div><div class="int-desc">Push CACI analytics to Power BI datasets, embed dashboards</div></div>
               <div class="int-status idle" id="ist-powerbi"><span class="spip warn"></span>Not connected</div>
-              <div class="int-actions">
-                <input class="ainput int-input" type="password" placeholder="Client Secret" id="ii-powerbi-secret" autocomplete="off"/>
-                <input class="ainput int-input" type="text" placeholder="Workspace ID" id="ii-powerbi-workspace" autocomplete="off"/>
-                <button class="asave int-btn" onclick="connectIntegration('powerbi')">Connect via OAuth</button>
-              </div>
+              <div class="int-actions"><input class="ainput int-input" type="password" placeholder="Client Secret" id="ii-powerbi-secret" autocomplete="off"/><input class="ainput int-input" type="text" placeholder="Workspace ID" id="ii-powerbi-workspace" autocomplete="off"/><button class="asave int-btn" onclick="connectIntegration('powerbi')">Connect via OAuth</button></div>
               <div class="int-fb" id="ifb-powerbi"></div>
             </div>
-
+            <div class="int-card" id="int-sharepoint">
+              <div class="int-logo" style="background:#038387"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="4.93" y1="4.93" x2="9.17" y2="9.17"/><line x1="14.83" y1="14.83" x2="19.07" y2="19.07"/><line x1="14.83" y1="9.17" x2="19.07" y2="4.93"/><line x1="4.93" y1="19.07" x2="9.17" y2="14.83"/></svg></div>
+              <div class="int-info"><div class="int-name">SharePoint</div><div class="int-desc">Browse and ingest documents directly from SharePoint libraries</div></div>
+              <div class="int-status idle" id="ist-sharepoint"><span class="spip warn"></span>Not connected</div>
+              <div class="int-actions"><input class="ainput int-input" type="password" placeholder="Client Secret" id="ii-sharepoint-secret" autocomplete="off"/><input class="ainput int-input" type="text" placeholder="Tenant ID" id="ii-sharepoint-tenant" autocomplete="off"/><button class="asave int-btn" onclick="connectIntegration('sharepoint')">Connect via OAuth</button></div>
+              <div class="int-fb" id="ifb-sharepoint"></div>
+            </div>
             <div class="int-card" id="int-quickbase">
-              <div class="int-logo" style="background:#e8401c">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
-              </div>
-              <div class="int-info">
-                <div class="int-name">QuickBase</div>
-                <div class="int-desc">Sync records bidirectionally, run AI analysis on QuickBase tables</div>
-              </div>
+              <div class="int-logo" style="background:#e8401c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></div>
+              <div class="int-info"><div class="int-name">QuickBase</div><div class="int-desc">Sync records bidirectionally, run AI analysis on QuickBase tables</div></div>
               <div class="int-status idle" id="ist-quickbase"><span class="spip warn"></span>Not connected</div>
-              <div class="int-actions">
-                <input class="ainput int-input" type="password" placeholder="User Token" id="ii-quickbase-token" autocomplete="off"/>
-                <input class="ainput int-input" type="text" placeholder="Realm Hostname (e.g. company.quickbase.com)" id="ii-quickbase-realm" autocomplete="off"/>
-                <button class="asave int-btn" onclick="connectIntegration('quickbase')">Save &amp; Test</button>
-              </div>
+              <div class="int-actions"><input class="ainput int-input" type="password" placeholder="User Token" id="ii-quickbase-token" autocomplete="off"/><input class="ainput int-input" type="text" placeholder="Realm (e.g. company.quickbase.com)" id="ii-quickbase-realm" autocomplete="off"/><button class="asave int-btn" onclick="connectIntegration('quickbase')">Save &amp; Test</button></div>
               <div class="int-fb" id="ifb-quickbase"></div>
             </div>
-
-            <div class="int-card int-coming" id="int-sharepoint">
-              <div class="int-logo" style="background:#038387">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="4.93" y1="4.93" x2="9.17" y2="9.17"/><line x1="14.83" y1="14.83" x2="19.07" y2="19.07"/><line x1="14.83" y1="9.17" x2="19.07" y2="4.93"/><line x1="4.93" y1="19.07" x2="9.17" y2="14.83"/></svg>
-              </div>
-              <div class="int-info">
-                <div class="int-name">SharePoint</div>
-                <div class="int-desc">Browse and ingest documents directly from SharePoint libraries</div>
-              </div>
-              <div class="int-status idle"><span class="spip warn"></span>Coming soon</div>
-              <div class="int-actions"><button class="asave int-btn" disabled style="opacity:0.4;cursor:default">Coming Soon</button></div>
-            </div>
-
           </div>
         </div>
 
+        <!-- CONNECTORS — Cannabis -->
         <div class="asec">
-          <div class="asec-head">
-            <div class="asec-title">Connected Integrations</div>
-            <div class="asec-line"></div>
-          </div>
-          <div id="int-connected-list" class="int-connected-list">
-            <div class="fempty" style="padding:24px 0">No integrations connected yet.</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- CONNECTORS -->
-    <div class="panel" data-panel="connectors">
-      <div class="admin-wrap">
-        <div class="asec">
-          <div class="asec-head">
-            <div class="asec-title">Cannabis Platform Connectors</div>
-            <div class="asec-sub-title">API connections to cannabis retail, compliance, and distribution platforms. Keys are stored in Cloudflare KV and never exposed to the browser after save.</div>
-            <div class="asec-line"></div>
-          </div>
+          <div class="asec-head"><div class="asec-title">Cannabis Platform Connectors</div><div class="asec-line"></div></div>
+          <div class="asec-sub-title" style="margin:-8px 0 14px">API connections to cannabis retail, compliance, and distribution platforms</div>
           <div class="int-grid">
-
             <div class="int-card" id="con-dutchie">
-              <div class="int-logo" style="background:#2d7d46">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2a9 9 0 00-9 9c0 4.17 2.84 7.67 6.69 8.69L12 22l2.31-2.31C18.16 18.67 21 15.17 21 11a9 9 0 00-9-9z"/></svg>
-              </div>
-              <div class="int-info">
-                <div class="int-name">Dutchie</div>
-                <div class="int-desc">POS &amp; eCommerce — pull sales, inventory, menu data for AI analysis</div>
-                <div class="int-tags"><span class="int-tag">POS</span><span class="int-tag">eCommerce</span><span class="int-tag">Inventory</span></div>
-              </div>
+              <div class="int-logo" style="background:#2d7d46"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2a9 9 0 00-9 9c0 4.17 2.84 7.67 6.69 8.69L12 22l2.31-2.31C18.16 18.67 21 15.17 21 11a9 9 0 00-9-9z"/></svg></div>
+              <div class="int-info"><div class="int-name">Dutchie</div><div class="int-desc">POS &amp; eCommerce — pull sales, inventory, menu data</div><div class="int-tags"><span class="int-tag">POS</span><span class="int-tag">eCommerce</span></div></div>
               <div class="con-status" id="cst-dutchie"><span class="spip warn"></span>Not configured</div>
-              <div class="int-actions">
-                <input class="ainput int-input" type="password" placeholder="Dutchie API Key" id="ci-dutchie-key" autocomplete="off"/>
-                <input class="ainput int-input" type="text" placeholder="Store ID / Slug" id="ci-dutchie-store" autocomplete="off"/>
-                <input class="ainput int-input" type="text" placeholder="Environment (prod / sandbox)" id="ci-dutchie-env" value="prod"/>
-                <button class="asave int-btn" onclick="saveConnector('dutchie')">Save &amp; Verify</button>
-              </div>
+              <div class="int-actions"><input class="ainput int-input" type="password" placeholder="Dutchie API Key" id="ci-dutchie-key" autocomplete="off"/><input class="ainput int-input" type="text" placeholder="Store ID / Slug" id="ci-dutchie-store" autocomplete="off"/><input class="ainput int-input" type="text" placeholder="Environment (prod / sandbox)" id="ci-dutchie-env" value="prod"/><button class="asave int-btn" onclick="saveConnector('dutchie')">Save &amp; Verify</button></div>
               <div class="int-fb" id="cfb-dutchie"></div>
             </div>
-
             <div class="int-card" id="con-metrc">
-              <div class="int-logo" style="background:#1a5c9a">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>
-              </div>
-              <div class="int-info">
-                <div class="int-name">METRC</div>
-                <div class="int-desc">State compliance &amp; track-and-trace — pull plant batches, transfers, lab results</div>
-                <div class="int-tags"><span class="int-tag">Compliance</span><span class="int-tag">Track &amp; Trace</span><span class="int-tag">State</span></div>
-              </div>
+              <div class="int-logo" style="background:#1a5c9a"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg></div>
+              <div class="int-info"><div class="int-name">METRC</div><div class="int-desc">State compliance &amp; track-and-trace — batches, transfers, lab results</div><div class="int-tags"><span class="int-tag">Compliance</span><span class="int-tag">State</span></div></div>
               <div class="con-status" id="cst-metrc"><span class="spip warn"></span>Not configured</div>
-              <div class="int-actions">
-                <input class="ainput int-input" type="password" placeholder="Software API Key" id="ci-metrc-sw" autocomplete="off"/>
-                <input class="ainput int-input" type="password" placeholder="User API Key" id="ci-metrc-user" autocomplete="off"/>
-                <input class="ainput int-input" type="text" placeholder="State abbreviation (e.g. CO, CA, IL)" id="ci-metrc-state"/>
-                <button class="asave int-btn" onclick="saveConnector('metrc')">Save &amp; Verify</button>
-              </div>
+              <div class="int-actions"><input class="ainput int-input" type="password" placeholder="Software API Key" id="ci-metrc-sw" autocomplete="off"/><input class="ainput int-input" type="password" placeholder="User API Key" id="ci-metrc-user" autocomplete="off"/><input class="ainput int-input" type="text" placeholder="State (e.g. CA, IL)" id="ci-metrc-state"/><button class="asave int-btn" onclick="saveConnector('metrc')">Save &amp; Verify</button></div>
               <div class="int-fb" id="cfb-metrc"></div>
             </div>
-
             <div class="int-card" id="con-iheartjane">
-              <div class="int-logo" style="background:#c0392b">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
-              </div>
-              <div class="int-info">
-                <div class="int-name">iHeartJane</div>
-                <div class="int-desc">Marketplace &amp; menu — pull product listings, orders, customer data</div>
-                <div class="int-tags"><span class="int-tag">Marketplace</span><span class="int-tag">Menu</span><span class="int-tag">Orders</span></div>
-              </div>
+              <div class="int-logo" style="background:#c0392b"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg></div>
+              <div class="int-info"><div class="int-name">iHeartJane</div><div class="int-desc">Marketplace &amp; menu — product listings, orders, customer data</div><div class="int-tags"><span class="int-tag">Marketplace</span><span class="int-tag">Menu</span></div></div>
               <div class="con-status" id="cst-iheartjane"><span class="spip warn"></span>Not configured</div>
-              <div class="int-actions">
-                <input class="ainput int-input" type="password" placeholder="Jane API Key" id="ci-jane-key" autocomplete="off"/>
-                <input class="ainput int-input" type="text" placeholder="Store ID" id="ci-jane-store" autocomplete="off"/>
-                <button class="asave int-btn" onclick="saveConnector('iheartjane')">Save &amp; Verify</button>
-              </div>
+              <div class="int-actions"><input class="ainput int-input" type="password" placeholder="Jane API Key" id="ci-jane-key" autocomplete="off"/><input class="ainput int-input" type="text" placeholder="Store ID" id="ci-jane-store" autocomplete="off"/><button class="asave int-btn" onclick="saveConnector('iheartjane')">Save &amp; Verify</button></div>
               <div class="int-fb" id="cfb-iheartjane"></div>
             </div>
-
             <div class="int-card" id="con-leaftrade">
-              <div class="int-logo" style="background:#3a7d44">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22V12M12 12C12 7 7 2 2 2c0 5 3.5 9.5 10 10zM12 12c0-5 5-10 10-10-1 5-4.5 9-10 10z"/></svg>
-              </div>
-              <div class="int-info">
-                <div class="int-name">LeafTrade</div>
-                <div class="int-desc">B2B wholesale marketplace — pull orders, vendor catalog, delivery status</div>
-                <div class="int-tags"><span class="int-tag">B2B</span><span class="int-tag">Wholesale</span><span class="int-tag">Orders</span></div>
-              </div>
+              <div class="int-logo" style="background:#3a7d44"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22V12M12 12C12 7 7 2 2 2c0 5 3.5 9.5 10 10zM12 12c0-5 5-10 10-10-1 5-4.5 9-10 10z"/></svg></div>
+              <div class="int-info"><div class="int-name">LeafTrade</div><div class="int-desc">B2B wholesale — orders, vendor catalog, delivery status</div><div class="int-tags"><span class="int-tag">B2B</span><span class="int-tag">Wholesale</span></div></div>
               <div class="con-status" id="cst-leaftrade"><span class="spip warn"></span>Not configured</div>
-              <div class="int-actions">
-                <input class="ainput int-input" type="password" placeholder="LeafTrade API Key" id="ci-leaftrade-key" autocomplete="off"/>
-                <input class="ainput int-input" type="text" placeholder="License Number" id="ci-leaftrade-license" autocomplete="off"/>
-                <button class="asave int-btn" onclick="saveConnector('leaftrade')">Save &amp; Verify</button>
-              </div>
+              <div class="int-actions"><input class="ainput int-input" type="password" placeholder="LeafTrade API Key" id="ci-leaftrade-key" autocomplete="off"/><input class="ainput int-input" type="text" placeholder="License Number" id="ci-leaftrade-license" autocomplete="off"/><button class="asave int-btn" onclick="saveConnector('leaftrade')">Save &amp; Verify</button></div>
               <div class="int-fb" id="cfb-leaftrade"></div>
             </div>
-
             <div class="int-card" id="con-mjfreeway">
-              <div class="int-logo" style="background:#7b3fa0">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
-              </div>
-              <div class="int-info">
-                <div class="int-name">MJ Freeway</div>
-                <div class="int-desc">Seed-to-sale ERP — pull inventory, sales, compliance reports</div>
-                <div class="int-tags"><span class="int-tag">ERP</span><span class="int-tag">Seed-to-Sale</span><span class="int-tag">Compliance</span></div>
-              </div>
+              <div class="int-logo" style="background:#7b3fa0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg></div>
+              <div class="int-info"><div class="int-name">MJ Freeway</div><div class="int-desc">Seed-to-sale ERP — inventory, sales, compliance reports</div><div class="int-tags"><span class="int-tag">ERP</span><span class="int-tag">Seed-to-Sale</span></div></div>
               <div class="con-status" id="cst-mjfreeway"><span class="spip warn"></span>Not configured</div>
-              <div class="int-actions">
-                <input class="ainput int-input" type="password" placeholder="API Token" id="ci-mjfw-token" autocomplete="off"/>
-                <input class="ainput int-input" type="text" placeholder="Facility License #" id="ci-mjfw-license" autocomplete="off"/>
-                <input class="ainput int-input" type="text" placeholder="API Base URL" id="ci-mjfw-url" value="https://api.mjfreeway.com/v1"/>
-                <button class="asave int-btn" onclick="saveConnector('mjfreeway')">Save &amp; Verify</button>
-              </div>
+              <div class="int-actions"><input class="ainput int-input" type="password" placeholder="API Token" id="ci-mjfw-token" autocomplete="off"/><input class="ainput int-input" type="text" placeholder="Facility License #" id="ci-mjfw-license" autocomplete="off"/><input class="ainput int-input" type="text" placeholder="API Base URL" id="ci-mjfw-url" value="https://api.mjfreeway.com/v1"/><button class="asave int-btn" onclick="saveConnector('mjfreeway')">Save &amp; Verify</button></div>
               <div class="int-fb" id="cfb-mjfreeway"></div>
             </div>
-
-            <div class="int-card int-coming">
-              <div class="int-logo" style="background:#444">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-              </div>
-              <div class="int-info">
-                <div class="int-name">More Coming</div>
-                <div class="int-desc">Treez, BioTrack, Flowhub, Weedmaps, and more — request via Config panel</div>
-                <div class="int-tags"><span class="int-tag">Roadmap</span></div>
-              </div>
-              <div class="con-status"><span class="spip warn"></span>Planned</div>
-              <div class="int-actions"><button class="asave int-btn" disabled style="opacity:0.4;cursor:default">Planned</button></div>
-            </div>
-
           </div>
         </div>
 
-        <div class="asec">
-          <div class="asec-head">
-            <div class="asec-title">Active Connectors</div>
-            <div class="asec-line"></div>
-          </div>
-          <div id="con-active-list" class="int-connected-list">
-            <div class="fempty" style="padding:24px 0">No connectors configured yet.</div>
-          </div>
-        </div>
       </div>
     </div>
 
   </div>
   <nav id="botbar"></nav>
+
+  <!-- ── App Launcher — collapsible right rail ─────────────── -->
+  <div id="app-launcher" class="app-launcher">
+    <button id="app-launcher-toggle" class="app-launcher-toggle" title="Apps" onclick="toggleAppLauncher()">
+      <!-- Waffle grid icon -->
+      <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
+        <rect x="1" y="1" width="7" height="7" rx="1"/><rect x="12" y="1" width="7" height="7" rx="1"/>
+        <rect x="1" y="12" width="7" height="7" rx="1"/><rect x="12" y="12" width="7" height="7" rx="1"/>
+      </svg>
+    </button>
+    <div class="app-launcher-panel" id="app-launcher-panel">
+      <div class="alp-header">
+        <div class="alp-title">Microsoft 365</div>
+        <button class="alp-close" onclick="toggleAppLauncher()">&times;</button>
+      </div>
+      <div class="alp-grid">
+
+        <!-- Teams -->
+        <a class="alp-app" href="https://teams.microsoft.com" target="_blank" rel="noopener">
+          <div class="alp-icon">
+            <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+              <rect width="64" height="64" rx="10" fill="#464eb8"/>
+              <path d="M38 20a6 6 0 100-12 6 6 0 000 12z" fill="#fff" opacity=".9"/>
+              <path d="M50 28h-12a2 2 0 00-2 2v14a8 8 0 0016 0V30a2 2 0 00-2-2z" fill="#fff" opacity=".9"/>
+              <path d="M26 26a8 8 0 100-16 8 8 0 000 16z" fill="#fff"/>
+              <path d="M10 36v14a12 12 0 0024 0V36a4 4 0 00-4-4H14a4 4 0 00-4 4z" fill="#fff"/>
+            </svg>
+          </div>
+          <div class="alp-name">Teams</div>
+          <div class="alp-status" id="als-teams"></div>
+        </a>
+
+        <!-- Excel -->
+        <a class="alp-app" href="https://office.com/launch/excel" target="_blank" rel="noopener">
+          <div class="alp-icon">
+            <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+              <rect width="64" height="64" rx="10" fill="#1d6f42"/>
+              <path d="M8 12h28l16 10v30H8z" fill="#fff" opacity=".08"/>
+              <path d="M36 8v12h12L36 8z" fill="#fff" opacity=".5"/>
+              <path d="M8 8h28l12 12v36H8V8z" fill="none" stroke="#fff" stroke-width="0" opacity="0"/>
+              <!-- X shape -->
+              <line x1="18" y1="28" x2="30" y2="44" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+              <line x1="30" y1="28" x2="18" y2="44" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+              <rect x="34" y="28" width="16" height="3" rx="1.5" fill="#fff" opacity=".8"/>
+              <rect x="34" y="34" width="16" height="3" rx="1.5" fill="#fff" opacity=".8"/>
+              <rect x="34" y="40" width="16" height="3" rx="1.5" fill="#fff" opacity=".8"/>
+            </svg>
+          </div>
+          <div class="alp-name">Excel</div>
+          <div class="alp-status" id="als-excel"></div>
+        </a>
+
+        <!-- Word -->
+        <a class="alp-app" href="https://office.com/launch/word" target="_blank" rel="noopener">
+          <div class="alp-icon">
+            <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+              <rect width="64" height="64" rx="10" fill="#185abd"/>
+              <path d="M36 8v12h12L36 8z" fill="#fff" opacity=".5"/>
+              <!-- W letterform -->
+              <text x="11" y="50" font-family="Arial Black, Arial" font-weight="900" font-size="36" fill="#fff">W</text>
+            </svg>
+          </div>
+          <div class="alp-name">Word</div>
+          <div class="alp-status" id="als-word"></div>
+        </a>
+
+        <!-- SharePoint -->
+        <a class="alp-app" href="https://sharepoint.com" target="_blank" rel="noopener">
+          <div class="alp-icon">
+            <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+              <rect width="64" height="64" rx="10" fill="#038387"/>
+              <!-- Overlapping circles like SharePoint logo -->
+              <circle cx="22" cy="32" r="16" fill="#fff" opacity=".15"/>
+              <circle cx="22" cy="32" r="16" fill="none" stroke="#fff" stroke-width="1.5" opacity=".4"/>
+              <circle cx="36" cy="32" r="13" fill="#fff" opacity=".2"/>
+              <circle cx="36" cy="32" r="13" fill="none" stroke="#fff" stroke-width="1.5" opacity=".5"/>
+              <circle cx="48" cy="32" r="9" fill="#fff" opacity=".3"/>
+              <circle cx="48" cy="32" r="9" fill="none" stroke="#fff" stroke-width="1.5" opacity=".6"/>
+              <circle cx="22" cy="32" r="6" fill="#fff" opacity=".8"/>
+            </svg>
+          </div>
+          <div class="alp-name">SharePoint</div>
+          <div class="alp-status" id="als-sharepoint"></div>
+        </a>
+
+        <!-- PowerPoint -->
+        <a class="alp-app" href="https://office.com/launch/powerpoint" target="_blank" rel="noopener">
+          <div class="alp-icon">
+            <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+              <rect width="64" height="64" rx="10" fill="#c43e1c"/>
+              <path d="M36 8v12h12L36 8z" fill="#fff" opacity=".5"/>
+              <!-- P letterform -->
+              <text x="10" y="50" font-family="Arial Black, Arial" font-weight="900" font-size="36" fill="#fff">P</text>
+            </svg>
+          </div>
+          <div class="alp-name">PowerPoint</div>
+          <div class="alp-status" id="als-powerpoint"></div>
+        </a>
+
+        <!-- Power BI -->
+        <a class="alp-app" href="https://app.powerbi.com" target="_blank" rel="noopener">
+          <div class="alp-icon">
+            <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+              <rect width="64" height="64" rx="10" fill="#f2c811"/>
+              <rect x="10" y="20" width="10" height="34" rx="2" fill="#1a1a1a" opacity=".8"/>
+              <rect x="27" y="30" width="10" height="24" rx="2" fill="#1a1a1a" opacity=".8"/>
+              <rect x="44" y="38" width="10" height="16" rx="2" fill="#1a1a1a" opacity=".8"/>
+            </svg>
+          </div>
+          <div class="alp-name">Power BI</div>
+          <div class="alp-status" id="als-powerbi"></div>
+        </a>
+
+        <!-- QuickBase -->
+        <a class="alp-app" href="https://quickbase.com" target="_blank" rel="noopener">
+          <div class="alp-icon">
+            <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+              <rect width="64" height="64" rx="10" fill="#e8401c"/>
+              <!-- QB-style stacked layers -->
+              <ellipse cx="32" cy="18" rx="18" ry="6" fill="#fff" opacity=".9"/>
+              <path d="M14 18v10c0 3.3 8 6 18 6s18-2.7 18-6V18" fill="#fff" opacity=".5"/>
+              <path d="M14 28v10c0 3.3 8 6 18 6s18-2.7 18-6V28" fill="#fff" opacity=".3"/>
+              <path d="M14 38v8c0 3.3 8 6 18 6s18-2.7 18-6v-8" fill="#fff" opacity=".15"/>
+            </svg>
+          </div>
+          <div class="alp-name">QuickBase</div>
+          <div class="alp-status" id="als-quickbase"></div>
+        </a>
+
+      </div>
+
+      <div class="alp-footer">
+        <button class="alp-settings-btn" onclick="switchPanel('admin'); toggleAppLauncher();">
+          &#9881; Manage Connections
+        </button>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <!-- Model Modal -->
@@ -2821,11 +2926,9 @@ const MODELS = [
 ];
 
 const MODS = [
-  {id:'chat',         label:'Intelligence', icon:'\u25C8'},
-  {id:'files',        label:'Documents',    icon:'\u2261'},
-  {id:'integrations', label:'Integrations', icon:'\u29C9'},
-  {id:'connectors',   label:'Connectors',   icon:'\u2B21'},
-  {id:'admin',        label:'Config',       icon:'\u2699'},
+  {id:'chat',  label:'Intelligence', icon:'\u25C8'},
+  {id:'files', label:'Documents',    icon:'\u2261'},
+  {id:'admin', label:'Config',       icon:'\u2699'},
 ];
 
 let token   = sessionStorage.getItem('caci_token') || '';
@@ -2970,8 +3073,7 @@ function switchPanel(id) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.p === id));
   $('tb-module').textContent = MODS.find(m => m.id === id)?.label || '';
   if (id === 'files') { loadCollections(); loadFiles(); loadContextDocs(); }
-  if (id === 'integrations') { loadIntegrationStatuses(); }
-  if (id === 'connectors') { loadConnectorStatuses(); }
+  if (id === 'admin') { loadAdminConfig(); loadIntegrationStatuses(); loadConnectorStatuses(); }
   if (id === 'reports') updateReportScopeNote();
 }
 
@@ -3087,6 +3189,33 @@ async function saveEditFile() {
     loadFiles();
   }
 }
+
+/* APP LAUNCHER */
+function toggleAppLauncher() {
+  const el = document.getElementById('app-launcher');
+  el.classList.toggle('open');
+  if (el.classList.contains('open')) syncAppLauncherStatus();
+}
+
+function syncAppLauncherStatus() {
+  const stored = JSON.parse(localStorage.getItem('caci_integrations') || '{}');
+  const map = {
+    'als-teams': 'teams', 'als-excel': 'excel', 'als-word': 'word',
+    'als-sharepoint': 'sharepoint', 'als-powerpoint': 'powerpoint',
+    'als-powerbi': 'powerbi', 'als-quickbase': 'quickbase',
+  };
+  Object.entries(map).forEach(([elId, key]) => {
+    const el = document.getElementById(elId);
+    if (el) el.className = 'alp-status' + (stored[key] ? ' connected' : '');
+  });
+}
+
+document.addEventListener('click', e => {
+  const launcher = document.getElementById('app-launcher');
+  if (launcher && launcher.classList.contains('open') && !launcher.contains(e.target)) {
+    launcher.classList.remove('open');
+  }
+});
 
 function setDept(id) {
   dept = id; localStorage.setItem('caci_dept', dept);
