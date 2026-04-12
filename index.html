@@ -3288,23 +3288,22 @@ body::before {
             <div class="afb" id="ant-fb"></div>
           </div>
           <div class="acard">
-            <div class="acard-title">Voice &mdash; Google Cloud TTS</div>
-            <div class="acard-sub">WaveNet neural voices &nbsp;&middot;&nbsp; 1M characters free/month &nbsp;&middot;&nbsp; <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:var(--gold-lt)">Get free API key &rarr;</a></div>
-            <div class="arow"><input class="ainput" type="password" id="gtts-key" placeholder="AIza..." autocomplete="off"/><button class="asave" id="gtts-save">Save Key</button></div>
-            <div class="afb" id="gtts-fb"></div>
-            <div class="arow" style="margin-top:10px;flex-wrap:wrap;gap:8px">
-              <select class="ainput" id="gtts-voice" style="flex:1">
-                <option value="en-US-Wavenet-F">WaveNet F — Professional Female (recommended)</option>
-                <option value="en-US-Wavenet-C">WaveNet C — Warm Female</option>
-                <option value="en-US-Wavenet-E">WaveNet E — Soft Female</option>
-                <option value="en-US-Wavenet-D">WaveNet D — Deep Male</option>
-                <option value="en-US-Wavenet-B">WaveNet B — Professional Male</option>
-                <option value="en-US-Neural2-F">Neural2 F — Natural Female</option>
-                <option value="en-US-Neural2-C">Neural2 C — Conversational Female</option>
+            <div class="acard-title">Voice &mdash; Caci&apos;s Voice Engine</div>
+            <div class="acard-sub">xAI API Key &mdash; required for Grok voice</div>
+            <div class="arow" style="margin-top:6px"><input class="ainput" type="password" id="xai-key" placeholder="xai-..." autocomplete="off"/><button class="asave" id="xai-save">Save Key</button></div>
+            <div class="afb" id="xai-fb"></div>
+            <div class="arow" style="margin-top:14px;flex-wrap:wrap;gap:8px">
+              <select class="ainput" id="tts-provider" style="flex:1">
+                <option value="grok">Grok (xAI) &mdash; Best quality</option>
+                <option value="cloudflare">Cloudflare &mdash; Deepgram Aura 2</option>
+                <option value="ollama" disabled>Ollama (Local) &mdash; Coming soon</option>
               </select>
-              <select class="ainput" id="gtts-speed" style="flex:0 0 120px">
-                <option value="0.9">Slower</option><option value="1.0" selected>Normal</option>
-                <option value="1.1">Faster</option><option value="1.2">Fast</option>
+              <select class="ainput" id="tts-grok-voice" style="flex:0 0 140px">
+                <option value="eve">Eve &mdash; Expressive</option>
+                <option value="ara">Ara &mdash; Warm</option>
+                <option value="sal">Sal &mdash; Clear</option>
+                <option value="leo">Leo &mdash; Deep</option>
+                <option value="rex">Rex &mdash; Authoritative</option>
               </select>
             </div>
             <div class="arow" style="margin-top:8px;align-items:center;gap:12px">
