@@ -869,8 +869,9 @@ body::before {
 .tmc-name { font-family: var(--f-mono); font-size: 9px; letter-spacing: 0.12em; color: var(--smoke3); text-transform: uppercase; }
 
 /* ── Content ───────────────────────────────────────────── */
-#content { position: fixed; right: 0; overflow: hidden; }
-.panel { display: none; position: absolute; inset: 0; flex-direction: column; }
+#content { position: fixed; right: 0; overflow: hidden; pointer-events: all; }
+.panel { display: none; position: absolute; inset: 0; flex-direction: column; pointer-events: none; }
+.panel.active { pointer-events: all; }
 .panel.active { display: flex; }
 
 /* ── Chat background ghost overlay ─────────────────────── */
@@ -1285,7 +1286,6 @@ body::before {
 .dg-name-above-bar {
   text-align: center;
   margin-bottom: 12px;
-  pointer-events: none;
   animation: dg-in 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
   pointer-events: none;
 }
@@ -2928,7 +2928,11 @@ body::before {
 
 <!-- LOGIN -->
 <div id="login-screen">
-
+  <div class="login-frame-box" aria-hidden="true">
+    <div class="fc tl"></div><div class="fc tr"></div>
+    <div class="fc bl"></div><div class="fc br"></div>
+    <div class="login-frame-shimmer"></div>
+  </div>
   <div class="login-wrap">
     <div class="login-mark">
       <div class="login-wordmark">CACI</div>
@@ -3014,7 +3018,7 @@ body::before {
 
     <!-- CHAT -->
     <div class="panel active" data-panel="chat">
-      <div class="chat-bg-overlay" aria-hidden="true"><svg viewBox="0 0 1200 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" style="pointer-events:none">
+      <div class="chat-bg-overlay" aria-hidden="true"><svg viewBox="0 0 1200 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <radialGradient id="vignette" cx="50%" cy="50%" r="70%">
       <stop offset="0%"   stop-color="#050810" stop-opacity="0"/>
