@@ -264,75 +264,129 @@ body::before {
 .login-card .corner.bl { bottom: 0; left: 0; transform: scaleY(-1); }
 .login-card .corner.br { bottom: 0; right: 0; transform: scale(-1); }
 
+.lfield-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 22px;
+  position: relative;
+}
+/* Ornamental rule above label */
+.lfield-rule {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-bottom: 13px;
+}
+.lfield-rule::before,
+.lfield-rule::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(184,150,12,0.22));
+}
+.lfield-rule::after {
+  background: linear-gradient(90deg, rgba(184,150,12,0.22), transparent);
+}
+.lfield-rule-diamond {
+  width: 4px; height: 4px;
+  background: rgba(212,168,50,0.55);
+  transform: rotate(45deg);
+  flex-shrink: 0;
+}
 .lfield-label {
   font-family: var(--f-mono);
-  font-size: 8.5px;
-  letter-spacing: 0.22em;
-  color: rgba(180,160,100,0.55);
+  font-size: 9px;
+  letter-spacing: 0.32em;
+  color: rgba(212,168,50,0.45);
   text-transform: uppercase;
-  margin-bottom: 9px;
+  text-align: center;
+  margin-bottom: 14px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
 }
 .linput {
   width: 100%;
-  padding: 13px 16px;
-  background: rgba(5,8,16,0.7);
-  border: 1px solid rgba(184,150,12,0.14);
-  border-radius: var(--r);
-  color: var(--smoke);
+  padding: 14px 20px;
+  background: rgba(4,6,14,0.75);
+  border: none;
+  border-bottom: 1px solid rgba(184,150,12,0.28);
+  border-radius: 0;
+  color: rgba(245,227,152,0.82);
   font-family: var(--f-mono);
-  font-size: 14px;
-  font-weight: 400;
+  font-size: 15px;
+  font-weight: 300;
   outline: none;
-  transition: border-color 0.25s var(--ease), box-shadow 0.25s var(--ease);
+  transition: border-color 0.3s var(--ease), box-shadow 0.3s var(--ease), color 0.3s;
   -webkit-appearance: none;
-  letter-spacing: 0.08em;
-  margin-bottom: 18px;
+  letter-spacing: 0.22em;
+  text-align: center;
+  caret-color: rgba(212,168,50,0.8);
+}
+.linput::placeholder {
+  color: rgba(184,150,12,0.18);
+  letter-spacing: 0.15em;
 }
 .linput:focus {
-  border-color: rgba(212,168,50,0.5);
-  box-shadow: 0 0 0 3px rgba(184,150,12,0.08), inset 0 1px 0 rgba(245,227,152,0.04);
+  border-color: rgba(212,168,50,0.65);
+  box-shadow: 0 4px 16px -4px rgba(184,150,12,0.12);
+  color: rgba(255,240,180,0.95);
+}
+/* Thin bottom glow line on focus */
+.linput:focus + .linput-glow {
+  opacity: 1;
+}
+.linput-glow {
+  position: absolute;
+  bottom: 0; left: 20%; right: 20%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(245,227,152,0.5) 50%, transparent);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
 }
 .lbtn {
   width: 100%;
-  padding: 14px;
-  background: linear-gradient(160deg, rgba(184,150,12,0.12) 0%, rgba(184,150,12,0.06) 100%);
-  border: 1px solid rgba(184,150,12,0.28);
-  border-radius: var(--r);
-  color: var(--gold-metal-2);
+  padding: 15px;
+  background: transparent;
+  border: 1px solid rgba(184,150,12,0.32);
+  border-radius: 2px;
+  color: rgba(212,168,50,0.7);
   font-family: var(--f-mono);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.2em;
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.38em;
   text-transform: uppercase;
   cursor: pointer;
-  transition: all 0.22s var(--ease);
+  transition: all 0.28s var(--ease);
   -webkit-appearance: none;
   position: relative;
   overflow: hidden;
+  -webkit-font-smoothing: antialiased;
 }
 .lbtn::before {
   content: '';
-  position: absolute; top: 0; left: 0; right: 0;
+  position: absolute; top: 0; left: 15%; right: 15%;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(245,227,152,0.4), transparent);
-  opacity: 0.6;
+  background: linear-gradient(90deg, transparent, rgba(245,227,152,0.5) 50%, transparent);
 }
 .lbtn::after {
   content: '';
   position: absolute; inset: 0;
-  background: linear-gradient(160deg, rgba(245,227,152,0.06) 0%, transparent 60%);
+  background: linear-gradient(160deg, rgba(245,227,152,0.04) 0%, transparent 70%);
   opacity: 0;
-  transition: opacity 0.2s;
+  transition: opacity 0.25s;
 }
 .lbtn:hover {
-  border-color: rgba(212,168,50,0.5);
-  color: var(--gold-metal-1);
-  background: linear-gradient(160deg, rgba(184,150,12,0.18) 0%, rgba(184,150,12,0.08) 100%);
-  box-shadow: 0 0 20px rgba(184,150,12,0.1), inset 0 1px 0 rgba(245,227,152,0.08);
+  border-color: rgba(212,168,50,0.55);
+  color: rgba(245,227,152,0.95);
+  box-shadow: 0 0 28px rgba(184,150,12,0.08), inset 0 0 20px rgba(184,150,12,0.04);
+  letter-spacing: 0.42em;
 }
 .lbtn:hover::after { opacity: 1; }
-.lbtn:active { opacity: 0.75; transform: translateY(1px); }
-.lbtn:disabled { opacity: 0.35; cursor: default; }
+.lbtn:active { opacity: 0.65; transform: translateY(1px); }
+.lbtn:disabled { opacity: 0.25; cursor: default; }
 .lerr {
   font-family: var(--f-mono);
   font-size: 10px;
@@ -2773,8 +2827,12 @@ body::before {
       <div class="corner tr"></div>
       <div class="corner bl"></div>
       <div class="corner br"></div>
-      <div class="lfield-label">Access Code</div>
-      <input class="linput" type="password" id="login-pw" placeholder="&#183;&#183;&#183;&#183;&#183;&#183;&#183;&#183;&#183;&#183;&#183;&#183;" autocomplete="current-password"/>
+      <div class="lfield-wrap">
+        <div class="lfield-rule"><div class="lfield-rule-diamond"></div></div>
+        <div class="lfield-label">Credentials</div>
+        <input class="linput" type="password" id="login-pw" placeholder="&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;" autocomplete="current-password"/>
+        <div class="linput-glow"></div>
+      </div>
       <button class="lbtn" id="login-btn">Authenticate</button>
       <div class="lerr" id="login-err">Access denied &mdash; invalid code</div>
     </div>
