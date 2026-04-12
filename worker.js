@@ -310,8 +310,33 @@ async function handleListCollections(url, env) {
 async function handleDeleteFile(id, env) {
   try {
     const fileMeta = await env.CACI_KV.get(`file:${id}`, 'json');
-    if (!fileMeta) return json({ error: 'File not found' }, 404);
-    const { dept, collection, name, isContext } = fileMeta;
+
+    // Even if the file record is missing, sweep all indexes to remove any trace
+    if (!fileMeta) {
+      // Scan dept indexes to find and remove the orphaned entry
+      const depts = ['global','retail','compliance','commercial','human_resources','finance','operations','technology'];
+      for (const d of depts) {
+        const deptIdx = await env.CACI_KV.get(`index:${d}`, 'json') || [];
+        const filtered = deptIdx.filter(f => f.id !== id);
+        if (filtered.length !== deptIdx.length) {
+          await env.CACI_KV.put(`index:${d}`, JSON.stringify(filtered));
+          // Also sweep collection and ctx indexes for this dept
+          const reg = await env.CACI_KV.get(`colreg:${d}`, 'json') || [];
+          for (const col of reg) {
+            const ck = `col:${d}:${col.name}`;
+            const ci = await env.CACI_KV.get(ck, 'json') || [];
+            if (ci.find(f => f.id === id)) await env.CACI_KV.put(ck, JSON.stringify(ci.filter(f => f.id !== id)));
+            const xk = `ctx:${d}:${col.name}`;
+            const xi = await env.CACI_KV.get(xk, 'json') || [];
+            if (xi.find(f => f.id === id)) await env.CACI_KV.put(xk, JSON.stringify(xi.filter(f => f.id !== id)));
+          }
+        }
+      }
+      await env.CACI_KV.delete(`file:${id}`);
+      return json({ ok: true });
+    }
+
+    const { dept, collection, name } = fileMeta;
 
     await env.CACI_KV.delete(`file:${id}`);
 
@@ -325,7 +350,7 @@ async function handleDeleteFile(id, env) {
     const newColIdx = colIdx.filter(f => f.id !== id);
     await env.CACI_KV.put(colKey, JSON.stringify(newColIdx));
 
-    // Remove from context index if it was a context doc
+    // Remove from context index
     const ctxKey = `ctx:${dept}:${collection}`;
     const ctxIdx = await env.CACI_KV.get(ctxKey, 'json') || [];
     const newCtxIdx = ctxIdx.filter(f => f.id !== id);
@@ -333,7 +358,7 @@ async function handleDeleteFile(id, env) {
       await env.CACI_KV.put(ctxKey, JSON.stringify(newCtxIdx));
     }
 
-    // If collection is now empty, remove from registry
+    // If collection fully empty, remove from registry
     if (newColIdx.length === 0 && newCtxIdx.length === 0) {
       const reg = await env.CACI_KV.get(`colreg:${dept}`, 'json') || [];
       await env.CACI_KV.put(`colreg:${dept}`, JSON.stringify(reg.filter(c => c.name !== collection)));
