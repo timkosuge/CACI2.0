@@ -5051,107 +5051,71 @@ let _currentSpkBtn  = null;
 let _recognition    = null;
 let _listening      = false;
 
-/* ── Google TTS ─────────────────────────────────────────── */
+/* ── Grok TTS ─────────────────────────────────────────── */
 async function speakText(btn, text) {
-  // Stop any current playback
   if (_currentAudio) {
     _currentAudio.pause();
     _currentAudio = null;
     if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
+    setVoiceStatus('');
+    const tog = $('spk-toggle-btn');
+    if (tog) tog.classList.toggle('active', voiceAutoSpeak);
+    return;
   }
   if (!text || !text.trim()) return;
-
-  // Strip markdown for cleaner speech
   const clean = text
     .replace(/\*\*(.*?)\*\*/g, '$1')
-    .replace(/\*(.*?)\*/g,     '$1')
-    .replace(/#{1,6}\s/g,      '')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/#{1,6}\s/g, '')
     .replace(/`{1,3}[^`]*`{1,3}/g, '')
     .replace(/\n+/g, ' ')
     .trim()
-    .slice(0, 4500); // Google TTS limit per request
-
-  const gttsKey   = localStorage.getItem('caci_gtts_key') || '';
-  const voiceId   = localStorage.getItem('caci_gtts_voice') || 'en-US-Wavenet-F';
-  const speed     = parseFloat(localStorage.getItem('caci_gtts_speed') || '1.0');
-
-  setVoiceStatus('Speaking\u2026', true);
+    .slice(0, 4500);
+  setVoiceStatus('Speaking…', true);
   if (btn) { btn.classList.add('playing'); _currentSpkBtn = btn; }
-  // Also light up the toggle button while speaking
   const tog = $('spk-toggle-btn');
   if (tog) tog.classList.add('active');
-
   try {
-    if (gttsKey) {
-      // Google Cloud TTS
-      const res = await fetch(
-        'https://texttospeech.googleapis.com/v1/text:synthesize?key=' + gttsKey,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            input: { text: clean },
-            voice: { languageCode: 'en-US', name: voiceId },
-            audioConfig: { audioEncoding: 'MP3', speakingRate: speed, pitch: 0 }
-          })
-        }
-      );
-      const data = await res.json();
-      if (data.audioContent) {
-        const audio = new Audio('data:audio/mp3;base64,' + data.audioContent);
-        _currentAudio = audio;
-        audio.onended = () => {
-          _currentAudio = null;
-          if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
-          const tog = $('spk-toggle-btn');
-          if (tog) tog.classList.toggle('active', voiceAutoSpeak);
-          setVoiceStatus('');
-        };
-        audio.play();
-        return;
-      }
-      throw new Error(data.error?.message || 'TTS failed');
-    } else {
-      // Fallback: Web Speech API — must cancel first then speak in same gesture tick
-      speechSynthesis.cancel();
-      const utt = new SpeechSynthesisUtterance(clean);
-      utt.rate  = speed;
-      utt.pitch = 1;
-      // Pick best available voice — wait for voices to load if needed
-      const trySpeak = () => {
-        const voices = speechSynthesis.getVoices();
-        const preferred = voices.find(v => /samantha|aria|zira|google.*us.*female/i.test(v.name))
-                       || voices.find(v => v.lang === 'en-US' && v.name.toLowerCase().includes('female'))
-                       || voices.find(v => v.lang === 'en-US')
-                       || voices[0];
-        if (preferred) utt.voice = preferred;
-        utt.onend = () => {
-          if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
-          const tog = $('spk-toggle-btn');
-          if (tog) tog.classList.toggle('active', voiceAutoSpeak);
-          setVoiceStatus('');
-        };
-        utt.onerror = (e) => {
-          console.warn('SpeechSynthesis error:', e.error);
-          if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
-          setVoiceStatus('');
-        };
-        speechSynthesis.speak(utt);
-      };
-      if (speechSynthesis.getVoices().length) {
-        trySpeak();
-      } else {
-        speechSynthesis.onvoiceschanged = () => { speechSynthesis.onvoiceschanged = null; trySpeak(); };
-      }
+    const provider  = localStorage.getItem('caci_tts_provider') || 'grok';
+    const grokVoice = localStorage.getItem('caci_tts_grok_voice') || 'eve';
+    const res = await apiFetch('/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: clean, provider: provider, voice: grokVoice }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(function() { return { error: 'TTS failed' }; });
+      throw new Error(err.error || 'TTS request failed');
     }
+    const blob  = await res.blob();
+    const url   = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    _currentAudio = audio;
+    audio.onended = function() {
+      URL.revokeObjectURL(url);
+      _currentAudio = null;
+      if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
+      const t = $('spk-toggle-btn');
+      if (t) t.classList.toggle('active', voiceAutoSpeak);
+      setVoiceStatus('');
+    };
+    audio.onerror = function() {
+      URL.revokeObjectURL(url);
+      _currentAudio = null;
+      if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
+      setVoiceStatus('');
+    };
+    audio.play();
   } catch(e) {
     console.warn('TTS error:', e.message);
-    setVoiceStatus('Voice error: ' + e.message.slice(0,40));
+    setVoiceStatus('Voice unavailable');
     if (btn) btn.classList.remove('playing');
-    setTimeout(() => setVoiceStatus(''), 3000);
+    if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
+    const t = $('spk-toggle-btn');
+    if (t) t.classList.toggle('active', voiceAutoSpeak);
+    setTimeout(function() { setVoiceStatus(''); }, 3000);
   }
 }
-
 function stopSpeaking() {
   if (_currentAudio) { _currentAudio.pause(); _currentAudio = null; }
   speechSynthesis.cancel();
