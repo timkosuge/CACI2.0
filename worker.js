@@ -412,6 +412,48 @@ async function handleChat(request, env) {
     const apiKey = (await env.CACI_KV.get('config:ANTHROPIC_API_KEY')) || env.ANTHROPIC_API_KEY;
     if (!apiKey) return json({ error: 'Anthropic API key not configured. Go to Admin to add it.' }, 400);
 
+    // ── Discovery mode: first message with no collection scoped ──
+    const isFirstMessage = history.length === 0;
+    const isDiscoveryMode = isFirstMessage && scope === 'all' && !collection && !fileId;
+
+    if (isDiscoveryMode) {
+      const discovery = await buildDiscoveryContext({ dept, env });
+
+      const system = `You are CACI, an internal AI intelligence assistant for Jushi Holdings, a vertically integrated multi-state cannabis operator.
+
+This is the START of a new conversation. Do NOT answer detailed data questions yet.
+
+Your job right now:
+1. Greet the user warmly and briefly (1 sentence).
+2. Ask what topic or data they want to explore today.
+3. Present the available collections as clear options.
+4. Optionally ask if they have a specific time period in mind.
+
+Keep it short — 5 to 8 lines max. Be friendly and direct.
+
+AVAILABLE COLLECTIONS:
+${discovery.collectionList}`;
+
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 400,
+          system,
+          messages: [{ role: 'user', content: message }],
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.text();
+        return json({ error: `Claude API error (${res.status}): ${err}` }, 500);
+      }
+      const data = await res.json();
+      return json({ ok: true, response: data.content?.[0]?.text || 'No response.', sources: [], scope: 'discovery', collections: discovery.rawCollections });
+    }
+
+    // ── Normal mode: scoped to collection or file ─────────────
     const context = await buildContext({ message, dept, collection, fileId, scope, env });
 
     // Load collection context docs (SOPs, rules, calendars)
@@ -480,6 +522,23 @@ When analyzing data, note the metadata context (period, location, category) to g
     const data = await res.json();
     return json({ ok: true, response: data.content?.[0]?.text || 'No response.', sources: context.sources, scope });
   } catch (err) { return json({ error: 'Chat error: ' + err.message }, 500); }
+}
+
+// ── Discovery Context Builder ─────────────────────────────────
+async function buildDiscoveryContext({ dept, env }) {
+  try {
+    const reg = await env.CACI_KV.get(`colreg:${dept}`, 'json') || [];
+    const enriched = await Promise.all(reg.map(async c => {
+      const files = await env.CACI_KV.get(`col:${dept}:${c.name}`, 'json') || [];
+      return { ...c, fileCount: files.length };
+    }));
+    const collectionList = enriched.length
+      ? enriched.map(c => `- ${c.name} (${c.fileCount} file${c.fileCount !== 1 ? 's' : ''}${c.category ? ', ' + c.category : ''})`).join('\n')
+      : '(No collections uploaded yet.)';
+    return { collectionList, rawCollections: enriched };
+  } catch {
+    return { collectionList: '(Could not load collections.)', rawCollections: [] };
+  }
 }
 
 // ── Report Generation ─────────────────────────────────────────
