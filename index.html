@@ -1100,12 +1100,8 @@ body::before {
   backdrop-filter: blur(10px);
   border-top: 1px solid rgba(184,150,12,0.1);
   flex-shrink: 0;
-  position: relative;
   z-index: 10;
-  pointer-events: all;
-}
-.chat-bar.has-messages {
-  background: rgba(5,8,16,0.88);
+  position: relative;
 }
 .chat-bar::before {
   content: '';
@@ -1222,7 +1218,6 @@ body::before {
 
 /* ── Chat panel layout adjustment when floating bar ───── */
 .panel[data-panel="chat"] {
-  position: relative;
   display: flex;
   flex-direction: column;
 }
@@ -3820,13 +3815,7 @@ function selectDiscoveryCollection(colName) {
 }
 
 function transitionToChat() {
-  // Move input bar to bottom-docked mode
-  const bar = $('chat-bar');
-  const msgs = $('chat-msgs');
-  if (bar && !bar.classList.contains('has-messages')) {
-    bar.classList.add('has-messages');
-    msgs.classList.add('has-messages');
-  }
+  // bar is always docked — nothing to do
 }
 
 // Sends the CACI greeting on first load (discovery mode)
