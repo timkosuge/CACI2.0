@@ -717,6 +717,56 @@ body::before {
   .chat-bg-overlay svg { width: 140%; left: -20%; }
 }
 
+/* Glint sweep — same technique as login card but with mix-blend-mode:screen
+   so it only brightens the chrome letters, vanishes on dark leather */
+.chat-glint {
+  position: absolute; inset: 0; z-index: 2;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  background: linear-gradient(
+    108deg,
+    transparent 0%,
+    transparent 35%,
+    rgba(200,170,80,0.03) 43%,
+    rgba(230,200,120,0.07) 48%,
+    rgba(255,240,180,0.11) 50%,
+    rgba(230,200,120,0.07) 52%,
+    rgba(200,170,80,0.03) 57%,
+    transparent 65%,
+    transparent 100%
+  );
+  background-size: 300% 100%;
+  background-position: 150% 0;
+  animation: chatGlint 14s ease-in-out 2s infinite;
+}
+.chat-glint::after {
+  content: '';
+  position: absolute; inset: 0;
+  mix-blend-mode: screen;
+  background: linear-gradient(
+    108deg,
+    transparent 0%,
+    transparent 38%,
+    rgba(180,150,60,0.02) 45%,
+    rgba(220,190,100,0.05) 49%,
+    rgba(255,235,160,0.08) 50%,
+    rgba(220,190,100,0.05) 51%,
+    rgba(180,150,60,0.02) 55%,
+    transparent 62%,
+    transparent 100%
+  );
+  background-size: 300% 100%;
+  background-position: 150% 0;
+  animation: chatGlint 18s ease-in-out 9s infinite;
+}
+@keyframes chatGlint {
+  0%   { background-position: 150% 0; opacity: 0; }
+  4%   { opacity: 1; }
+  48%  { background-position: -50% 0; opacity: 0.85; }
+  54%  { opacity: 0; }
+  100% { background-position: -50% 0; opacity: 0; }
+}
+
 /* ── Scope bar ─────────────────────────────────────────── */
 .scope-bar {
   display: flex; align-items: center; gap: 6px;
@@ -2692,78 +2742,18 @@ body::before {
 
     <!-- CHAT -->
     <div class="panel active" data-panel="chat">
-      <div class="chat-bg-overlay" aria-hidden="true"><svg viewBox="0 0 1200 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <radialGradient id="vignette" cx="50%" cy="50%" r="70%">
-      <stop offset="0%"   stop-color="#050810" stop-opacity="0"/>
-      <stop offset="100%" stop-color="#050810" stop-opacity="0.90"/>
-    </radialGradient>
-
-    <!-- Razor-thin specular glint gradient.
-         The rect is 4000px wide; the bright band is centered at 50% = x:2000.
-         We move the rect from x:-2800 to x:+1800 so the center crosses 60->1140 (letter zone).
-         Stop offsets: bright core is only 1.2% of 4000px = ~48px total width. -->
-    <linearGradient id="glint1" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%"      stop-color="#ffffff" stop-opacity="0"/>
-      <stop offset="49.2%"   stop-color="#c49a16" stop-opacity="0.05"/>
-      <stop offset="49.7%"   stop-color="#f5e398" stop-opacity="0.42"/>
-      <stop offset="50%"     stop-color="#ffffff"  stop-opacity="0.65"/>
-      <stop offset="50.3%"   stop-color="#f5e398" stop-opacity="0.42"/>
-      <stop offset="50.8%"   stop-color="#c49a16" stop-opacity="0.05"/>
-      <stop offset="100%"    stop-color="#ffffff" stop-opacity="0"/>
-    </linearGradient>
-
-    <linearGradient id="glint2" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%"      stop-color="#ffffff" stop-opacity="0"/>
-      <stop offset="49.4%"   stop-color="#d4a832" stop-opacity="0.04"/>
-      <stop offset="49.8%"   stop-color="#fff8d0" stop-opacity="0.28"/>
-      <stop offset="50%"     stop-color="#ffffff"  stop-opacity="0.40"/>
-      <stop offset="50.2%"   stop-color="#fff8d0" stop-opacity="0.28"/>
-      <stop offset="50.6%"   stop-color="#d4a832" stop-opacity="0.04"/>
-      <stop offset="100%"    stop-color="#ffffff" stop-opacity="0"/>
-    </linearGradient>
-
-    <clipPath id="letterZone">
-      <rect x="55" y="195" width="1090" height="510"/>
-    </clipPath>
-    <filter id="gBlur">
-      <feGaussianBlur stdDeviation="1.5"/>
-    </filter>
-  </defs>
-
-  <!-- CSS handles the sweep animation cleanly -->
-  <style>
-    @keyframes glintSweep1 {
-      0%   { transform: rotate(11deg) translateX(-2800px); opacity: 0; }
-      3%   { opacity: 1; }
-      40%  { opacity: 1; }
-      43%  { transform: rotate(11deg) translateX(1800px); opacity: 0; }
-      100% { transform: rotate(11deg) translateX(1800px); opacity: 0; }
-    }
-    @keyframes glintSweep2 {
-      0%   { transform: rotate(11deg) translateX(-2800px); opacity: 0; }
-      3%   { opacity: 1; }
-      44%  { opacity: 1; }
-      47%  { transform: rotate(11deg) translateX(1800px); opacity: 0; }
-      100% { transform: rotate(11deg) translateX(1800px); opacity: 0; }
-    }
-    .glint-r1 { animation: glintSweep1 13s ease-in-out 1.5s infinite; }
-    .glint-r2 { animation: glintSweep2 18s ease-in-out 8s infinite; }
-  </style>
-
-  <g clip-path="url(#letterZone)" filter="url(#gBlur)">
-    <rect class="glint-r1" x="-2000" y="-200" width="4000" height="1300"
-          fill="url(#glint1)" opacity="0"
-          transform-origin="600 450"/>
-  </g>
-  <g clip-path="url(#letterZone)" filter="url(#gBlur)">
-    <rect class="glint-r2" x="-2000" y="-200" width="4000" height="1300"
-          fill="url(#glint2)" opacity="0"
-          transform-origin="600 450"/>
-  </g>
-
-  <rect width="1200" height="900" fill="url(#vignette)"/>
-</svg></div>
+      <div class="chat-bg-overlay" aria-hidden="true">
+        <div class="chat-glint"></div>
+        <svg viewBox="0 0 1200 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <radialGradient id="vignette" cx="50%" cy="50%" r="70%">
+              <stop offset="0%"   stop-color="#050810" stop-opacity="0"/>
+              <stop offset="100%" stop-color="#050810" stop-opacity="0.88"/>
+            </radialGradient>
+          </defs>
+          <rect width="1200" height="900" fill="url(#vignette)"/>
+        </svg>
+      </div>
       <div class="scope-bar" id="scope-bar">
         <span class="scope-label">Context</span>
         <button class="scope-btn active" data-scope="all" id="scope-all">All Files</button>
