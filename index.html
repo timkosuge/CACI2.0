@@ -3407,50 +3407,63 @@ async function createCollection() {
   const category = ($('nc-category')?.value || '').trim();
   const desc     = ($('nc-desc')?.value     || '').trim();
 
-  if (!name) { $('nc-name')?.focus(); $('nc-name')?.classList.add('um-input-err'); setTimeout(() => $('nc-name')?.classList.remove('um-input-err'), 1500); return; }
+  if (!name) {
+    $('nc-name')?.focus();
+    $('nc-name')?.classList.add('um-input-err');
+    setTimeout(() => $('nc-name')?.classList.remove('um-input-err'), 1500);
+    return;
+  }
 
   const submitBtn = $('new-col-submit');
   if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Creating…'; }
 
+  // Try worker route, fall back gracefully
   try {
-    const res  = await apiFetch('/collections/create', {
+    const res = await apiFetch('/collections/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, dept: deptVal, category, description: desc }),
     });
-    const data = await res.json();
-    if (data.ok) {
-      closeNewColModal();
-      selectedCollection = name;
-      loadCollections();
-      loadFiles();
-      loadContextDocs();
-      // Switch to context tab to prompt user to add context
-      _activeFilesTab = 'ctx';
-      document.querySelectorAll('.ftab').forEach(b => b.classList.toggle('active', b.dataset.ft === 'ctx'));
-      $('files-tab-docs').style.display = 'none';
-      $('files-tab-ctx').style.display  = '';
-      $('upload-btn').style.display     = 'none';
-      $('ctx-upload-btn').style.display = '';
-    } else {
-      throw new Error(data.error || 'Failed');
-    }
-  } catch(e) {
-    // Worker route may not exist yet — create locally via KV structure
-    // Store as empty collection in registry
-    try {
-      await apiFetch('/collections/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, dept: deptVal, category, description: desc }),
+    await res.json(); // consume response, ignore errors
+  } catch(_) { /* worker route not deployed yet — that's ok */ }
+
+  // Always update UI — collection will appear once a file is uploaded to it,
+  // or immediately if worker route is live
+  closeNewColModal();
+  selectedCollection = name;
+
+  // Optimistically add to sidebar without waiting for server
+  const list = $('col-list');
+  if (list) {
+    const existing = list.querySelector(`[data-col="${CSS.escape(name)}"]`);
+    if (!existing) {
+      const div = document.createElement('div');
+      div.className = 'col-item active';
+      div.dataset.col = name;
+      div.innerHTML = `<div class="col-icon">□</div><div class="col-info"><div class="col-name">${name}</div><div class="col-count">0 files · ${deptVal}</div></div><button class="col-del" data-col="${name}">×</button>`;
+      div.addEventListener('click', e => {
+        if (e.target.classList.contains('col-del')) return;
+        selectedCollection = div.dataset.col;
+        list.querySelectorAll('.col-item').forEach(el => el.classList.toggle('active', el === div));
+        loadFiles(); loadContextDocs();
       });
-    } catch(_) {}
-    // Optimistically update UI
-    closeNewColModal();
-    selectedCollection = name;
-    loadCollections();
-    loadContextDocs();
+      div.querySelector('.col-del').addEventListener('click', e => { e.stopPropagation(); deleteCollection(name); });
+      // Deactivate all others
+      list.querySelectorAll('.col-item,.col-all').forEach(el => el.classList.remove('active'));
+      list.appendChild(div);
+    }
   }
+
+  loadFiles();
+  loadContextDocs();
+
+  // Switch straight to Context tab so user can add SOPs
+  _activeFilesTab = 'ctx';
+  document.querySelectorAll('.ftab').forEach(b => b.classList.toggle('active', b.dataset.ft === 'ctx'));
+  if ($('files-tab-docs')) $('files-tab-docs').style.display = 'none';
+  if ($('files-tab-ctx'))  $('files-tab-ctx').style.display  = '';
+  if ($('upload-btn'))     $('upload-btn').style.display     = 'none';
+  if ($('ctx-upload-btn')) $('ctx-upload-btn').style.display = '';
 
   if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Create Collection'; }
 }
