@@ -1313,25 +1313,17 @@ body::before {
   font-weight: 300;
   letter-spacing: 0.1em;
   line-height: 1.9;
-  max-width: min(560px, calc(100vw - 260px));
+  max-width: 560px;
+  width: calc(100% - 32px);
   margin: 0 auto;
-  padding: 0 16px;
   white-space: normal;
-  overflow: visible;
-  text-overflow: unset;
   box-sizing: border-box;
-  background: linear-gradient(105deg,
-    rgba(184,150,12,0.35) 0%,
-    rgba(212,168,50,0.5) 30%,
-    rgba(245,227,152,0.75) 50%,
-    rgba(212,168,50,0.5) 70%,
-    rgba(184,150,12,0.35) 100%
-  );
-  background-size: 200% 100%;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  animation: nameShimmer 4s ease-in-out 1.2s infinite;
+  color: rgba(212,168,50,0.5);
+  animation: dgsShimmer 4s ease-in-out 1.2s infinite;
+}
+@keyframes dgsShimmer {
+  0%, 100% { color: rgba(184,150,12,0.38); }
+  50%       { color: rgba(245,227,152,0.65); }
 }
 .dg-eyebrow {
   font-family: var(--f-display);
