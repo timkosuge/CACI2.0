@@ -311,19 +311,30 @@ async function handleDeleteFile(id, env) {
   try {
     const fileMeta = await env.CACI_KV.get(`file:${id}`, 'json');
     if (!fileMeta) return json({ error: 'File not found' }, 404);
-    const { dept, collection, name } = fileMeta;
+    const { dept, collection, name, isContext } = fileMeta;
 
     await env.CACI_KV.delete(`file:${id}`);
 
+    // Remove from dept index
     const deptIdx = await env.CACI_KV.get(`index:${dept}`, 'json') || [];
     await env.CACI_KV.put(`index:${dept}`, JSON.stringify(deptIdx.filter(f => f.id !== id)));
 
+    // Remove from collection index
     const colKey = `col:${dept}:${collection}`;
     const colIdx = await env.CACI_KV.get(colKey, 'json') || [];
     const newColIdx = colIdx.filter(f => f.id !== id);
     await env.CACI_KV.put(colKey, JSON.stringify(newColIdx));
 
-    if (newColIdx.length === 0) {
+    // Remove from context index if it was a context doc
+    const ctxKey = `ctx:${dept}:${collection}`;
+    const ctxIdx = await env.CACI_KV.get(ctxKey, 'json') || [];
+    const newCtxIdx = ctxIdx.filter(f => f.id !== id);
+    if (newCtxIdx.length !== ctxIdx.length) {
+      await env.CACI_KV.put(ctxKey, JSON.stringify(newCtxIdx));
+    }
+
+    // If collection is now empty, remove from registry
+    if (newColIdx.length === 0 && newCtxIdx.length === 0) {
       const reg = await env.CACI_KV.get(`colreg:${dept}`, 'json') || [];
       await env.CACI_KV.put(`colreg:${dept}`, JSON.stringify(reg.filter(c => c.name !== collection)));
       await env.CACI_KV.delete(colKey);
