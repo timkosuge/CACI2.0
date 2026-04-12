@@ -566,18 +566,34 @@ async function handleChat(request, env) {
 
 This is the opening of a new conversation. No data has been scoped yet.
 
-Your only job right now is to open the conversation — briefly, naturally, in your own voice. One or two sentences max. Let them know what you have access to and invite them to tell you what they're looking for. Don't list everything out formally. Keep it conversational and real.
-
-Do not use any emoji. Do not use bullet points for the greeting itself.
+Your only job right now is to open the conversation briefly and naturally. Tell them what collections you have access to and invite them to tell you what they are looking for. Ask if they have a specific time period in mind. Keep it to 5-8 lines max. Do not use emoji. Do not use bullet points.
 
 AVAILABLE COLLECTIONS:
 ${discovery.collectionList}`;
 
-      const discoveryText = await callLLM({ model: activeModel, system, messages: [{ role: 'user', content: message }], maxTokens: 400, env, anthropicKey, xaiKey });
-      return json({ ok: true, response: discoveryText, sources: [], scope: 'discovery', collections: discovery.rawCollections });
+      const apiKey = anthropicKey;
+      if (!apiKey) return json({ error: 'Anthropic API key not configured. Go to Config to add it.' }, 400);
+
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 400,
+          system,
+          messages: [{ role: 'user', content: message }],
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.text();
+        return json({ error: `Claude API error (${res.status}): ${err}` }, 500);
+      }
+      const data = await res.json();
+      return json({ ok: true, response: data.content?.[0]?.text || 'No response.', sources: [], scope: 'discovery', collections: discovery.rawCollections });
     }
 
-    // ── Normal mode: scoped to collection or file ─────────────
+        // ── Normal mode: scoped to collection or file ─────────────
     const context = await buildContext({ message, dept, collection, fileId, scope, env });
 
     // Load collection context docs (SOPs, rules, calendars)
