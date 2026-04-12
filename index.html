@@ -523,10 +523,27 @@ body::before {
   pointer-events: none;
   overflow: hidden;
 }
+/* Base image layer */
+.chat-bg-overlay::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: url('JUSHI.jpg') center center / cover no-repeat;
+  opacity: 0.09;
+  filter: grayscale(30%) contrast(1.1);
+}
+/* Dark ink wash over image — kills most of it, keeps the texture ghost */
+.chat-bg-overlay::after {
+  content: '';
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 50%, rgba(5,8,16,0.55) 0%, rgba(5,8,16,0.88) 100%),
+    linear-gradient(180deg, rgba(5,8,16,0.3) 0%, rgba(5,8,16,0.6) 100%);
+}
 .chat-bg-overlay svg {
   position: absolute;
   width: 100%; height: 100%;
   top: 0; left: 0;
+  z-index: 1;
 }
 @media (max-width: 600px) {
   .chat-bg-overlay svg { width: 140%; left: -20%; }
@@ -2150,7 +2167,7 @@ body::before {
   </defs>
 
   <!-- LAYER 1: Fine grid baseline -->
-  <g stroke="#b8960c" stroke-width="0.3" opacity="0.04">
+  <g stroke="#b8960c" stroke-width="0.3" opacity="0.03">
     <line x1="0" y1="75" x2="1200" y2="75"/><line x1="0" y1="150" x2="1200" y2="150"/>
     <line x1="0" y1="225" x2="1200" y2="225"/><line x1="0" y1="300" x2="1200" y2="300"/>
     <line x1="0" y1="375" x2="1200" y2="375"/><line x1="0" y1="450" x2="1200" y2="450"/>
@@ -2190,7 +2207,7 @@ body::before {
   </g>
 
   <!-- LAYER 4: Main radar/targeting reticle — center -->
-  <g fill="none" stroke="#b8960c" opacity="0.07" transform="translate(600,430)">
+  <g fill="none" stroke="#b8960c" opacity="0.055" transform="translate(600,430)">
     <circle r="280" stroke-width="0.4"/>
     <circle r="220" stroke-width="0.4"/>
     <circle r="160" stroke-width="0.5"/>
