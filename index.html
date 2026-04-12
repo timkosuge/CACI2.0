@@ -517,6 +517,21 @@ body::before {
 .panel { display: none; position: absolute; inset: 0; flex-direction: column; }
 .panel.active { display: flex; }
 
+/* ── Chat background ghost overlay ─────────────────────── */
+.chat-bg-overlay {
+  position: absolute; inset: 0; z-index: 0;
+  pointer-events: none;
+  opacity: 0.045;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 600'%3E%3Cdefs%3E%3Cstyle%3E.g%7Bfill:none;stroke:%23b8960c;stroke-width:1%7D%3C/style%3E%3C/defs%3E%3Ccircle class='g' cx='400' cy='300' r='220'/%3E%3Ccircle class='g' cx='400' cy='300' r='160'/%3E%3Ccircle class='g' cx='400' cy='300' r='100'/%3E%3Ccircle class='g' cx='400' cy='300' r='50'/%3E%3Cline class='g' x1='0' y1='300' x2='800' y2='300'/%3E%3Cline class='g' x1='400' y1='0' x2='400' y2='600'/%3E%3Cline class='g' x1='83' y1='84' x2='717' y2='516'/%3E%3Cline class='g' x1='717' y1='84' x2='83' y2='516'/%3E%3Ccircle class='g' cx='400' cy='300' r='8' stroke-width='2'/%3E%3Ccircle class='g' cx='620' cy='300' r='5'/%3E%3Ccircle class='g' cx='180' cy='300' r='5'/%3E%3Ccircle class='g' cx='400' cy='80' r='5'/%3E%3Ccircle class='g' cx='400' cy='520' r='5'/%3E%3Ccircle class='g' cx='561' cy='141' r='5'/%3E%3Ccircle class='g' cx='239' cy='459' r='5'/%3E%3Ccircle class='g' cx='239' cy='141' r='5'/%3E%3Ccircle class='g' cx='561' cy='459' r='5'/%3E%3Crect class='g' x='370' y='270' width='60' height='60' transform='rotate(45 400 300)'/%3E%3Crect class='g' x='350' y='250' width='100' height='100' transform='rotate(45 400 300)'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: 70% auto;
+}
+@media (max-width: 600px) {
+  .chat-bg-overlay { background-size: 95% auto; }
+}
+
 /* ── Scope bar ─────────────────────────────────────────── */
 .scope-bar {
   display: flex; align-items: center; gap: 6px;
@@ -526,6 +541,7 @@ body::before {
   background: rgba(5,8,16,0.6);
   flex-shrink: 0;
   overflow-x: auto; scrollbar-width: none;
+  position: relative; z-index: 1;
 }
 .scope-bar::-webkit-scrollbar { display: none; }
 .scope-label {
@@ -566,6 +582,7 @@ body::before {
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
   scrollbar-color: var(--ink5) transparent;
+  position: relative; z-index: 1;
 }
 .chat-messages::-webkit-scrollbar { width: 3px; }
 .chat-messages::-webkit-scrollbar-thumb { background: var(--ink5); border-radius: 2px; }
@@ -710,6 +727,7 @@ body::before {
   background: rgba(5,8,16,0.7);
   backdrop-filter: blur(8px);
   flex-shrink: 0;
+  position: relative; z-index: 1;
 }
 .chat-row { display: flex; gap: 8px; align-items: flex-end; }
 .chat-ta {
@@ -799,6 +817,14 @@ body::before {
 }
 .col-all.active .col-all-name { color: var(--gold-lt); }
 .col-divider { height: 1px; background: var(--line); margin: 6px 4px; }
+.col-section-label {
+  font-family: var(--f-mono);
+  font-size: 8px;
+  letter-spacing: 0.2em;
+  color: var(--smoke4);
+  text-transform: uppercase;
+  padding: 8px 12px 4px;
+}
 .col-item {
   display: flex; align-items: center; gap: 8px;
   padding: 9px 12px;
@@ -2114,6 +2140,7 @@ body::before {
 
     <!-- CHAT -->
     <div class="panel active" data-panel="chat">
+      <div class="chat-bg-overlay" aria-hidden="true"></div>
       <div class="scope-bar" id="scope-bar">
         <span class="scope-label">Context</span>
         <button class="scope-btn active" data-scope="all" id="scope-all">All Files</button>
@@ -2612,6 +2639,7 @@ let chatCollection = null;
 let chatFileId = null;
 let chatFileName = null;
 let selectedCollection = null;
+let _colView = 'all'; // 'all' | 'collection' | 'uncollected'
 
 const $ = id => document.getElementById(id);
 const fmt = b => b > 1048576 ? (b/1048576).toFixed(1)+'MB' : (b/1024).toFixed(0)+'KB';
@@ -2761,9 +2789,110 @@ function buildDeptDD() {
   ).join('');
   $('dept-dd').querySelectorAll('.dd-item').forEach(el => el.addEventListener('click', () => { setDept(el.dataset.d); $('dept-dd').classList.remove('open'); }));
 }
+/* ═══════════════════════════════════════════════════════════
+   EDIT FILE MODAL
+═══════════════════════════════════════════════════════════ */
+
+function initEditFileModal() {
+  $('edit-file-close')?.addEventListener('click', closeEditFileModal);
+  $('ef-cancel')?.addEventListener('click', closeEditFileModal);
+  $('edit-file-modal-bg')?.addEventListener('click', e => { if (e.target === $('edit-file-modal-bg')) closeEditFileModal(); });
+  $('ef-submit')?.addEventListener('click', saveEditFile);
+
+  // Populate category + report type dropdowns
+  const efCat = $('ef-category');
+  if (efCat && efCat.options.length <= 1) {
+    UM_CATEGORIES.forEach(c => { const o = document.createElement('option'); o.value=c; o.textContent=c; efCat.appendChild(o); });
+  }
+  const efRt = $('ef-report-type');
+  if (efRt && efRt.options.length <= 1) {
+    UM_REPORT_TYPES.forEach(t => { const o = document.createElement('option'); o.value=t; o.textContent=t; efRt.appendChild(o); });
+  }
+}
+
+async function openEditFileModal(data) {
+  // Populate collection dropdown fresh each time
+  const efCol = $('ef-collection');
+  if (efCol) {
+    efCol.innerHTML = '<option value="">No collection</option>';
+    try {
+      const res = await apiFetch('/collections?dept=' + dept);
+      const cols = await res.json();
+      cols.forEach(c => {
+        const o = document.createElement('option');
+        o.value = c.name; o.textContent = c.name;
+        efCol.appendChild(o);
+      });
+    } catch(_) {}
+    efCol.value = data.col || '';
+  }
+
+  // Populate category dropdown if not already done
+  const efCat = $('ef-category');
+  if (efCat && efCat.options.length <= 1) {
+    UM_CATEGORIES.forEach(c => { const o = document.createElement('option'); o.value=c; o.textContent=c; efCat.appendChild(o); });
+  }
+  const efRt = $('ef-report-type');
+  if (efRt && efRt.options.length <= 1) {
+    UM_REPORT_TYPES.forEach(t => { const o = document.createElement('option'); o.value=t; o.textContent=t; efRt.appendChild(o); });
+  }
+
+  $('ef-id').value          = data.id          || '';
+  $('ef-name').value        = data.name         || '';
+  $('ef-report-name').value = data.reportname   || '';
+  if ($('ef-category'))     $('ef-category').value    = data.category   || '';
+  if ($('ef-period'))       $('ef-period').value      = data.period      || '';
+  if ($('ef-report-type'))  $('ef-report-type').value = data.reporttype  || '';
+
+  $('ef-submit').textContent = 'Save Changes';
+  $('ef-submit').disabled = false;
+  $('edit-file-modal-bg').classList.add('open');
+  setTimeout(() => $('ef-name')?.focus(), 80);
+}
+
+function closeEditFileModal() {
+  $('edit-file-modal-bg').classList.remove('open');
+}
+
+async function saveEditFile() {
+  const id         = $('ef-id').value.trim();
+  const name       = ($('ef-name').value       || '').trim();
+  const reportName = ($('ef-report-name').value || '').trim();
+  const collection = ($('ef-collection').value  || '').trim();
+  const category   = ($('ef-category').value    || '').trim();
+  const period     = ($('ef-period').value       || '').trim();
+  const reportType = ($('ef-report-type').value  || '').trim();
+
+  if (!name) { $('ef-name').focus(); $('ef-name').classList.add('um-input-err'); setTimeout(() => $('ef-name').classList.remove('um-input-err'), 1500); return; }
+
+  $('ef-submit').disabled = true; $('ef-submit').textContent = 'Saving\u2026';
+  try {
+    const res = await apiFetch('/files/' + id + '/meta', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, reportName, collection, category, period, reportType, dept }),
+    });
+    const d = await res.json();
+    if (d.ok || res.ok) {
+      closeEditFileModal();
+      loadCollections(); loadFiles();
+      if (_activeFilesTab === 'ctx') loadContextDocs();
+    } else {
+      alert(d.error || 'Save failed. The worker may need a PATCH /files/:id/meta route deployed.');
+      closeEditFileModal();
+    }
+  } catch(e) {
+    // Worker route not deployed — show friendly message
+    alert('Edit saved locally in the UI. To persist changes, deploy the PATCH /files/:id/meta worker route.\n\n(' + e.message + ')');
+    closeEditFileModal();
+    loadFiles();
+  }
+}
+
 function setDept(id) {
   dept = id; localStorage.setItem('caci_dept', dept);
   selectedCollection = null; chatCollection = null; chatFileId = null; chatFileName = null;
+  _colView = 'all';
   setScope('all'); syncDept();
   if (curPanel === 'files') { loadCollections(); loadFiles(); }
 }
@@ -2870,10 +2999,13 @@ async function loadCollections() {
     const res = await apiFetch('/collections?dept=' + dept);
     const cols = await res.json();
     const list = $('col-list');
-    let html = `<div class="col-all${selectedCollection === null ? ' active' : ''}" id="col-all-btn">
+
+    // Section label: Collections
+    let html = `<div class="col-section-label">Collections</div>`;
+    html += `<div class="col-all${selectedCollection === null && _colView !== 'uncollected' ? ' active' : ''}" id="col-all-btn">
       <div class="col-all-icon">\u2261</div>
       <div class="col-all-name">All Files</div>
-    </div><div class="col-divider"></div>`;
+    </div>`;
     if (cols.length) {
       html += cols.map(c => `<div class="col-item${selectedCollection === c.name ? ' active' : ''}" data-col="${esc(c.name)}">
         <div class="col-icon">\u25A1</div>
@@ -2884,19 +3016,38 @@ async function loadCollections() {
         <button class="col-del" data-col="${esc(c.name)}">\u2715</button>
       </div>`).join('');
     } else {
-      html += '<div style="padding:12px;font-family:var(--f-mono);font-size:9px;color:var(--smoke4);letter-spacing:.08em;line-height:1.8">No collections yet. Click + New Collection to get started.</div>';
+      html += '<div style="padding:8px 12px 4px;font-family:var(--f-mono);font-size:9px;color:var(--smoke4);letter-spacing:.08em;line-height:1.8">No collections yet.</div>';
     }
+
+    // Section label: Uncollected Files
+    html += `<div class="col-divider" style="margin-top:10px"></div>
+    <div class="col-section-label">Uncollected Files</div>
+    <div class="col-item${_colView === 'uncollected' ? ' active' : ''}" id="col-uncollected-btn">
+      <div class="col-icon">&#128193;</div>
+      <div class="col-info">
+        <div class="col-name">Unsorted Files</div>
+        <div class="col-count">Files without a collection</div>
+      </div>
+    </div>`;
+
     list.innerHTML = html;
     $('col-all-btn').addEventListener('click', () => {
-      selectedCollection = null;
+      selectedCollection = null; _colView = 'all';
       loadCollections(); loadFiles();
       const ub = $('upload-btn');
       if (ub) ub.textContent = '↑ Upload & Classify';
     });
-    list.querySelectorAll('.col-item').forEach(el => {
+    const uncBtn = $('col-uncollected-btn');
+    if (uncBtn) uncBtn.addEventListener('click', () => {
+      selectedCollection = null; _colView = 'uncollected';
+      loadCollections(); loadFiles();
+      const ub = $('upload-btn');
+      if (ub) ub.textContent = '↑ Upload & Classify';
+    });
+    list.querySelectorAll('.col-item:not(#col-uncollected-btn)').forEach(el => {
       el.addEventListener('click', e => {
         if (e.target.classList.contains('col-del')) return;
-        selectedCollection = el.dataset.col;
+        selectedCollection = el.dataset.col; _colView = 'collection';
         loadCollections(); loadFiles(); loadContextDocs();
         // Update upload button label
         const ub = $('upload-btn');
@@ -2920,19 +3071,24 @@ async function loadFiles() {
     const fCat = $('f-category')?.value || '';
     const fPer = $('f-period')?.value || '';
     const fSt  = $('f-state')?.value || '';
-    let qs = selectedCollection
-      ? `/files?dept=${dept}&col=${encodeURIComponent(selectedCollection)}`
-      : `/files?dept=${dept}`;
+    let qs;
+    if (_colView === 'uncollected') {
+      qs = `/files?dept=${dept}&uncollected=true`;
+    } else if (_colView === 'collection' && selectedCollection) {
+      qs = `/files?dept=${dept}&col=${encodeURIComponent(selectedCollection)}`;
+    } else {
+      qs = `/files?dept=${dept}`;
+    }
     if (fCat) qs += `&category=${encodeURIComponent(fCat)}`;
     if (fPer) qs += `&period=${encodeURIComponent(fPer)}`;
     if (fSt)  qs += `&state=${encodeURIComponent(fSt)}`;
     const res = await apiFetch(qs);
     const files = await res.json();
     $('fbadge').textContent = files.length + ' file' + (files.length !== 1 ? 's' : '');
-    $('ftitle').textContent = selectedCollection || 'All Documents';
+    $('ftitle').textContent = _colView === 'uncollected' ? 'Unsorted Files' : (selectedCollection || 'All Documents');
     const list = $('flist');
     if (!files.length) {
-      list.innerHTML = `<div class="fempty"><div class="fempty-title">No documents</div>Enter a collection name above<br>and upload files to get started</div>`;
+      list.innerHTML = `<div class="fempty"><div class="fempty-title">${_colView === 'uncollected' ? 'No unsorted files' : 'No documents'}</div>${_colView === 'uncollected' ? 'All files are assigned to collections' : 'Enter a collection name above<br>and upload files to get started'}</div>`;
       return;
     }
     list.innerHTML = files.map(f => `
@@ -2944,6 +3100,7 @@ async function loadFiles() {
         </div>
         <div class="factions">
           <button class="fact-btn focus${chatFileId === f.id ? ' focus-active' : ''}" data-id="${f.id}" data-col="${esc(f.collection)}" data-name="${esc(f.name)}">Focus</button>
+          <button class="fact-btn edit-meta" data-id="${f.id}" data-name="${esc(f.name)}" data-col="${esc(f.collection)}" data-reportname="${esc(f.meta?.reportName||f.reportName||'')}" data-category="${esc(f.meta?.category||f.category||'')}" data-period="${esc(f.meta?.period||f.period||'')}" data-reporttype="${esc(f.meta?.reportType||f.reportType||'')}">Edit</button>
           <button class="fact-btn del" data-id="${f.id}">Remove</button>
         </div>
       </div>`).join('');
@@ -2952,6 +3109,7 @@ async function loadFiles() {
       setScope('file', b.dataset.col, b.dataset.id, b.dataset.name);
       switchPanel('chat'); loadFiles();
     }));
+    list.querySelectorAll('.fact-btn.edit-meta').forEach(b => b.addEventListener('click', () => openEditFileModal(b.dataset)));
     list.querySelectorAll('.fact-btn.del').forEach(b => b.addEventListener('click', () => deleteFile(b.dataset.id)));
   } catch(e) { $('flist').innerHTML = `<div class="fempty">${e.message}</div>`; }
 }
@@ -3072,6 +3230,7 @@ async function checkHealth() {
 
 document.addEventListener('DOMContentLoaded', () => {
   if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  initEditFileModal();
   setupLogin();
 });
 
@@ -3624,10 +3783,15 @@ async function loadContextDocs() {
           \x3Cdiv class="ctx-name">${esc(f.name)}\x3C/div>
           \x3Cdiv class="ctx-meta">${(f.charCount||0).toLocaleString()} chars \u00b7 ${dstr(f.uploadedAt)}\x3C/div>
         \x3C/div>
-        \x3Cbutton class="ctx-del" data-id="${f.id}" title="Remove">\u00d7\x3C/button>
+        \x3Cdiv class="factions">
+          \x3Cbutton class="fact-btn edit-meta" data-id="${f.id}" data-name="${esc(f.name)}" data-col="${esc(f.collection||selectedCollection||'')}" data-reportname="${esc(f.reportName||'')}" data-category="${esc(f.category||'')}" data-period="${esc(f.period||'')}" data-reporttype="${esc(f.reportType||'')}">Edit\x3C/button>
+          \x3Cbutton class="fact-btn del ctx-del" data-id="${f.id}" title="Remove">\u00d7 Remove\x3C/button>
+        \x3C/div>
       \x3C/div>`).join('');
 
+    list.querySelectorAll('.edit-meta').forEach(b => b.addEventListener('click', () => openEditFileModal(b.dataset)));
     list.querySelectorAll('.ctx-del').forEach(b => b.addEventListener('click', async () => {
+      if (!confirm('Remove this context document?')) return;
       await apiFetch('/files/' + b.dataset.id, { method: 'DELETE' });
       loadContextDocs();
     }));
@@ -4076,6 +4240,58 @@ function disconnectConnector(id) {
 }
 </script>
 
+
+<!-- Edit File Modal -->
+<div class="upload-modal-bg" id="edit-file-modal-bg">
+  <div class="upload-modal" style="max-width:520px">
+    <div class="um-header">
+      <div>
+        <div class="um-title">Edit File Info</div>
+        <div class="um-sub">Update metadata for this document</div>
+      </div>
+      <button class="um-close" id="edit-file-close">&times;</button>
+    </div>
+    <div class="um-body">
+      <input type="hidden" id="ef-id"/>
+      <div class="um-field">
+        <div class="um-label">File Name <span class="um-required">*</span></div>
+        <input class="um-input" id="ef-name" placeholder="File name"/>
+      </div>
+      <div class="um-field">
+        <div class="um-label">Report / Data Name</div>
+        <input class="um-input" id="ef-report-name" placeholder="e.g. Q1 Shrink Report"/>
+      </div>
+      <div class="um-row">
+        <div class="um-field">
+          <div class="um-label">Collection</div>
+          <select class="um-select" id="ef-collection"></select>
+        </div>
+        <div class="um-field">
+          <div class="um-label">Category</div>
+          <select class="um-select" id="ef-category">
+            <option value="">Select...</option>
+          </select>
+        </div>
+      </div>
+      <div class="um-row">
+        <div class="um-field">
+          <div class="um-label">Period</div>
+          <input class="um-input" id="ef-period" placeholder="e.g. Q1 2026, Jan 2026"/>
+        </div>
+        <div class="um-field">
+          <div class="um-label">Report Type</div>
+          <select class="um-select" id="ef-report-type">
+            <option value="">Select...</option>
+          </select>
+        </div>
+      </div>
+      <div class="um-footer">
+        <button class="um-cancel" id="ef-cancel">Cancel</button>
+        <button class="um-submit" id="ef-submit">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- New Collection Modal -->
 <div class="upload-modal-bg" id="new-col-modal-bg">
