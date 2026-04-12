@@ -5,7 +5,7 @@
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
@@ -36,6 +36,7 @@ export default {
     if (path === '/upload'    && method === 'POST')   return handleUpload(request, env);
     if (path === '/duplicate-check' && method === 'POST') return handleDuplicateCheck(request, env);
     if (path === '/files'     && method === 'GET')    return handleListFiles(url, env);
+    if (path.startsWith('/files/') && path.endsWith('/meta') && method === 'PATCH') return handlePatchFileMeta(path, request, env);
     if (path.startsWith('/files/') && method === 'DELETE') return handleDeleteFile(path.replace('/files/', ''), env);
     if (path === '/collections' && method === 'GET')  return handleListCollections(url, env);
     if (path === '/collections/create' && method === 'POST') return handleCreateCollection(request, env);
@@ -181,12 +182,13 @@ async function handleUpload(request, env) {
 // ── List Files ────────────────────────────────────────────────
 async function handleListFiles(url, env) {
   try {
-    const dept     = url.searchParams.get('dept') || 'global';
-    const col      = url.searchParams.get('col');
-    const category = url.searchParams.get('category');
-    const state    = url.searchParams.get('state');
-    const period   = url.searchParams.get('period');
-    const fileId   = url.searchParams.get('fileId');
+    const dept        = url.searchParams.get('dept') || 'global';
+    const col         = url.searchParams.get('col');
+    const category    = url.searchParams.get('category');
+    const state       = url.searchParams.get('state');
+    const period      = url.searchParams.get('period');
+    const fileId      = url.searchParams.get('fileId');
+    const uncollected = url.searchParams.get('uncollected') === 'true';
 
     if (fileId) {
       const f = await env.CACI_KV.get(`file:${fileId}`, 'json');
@@ -201,18 +203,79 @@ async function handleListFiles(url, env) {
     } else if (col) {
       files = await env.CACI_KV.get(`col:${dept}:${col}`, 'json') || [];
       files = files.filter(f => !f.isContext);
+    } else if (uncollected) {
+      // All files for the dept that have no collection or are in an auto-named collection
+      const allFiles = await env.CACI_KV.get(`index:${dept}`, 'json') || [];
+      const reg = await env.CACI_KV.get(`colreg:${dept}`, 'json') || [];
+      const namedCols = new Set(reg.map(c => c.name));
+      files = allFiles.filter(f => !f.isContext && (!f.collection || !namedCols.has(f.collection)));
     } else {
       files = await env.CACI_KV.get(`index:${dept}`, 'json') || [];
       files = files.filter(f => !f.isContext);
     }
 
     // Apply filters
-    if (category) files = files.filter(f => f.meta?.category === category);
+    if (category) files = files.filter(f => f.meta?.category === category || f.category === category);
     if (state)    files = files.filter(f => f.meta?.states?.includes(state) || f.meta?.state === state);
-    if (period)   files = files.filter(f => f.meta?.period === period);
+    if (period)   files = files.filter(f => f.meta?.period === period || f.period === period);
 
     return json(files);
   } catch { return json([]); }
+}
+
+// ── Patch File Metadata ───────────────────────────────────────
+async function handlePatchFileMeta(path, request, env) {
+  try {
+    const id = path.replace('/files/', '').replace('/meta', '');
+    const body = await request.json();
+    const { name, reportName, collection, category, period, reportType, dept } = body;
+
+    const stored = await env.CACI_KV.get(`file:${id}`, 'json');
+    if (!stored) return json({ error: 'File not found' }, 404);
+
+    const oldCollection = stored.collection;
+    const oldDept = stored.dept;
+
+    // Merge changes
+    if (name)       stored.name = name;
+    if (collection !== undefined) stored.collection = collection;
+    if (!stored.meta) stored.meta = {};
+    if (reportName  !== undefined) stored.meta.reportName  = reportName;
+    if (category    !== undefined) stored.meta.category    = category;
+    if (period      !== undefined) stored.meta.period      = period;
+    if (reportType  !== undefined) stored.meta.reportType  = reportType;
+
+    await env.CACI_KV.put(`file:${id}`, JSON.stringify(stored));
+
+    // Update dept index
+    const deptKey = `index:${oldDept}`;
+    const deptIdx = await env.CACI_KV.get(deptKey, 'json') || [];
+    const deptEntry = deptIdx.find(f => f.id === id);
+    if (deptEntry) {
+      Object.assign(deptEntry, { name: stored.name, collection: stored.collection, meta: stored.meta });
+      await env.CACI_KV.put(deptKey, JSON.stringify(deptIdx));
+    }
+
+    // Update old collection index — remove or update entry
+    if (oldCollection) {
+      const oldColKey = `col:${oldDept}:${oldCollection}`;
+      const oldColIdx = await env.CACI_KV.get(oldColKey, 'json') || [];
+      if (collection && collection !== oldCollection) {
+        // Move to new collection
+        const updated = oldColIdx.filter(f => f.id !== id);
+        await env.CACI_KV.put(oldColKey, JSON.stringify(updated));
+        const newColKey = `col:${oldDept}:${collection}`;
+        const newColIdx = await env.CACI_KV.get(newColKey, 'json') || [];
+        newColIdx.unshift({ ...stored });
+        await env.CACI_KV.put(newColKey, JSON.stringify(newColIdx));
+      } else {
+        const entry = oldColIdx.find(f => f.id === id);
+        if (entry) { Object.assign(entry, { name: stored.name, meta: stored.meta }); await env.CACI_KV.put(oldColKey, JSON.stringify(oldColIdx)); }
+      }
+    }
+
+    return json({ ok: true });
+  } catch(e) { return json({ error: e.message }, 500); }
 }
 
 // ── Create Collection ────────────────────────────────────────
