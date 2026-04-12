@@ -37,7 +37,7 @@ export default {
     if (path === '/duplicate-check' && method === 'POST') return handleDuplicateCheck(request, env);
     if (path === '/files'     && method === 'GET')    return handleListFiles(url, env);
     if (path.startsWith('/files/') && path.endsWith('/meta') && method === 'PATCH') return handlePatchFileMeta(path, request, env);
-    if (path.startsWith('/files/') && method === 'DELETE') return handleDeleteFile(path.replace('/files/', ''), env);
+    if (path.startsWith('/files/') && method === 'DELETE') return handleDeleteFile(path.replace('/files/', ''), env, url);
     if (path === '/collections' && method === 'GET')  return handleListCollections(url, env);
     if (path === '/collections/create' && method === 'POST') return handleCreateCollection(request, env);
     if (path.startsWith('/collections/') && method === 'DELETE') return handleDeleteCollection(path.replace('/collections/', ''), url, env);
@@ -307,20 +307,37 @@ async function handleListCollections(url, env) {
 }
 
 // ── Delete File ───────────────────────────────────────────────
-async function handleDeleteFile(id, env) {
+async function handleDeleteFile(id, env, url) {
   try {
+    // If caller passes explicit dept + col + ctx=true, use those directly
+    const explicitDept = url?.searchParams.get('dept');
+    const explicitCol  = url?.searchParams.get('col');
+    const isCtxDelete  = url?.searchParams.get('ctx') === 'true';
+
+    if (isCtxDelete && explicitDept && explicitCol) {
+      // Direct ctx index removal — no file record lookup needed
+      const ctxKey = `ctx:${explicitDept}:${explicitCol}`;
+      const ctxIdx = await env.CACI_KV.get(ctxKey, 'json') || [];
+      await env.CACI_KV.put(ctxKey, JSON.stringify(ctxIdx.filter(f => f.id !== id)));
+
+      // Also clean dept index and file record
+      await env.CACI_KV.delete(`file:${id}`);
+      const deptIdx = await env.CACI_KV.get(`index:${explicitDept}`, 'json') || [];
+      await env.CACI_KV.put(`index:${explicitDept}`, JSON.stringify(deptIdx.filter(f => f.id !== id)));
+
+      return json({ ok: true });
+    }
+
     const fileMeta = await env.CACI_KV.get(`file:${id}`, 'json');
 
-    // Even if the file record is missing, sweep all indexes to remove any trace
+    // If file record missing, sweep all indexes
     if (!fileMeta) {
-      // Scan dept indexes to find and remove the orphaned entry
       const depts = ['global','retail','compliance','commercial','human_resources','finance','operations','technology'];
       for (const d of depts) {
         const deptIdx = await env.CACI_KV.get(`index:${d}`, 'json') || [];
         const filtered = deptIdx.filter(f => f.id !== id);
         if (filtered.length !== deptIdx.length) {
           await env.CACI_KV.put(`index:${d}`, JSON.stringify(filtered));
-          // Also sweep collection and ctx indexes for this dept
           const reg = await env.CACI_KV.get(`colreg:${d}`, 'json') || [];
           for (const col of reg) {
             const ck = `col:${d}:${col.name}`;
@@ -340,25 +357,19 @@ async function handleDeleteFile(id, env) {
 
     await env.CACI_KV.delete(`file:${id}`);
 
-    // Remove from dept index
     const deptIdx = await env.CACI_KV.get(`index:${dept}`, 'json') || [];
     await env.CACI_KV.put(`index:${dept}`, JSON.stringify(deptIdx.filter(f => f.id !== id)));
 
-    // Remove from collection index
     const colKey = `col:${dept}:${collection}`;
     const colIdx = await env.CACI_KV.get(colKey, 'json') || [];
     const newColIdx = colIdx.filter(f => f.id !== id);
     await env.CACI_KV.put(colKey, JSON.stringify(newColIdx));
 
-    // Remove from context index
     const ctxKey = `ctx:${dept}:${collection}`;
     const ctxIdx = await env.CACI_KV.get(ctxKey, 'json') || [];
     const newCtxIdx = ctxIdx.filter(f => f.id !== id);
-    if (newCtxIdx.length !== ctxIdx.length) {
-      await env.CACI_KV.put(ctxKey, JSON.stringify(newCtxIdx));
-    }
+    if (newCtxIdx.length !== ctxIdx.length) await env.CACI_KV.put(ctxKey, JSON.stringify(newCtxIdx));
 
-    // If collection fully empty, remove from registry
     if (newColIdx.length === 0 && newCtxIdx.length === 0) {
       const reg = await env.CACI_KV.get(`colreg:${dept}`, 'json') || [];
       await env.CACI_KV.put(`colreg:${dept}`, JSON.stringify(reg.filter(c => c.name !== collection)));
