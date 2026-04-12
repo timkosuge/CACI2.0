@@ -103,10 +103,11 @@ async function handleUpload(request, env) {
     try { stats = JSON.parse(statsJson); } catch {}
 
     const name      = meta.fileName || (file ? file.name : 'unknown');
-    // Collection = category/period auto-structure
-    const category  = meta.category || 'General';
-    const period    = meta.period || '';
-    const collection = period ? `${category} — ${period}` : category;
+    const category  = meta.category || formData.get('category') || 'General';
+    const period    = meta.period   || formData.get('period')   || '';
+    // Use explicitly sent collection name if provided, otherwise build from fields
+    const sentCollection = formData.get('collection') || '';
+    const collection = sentCollection || (period ? `${category} — ${period}` : category);
 
     if (!text && !file) return json({ error: 'No content provided' }, 400);
 
