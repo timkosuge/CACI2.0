@@ -1182,6 +1182,15 @@ body::before {
 }
 .resp-expand-btn:hover { color: var(--gold-lt); background: var(--gold-dim); }
 
+.msg-model-label {
+  font-family: var(--f-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.12em;
+  color: rgba(184,150,12,0.35);
+  text-transform: uppercase;
+  margin-top: 4px;
+  padding-left: 2px;
+}
 .msg-sources {
   font-family: var(--f-mono);
   font-size: 9px;
@@ -3708,7 +3717,7 @@ function bootApp() {
   initContextTab();
   initNewCollectionModal();
   initVoiceInput();
-  initVoiceSettings();
+  if ($('ant-save')) $('ant-save').addEventListener('click', saveKey);
 
   // Filter bar
   const filterClear = document.getElementById('filter-clear');
@@ -3734,7 +3743,6 @@ function bootApp() {
     const el = $(id); if (el) el.addEventListener('click', () => { buildModelList(); $('model-modal').classList.add('open'); });
   });
   $('model-modal').addEventListener('click', e => { if (e.target === $('model-modal')) $('model-modal').classList.remove('open'); });
-  $('ant-save').addEventListener('click', saveKey);
 }
 
 /* NAV */
@@ -4084,6 +4092,7 @@ function appendMsg(role, text, sources, scope) {
   const av = role === 'user' ? 'YOU' : 'CACI';
   const src = sources && sources.length ? `<div class="msg-sources">Sources &mdash; <b>${sources.join(' \u00b7 ')}</b></div>` : '';
   const sc = scope && scope !== 'all' ? `<div class="msg-scope">Scope: ${scope === 'file' ? chatFileName : scope === 'collection' ? chatCollection : 'all'}</div>` : '';
+  const modelLabel = (role === 'ai' && sources !== undefined) ? `<div class="msg-model-label">${modelId === 'grok' ? 'Grok · xAI' : modelId === 'cloudflare' ? 'Cloudflare AI' : modelId === 'ollama' ? 'Ollama · Local' : 'Claude · Anthropic'}</div>` : '';
   const spk = role === 'ai' ? `<button class="spk-btn" title="Read aloud" data-spk="1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 010 7.07"/><path d="M19.07 4.93a10 10 0 010 14.14"/></svg></button>` : '';
   const actions = role === 'ai' ? `<div class="msg-actions">
     <button class="msg-action-btn dl-btn" title="Download as .md file">
@@ -4095,7 +4104,7 @@ function appendMsg(role, text, sources, scope) {
       Save
     </button>
   </div>` : '';
-  el.innerHTML = `<div class="msg-av">${av}</div><div class="msg-body">${sc}\x3Cdiv class="msg-bubble">${esc(text)}\x3C/div>${src}${spk}${actions}\x3C/div>`;
+  el.innerHTML = `<div class="msg-av">${av}</div><div class="msg-body">${sc}${modelLabel}\x3Cdiv class="msg-bubble">${esc(text)}\x3C/div>${src}${spk}${actions}\x3C/div>`;
   if (role === 'ai') {
     const spkBtn = el.querySelector('.spk-btn');
     if (spkBtn) {
@@ -4430,14 +4439,6 @@ async function loadAdminConfig() {
     });
     const testBtn = $('gtts-test');
     if (testBtn) testBtn.addEventListener('click', () => speakText(null, "Hey. I'm Caci. Let me know what you're looking for and we'll dig in."));
-    const antSave = $('ant-save');
-    if (antSave) antSave.addEventListener('click', async () => {
-      const key = $('ant-key').value.trim();
-      const res = await apiFetch('/admin/config', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ANTHROPIC_API_KEY:key})});
-      const d = await res.json();
-      $('ant-fb').textContent = d.ok ? 'Saved.' : (d.error||'Error');
-      setTimeout(() => { $('ant-fb').textContent=''; }, 2500);
-    });
     const xaiSave = $('xai-save');
     if (xaiSave) xaiSave.addEventListener('click', async () => {
       const key = $('xai-key').value.trim();
