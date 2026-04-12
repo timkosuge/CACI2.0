@@ -2165,7 +2165,7 @@ body::before {
             <div class="col-sidebar-title">Collections</div>
             <div class="col-sidebar-dept" id="col-dept-name">Retail</div>
           </div>
-          <button class="new-col-btn" id="new-col-btn">+ New Collection</button>
+          <button class="new-col-btn" id="new-col-btn" onclick="openNewColModal()">+ New Collection</button>
           <div class="col-list" id="col-list"></div>
         </div>
         <div class="files-main">
@@ -3368,8 +3368,6 @@ async function handleFiles(fileList, colName, meta = {}) {
 ═══════════════════════════════════════════════════════════ */
 
 function initNewCollectionModal() {
-  const btn = $('new-col-btn');
-  if (btn) btn.addEventListener('click', openNewColModal);
   const closeBtn = $('new-col-close');
   if (closeBtn) closeBtn.addEventListener('click', closeNewColModal);
   const cancelBtn = $('new-col-cancel');
@@ -3378,21 +3376,19 @@ function initNewCollectionModal() {
   if (bg) bg.addEventListener('click', e => { if (e.target === bg) closeNewColModal(); });
   const submitBtn = $('new-col-submit');
   if (submitBtn) submitBtn.addEventListener('click', createCollection);
-
-  // Populate dept and category selects
-  const ncDept = $('nc-dept');
-  if (ncDept) DEPTS.forEach(d => {
-    const o = document.createElement('option');
-    o.value = d.id; o.textContent = d.label; ncDept.appendChild(o);
-  });
-  const ncCat = $('nc-category');
-  if (ncCat) UM_CATEGORIES.forEach(cat => {
-    const o = document.createElement('option');
-    o.value = cat; o.textContent = cat; ncCat.appendChild(o);
-  });
 }
 
 function openNewColModal() {
+  // Populate selects lazily so they're always up to date
+  const ncDept = $('nc-dept');
+  if (ncDept && ncDept.options.length <= 1) {
+    DEPTS.forEach(d => { const o = document.createElement('option'); o.value=d.id; o.textContent=d.label; ncDept.appendChild(o); });
+  }
+  const ncCat = $('nc-category');
+  if (ncCat && ncCat.options.length <= 1) {
+    UM_CATEGORIES.forEach(cat => { const o = document.createElement('option'); o.value=cat; o.textContent=cat; ncCat.appendChild(o); });
+  }
+
   if ($('nc-name'))     $('nc-name').value     = '';
   if ($('nc-desc'))     $('nc-desc').value     = '';
   if ($('nc-dept'))     $('nc-dept').value     = dept;
