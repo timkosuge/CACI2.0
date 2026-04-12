@@ -2705,10 +2705,8 @@ body::before {
   </defs>
 
   <style>
-    /* Many short dashes with large gaps = scattered sparks, not a worm */
-    /* stroke-dasharray: dash_len gap_len — keep dash short (8-18px), gap large (80-200px) */
+    /* Sparse short sparks — small dashes, wide gaps, slow */
 
-    /* J paths — 3 layers, staggered */
     @keyframes sJ1 { from { stroke-dashoffset: 2200; } to { stroke-dashoffset: 0; } }
     @keyframes sJ2 { from { stroke-dashoffset: 1800; } to { stroke-dashoffset: 0; } }
     @keyframes sJ3 { from { stroke-dashoffset: 2600; } to { stroke-dashoffset: 0; } }
@@ -2729,26 +2727,26 @@ body::before {
     @keyframes sI2 { from { stroke-dashoffset: 1000; } to { stroke-dashoffset: 0; } }
     @keyframes sI3 { from { stroke-dashoffset: 1800; } to { stroke-dashoffset: 0; } }
 
-    /* Layer 1: bright short sparks, fast */
-    .j1 { stroke-dasharray: 10 120; animation: sJ1 5s linear 0s infinite; }
-    .j2 { stroke-dasharray: 6  90;  animation: sJ2 7s linear 1.8s infinite; }
-    .j3 { stroke-dasharray: 14 160; animation: sJ3 9s linear 3.5s infinite; }
+    /* Dash halved, gaps wider (~25% fewer dots), speed slowed ~40% */
+    .j1 { stroke-dasharray: 5 160; animation: sJ1 8s linear 0s infinite; }
+    .j2 { stroke-dasharray: 3 120; animation: sJ2 11s linear 1.8s infinite; }
+    .j3 { stroke-dasharray: 7 210; animation: sJ3 14s linear 3.5s infinite; }
 
-    .u1 { stroke-dasharray: 10 120; animation: sU1 5s linear 0.6s infinite; }
-    .u2 { stroke-dasharray: 6  90;  animation: sU2 7s linear 2.4s infinite; }
-    .u3 { stroke-dasharray: 14 160; animation: sU3 9s linear 4.1s infinite; }
+    .u1 { stroke-dasharray: 5 160; animation: sU1 8s linear 0.6s infinite; }
+    .u2 { stroke-dasharray: 3 120; animation: sU2 11s linear 2.4s infinite; }
+    .u3 { stroke-dasharray: 7 210; animation: sU3 14s linear 4.1s infinite; }
 
-    .s1 { stroke-dasharray: 10 120; animation: sS1 5s linear 1.2s infinite; }
-    .s2 { stroke-dasharray: 6  90;  animation: sS2 7s linear 3.0s infinite; }
-    .s3 { stroke-dasharray: 14 160; animation: sS3 9s linear 0.7s infinite; }
+    .s1 { stroke-dasharray: 5 160; animation: sS1 8s linear 1.2s infinite; }
+    .s2 { stroke-dasharray: 3 120; animation: sS2 11s linear 3.0s infinite; }
+    .s3 { stroke-dasharray: 7 210; animation: sS3 14s linear 0.7s infinite; }
 
-    .h1 { stroke-dasharray: 10 120; animation: sH1 5s linear 1.8s infinite; }
-    .h2 { stroke-dasharray: 6  90;  animation: sH2 7s linear 0.3s infinite; }
-    .h3 { stroke-dasharray: 14 160; animation: sH3 9s linear 5.2s infinite; }
+    .h1 { stroke-dasharray: 5 160; animation: sH1 8s linear 1.8s infinite; }
+    .h2 { stroke-dasharray: 3 120; animation: sH2 11s linear 0.3s infinite; }
+    .h3 { stroke-dasharray: 7 210; animation: sH3 14s linear 5.2s infinite; }
 
-    .i1 { stroke-dasharray: 10 120; animation: sI1 5s linear 2.4s infinite; }
-    .i2 { stroke-dasharray: 6  90;  animation: sI2 7s linear 4.7s infinite; }
-    .i3 { stroke-dasharray: 14 160; animation: sI3 9s linear 1.3s infinite; }
+    .i1 { stroke-dasharray: 5 160; animation: sI1 8s linear 2.4s infinite; }
+    .i2 { stroke-dasharray: 3 120; animation: sI2 11s linear 4.7s infinite; }
+    .i3 { stroke-dasharray: 7 210; animation: sI3 14s linear 1.3s infinite; }
   </style>
 
   <!-- Letter paths — approximate outlines matching JUSHI.jpg chrome letters -->
@@ -2757,51 +2755,51 @@ body::before {
   <!-- J -->
   <g fill="none" filter="url(#sf)">
     <path class="j1" d="M 108,210 L 232,210 L 232,590 Q 232,660 196,695 Q 158,732 110,720 Q 72,708 58,680"
-      stroke="#f5e8a0" stroke-width="1.5" opacity="0.55"/>
+      stroke="#f5e8a0" stroke-width="0.8" opacity="0.45"/>
     <path class="j2" d="M 108,210 L 232,210 L 232,590 Q 232,660 196,695 Q 158,732 110,720 Q 72,708 58,680"
-      stroke="#ffffff" stroke-width="0.8" opacity="0.35"/>
+      stroke="#ffffff" stroke-width="0.5" opacity="0.28"/>
     <path class="j3" d="M 108,210 L 232,210 L 232,590 Q 232,660 196,695 Q 158,732 110,720 Q 72,708 58,680"
-      stroke="#d4a832" stroke-width="2.5" opacity="0.22"/>
+      stroke="#d4a832" stroke-width="1.2" opacity="0.18"/>
   </g>
 
   <!-- U -->
   <g fill="none" filter="url(#sf)">
     <path class="u1" d="M 290,210 L 290,600 Q 290,700 385,718 Q 480,700 480,600 L 480,210"
-      stroke="#f5e8a0" stroke-width="1.5" opacity="0.55"/>
+      stroke="#f5e8a0" stroke-width="0.8" opacity="0.45"/>
     <path class="u2" d="M 290,210 L 290,600 Q 290,700 385,718 Q 480,700 480,600 L 480,210"
-      stroke="#ffffff" stroke-width="0.8" opacity="0.35"/>
+      stroke="#ffffff" stroke-width="0.5" opacity="0.28"/>
     <path class="u3" d="M 290,210 L 290,600 Q 290,700 385,718 Q 480,700 480,600 L 480,210"
-      stroke="#d4a832" stroke-width="2.5" opacity="0.22"/>
+      stroke="#d4a832" stroke-width="1.2" opacity="0.18"/>
   </g>
 
   <!-- S -->
   <g fill="none" filter="url(#sf)">
     <path class="s1" d="M 688,268 Q 650,210 600,200 Q 540,188 512,232 Q 492,268 540,308 Q 590,344 630,372 Q 678,408 686,454 Q 696,508 658,552 Q 620,596 568,608 Q 516,618 510,700"
-      stroke="#f5e8a0" stroke-width="1.5" opacity="0.55"/>
+      stroke="#f5e8a0" stroke-width="0.8" opacity="0.45"/>
     <path class="s2" d="M 688,268 Q 650,210 600,200 Q 540,188 512,232 Q 492,268 540,308 Q 590,344 630,372 Q 678,408 686,454 Q 696,508 658,552 Q 620,596 568,608 Q 516,618 510,700"
-      stroke="#ffffff" stroke-width="0.8" opacity="0.35"/>
+      stroke="#ffffff" stroke-width="0.5" opacity="0.28"/>
     <path class="s3" d="M 688,268 Q 650,210 600,200 Q 540,188 512,232 Q 492,268 540,308 Q 590,344 630,372 Q 678,408 686,454 Q 696,508 658,552 Q 620,596 568,608 Q 516,618 510,700"
-      stroke="#d4a832" stroke-width="2.5" opacity="0.22"/>
+      stroke="#d4a832" stroke-width="1.2" opacity="0.18"/>
   </g>
 
   <!-- H -->
   <g fill="none" filter="url(#sf)">
     <path class="h1" d="M 732,210 L 732,710 M 922,210 L 922,710 M 732,452 L 922,452"
-      stroke="#f5e8a0" stroke-width="1.5" opacity="0.55"/>
+      stroke="#f5e8a0" stroke-width="0.8" opacity="0.45"/>
     <path class="h2" d="M 732,210 L 732,710 M 922,210 L 922,710 M 732,452 L 922,452"
-      stroke="#ffffff" stroke-width="0.8" opacity="0.35"/>
+      stroke="#ffffff" stroke-width="0.5" opacity="0.28"/>
     <path class="h3" d="M 732,210 L 732,710 M 922,210 L 922,710 M 732,452 L 922,452"
-      stroke="#d4a832" stroke-width="2.5" opacity="0.22"/>
+      stroke="#d4a832" stroke-width="1.2" opacity="0.18"/>
   </g>
 
   <!-- I -->
   <g fill="none" filter="url(#sf)">
     <path class="i1" d="M 958,210 L 1148,210 M 1053,210 L 1053,710 M 958,710 L 1148,710"
-      stroke="#f5e8a0" stroke-width="1.5" opacity="0.55"/>
+      stroke="#f5e8a0" stroke-width="0.8" opacity="0.45"/>
     <path class="i2" d="M 958,210 L 1148,210 M 1053,210 L 1053,710 M 958,710 L 1148,710"
-      stroke="#ffffff" stroke-width="0.8" opacity="0.35"/>
+      stroke="#ffffff" stroke-width="0.5" opacity="0.28"/>
     <path class="i3" d="M 958,210 L 1148,210 M 1053,210 L 1053,710 M 958,710 L 1148,710"
-      stroke="#d4a832" stroke-width="2.5" opacity="0.22"/>
+      stroke="#d4a832" stroke-width="1.2" opacity="0.18"/>
   </g>
 
   <rect width="1200" height="900" fill="url(#vignette)"/>
