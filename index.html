@@ -1896,13 +1896,15 @@ body::before {
 }
 
 /* ── Admin ─────────────────────────────────────────────── */
+.panel[data-panel="admin"] { overflow: hidden; }
 .admin-wrap {
   overflow-y: auto;
   padding: 24px;
   height: 100%;
+  box-sizing: border-box;
   scrollbar-width: thin;
   scrollbar-color: var(--ink5) transparent;
-  max-width: 700px;
+  max-width: 760px;
 }
 .admin-wrap::-webkit-scrollbar { width: 3px; }
 .admin-wrap::-webkit-scrollbar-thumb { background: var(--ink5); }
@@ -3294,7 +3296,10 @@ body::before {
           <div class="acard">
             <div class="acard-title">Voice &mdash; Caci&apos;s Voice Engine</div>
             <div class="acard-sub">Select the TTS provider &nbsp;&middot;&nbsp; Each sounds different &nbsp;&middot;&nbsp; Switch anytime</div>
-            <div class="arow" style="margin-top:10px;flex-wrap:wrap;gap:8px">
+            <div class="acard-sub" style="margin-top:8px;color:rgba(184,150,12,0.5)">xAI API Key &mdash; required for Grok voice</div>
+            <div class="arow" style="margin-top:6px"><input class="ainput" type="password" id="xai-key" placeholder="xai-..." autocomplete="off"/><button class="asave" id="xai-save">Save Key</button></div>
+            <div class="afb" id="xai-fb"></div>
+            <div class="arow" style="margin-top:14px;flex-wrap:wrap;gap:8px">
               <select class="ainput" id="tts-provider" style="flex:1">
                 <option value="grok">Grok (xAI) &mdash; Eve &mdash; Best quality</option>
                 <option value="cloudflare">Cloudflare &mdash; Deepgram Aura 2 &mdash; Enterprise</option>
@@ -3584,7 +3589,8 @@ const DEPTS = [
 
 const MODELS = [
   {id:'claude',     name:'Claude Sonnet',   sub:'Anthropic \u00b7 Best reasoning',  dot:'#22c55e'},
-  {id:'cloudflare', name:'Cloudflare AI',   sub:'Llama 3.1 \u00b7 Fast & free',    dot:'#d4a017'},
+  {id:'grok',       name:'Grok',            sub:'xAI \u00b7 Fast & sharp',          dot:'#d4a017'},
+  {id:'cloudflare', name:'Cloudflare AI',   sub:'Llama 4 \u00b7 Fast & free',      dot:'#f97316'},
   {id:'ollama',     name:'Ollama',          sub:'Local \u00b7 Fully private',       dot:'#8e44ad'},
 ];
 
@@ -4442,6 +4448,17 @@ async function loadAdminConfig() {
   const testBtn = $('gtts-test');
   if (testBtn) {
     testBtn.addEventListener('click', () => speakText(null, "Hey. I'm Caci. Let me know what you're looking for and we'll dig in."));
+  }
+  // xAI key
+  const xaiSave = $('xai-save');
+  if (xaiSave) {
+    xaiSave.addEventListener('click', async () => {
+      const key = $('xai-key').value.trim();
+      const res = await apiFetch('/admin/config', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ XAI_API_KEY: key }) });
+      const d = await res.json();
+      $('xai-fb').textContent = d.ok ? 'Saved.' : (d.error || 'Error');
+      setTimeout(() => { $('xai-fb').textContent = ''; }, 2500);
+    });
   }
 
   try {
