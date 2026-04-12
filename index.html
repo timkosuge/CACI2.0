@@ -1188,84 +1188,56 @@ body::before {
 
 
 /* ── Discovery Greeting ────────────────────────────────── */
-.discovery-greeting {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+/* Name sits just above the input bar — injected into bar zone */
+.dg-name-above-bar {
   text-align: center;
-  padding: 0 32px 60px;
-  flex: 1;
-  animation: dg-in 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-}
-@keyframes dg-in {
-  from { opacity: 0; transform: translateY(18px) scale(0.97); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-.discovery-greeting.collapsing {
-  animation: dg-out 0.4s cubic-bezier(0.4, 0, 1, 1) both;
-}
-@keyframes dg-out {
-  from { opacity: 1; transform: translateY(0) scale(1); max-height: 400px; }
-  to   { opacity: 0; transform: translateY(-12px) scale(0.97); max-height: 0; padding: 0; overflow: hidden; }
+  margin-bottom: 10px;
+  animation: dg-in 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  pointer-events: none;
 }
 .dg-eyebrow {
   font-family: var(--f-display);
-  font-size: 10px;
-  letter-spacing: 0.28em;
+  font-size: 9px;
+  letter-spacing: 0.3em;
   text-transform: uppercase;
   color: var(--gold);
-  opacity: 0.6;
-  margin-bottom: 14px;
+  opacity: 0.45;
+  margin-bottom: 6px;
 }
 .dg-name {
   font-family: var(--f-display);
-  font-size: clamp(36px, 6vw, 56px);
+  font-size: clamp(28px, 4vw, 42px);
   font-weight: 300;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.1em;
   line-height: 1;
   background: linear-gradient(150deg, var(--gold-metal-1) 0%, var(--gold-metal-3) 45%, var(--gold-metal-2) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  filter: drop-shadow(0 0 20px rgba(184,150,12,0.3));
-  margin-bottom: 20px;
+  filter: drop-shadow(0 0 16px rgba(184,150,12,0.25));
+}
+/* Greeting text floats below the bar */
+.dg-text-below-bar {
+  text-align: center;
+  max-width: 520px;
+  margin: 14px auto 0;
+  animation: dg-in 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) 0.15s both;
+  pointer-events: none;
 }
 .dg-text {
-  font-size: 14px;
-  font-weight: 300;
-  color: var(--smoke3);
-  line-height: 1.7;
-  max-width: 460px;
-  white-space: pre-line;
-  margin-bottom: 28px;
-}
-.dg-collections {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: center;
-  max-width: 520px;
-}
-.dg-col-btn {
-  padding: 8px 18px;
-  border: 1px solid rgba(184,150,12,0.28);
-  background: rgba(184,150,12,0.06);
-  border-radius: 100px;
-  color: var(--gold-metal-2);
-  font-family: var(--f-body);
   font-size: 12px;
-  letter-spacing: 0.06em;
-  cursor: pointer;
-  transition: all 0.18s ease;
+  font-weight: 300;
+  color: rgba(255,255,255,0.28);
+  line-height: 1.8;
+  letter-spacing: 0.03em;
+  white-space: pre-line;
 }
-.dg-col-btn:hover {
-  background: rgba(184,150,12,0.14);
-  border-color: rgba(184,150,12,0.5);
-  color: var(--gold-metal-1);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(184,150,12,0.15);
+@keyframes dg-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
+/* Hide collection pills — greeting text already covers it */
+.dg-collections { display: none; }
 
 /* ── Chat panel layout adjustment when floating bar ───── */
 .panel[data-panel="chat"] {
@@ -3767,6 +3739,7 @@ function setDept(id) {
   // Reset chat bar to floating state and clear history for new dept
   chatHistory = [];
   window._caciCollections = null;
+  ['discovery-name', 'discovery-subtext'].forEach(id => { const el = document.getElementById(id); if (el) el.remove(); });
   const bar = $('chat-bar'), msgs = $('chat-msgs');
   if (bar) bar.classList.remove('has-messages');
   if (msgs) { msgs.classList.remove('has-messages'); msgs.innerHTML = ''; }
@@ -3830,41 +3803,38 @@ function setScope(scope, col, fileId, fileName) {
 /* CHAT */
 // Renders the discovery greeting (centered hero, not a chat bubble)
 function renderDiscoveryGreeting(text, collections) {
-  const msgs = $('chat-msgs');
-  // Remove any existing discovery greeting
-  const old = msgs.querySelector('.discovery-greeting');
-  if (old) old.remove();
+  // Remove any existing discovery elements
+  ['discovery-name', 'discovery-subtext'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.remove();
+  });
 
-  // Parse text into intro + collection names (collections come from API)
-  const colBtns = (collections || []).map(c =>
-    `<button class="dg-col-btn" onclick="selectDiscoveryCollection('${c.name.replace(/'/g,"\\'")}')">
-      ${c.name}${c.fileCount ? ' <span style="opacity:0.5;font-size:10px">('+c.fileCount+')</span>' : ''}
-    </button>`
-  ).join('');
-
-  // Strip emoji and tidy text before rendering
+  // Strip emoji
   const cleanText = text.replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u{2B50}\u{1F300}-\u{1F9FF}]/gu, '').replace(/\n{3,}/g, '\n\n').trim();
 
-  const el = document.createElement('div');
-  el.className = 'discovery-greeting';
-  el.id = 'discovery-greeting';
-  el.innerHTML = `
-    <div class="dg-eyebrow">Intelligence Assistant</div>
-    <div class="dg-name">CACI</div>
-    <div class="dg-text">${esc(cleanText)}</div>
-    ${colBtns ? `<div class="dg-collections">${colBtns}</div>` : ''}
-  `;
-  msgs.appendChild(el);
+  // Name sits just above the bar — inject into bar wrapper
+  const bar = $('chat-bar');
+  const nameEl = document.createElement('div');
+  nameEl.id = 'discovery-name';
+  nameEl.className = 'dg-name-above-bar';
+  nameEl.innerHTML = `<div class="dg-eyebrow">Intelligence Assistant</div><div class="dg-name">CACI</div>`;
+  bar.insertBefore(nameEl, bar.firstChild);
+
+  // Greeting text sits below the bar
+  const subtextEl = document.createElement('div');
+  subtextEl.id = 'discovery-subtext';
+  subtextEl.className = 'dg-text-below-bar';
+  subtextEl.innerHTML = `<div class="dg-text">${esc(cleanText)}</div>`;
+  bar.insertAdjacentElement('afterend', subtextEl);
+
   $('chat-empty').style.display = 'none';
 }
 
 function selectDiscoveryCollection(colName) {
-  // Collapse greeting, set scope, focus textarea
-  const greet = $('discovery-greeting');
-  if (greet) {
-    greet.classList.add('collapsing');
-    setTimeout(() => greet.remove(), 400);
-  }
+  ['discovery-name', 'discovery-subtext'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.style.opacity = '0'; el.style.transition = 'opacity 0.3s'; setTimeout(() => el.remove(), 300); }
+  });
   setScope('collection', colName);
   transitionToChat();
   $('chat-ta').focus();
@@ -3904,9 +3874,11 @@ async function sendChat() {
   $('chat-empty').style.display = 'none';
   ta.value = ''; ta.style.height = 'auto';
   $('send-btn').disabled = true;
-  // Collapse discovery greeting and dock the bar on first user message
-  const greet = $('discovery-greeting');
-  if (greet) { greet.classList.add('collapsing'); setTimeout(() => greet.remove(), 400); }
+  // Collapse discovery elements and dock the bar on first user message
+  ['discovery-name', 'discovery-subtext'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.style.opacity = '0'; el.style.transition = 'opacity 0.25s'; setTimeout(() => el.remove(), 250); }
+  });
   transitionToChat();
   appendMsg('user', msg);
   chatHistory.push({role:'user', content:msg});
