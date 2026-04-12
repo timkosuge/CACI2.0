@@ -4008,10 +4008,14 @@ async function initChatGreeting() {
   try {
     const body = {message: 'hello', dept, model: modelId, scope: 'all', history: []};
     const res = await apiFetch('/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
-    const d = await res.json();
+    const raw = await res.text();
+    console.log('GREETING RAW RESPONSE:', raw);
     ty.remove();
+    let d;
+    try { d = JSON.parse(raw); } catch(pe) { console.error('JSON parse error:', pe); renderGreetingStrip("I'm here whenever you're ready."); return; }
+    console.log('GREETING PARSED:', d);
     if (d.error) {
-      console.warn('Greeting error:', d.error);
+      console.warn('Greeting error from worker:', d.error);
       renderGreetingStrip("I'm here. Select a collection and ask me anything.");
     } else {
       renderGreetingStrip(d.response);
@@ -4020,7 +4024,7 @@ async function initChatGreeting() {
     }
   } catch(e) {
     ty.remove();
-    console.warn('Greeting failed:', e.message);
+    console.error('Greeting fetch failed:', e.message, e.stack);
     renderGreetingStrip("I'm here whenever you're ready.");
   }
 }
