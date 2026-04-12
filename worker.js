@@ -645,7 +645,7 @@ When working with data:
       { role: 'user', content: message },
     ];
     const responseText = await callLLM({ model: activeModel, system, messages, maxTokens: 3000, env, anthropicKey, xaiKey });
-    return json({ ok: true, response: responseText, sources: context.sources, scope });
+    return json({ ok: true, response: responseText, sources: context.sources, scope, model: activeModel });
   } catch (err) { return json({ error: 'Chat error: ' + err.message }, 500); }
 }
 
