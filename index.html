@@ -528,16 +528,16 @@ body::before {
   content: '';
   position: absolute; inset: 0;
   background: url('JUSHI.jpg') center center / cover no-repeat;
-  opacity: 0.09;
-  filter: grayscale(30%) contrast(1.1);
+  opacity: 0.22;
+  filter: grayscale(20%) contrast(1.05);
 }
-/* Dark ink wash over image — kills most of it, keeps the texture ghost */
+/* Dark ink wash over image — keeps center readable, lets edges show texture */
 .chat-bg-overlay::after {
   content: '';
   position: absolute; inset: 0;
   background:
-    radial-gradient(ellipse 70% 60% at 50% 50%, rgba(5,8,16,0.55) 0%, rgba(5,8,16,0.88) 100%),
-    linear-gradient(180deg, rgba(5,8,16,0.3) 0%, rgba(5,8,16,0.6) 100%);
+    radial-gradient(ellipse 65% 55% at 50% 50%, rgba(5,8,16,0.72) 0%, rgba(5,8,16,0.35) 100%),
+    linear-gradient(180deg, rgba(5,8,16,0.2) 0%, rgba(5,8,16,0.45) 100%);
 }
 .chat-bg-overlay svg {
   position: absolute;
