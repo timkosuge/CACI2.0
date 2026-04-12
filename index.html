@@ -842,6 +842,14 @@ body::before {
   text-transform: uppercase;
   padding: 8px 12px 4px;
 }
+.col-section-label.primary {
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  color: var(--gold-lt);
+  padding: 12px 12px 6px;
+  border-top: 1px solid var(--line);
+  margin-top: 2px;
+}
 .col-item {
   display: flex; align-items: center; gap: 8px;
   padding: 9px 12px;
@@ -3190,7 +3198,7 @@ async function loadCollections() {
     const list = $('col-list');
 
     // Section label: Collections
-    let html = `<div class="col-section-label">Collections</div>`;
+    let html = `<div class="col-section-label primary">Collections</div>`;
     html += `<div class="col-all${selectedCollection === null && _colView !== 'uncollected' ? ' active' : ''}" id="col-all-btn">
       <div class="col-all-icon">\u2261</div>
       <div class="col-all-name">All Files</div>
