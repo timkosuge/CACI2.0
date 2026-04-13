@@ -5600,8 +5600,7 @@ function initSplitPdf() {
   if (!btn || !input) return;
   btn.addEventListener('click', () => {
     if (!selectedCollection) { alert('Select a collection first.'); return; }
-    input.value = '';
-    input.click();
+    openSplitMetaModal();
   });
   input.addEventListener('change', async e => {
     const file = e.target.files[0];
@@ -5609,9 +5608,50 @@ function initSplitPdf() {
     input.value = '';
     await runPdfSplitter(file);
   });
+
+  // Pre-flight modal wiring
+  $('spm-close')?.addEventListener('click', closeSplitMetaModal);
+  $('spm-cancel')?.addEventListener('click', closeSplitMetaModal);
+  $('split-meta-modal-bg')?.addEventListener('click', e => { if (e.target === $('split-meta-modal-bg')) closeSplitMetaModal(); });
+  $('spm-submit')?.addEventListener('click', () => {
+    closeSplitMetaModal();
+    input.click();
+  });
+}
+
+function openSplitMetaModal() {
+  // Populate dept dropdown
+  const spmDept = $('spm-dept');
+  if (spmDept && spmDept.options.length === 0) {
+    DEPTS.forEach(d => { const o = document.createElement('option'); o.value=d.id; o.textContent=d.label; spmDept.appendChild(o); });
+  }
+  if (spmDept) spmDept.value = dept;
+
+  // Populate category dropdown
+  const spmCat = $('spm-category');
+  if (spmCat && spmCat.options.length <= 1) {
+    UM_CATEGORIES.forEach(c => { const o = document.createElement('option'); o.value=c; o.textContent=c; spmCat.appendChild(o); });
+  }
+
+  // Pre-fill with sensible defaults
+  if ($('spm-category')) $('spm-category').value = 'Compliance';
+  if ($('spm-period'))   $('spm-period').value   = '';
+  if ($('spm-chunk'))    $('spm-chunk').value     = '800';
+  $('split-meta-modal-bg').classList.add('open');
+  setTimeout(() => $('spm-period')?.focus(), 80);
+}
+
+function closeSplitMetaModal() {
+  $('split-meta-modal-bg').classList.remove('open');
 }
 
 async function runPdfSplitter(file) {
+  // Read metadata from pre-flight modal
+  const splitCategory = ($('spm-category')?.value || 'Compliance').trim();
+  const splitPeriod   = ($('spm-period')?.value   || '').trim();
+  const splitDept     = ($('spm-dept')?.value      || dept).trim();
+  const splitChunk    = parseInt($('spm-chunk')?.value || '800', 10) || 800;
+
   const prog  = $('uprog');
   const fill  = $('pfill');
   const label = $('plabel');
@@ -5732,11 +5772,13 @@ async function runPdfSplitter(file) {
       fd.append('file',        subFile);
       fd.append('text',        subText);
       fd.append('name',        subName);
-      fd.append('dept',        dept);
+      fd.append('dept',        splitDept);
+      fd.append('fileDept',    splitDept);
       fd.append('collection',  selectedCollection);
-      fd.append('category',    'Compliance');
+      fd.append('category',    splitCategory);
       fd.append('reportName',  split.label + ' — ' + baseName);
-      fd.append('chunkSize',   '800'); // fine chunking for legal docs
+      if (splitPeriod) fd.append('period', splitPeriod);
+      fd.append('chunkSize',   String(splitChunk));
 
       const res = await apiFetch('/upload', { method: 'POST', body: fd });
       const d   = await res.json();
@@ -5998,6 +6040,54 @@ async function runPdfSplitter(file) {
       <div class="um-footer">
         <button class="um-cancel" id="um-cancel">Cancel</button>
         <button class="um-submit" id="um-submit">Check &amp; Upload</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Split PDF Pre-flight Modal -->
+<div class="upload-modal-bg" id="split-meta-modal-bg">
+  <div class="upload-modal" style="max-width:440px">
+    <div class="um-header">
+      <div>
+        <div class="um-title">Split &amp; Upload PDF</div>
+        <div class="um-sub">Set metadata applied to all sections on upload</div>
+      </div>
+      <button class="um-close" id="spm-close">&times;</button>
+    </div>
+    <div class="um-body">
+      <div class="um-row">
+        <div class="um-field">
+          <div class="um-label">Department</div>
+          <select class="um-select" id="spm-dept"></select>
+        </div>
+        <div class="um-field">
+          <div class="um-label">Category</div>
+          <select class="um-select" id="spm-category">
+            <option value="">Select...</option>
+          </select>
+        </div>
+      </div>
+      <div class="um-field">
+        <div class="um-label">Period <span style="color:var(--smoke4);font-size:9px">(optional — leave blank for evergreen docs)</span></div>
+        <input class="um-input" id="spm-period" placeholder="e.g. 2025, Q1 2026 — or leave blank"/>
+      </div>
+      <div class="um-field">
+        <div class="um-label">Retrieval Granularity</div>
+        <select class="um-select" id="spm-chunk">
+          <option value="1500">Standard — general reports</option>
+          <option value="800" selected>Fine — legal &amp; regulatory docs</option>
+          <option value="400">Ultra-fine — contracts &amp; compliance codes</option>
+        </select>
+      </div>
+      <div style="font-family:var(--f-mono);font-size:9px;color:var(--smoke4);line-height:1.7;padding:10px 14px;background:var(--ink3);border:1px solid var(--line);border-radius:var(--r)">
+        &#9986; The PDF will be split by Article / Chapter / Section breaks detected automatically.
+        Each section gets its own file in the collection with the section name as its report name.
+        Text is extracted and chunked client-side — no extra API cost.
+      </div>
+      <div class="um-footer">
+        <button class="um-cancel" id="spm-cancel">Cancel</button>
+        <button class="um-submit" id="spm-submit">Choose PDF &amp; Split</button>
       </div>
     </div>
   </div>
