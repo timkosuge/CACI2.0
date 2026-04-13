@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-//  CACI Worker v5.8 — Metadata Fix: all fields captured on upload
+//  CACI Worker v5.9 — Adaptive chunk depth for large single-file docs
 // ─────────────────────────────────────────────────────────────
 
 const CORS = {
@@ -28,7 +28,7 @@ export default {
 
     if (method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
     if (path === '/auth/login' && method === 'POST') return handleLogin(request, env);
-    if (path === '/health') return json({ ok: true, version: '5.8.0' });
+    if (path === '/health') return json({ ok: true, version: '5.9.0' });
 
     if (!verifyToken(request, env)) return json({ error: 'Unauthorized' }, 401);
 
@@ -883,7 +883,10 @@ async function buildContextTwoPass({ message, dept, collection, env }) {
     }
 
     // Get best chunks — carry file-level _score as boost so range-matched files dominate top slots
+    // When few files in collection, give more chunks per file for deeper coverage
     const keywords2 = extractKeywords(message);
+    const chunksPerFile = fullFiles.length <= 2 ? 12 : fullFiles.length <= 5 ? 6 : 3;
+    const totalChunkLimit = fullFiles.length <= 2 ? 20 : fullFiles.length <= 5 ? 20 : 15;
     const allChunks = [];
     for (const fileData of fullFiles) {
       if (!fileData.chunks) continue;
@@ -894,11 +897,11 @@ async function buildContextTwoPass({ message, dept, collection, env }) {
         filename: fileData.name, collection: fileData.collection, meta: fileData.meta || {}
       }));
       fileChunks.sort((a, b) => b.score - a.score);
-      allChunks.push(...fileChunks.slice(0, 2));
+      allChunks.push(...fileChunks.slice(0, chunksPerFile));
     }
 
     allChunks.sort((a, b) => b.score - a.score);
-    const top = allChunks.slice(0, 15);
+    const top = allChunks.slice(0, totalChunkLimit);
 
     if (!top.length) return { text: '', sources: [], statsContext: statsLines.join('\n'), focusFile: fullFiles[0]?.name };
 
@@ -1023,7 +1026,9 @@ async function buildContext({ message, dept, collection, fileId, scope, env }) {
     }
     const remaining = scored.filter(s => !guaranteed.includes(s));
     const combined = [...guaranteed, ...remaining];
-    const top = combined.slice(0, 12);
+    // Give more chunks when searching a small number of files (e.g. single file scope)
+    const ctxChunkLimit = filesToSearch.length <= 2 ? 20 : filesToSearch.length <= 5 ? 16 : 12;
+    const top = combined.slice(0, ctxChunkLimit);
 
     if (!top.length) {
       const fallback = filesToSearch.slice(0, 3).flatMap(f =>
