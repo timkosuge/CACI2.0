@@ -4093,7 +4093,7 @@ async function sendChat() {
     ty.remove();
     if (d.error) appendMsg('ai', '\u26A0  ' + d.error);
     else {
-      appendMsg('ai', d.response, d.sources, d.scope);
+      appendMsg('ai', d.response, d.sources, d.scope, d.model);
       chatHistory.push({role:'assistant', content:d.response});
       // If discovery returned collections, cache them
       if (d.collections) window._caciCollections = d.collections;
@@ -4102,7 +4102,7 @@ async function sendChat() {
   $('send-btn').disabled = false;
 }
 
-function appendMsg(role, text, sources, scope) {
+function appendMsg(role, text, sources, scope, model) {
   const el = document.createElement('div');
   el.className = 'msg ' + role;
   const av = role === 'user' ? 'YOU' : 'CACI';
@@ -4119,7 +4119,7 @@ function appendMsg(role, text, sources, scope) {
       Save
     </button>
   </div>` : '';
-  el.innerHTML = `<div class="msg-av">${av}</div><div class="msg-body">${sc}\x3Cdiv class="msg-bubble">${esc(text)}\x3C/div>${src}${spk}${actions}\x3C/div>`;
+  el.innerHTML = `<div class="msg-av">${av}</div><div class="msg-body">${sc}\x3Cdiv class="msg-bubble">${esc(text)}\x3C/div>${src}${modelLabel}${spk}${actions}\x3C/div>`;
   if (role === 'ai') {
     const spkBtn = el.querySelector('.spk-btn');
     if (spkBtn) {
