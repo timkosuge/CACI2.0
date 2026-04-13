@@ -4760,6 +4760,7 @@ async function openUploadModal(fileList) {
   // Reset form state
   if ($('um-report-name'))  $('um-report-name').value  = '';
   if ($('um-category'))     $('um-category').value     = '';
+  if ($('um-chunk-size'))   $('um-chunk-size').value   = '1500';
   if ($('um-report-type'))  $('um-report-type').value  = '';
   if ($('um-store'))        $('um-store').value        = '';
   if ($('um-collection-pick')) {
@@ -4804,6 +4805,7 @@ function initUploadModal() {
     const stateChips = $('um-states')?.querySelectorAll('.um-state-chip.selected') || [];
     const states     = Array.from(stateChips).map(s => s.dataset.s).join(',');
     const store      = ($('um-store')?.value || '').trim();
+    const chunkSize  = parseInt($('um-chunk-size')?.value || '1500', 10);
 
     if (!reportName) {
       $('um-report-name')?.focus();
@@ -4843,7 +4845,7 @@ function initUploadModal() {
     const colName   = pickedCol || colParts.join(' — ') || 'General';
     const files    = _umFiles.slice();
     closeUploadModal();
-    await handleFiles(files, colName, { reportName, category, period, reportType, states, store, fileDept });
+    await handleFiles(files, colName, { reportName, category, period, reportType, states, store, fileDept, chunkSize });
   });
 }
 
@@ -4880,6 +4882,7 @@ async function handleFiles(fileList, colName, meta = {}) {
       if (meta.states)    fd.append('states',    meta.states);
       if (meta.store)     fd.append('store',     meta.store);
       if (meta.fileDept)  fd.append('fileDept',  meta.fileDept);
+      if (meta.chunkSize) fd.append('chunkSize', String(meta.chunkSize));
       const res = await apiFetch('/upload', { method: 'POST', body: fd });
       const d   = await res.json();
       if (d.ok) addLog(log, `\u2713 Stored \u2014 ${d.chunks} segments`);
@@ -5789,6 +5792,19 @@ function disconnectConnector(id) {
           <select class="um-select" id="um-store">
             <option value="">All stores in state</option>
           </select>
+        </div>
+      </div>
+
+      <!-- Chunk Size (Advanced) -->
+      <div class="um-field">
+        <div class="um-label">Retrieval Granularity</div>
+        <select class="um-select" id="um-chunk-size">
+          <option value="1500">Standard — General reports, spreadsheets, financial docs</option>
+          <option value="800">Fine — Legal docs, regulations, dense technical text</option>
+          <option value="400">Ultra-fine — Contracts, compliance codes, highly specific lookups</option>
+        </select>
+        <div style="font-family:var(--f-mono);font-size:9px;color:var(--smoke4);margin-top:4px;letter-spacing:0.04em">
+          Smaller = more precise retrieval for dense documents. Use Fine or Ultra-fine for regulations and legal text.
         </div>
       </div>
 
