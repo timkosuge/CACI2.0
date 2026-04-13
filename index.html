@@ -504,7 +504,7 @@ body::before {
   top: 50%;
   transform: translateY(-50%);
   left: var(--sidebar);
-  width: 14px; height: 48px;
+  width: 20px; height: 64px;
   background: rgba(8,12,22,0.92);
   border: 1px solid rgba(184,150,12,0.3);
   border-left: none;
@@ -523,7 +523,7 @@ body::before {
   background: rgba(12,18,32,0.98);
 }
 #sb-toggle.collapsed { left: 0; }
-#sb-toggle svg { width: 8px; height: 8px; transition: transform 0.35s ease; }
+#sb-toggle svg { width: 10px; height: 10px; transition: transform 0.35s ease; }
 #sb-toggle.collapsed svg { transform: scaleX(-1); }
 /* Scanline texture on sidebar */
 #sidebar::after {
@@ -4102,7 +4102,7 @@ async function sendChat() {
   $('send-btn').disabled = false;
 }
 
-function appendMsg(role, text, sources, scope, model) {
+function appendMsg(role, text, sources, scope, model = '') {
   const el = document.createElement('div');
   el.className = 'msg ' + role;
   const av = role === 'user' ? 'YOU' : 'CACI';
