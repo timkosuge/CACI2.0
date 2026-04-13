@@ -3599,7 +3599,7 @@ const MODS = [
 
 let token   = sessionStorage.getItem('caci_token') || '';
 let dept    = localStorage.getItem('caci_dept')    || 'retail';
-let modelId = localStorage.getItem('caci_model')   || 'claude';
+let modelId = localStorage.getItem('caci_model')   || 'grok';
 let chatHistory = [];
 let curPanel = 'chat';
 let chatScope = 'all';
@@ -4075,11 +4075,11 @@ async function sendChat() {
       const msgLower = msg.toLowerCase();
       // Match full name, category, OR any significant word from the collection name (3+ chars, not stop words)
       const stopWords = new Set(['the','and','for','all','from','with','that','this','are','was','were','has','have']);
+      // Only match on full collection name — not partial words
+      // Prevents state names like "Ohio" from switching to "Ohio Regulations"
       const match = window._caciCollections.find(c => {
         if (msgLower.includes(c.name.toLowerCase())) return true;
-        if (c.category && msgLower.includes(c.category.toLowerCase())) return true;
-        const words = c.name.toLowerCase().split(/[\s&,\/]+/).filter(w => w.length >= 4 && !stopWords.has(w));
-        return words.some(w => msgLower.includes(w));
+        return false;
       });
       if (match) {
         setScope('collection', match.name);
