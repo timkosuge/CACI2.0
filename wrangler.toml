@@ -12,6 +12,9 @@ bucket_name = "caci-files"
 binding = "CACI_KV"
 id = "6d06975deb194f66aef11dc4498731cf"
 
+[ai]
+binding = "AI"
+
 [vars]
 ENVIRONMENT = "production"
 
