@@ -3149,6 +3149,8 @@ body::before {
       <div class="scope-bar" id="scope-bar">
         <span class="scope-label">Context</span>
         <button class="scope-btn active" data-scope="all" id="scope-all">All Files</button>
+        <span class="scope-chevron" id="scope-col-divider" style="color:rgba(184,150,12,0.2);font-size:11px;flex-shrink:0">|</span>
+        <div id="scope-col-pills" style="display:flex;gap:4px;flex-shrink:0;align-items:center"></div>
         <span class="scope-chevron" id="sep-col" style="display:none">&#8250;</span>
         <button class="scope-btn" data-scope="collection" id="scope-col" style="display:none">Collection</button>
         <span class="scope-chevron" id="sep-file" style="display:none">&#8250;</span>
@@ -3773,7 +3775,7 @@ function switchPanel(id) {
   if (id === 'responses') loadResponses();
   if (id === 'files') { loadCollections(); loadFiles(); loadContextDocs(); }
   if (id === 'admin') { loadAdminConfig(); loadIntegrationStatuses(); loadConnectorStatuses(); }
-  if (id === 'chat') initChatGreeting();
+  if (id === 'chat') { initChatGreeting(); loadCollections(); }
 }
 
 /* DEPT */
@@ -3929,6 +3931,7 @@ function setDept(id) {
   if (msgs) { msgs.classList.remove('has-messages'); msgs.innerHTML = ''; }
   const chatEmpty = $('chat-empty'); if (chatEmpty) chatEmpty.style.display = 'none';
   setScope('all'); syncDept();
+  renderScopeCollections([]);
   if (curPanel === 'files') { loadCollections(); loadFiles(); }
   if (curPanel === 'chat') initChatGreeting();
 }
@@ -3982,6 +3985,55 @@ function setScope(scope, col, fileId, fileName) {
   $('scope-all').classList.toggle('active', scope === 'all');
   if (showCol) $('scope-col').classList.toggle('active', scope === 'collection');
   if (showFile) $('scope-file').classList.toggle('active', scope === 'file');
+  // Sync collection pills active state
+  const pills = $('scope-col-pills');
+  if (pills) {
+    pills.querySelectorAll('.scope-btn').forEach(b => {
+      b.classList.toggle('active', scope === 'collection' && b.textContent === chatCollection);
+    });
+  }
+  if (scope === 'all') {
+    const ta = $('chat-ta');
+    if (ta) ta.placeholder = 'Ask anything\u2026';
+  }
+}
+
+/* SCOPE COLLECTION PILLS */
+function renderScopeCollections(cols) {
+  const pills = $('scope-col-pills');
+  const divider = $('scope-col-divider');
+  if (!pills) return;
+  pills.innerHTML = '';
+  if (!cols || !cols.length) {
+    if (divider) divider.style.display = 'none';
+    return;
+  }
+  if (divider) divider.style.display = 'inline';
+  cols.forEach(c => {
+    const btn = document.createElement('button');
+    btn.className = 'scope-btn' + (chatCollection === c.name && chatScope === 'collection' ? ' active' : '');
+    btn.style.cssText = 'max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+    btn.textContent = c.name;
+    btn.title = c.name + (c.fileCount ? ' (' + c.fileCount + ' files)' : '');
+    btn.addEventListener('click', () => {
+      if (chatCollection === c.name && chatScope === 'collection') {
+        // Toggle off — go back to all
+        chatCollection = null;
+        setScope('all');
+        pills.querySelectorAll('.scope-btn').forEach(b => b.classList.remove('active'));
+        $('scope-all').classList.add('active');
+      } else {
+        chatCollection = c.name;
+        setScope('collection', c.name);
+        pills.querySelectorAll('.scope-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        $('scope-all').classList.remove('active');
+        $('chat-ta').placeholder = 'Ask about ' + c.name + '\u2026';
+        $('chat-ta').focus();
+      }
+    });
+    pills.appendChild(btn);
+  });
 }
 
 /* CHAT */
@@ -4290,6 +4342,8 @@ async function loadCollections() {
       });
     });
     list.querySelectorAll('.col-del').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); deleteCollection(b.dataset.col); }));
+    // Sync scope bar pills
+    renderScopeCollections(cols);
   } catch(e) { console.error(e); }
 }
 
