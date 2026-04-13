@@ -5137,12 +5137,31 @@ async function speakText(btn, text) {
     audio.play();
   } catch(e) {
     console.warn('TTS error:', e.message);
-    setVoiceStatus('Voice unavailable');
-    if (btn) btn.classList.remove('playing');
-    if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
-    const t = $('spk-toggle-btn');
-    if (t) t.classList.toggle('active', voiceAutoSpeak);
-    setTimeout(function() { setVoiceStatus(''); }, 3000);
+    // Fallback to browser speech synthesis
+    try {
+      speechSynthesis.cancel();
+      const utt = new SpeechSynthesisUtterance(clean);
+      utt.rate = 1.0; utt.pitch = 1;
+      const voices = speechSynthesis.getVoices();
+      const preferred = voices.find(v => /samantha|aria|zira/i.test(v.name))
+                     || voices.find(v => v.lang === 'en-US') || voices[0];
+      if (preferred) utt.voice = preferred;
+      utt.onend = function() {
+        if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
+        const t = $('spk-toggle-btn');
+        if (t) t.classList.toggle('active', voiceAutoSpeak);
+        setVoiceStatus('');
+      };
+      setVoiceStatus('Speaking… (browser)', true);
+      speechSynthesis.speak(utt);
+    } catch(e2) {
+      setVoiceStatus('Voice unavailable');
+      if (btn) btn.classList.remove('playing');
+      if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
+      const t = $('spk-toggle-btn');
+      if (t) t.classList.toggle('active', voiceAutoSpeak);
+      setTimeout(function() { setVoiceStatus(''); }, 3000);
+    }
   }
 }
 function stopSpeaking() {
