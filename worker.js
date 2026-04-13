@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-//  CACI Worker v5.5 — Date Range Retrieval Fix
+//  CACI Worker v5.8 — Metadata Fix: all fields captured on upload
 // ─────────────────────────────────────────────────────────────
 
 const CORS = {
@@ -28,7 +28,7 @@ export default {
 
     if (method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
     if (path === '/auth/login' && method === 'POST') return handleLogin(request, env);
-    if (path === '/health') return json({ ok: true, version: '5.5.0' });
+    if (path === '/health') return json({ ok: true, version: '5.8.0' });
 
     if (!verifyToken(request, env)) return json({ error: 'Unauthorized' }, 401);
 
@@ -129,9 +129,23 @@ async function handleUpload(request, env) {
     try { meta = JSON.parse(metaJson); } catch {}
     try { stats = JSON.parse(statsJson); } catch {}
 
-    const name      = meta.fileName || (file ? file.name : 'unknown');
-    const category  = meta.category || formData.get('category') || 'General';
-    const period    = meta.period   || formData.get('period')   || '';
+    const name       = meta.fileName  || (file ? file.name : 'unknown');
+    // Merge flat form fields into meta object so everything is in one place
+    const category   = meta.category  || formData.get('category')   || 'General';
+    const period     = meta.period    || formData.get('period')      || '';
+    const reportName = meta.reportName|| formData.get('reportName')  || '';
+    const reportType = meta.reportType|| formData.get('reportType')  || '';
+    const states     = meta.states    || formData.get('states')      || '';
+    const store      = meta.store     || formData.get('store')       || '';
+    // Ensure meta object always has all fields populated
+    meta.category   = category;
+    meta.period     = period;
+    meta.reportName = reportName;
+    meta.reportType = reportType;
+    meta.states     = states;
+    meta.store      = store;
+    meta.fileName   = name;
+
     const sentCollection = formData.get('collection') || '';
     const collection = sentCollection || (period ? `${category} — ${period}` : category);
 
@@ -843,8 +857,14 @@ async function buildContextTwoPass({ message, dept, collection, env }) {
       topFiles = [...top3, ...spread];
     }
 
-    // Load full content for selected files
-    const fullFiles = (await Promise.all(topFiles.map(f => env.CACI_KV.get(`file:${f.id}`, 'json')))).filter(Boolean);
+    // Load full content for selected files — preserve _score for chunk boosting
+    const fullFiles = (await Promise.all(
+      topFiles.map(async f => {
+        const data = await env.CACI_KV.get(`file:${f.id}`, 'json');
+        if (data) data._score = f._score || 0;
+        return data;
+      })
+    )).filter(Boolean);
 
     // Build stats context
     const statsLines = [];
@@ -862,13 +882,15 @@ async function buildContextTwoPass({ message, dept, collection, env }) {
       }
     }
 
-    // Get best chunks — up to 2 per file, 15 total
+    // Get best chunks — carry file-level _score as boost so range-matched files dominate top slots
     const keywords2 = extractKeywords(message);
     const allChunks = [];
     for (const fileData of fullFiles) {
       if (!fileData.chunks) continue;
+      const fileBoost = fileData._score || 0;
       const fileChunks = fileData.chunks.map(chunk => ({
-        chunk, score: scoreChunk(chunk, keywords2),
+        chunk,
+        score: scoreChunk(chunk, keywords2) + fileBoost,
         filename: fileData.name, collection: fileData.collection, meta: fileData.meta || {}
       }));
       fileChunks.sort((a, b) => b.score - a.score);
@@ -951,19 +973,43 @@ async function buildContext({ message, dept, collection, fileId, scope, env }) {
       }
     }
 
+    // Date range detection — same logic as buildContextTwoPass
+    const { rangeStart: ctxRangeStart, rangeEnd: ctxRangeEnd } = parseDateRange(message);
     const yearMatches = message.match(/20\d\d/g) || [];
     const queryYears = new Set(yearMatches);
+
+    // Score each file by date relevance, then propagate into chunk scores
+    const fileScoreMap = new Map();
+    for (const fileData of filesToSearch) {
+      const nameLower = (fileData.name || '').toLowerCase();
+      let fScore = 0;
+      // Range match
+      if (ctxRangeStart && ctxRangeEnd) {
+        const { fileMonth, fileYear } = fileMonthYear(nameLower);
+        if (fileMonth && fileYear) {
+          const fileVal  = fileYear * 100 + fileMonth;
+          const startVal = ctxRangeStart.y * 100 + ctxRangeStart.m;
+          const endVal   = ctxRangeEnd.y   * 100 + ctxRangeEnd.m;
+          if (fileVal >= startVal && fileVal <= endVal) fScore += 30;
+        }
+      }
+      // Year match with larger multiplier
+      const matchedYears = queryYears.size > 0 ? [...queryYears].filter(y => nameLower.includes(y)) : [];
+      if (matchedYears.length > 0) {
+        const maxYear = Math.max(...matchedYears.map(Number));
+        fScore += 10 + (maxYear - 2020) * 3;
+      }
+      const isXlsx = nameLower.endsWith('.xlsx') || nameLower.endsWith('.xls');
+      if (isXlsx) fScore -= 1;
+      fileScoreMap.set(fileData.name, fScore);
+    }
 
     const scored = [];
     for (const fileData of filesToSearch) {
       if (!fileData.chunks) continue;
-      const fileNameLower = (fileData.name || '').toLowerCase();
-      const isAnnual = fileNameLower.includes('annual') || fileNameLower.includes('full year') || fileNameLower.includes('ye ') || fileNameLower.includes('fy');
-      const yearBoost = queryYears.size > 0 && [...queryYears].some(y => fileNameLower.includes(y)) ? (isAnnual ? 10 : 5) : 0;
-      const isXlsx = fileNameLower.endsWith('.xlsx') || fileNameLower.endsWith('.xls');
-      const xlsxPenalty = isXlsx && filesToSearch.some(f => f.name && !f.name.toLowerCase().endsWith('.xlsx') && !f.name.toLowerCase().endsWith('.xls')) ? -1 : 0;
+      const fileBoost = fileScoreMap.get(fileData.name) || 0;
       for (const chunk of fileData.chunks) {
-        const score = scoreChunk(chunk, keywords) + yearBoost + xlsxPenalty;
+        const score = scoreChunk(chunk, keywords) + fileBoost;
         if (score > 0) scored.push({ chunk, score, filename: fileData.name, collection: fileData.collection, meta: fileData.meta || {} });
       }
     }
