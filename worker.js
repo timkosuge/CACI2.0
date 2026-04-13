@@ -951,9 +951,12 @@ async function handleTTS(request, env) {
       const res = await fetch('https://api.x.ai/v1/audio/speech', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'grok-2-aurora', input: text, voice }),
+        body: JSON.stringify({ model: 'grok-tts', input: text, voice }),
       });
-      if (!res.ok) { const err = await res.json().catch(() => ({ error: 'TTS failed' })); return json({ error: err.error || 'TTS failed' }, 500); }
+      if (!res.ok) {
+        const errText = await res.text().catch(() => 'TTS failed');
+        return json({ error: `xAI TTS error (${res.status}): ${errText}` }, 500);
+      }
       const audio = await res.arrayBuffer();
       return new Response(audio, { headers: { 'Content-Type': 'audio/mpeg', ...CORS } });
     }
