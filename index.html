@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -870,8 +869,9 @@ body::before {
 .tmc-name { font-family: var(--f-mono); font-size: 9px; letter-spacing: 0.12em; color: var(--smoke3); text-transform: uppercase; }
 
 /* ── Content ───────────────────────────────────────────── */
-#content { position: fixed; right: 0; overflow: hidden; }
-.panel { display: none; position: absolute; inset: 0; flex-direction: column; }
+#content { position: fixed; right: 0; overflow: hidden; pointer-events: all; }
+.panel { display: none; position: absolute; inset: 0; flex-direction: column; pointer-events: none; }
+.panel.active { pointer-events: all; }
 .panel.active { display: flex; }
 
 /* ── Chat background ghost overlay ─────────────────────── */
@@ -3288,23 +3288,22 @@ body::before {
             <div class="afb" id="ant-fb"></div>
           </div>
           <div class="acard">
-            <div class="acard-title">Voice &mdash; Google Cloud TTS</div>
-            <div class="acard-sub">WaveNet neural voices &nbsp;&middot;&nbsp; 1M characters free/month &nbsp;&middot;&nbsp; <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:var(--gold-lt)">Get free API key &rarr;</a></div>
-            <div class="arow"><input class="ainput" type="password" id="gtts-key" placeholder="AIza..." autocomplete="off"/><button class="asave" id="gtts-save">Save Key</button></div>
-            <div class="afb" id="gtts-fb"></div>
-            <div class="arow" style="margin-top:10px;flex-wrap:wrap;gap:8px">
-              <select class="ainput" id="gtts-voice" style="flex:1">
-                <option value="en-US-Wavenet-F">WaveNet F — Professional Female (recommended)</option>
-                <option value="en-US-Wavenet-C">WaveNet C — Warm Female</option>
-                <option value="en-US-Wavenet-E">WaveNet E — Soft Female</option>
-                <option value="en-US-Wavenet-D">WaveNet D — Deep Male</option>
-                <option value="en-US-Wavenet-B">WaveNet B — Professional Male</option>
-                <option value="en-US-Neural2-F">Neural2 F — Natural Female</option>
-                <option value="en-US-Neural2-C">Neural2 C — Conversational Female</option>
+            <div class="acard-title">Voice &mdash; Caci&apos;s Voice Engine</div>
+            <div class="acard-sub">xAI API Key &mdash; required for Grok voice</div>
+            <div class="arow" style="margin-top:6px"><input class="ainput" type="password" id="xai-key" placeholder="xai-..." autocomplete="off"/><button class="asave" id="xai-save">Save Key</button></div>
+            <div class="afb" id="xai-fb"></div>
+            <div class="arow" style="margin-top:14px;flex-wrap:wrap;gap:8px">
+              <select class="ainput" id="tts-provider" style="flex:1">
+                <option value="grok">Grok (xAI) &mdash; Best quality</option>
+                <option value="cloudflare">Cloudflare &mdash; Deepgram Aura 2</option>
+                <option value="ollama" disabled>Ollama (Local) &mdash; Coming soon</option>
               </select>
-              <select class="ainput" id="gtts-speed" style="flex:0 0 120px">
-                <option value="0.9">Slower</option><option value="1.0" selected>Normal</option>
-                <option value="1.1">Faster</option><option value="1.2">Fast</option>
+              <select class="ainput" id="tts-grok-voice" style="flex:0 0 140px">
+                <option value="eve">Eve &mdash; Expressive</option>
+                <option value="ara">Ara &mdash; Warm</option>
+                <option value="sal">Sal &mdash; Clear</option>
+                <option value="leo">Leo &mdash; Deep</option>
+                <option value="rex">Rex &mdash; Authoritative</option>
               </select>
             </div>
             <div class="arow" style="margin-top:8px;align-items:center;gap:12px">
@@ -3566,7 +3565,7 @@ body::before {
 </div>
 
 <script>
-const API = 'https://caci-api.timtkosuge.workers.dev';
+const API = 'https://caci-worker.timtkosuge.workers.dev';
 
 const DEPTS = [
   {id:'retail',     label:'Retail',     color:'#6c63ff'},
@@ -3581,7 +3580,8 @@ const DEPTS = [
 
 const MODELS = [
   {id:'claude',     name:'Claude Sonnet',   sub:'Anthropic \u00b7 Best reasoning',  dot:'#22c55e'},
-  {id:'cloudflare', name:'Cloudflare AI',   sub:'Llama 3.1 \u00b7 Fast & free',    dot:'#d4a017'},
+  {id:'grok',       name:'Grok',            sub:'xAI \u00b7 Fast & sharp',          dot:'#d4a017'},
+  {id:'cloudflare', name:'Cloudflare AI',   sub:'Llama 4 \u00b7 Fast & free',      dot:'#f97316'},
   {id:'ollama',     name:'Ollama',          sub:'Local \u00b7 Fully private',       dot:'#8e44ad'},
 ];
 
@@ -3731,6 +3731,7 @@ function bootApp() {
   });
   $('model-modal').addEventListener('click', e => { if (e.target === $('model-modal')) $('model-modal').classList.remove('open'); });
   $('ant-save').addEventListener('click', saveKey);
+  if ($('xai-save')) $('xai-save').addEventListener('click', saveXaiKey);
 }
 
 /* NAV */
@@ -3907,7 +3908,7 @@ function setDept(id) {
   const bar = $('chat-bar'), msgs = $('chat-msgs');
   if (bar) bar.classList.remove('has-messages');
   if (msgs) { msgs.classList.remove('has-messages'); msgs.innerHTML = ''; }
-  $('chat-empty').style.display = 'none';
+  const chatEmpty = $('chat-empty'); if (chatEmpty) chatEmpty.style.display = 'none';
   setScope('all'); syncDept();
   if (curPanel === 'files') { loadCollections(); loadFiles(); }
   if (curPanel === 'chat') initChatGreeting();
@@ -3983,7 +3984,7 @@ function renderDiscoveryGreeting(text, collections) {
   const msgs = $('chat-msgs');
   const nameEl = document.createElement('div');
   nameEl.id = 'discovery-name';
-  nameEl.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;text-align:center;';
+  nameEl.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;text-align:center;pointer-events:none;';
   nameEl.innerHTML = `<div class="dg-eyebrow" style="margin-bottom:8px">Intelligence Assistant</div><div class="dg-name">CACI</div>`;
   msgs.appendChild(nameEl);
 
@@ -4409,6 +4410,24 @@ async function saveKey() {
     }
   } catch(e) { $('ant-fb').className = 'afb err'; $('ant-fb').textContent = '\u2717 ' + e.message; }
   $('ant-save').disabled = false; $('ant-save').textContent = 'Save Key';
+}
+async function saveXaiKey() {
+  const key = $('xai-key').value.trim(); if (!key) return;
+  $('xai-save').disabled = true; $('xai-save').textContent = 'Saving…';
+  try {
+    const res = await apiFetch('/admin/config', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({XAI_API_KEY: key}),
+    });
+    const d = await res.json(); const fb = $('xai-fb');
+    if (d.ok || d.saved) {
+      fb.className = 'afb ok'; fb.textContent = '✓ Key saved';
+      $('xai-key').value = '';
+    } else {
+      fb.className = 'afb err'; fb.textContent = '✗ ' + (d.error || 'Save failed');
+    }
+  } catch(e) { $('xai-fb').className = 'afb err'; $('xai-fb').textContent = '✗ ' + e.message; }
+  $('xai-save').disabled = false; $('xai-save').textContent = 'Save Key';
 }
 async function loadAdminConfig() {
   try {
@@ -5032,107 +5051,71 @@ let _currentSpkBtn  = null;
 let _recognition    = null;
 let _listening      = false;
 
-/* ── Google TTS ─────────────────────────────────────────── */
+/* ── Grok TTS ─────────────────────────────────────────── */
 async function speakText(btn, text) {
-  // Stop any current playback
   if (_currentAudio) {
     _currentAudio.pause();
     _currentAudio = null;
     if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
+    setVoiceStatus('');
+    const tog = $('spk-toggle-btn');
+    if (tog) tog.classList.toggle('active', voiceAutoSpeak);
+    return;
   }
   if (!text || !text.trim()) return;
-
-  // Strip markdown for cleaner speech
   const clean = text
     .replace(/\*\*(.*?)\*\*/g, '$1')
-    .replace(/\*(.*?)\*/g,     '$1')
-    .replace(/#{1,6}\s/g,      '')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/#{1,6}\s/g, '')
     .replace(/`{1,3}[^`]*`{1,3}/g, '')
     .replace(/\n+/g, ' ')
     .trim()
-    .slice(0, 4500); // Google TTS limit per request
-
-  const gttsKey   = localStorage.getItem('caci_gtts_key') || '';
-  const voiceId   = localStorage.getItem('caci_gtts_voice') || 'en-US-Wavenet-F';
-  const speed     = parseFloat(localStorage.getItem('caci_gtts_speed') || '1.0');
-
-  setVoiceStatus('Speaking\u2026', true);
+    .slice(0, 4500);
+  setVoiceStatus('Speaking…', true);
   if (btn) { btn.classList.add('playing'); _currentSpkBtn = btn; }
-  // Also light up the toggle button while speaking
   const tog = $('spk-toggle-btn');
   if (tog) tog.classList.add('active');
-
   try {
-    if (gttsKey) {
-      // Google Cloud TTS
-      const res = await fetch(
-        'https://texttospeech.googleapis.com/v1/text:synthesize?key=' + gttsKey,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            input: { text: clean },
-            voice: { languageCode: 'en-US', name: voiceId },
-            audioConfig: { audioEncoding: 'MP3', speakingRate: speed, pitch: 0 }
-          })
-        }
-      );
-      const data = await res.json();
-      if (data.audioContent) {
-        const audio = new Audio('data:audio/mp3;base64,' + data.audioContent);
-        _currentAudio = audio;
-        audio.onended = () => {
-          _currentAudio = null;
-          if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
-          const tog = $('spk-toggle-btn');
-          if (tog) tog.classList.toggle('active', voiceAutoSpeak);
-          setVoiceStatus('');
-        };
-        audio.play();
-        return;
-      }
-      throw new Error(data.error?.message || 'TTS failed');
-    } else {
-      // Fallback: Web Speech API — must cancel first then speak in same gesture tick
-      speechSynthesis.cancel();
-      const utt = new SpeechSynthesisUtterance(clean);
-      utt.rate  = speed;
-      utt.pitch = 1;
-      // Pick best available voice — wait for voices to load if needed
-      const trySpeak = () => {
-        const voices = speechSynthesis.getVoices();
-        const preferred = voices.find(v => /samantha|aria|zira|google.*us.*female/i.test(v.name))
-                       || voices.find(v => v.lang === 'en-US' && v.name.toLowerCase().includes('female'))
-                       || voices.find(v => v.lang === 'en-US')
-                       || voices[0];
-        if (preferred) utt.voice = preferred;
-        utt.onend = () => {
-          if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
-          const tog = $('spk-toggle-btn');
-          if (tog) tog.classList.toggle('active', voiceAutoSpeak);
-          setVoiceStatus('');
-        };
-        utt.onerror = (e) => {
-          console.warn('SpeechSynthesis error:', e.error);
-          if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
-          setVoiceStatus('');
-        };
-        speechSynthesis.speak(utt);
-      };
-      if (speechSynthesis.getVoices().length) {
-        trySpeak();
-      } else {
-        speechSynthesis.onvoiceschanged = () => { speechSynthesis.onvoiceschanged = null; trySpeak(); };
-      }
+    const provider  = localStorage.getItem('caci_tts_provider') || 'grok';
+    const grokVoice = localStorage.getItem('caci_tts_grok_voice') || 'eve';
+    const res = await apiFetch('/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: clean, provider: provider, voice: grokVoice }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(function() { return { error: 'TTS failed' }; });
+      throw new Error(err.error || 'TTS request failed');
     }
+    const blob  = await res.blob();
+    const url   = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    _currentAudio = audio;
+    audio.onended = function() {
+      URL.revokeObjectURL(url);
+      _currentAudio = null;
+      if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
+      const t = $('spk-toggle-btn');
+      if (t) t.classList.toggle('active', voiceAutoSpeak);
+      setVoiceStatus('');
+    };
+    audio.onerror = function() {
+      URL.revokeObjectURL(url);
+      _currentAudio = null;
+      if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
+      setVoiceStatus('');
+    };
+    audio.play();
   } catch(e) {
     console.warn('TTS error:', e.message);
-    setVoiceStatus('Voice error: ' + e.message.slice(0,40));
+    setVoiceStatus('Voice unavailable');
     if (btn) btn.classList.remove('playing');
-    setTimeout(() => setVoiceStatus(''), 3000);
+    if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
+    const t = $('spk-toggle-btn');
+    if (t) t.classList.toggle('active', voiceAutoSpeak);
+    setTimeout(function() { setVoiceStatus(''); }, 3000);
   }
 }
-
 function stopSpeaking() {
   if (_currentAudio) { _currentAudio.pause(); _currentAudio = null; }
   speechSynthesis.cancel();
