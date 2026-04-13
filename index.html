@@ -4119,6 +4119,8 @@ function appendMsg(role, text, sources, scope, model = '') {
       Save
     </button>
   </div>` : '';
+  const modelNames = { claude: 'Claude · Anthropic', grok: 'Grok · xAI', cloudflare: 'Cloudflare AI · Llama', ollama: 'Ollama · Local' };
+  const modelLabel = (role === 'ai' && model) ? `<div style="font-family:var(--f-mono);font-size:8px;letter-spacing:0.12em;color:rgba(184,150,12,0.35);text-transform:uppercase;margin-top:6px;padding-left:2px">${modelNames[model] || model}</div>` : '';
   el.innerHTML = `<div class="msg-av">${av}</div><div class="msg-body">${sc}\x3Cdiv class="msg-bubble">${esc(text)}\x3C/div>${src}${modelLabel}${spk}${actions}\x3C/div>`;
   if (role === 'ai') {
     const spkBtn = el.querySelector('.spk-btn');
