@@ -1063,10 +1063,12 @@ body::before {
   letter-spacing: 0.01em;
 }
 .msg.user .msg-bubble {
-  background: var(--gold);
-  color: var(--ink);
+  background: linear-gradient(135deg, var(--gold-metal-2) 0%, var(--gold-metal-3) 50%, var(--gold-metal-2) 100%);
+  color: #0d1020;
   border-radius: 8px 2px 8px 8px;
-  font-weight: 400;
+  font-weight: 500;
+  box-shadow: 0 1px 0 rgba(245,227,152,0.4) inset, 0 2px 8px rgba(184,150,12,0.2);
+  text-shadow: 0 1px 0 rgba(255,240,170,0.2);
 }
 .msg.ai .msg-bubble {
   background: var(--ink2);
