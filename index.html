@@ -3698,7 +3698,14 @@ function bootApp() {
     $('chat-ta').value = b.dataset.h; sendChat();
   }));
 
-  document.querySelectorAll('.scope-btn').forEach(b => b.addEventListener('click', () => setScope(b.dataset.scope)));
+  document.querySelectorAll('.scope-btn').forEach(b => b.addEventListener('click', () => {
+    if (b.dataset.scope === 'all') {
+      chatCollection = null; chatFileId = null; chatFileName = null;
+      setScope('all');
+    } else {
+      setScope(b.dataset.scope);
+    }
+  }));
 
   $('upload-btn').addEventListener('click', () => $('file-input').click());
   $('file-input').addEventListener('change', e => { if(e.target.files.length) openUploadModal(e.target.files); });
