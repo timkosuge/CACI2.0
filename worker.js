@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-//  CACI Worker v5.9 — Adaptive chunk depth + configurable chunk size on upload
+//  CACI Worker v6.0 — AI Auto-Classification on Upload
 // ─────────────────────────────────────────────────────────────
 
 const CORS = {
@@ -28,7 +28,7 @@ export default {
 
     if (method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
     if (path === '/auth/login' && method === 'POST') return handleLogin(request, env);
-    if (path === '/health') return json({ ok: true, version: '5.9.0' });
+    if (path === '/health') return json({ ok: true, version: '6.0.0' });
 
     if (!verifyToken(request, env)) return json({ error: 'Unauthorized' }, 401);
 
@@ -69,6 +69,7 @@ export default {
     }
     if (path === '/chat'      && method === 'POST')   return handleChat(request, env);
     if (path === '/report'    && method === 'POST')   return handleReport(request, env);
+    if (path === '/ai-classify' && method === 'POST') return handleAiClassify(request, env);
     if (path === '/admin/config' && method === 'POST') return handleAdminSave(request, env);
     if (path === '/admin/config' && method === 'GET')  return handleAdminGet(env);
 
@@ -1056,6 +1057,65 @@ async function buildContext({ message, dept, collection, fileId, scope, env }) {
   } catch (err) {
     console.error('Context error:', err.message);
     return { text: '', sources: [], statsContext: '', focusFile: null };
+  }
+}
+
+// ── AI Document Classification ────────────────────────────────
+async function handleAiClassify(request, env) {
+  try {
+    const { fileName, collection, sample, colNames } = await request.json();
+    if (!fileName || !sample) return json({ error: 'fileName and sample required' }, 400);
+
+    const apiKey = (await env.CACI_KV.get('config:ANTHROPIC_API_KEY')) || env.ANTHROPIC_API_KEY;
+    if (!apiKey) return json({ error: 'Anthropic API key not configured' }, 400);
+
+    const prompt = `You are classifying a business document for a cannabis company (Jushi Holdings).
+
+Document filename: "${fileName}"
+Current collection: "${collection}"
+Available collections: ${colNames || 'none yet'}
+
+First 2500 characters of document text:
+---
+${sample}
+---
+
+Extract the following and return ONLY valid JSON, no markdown, no other text:
+{
+  "reportName": "short descriptive name for this specific report (not the filename, max 60 chars)",
+  "category": "one of: Sales, Inventory, Compliance, Finance, HR, Operations, Marketing, Customer, Product, Legal, Technology, Other",
+  "period": "time period this covers e.g. Q1 2026, March 2025, Full Year 2025 — empty string if evergreen or no clear date",
+  "reportType": "one of: Summary Report, Detail Report, Audit, Survey, Invoice, Contract, Policy, Presentation, Spreadsheet, Other",
+  "suggestedCollection": "name of best matching collection from the available list if different from current, else empty string",
+  "isContextDoc": false,
+  "confidence": "high, medium, or low"
+}
+
+Rules:
+- isContextDoc = true only for SOPs, glossaries, regulations, policies, org charts, reference documents (not time-series data reports)
+- period = empty string for regulations, policies, contracts (evergreen docs)
+- confidence = low if you cannot determine category or reportName clearly from the text`;
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 350,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      return json({ error: `Claude error: ${err}` }, 500);
+    }
+
+    const data = await res.json();
+    const result = data.content?.[0]?.text || '';
+    return json({ ok: true, result });
+  } catch(err) {
+    return json({ error: 'AI classify error: ' + err.message }, 500);
   }
 }
 
