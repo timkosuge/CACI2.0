@@ -1,5747 +1,1079 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-<meta name="apple-mobile-web-app-capable" content="yes"/>
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<meta name="theme-color" content="#050810"/>
-<title>CACI Intelligence Platform</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@300;400;500&family=Outfit:wght@200;300;400;500&display=swap" rel="stylesheet"/>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<style>
-/* ── Variables ─────────────────────────────────────────── */
-:root {
-  --ink:        #050810;
-  --ink2:       #080d18;
-  --ink3:       #0d1525;
-  --ink4:       #131e30;
-  --ink5:       #1a2840;
-  --line:       rgba(184,150,12,0.10);
-  --line2:      rgba(184,150,12,0.18);
-  --line3:      rgba(184,150,12,0.30);
-  --gold:       #b8960c;
-  --gold-lt:    #d4ad14;
-  --gold-dim:   rgba(184,150,12,0.08);
-  --gold-glow:  rgba(184,150,12,0.20);
-  --smoke:      #e8eaf0;
-  --smoke2:     #9aa3b4;
-  --smoke3:     #5a6378;
-  --smoke4:     #2e3a50;
-  --green:      #2a7a4b;
-  --green-lt:   #3db36e;
-  --red:        #8b2020;
-  --red-lt:     #c0392b;
-  --amber:      #7a5a0a;
-  --amber-lt:   #c49a16;
-
-  --sidebar:    240px;
-  --topbar:     56px;
-  --botbar:     64px;
-
-  --f-display:  'Cormorant Garamond', Georgia, serif;
-  --f-mono:     'DM Mono', 'Courier New', monospace;
-  --f-body:     'Outfit', sans-serif;
-
-  --ease:       cubic-bezier(0.22, 0.61, 0.36, 1);
-  --r:          6px;
-  --r2:         10px;
-}
-
-/* ── Reset ─────────────────────────────────────────────── */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { height: 100%; -webkit-text-size-adjust: 100%; }
-body {
-  height: 100%; overflow: hidden;
-  background: var(--ink);
-  color: var(--smoke);
-  font-family: var(--f-body);
-  font-weight: 300;
-  font-size: 13px;
-  letter-spacing: 0.01em;
-  -webkit-font-smoothing: antialiased;
-}
-
-/* ── Topographic SVG overlay ───────────────────────────── */
-#topo-overlay {
-  position: fixed; inset: 0; z-index: 0;
-  pointer-events: none; overflow: hidden; opacity: 0.55;
-}
-#topo-overlay svg { width: 100%; height: 100%; }
-
-/* Grain texture */
-body::before {
-  content: '';
-  position: fixed; inset: 0; z-index: 1;
-  pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.035'/%3E%3C/svg%3E");
-  background-repeat: repeat;
-  background-size: 128px 128px;
-}
-
-/* ── Gold metal variables ───────────────────────────────── */
-:root {
-  --gold-metal-1: #f5e398;  /* bright highlight */
-  --gold-metal-2: #d4a832;  /* warm mid */
-  --gold-metal-3: #b8860c;  /* base gold */
-  --gold-metal-4: #8a6008;  /* shadow gold */
-  --gold-shine: linear-gradient(105deg,
-    transparent 20%,
-    rgba(245,227,152,0.08) 35%,
-    rgba(245,227,152,0.18) 45%,
-    rgba(245,227,152,0.08) 55%,
-    transparent 70%
-  );
-}
-
-/* ── Login ─────────────────────────────────────────────── */
-#login-screen {
-  position: fixed; inset: 0; z-index: 9000;
-  display: flex; align-items: center; justify-content: center;
-  padding: 24px;
-  /* Deep navy base */
-  background-color: #060911;
-  /* Subtle overhead warm light — like a single pendant lamp above center */
-  background-image:
-    radial-gradient(ellipse 70% 38% at 50% 0%, rgba(200,170,90,0.06) 0%, transparent 100%),
-    radial-gradient(ellipse 40% 28% at 50% -4%, rgba(220,185,110,0.055) 0%, transparent 80%),
-    radial-gradient(ellipse 100% 60% at 50% 0%, rgba(15,20,38,0.6) 0%, transparent 100%);
-  /* Suede noise overlay via pseudo-element — see ::before */
-}
-#login-screen::before {
-  content: '';
-  position: absolute; inset: 0;
-  z-index: 0;
-  opacity: 0.05;
-  /* Fine-grain suede — high frequency = crisp, not blurry */
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='2' stitchTiles='stitch' result='noise'/%3E%3CfeColorMatrix type='matrix' values='0.5 0.35 0 0 0.14 0.4 0.28 0 0 0.09 0.25 0.15 0 0 0.04 0 0 0 1 0' in='noise'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
-  background-repeat: repeat;
-  background-size: 160px 160px;
-  pointer-events: none;
-}
-#login-screen > * { position: relative; z-index: 1; }
-.login-wrap {
-  width: 100%; max-width: 380px;
-  animation: fadeUp 0.9s var(--ease) both;
-}
-/* Gold rectangle frame — wraps the entire login content area */
-.login-frame-box {
-  position: fixed;
-  top: 12vh; bottom: 12vh;
-  left: 8vw; right: 8vw;
-  border: 1px solid rgba(184,150,12,0.35);
-  pointer-events: none;
-  z-index: 8999;
-  box-shadow: 0 0 40px rgba(184,150,12,0.04), inset 0 0 0 1px rgba(245,227,152,0.03);
-  animation: fadeUp 1.1s var(--ease) both;
-}
-/* Top bright edge */
-.login-frame-box::before {
-  content: '';
-  position: absolute; top: 0; left: 8%; right: 8%;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(245,227,152,0.5) 25%, rgba(255,248,200,0.9) 50%, rgba(245,227,152,0.5) 75%, transparent);
-}
-/* Bottom dim edge */
-.login-frame-box::after {
-  content: '';
-  position: absolute; bottom: 0; left: 8%; right: 8%;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(184,150,12,0.25) 25%, rgba(212,168,50,0.45) 50%, rgba(184,150,12,0.25) 75%, transparent);
-}
-/* Shimmer sweep */
-.login-frame-shimmer {
-  position: absolute; inset: 0;
-  background: linear-gradient(108deg,
-    transparent 0%, transparent 30%,
-    rgba(245,227,152,0.04) 42%, rgba(255,248,200,0.08) 50%,
-    rgba(245,227,152,0.04) 58%, transparent 70%, transparent 100%
-  );
-  background-size: 300% 100%;
-  background-position: 140% 0;
-  animation: frameShimmer 3.4s ease 0.8s both;
-  pointer-events: none;
-}
-@keyframes frameShimmer {
-  0%   { background-position: 140% 0; opacity: 0; }
-  6%   { opacity: 1; }
-  100% { background-position: -60% 0; opacity: 0.8; }
-}
-/* Corner dots */
-.login-frame-box .fc {
-  position: absolute;
-  width: 5px; height: 5px;
-  border-radius: 50%;
-  background: rgba(212,168,50,0.55);
-  box-shadow: 0 0 8px rgba(184,150,12,0.5);
-}
-.login-frame-box .fc.tl { top: -2.5px; left: -2.5px; }
-.login-frame-box .fc.tr { top: -2.5px; right: -2.5px; }
-.login-frame-box .fc.bl { bottom: -2.5px; left: -2.5px; }
-.login-frame-box .fc.br { bottom: -2.5px; right: -2.5px; }
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(28px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-.login-mark {
-  margin-bottom: 44px;
-  text-align: center;
-}
-.login-wordmark {
-  font-family: var(--f-display);
-  font-size: 56px;
-  font-weight: 300;
-  letter-spacing: 0.28em;
-  background: linear-gradient(160deg,
-    var(--gold-metal-1) 0%,
-    var(--gold-metal-2) 30%,
-    var(--gold-metal-3) 55%,
-    var(--gold-metal-2) 75%,
-    var(--gold-metal-1) 100%
-  );
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  line-height: 1;
-  display: inline-block;
-  position: relative;
-  filter: drop-shadow(0 1px 8px rgba(184,150,12,0.25));
-}
-.login-wordmark::after {
-  content: '';
-  display: block;
-  height: 1px;
-  background: linear-gradient(90deg,
-    transparent,
-    rgba(212,168,50,0.2) 15%,
-    rgba(245,227,152,0.7) 40%,
-    rgba(212,168,50,0.9) 50%,
-    rgba(245,227,152,0.7) 60%,
-    rgba(212,168,50,0.2) 85%,
-    transparent
-  );
-  margin-top: 14px;
-}
-.login-sub {
-  font-family: var(--f-mono);
-  font-size: 10px;
-  letter-spacing: 0.24em;
-  color: rgba(255,255,255,0.18);
-  text-transform: uppercase;
-  margin-top: 12px;
-  text-align: center;
-  -webkit-font-smoothing: antialiased;
-  text-rendering: geometricPrecision;
-}
-
-/* Login card — metallic bordered, glimmering on load */
-.login-card {
-  background: linear-gradient(160deg, rgba(13,19,34,0.98) 0%, rgba(8,12,22,0.99) 100%);
-  border-radius: 10px;
-  padding: 38px 34px;
-  position: relative;
-  overflow: hidden;
-  /* Metallic border via box-shadow layering */
-  box-shadow:
-    0 0 0 1px rgba(184,150,12,0.45),
-    0 0 0 2px rgba(184,150,12,0.12),
-    0 0 0 1px rgba(245,227,152,0.18) inset,
-    0 0 28px rgba(184,150,12,0.08) inset,
-    0 32px 80px rgba(0,0,0,0.75),
-    0 2px 4px rgba(0,0,0,0.5);
-}
-
-/* Metallic top edge — the brightest part of a gold frame */
-.login-card::before {
-  content: '';
-  position: absolute; top: 0; left: 0%; right: 0%;
-  height: 1px;
-  background: linear-gradient(90deg,
-    transparent,
-    rgba(212,168,50,0.3) 20%,
-    rgba(245,227,152,0.85) 45%,
-    rgba(255,240,170,1) 50%,
-    rgba(245,227,152,0.85) 55%,
-    rgba(212,168,50,0.3) 80%,
-    transparent
-  );
-}
-
-/* Glimmer sweep animation — once on load */
-.login-card::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    110deg,
-    transparent 0%,
-    transparent 30%,
-    rgba(245,227,152,0.04) 40%,
-    rgba(245,227,152,0.09) 48%,
-    rgba(255,248,200,0.12) 50%,
-    rgba(245,227,152,0.09) 52%,
-    rgba(245,227,152,0.04) 60%,
-    transparent 70%,
-    transparent 100%
-  );
-  background-size: 300% 100%;
-  background-position: 120% 0;
-  animation: goldGlimmer 2.2s ease 1s both;
-  pointer-events: none;
-  border-radius: 10px;
-}
-@keyframes goldGlimmer {
-  0%   { background-position: 120% 0; opacity: 0; }
-  5%   { opacity: 1; }
-  100% { background-position: -40% 0; opacity: 0.6; }
-}
-
-/* Corner accents — hand-crafted feel */
-.login-card .corner {
-  position: absolute;
-  width: 14px; height: 14px;
-  pointer-events: none;
-}
-.login-card .corner::before,
-.login-card .corner::after {
-  content: '';
-  position: absolute;
-  background: linear-gradient(135deg, rgba(255,240,170,0.92), rgba(212,168,50,0.55));
-}
-.login-card .corner::before { width: 1px; height: 100%; }
-.login-card .corner::after  { width: 100%; height: 1px; }
-.login-card .corner.tl { top: 0; left: 0; }
-.login-card .corner.tr { top: 0; right: 0; transform: scaleX(-1); }
-.login-card .corner.bl { bottom: 0; left: 0; transform: scaleY(-1); }
-.login-card .corner.br { bottom: 0; right: 0; transform: scale(-1); }
-
-.lfield-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin-bottom: 22px;
-  position: relative;
-}
-/* Ornamental rule above label */
-.lfield-rule {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  margin-bottom: 13px;
-}
-.lfield-rule::before,
-.lfield-rule::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(184,150,12,0.22));
-}
-.lfield-rule::after {
-  background: linear-gradient(90deg, rgba(184,150,12,0.22), transparent);
-}
-.lfield-rule-diamond {
-  width: 4px; height: 4px;
-  background: rgba(212,168,50,0.55);
-  transform: rotate(45deg);
-  flex-shrink: 0;
-}
-.lfield-label {
-  font-family: var(--f-mono);
-  font-size: 9px;
-  letter-spacing: 0.32em;
-  color: rgba(212,168,50,0.45);
-  text-transform: uppercase;
-  text-align: center;
-  margin-bottom: 14px;
-  -webkit-font-smoothing: antialiased;
-  text-rendering: geometricPrecision;
-}
-.linput {
-  width: 100%;
-  padding: 14px 20px;
-  background: rgba(8,12,24,0.6);
-  border: 1px solid rgba(184,150,12,0.28);
-  border-radius: 3px;
-  color: rgba(245,227,152,0.75);
-  font-family: var(--f-mono);
-  font-size: 15px;
-  font-weight: 300;
-  outline: none;
-  transition: border-color 0.3s var(--ease), box-shadow 0.3s var(--ease), color 0.3s;
-  -webkit-appearance: none;
-  letter-spacing: 0.22em;
-  text-align: center;
-  caret-color: rgba(212,168,50,0.8);
-}
-/* Kill browser autofill white background */
-.linput:-webkit-autofill,
-.linput:-webkit-autofill:hover,
-.linput:-webkit-autofill:focus {
-  -webkit-box-shadow: 0 0 0 100px rgba(8,12,24,1) inset;
-  -webkit-text-fill-color: rgba(245,227,152,0.75);
-  caret-color: rgba(212,168,50,0.8);
-}
-.linput::placeholder {
-  color: rgba(184,150,12,0.15);
-  letter-spacing: 0.15em;
-}
-.linput:focus {
-  border-color: rgba(212,168,50,0.6);
-  box-shadow: 0 0 0 1px rgba(184,150,12,0.12);
-  color: rgba(245,227,152,0.9);
-}
-/* Thin bottom glow line on focus */
-.linput:focus + .linput-glow {
-  opacity: 1;
-}
-.linput-glow {
-  position: absolute;
-  bottom: 0; left: 20%; right: 20%;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(245,227,152,0.5) 50%, transparent);
-  opacity: 0;
-  transition: opacity 0.4s ease;
-  pointer-events: none;
-}
-.lbtn {
-  width: 100%;
-  padding: 15px;
-  background: transparent;
-  border: 1px solid rgba(184,150,12,0.32);
-  border-radius: 2px;
-  color: rgba(212,168,50,0.7);
-  font-family: var(--f-mono);
-  font-size: 10px;
-  font-weight: 400;
-  letter-spacing: 0.38em;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: all 0.28s var(--ease);
-  -webkit-appearance: none;
-  position: relative;
-  overflow: hidden;
-  -webkit-font-smoothing: antialiased;
-}
-.lbtn::before {
-  content: '';
-  position: absolute; top: 0; left: 15%; right: 15%;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(245,227,152,0.5) 50%, transparent);
-}
-.lbtn::after {
-  content: '';
-  position: absolute; inset: 0;
-  background: linear-gradient(160deg, rgba(245,227,152,0.04) 0%, transparent 70%);
-  opacity: 0;
-  transition: opacity 0.25s;
-}
-.lbtn:hover {
-  border-color: rgba(212,168,50,0.55);
-  color: rgba(245,227,152,0.95);
-  box-shadow: 0 0 28px rgba(184,150,12,0.08), inset 0 0 20px rgba(184,150,12,0.04);
-  letter-spacing: 0.42em;
-}
-.lbtn:hover::after { opacity: 1; }
-.lbtn:active { opacity: 0.65; transform: translateY(1px); }
-.lbtn:disabled { opacity: 0.25; cursor: default; }
-.lerr {
-  font-family: var(--f-mono);
-  font-size: 10px;
-  color: var(--red-lt);
-  letter-spacing: 0.1em;
-  margin-top: 12px;
-  text-align: center;
-  display: none;
-}
-
-/* ── App shell ─────────────────────────────────────────── */
-#app { display: none; height: 100dvh; position: relative; z-index: 2; }
-
-/* ── Sidebar ───────────────────────────────────────────── */
-#sidebar {
-  position: fixed; top: 0; left: 0; bottom: 0;
-  width: var(--sidebar);
-  background: var(--ink2);
-  border-right: none;
-  display: flex; flex-direction: column;
-  z-index: 200;
-  overflow: hidden;
-  transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 1px 0 0 0 rgba(245,227,152,0.04);
-}
-#sidebar.collapsed {
-  width: 0;
-}
-/* Gold glimmering right edge */
-#sidebar::before {
-  content: '';
-  position: absolute; top: 0; right: 0; bottom: 0;
-  width: 2px;
-  background: linear-gradient(180deg,
-    transparent 0%,
-    rgba(184,150,12,0.2) 10%,
-    rgba(212,168,50,0.5) 35%,
-    rgba(245,227,152,0.85) 50%,
-    rgba(212,168,50,0.5) 65%,
-    rgba(184,150,12,0.2) 90%,
-    transparent 100%
-  );
-  z-index: 1;
-  animation: edgeGlimmer 4s ease-in-out 1s infinite;
-}
-@keyframes edgeGlimmer {
-  0%, 100% { opacity: 0.6; }
-  50%       { opacity: 1; }
-}
-/* Sidebar toggle button */
-#sb-toggle {
-  position: fixed;
-  top: 50%;
-  transform: translateY(-50%);
-  left: var(--sidebar);
-  width: 20px; height: 68px;
-  background: rgba(8,12,22,0.95);
-  border: 1px solid rgba(184,150,12,0.45);
-  border-left: none;
-  border-radius: 0 6px 6px 0;
-  cursor: pointer;
-  z-index: 201;
-  display: flex; align-items: center; justify-content: center;
-  color: rgba(184,150,12,0.65);
-  transition: left 0.35s cubic-bezier(0.4, 0, 0.2, 1), color 0.2s, background 0.2s, border-color 0.2s;
-  padding: 0;
-  box-shadow: 3px 0 12px rgba(0,0,0,0.4), inset -1px 0 0 rgba(245,227,152,0.06);
-}
-#sb-toggle:hover {
-  color: rgba(245,227,152,0.95);
-  background: rgba(14,20,36,0.99);
-  border-color: rgba(212,168,50,0.7);
-  box-shadow: 3px 0 16px rgba(184,150,12,0.15);
-}
-#sb-toggle.collapsed { left: 0; }
-#sb-toggle svg { width: 10px; height: 10px; transition: transform 0.35s ease; }
-#sb-toggle.collapsed svg { transform: scaleX(-1); }
-/* Scanline texture on sidebar */
-#sidebar::after {
-  content: '';
-  position: absolute; inset: 0; pointer-events: none;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 3px,
-    rgba(255,255,255,0.006) 3px,
-    rgba(255,255,255,0.006) 4px
-  );
-}
-.sb-header {
-  padding: 22px 20px 18px;
-  border-bottom: 1px solid rgba(184,150,12,0.1);
-  flex-shrink: 0;
-  position: relative;
-}
-.sb-header::before {
-  content: '';
-  position: absolute; top: 0; left: 0; right: 0;
-  height: 2px;
-  background: linear-gradient(90deg,
-    transparent,
-    rgba(184,150,12,0.15) 20%,
-    rgba(212,168,50,0.45) 40%,
-    rgba(245,227,152,0.65) 50%,
-    rgba(212,168,50,0.45) 60%,
-    rgba(184,150,12,0.15) 80%,
-    transparent
-  );
-}
-.sb-header::after {
-  content: '';
-  position: absolute; top: 0; left: 0; right: 0;
-  height: 2px;
-  background: linear-gradient(90deg,
-    transparent,
-    rgba(212,168,50,0.4) 30%,
-    rgba(245,227,152,0.7) 50%,
-    rgba(212,168,50,0.4) 70%,
-    transparent
-  );
-}
-.sb-wordmark {
-  font-family: var(--f-display);
-  font-size: 26px;
-  font-weight: 300;
-  letter-spacing: 0.28em;
-  line-height: 1;
-  padding-left: 2px;
-  background: linear-gradient(150deg,
-    var(--gold-metal-1) 0%,
-    var(--gold-metal-2) 40%,
-    var(--gold-metal-3) 65%,
-    var(--gold-metal-2) 85%,
-    var(--gold-metal-1) 100%
-  );
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-.sb-tagline {
-  font-family: var(--f-mono);
-  font-size: 8px;
-  letter-spacing: 0.2em;
-  color: var(--smoke4);
-  text-transform: uppercase;
-  margin-top: 6px;
-}
-.sb-divider {
-  height: 1px;
-  background: linear-gradient(90deg, rgba(184,150,12,0.14), transparent);
-  margin: 8px 0;
-  flex-shrink: 0;
-}
-.sb-section-label {
-  font-family: var(--f-mono);
-  font-size: 8px;
-  letter-spacing: 0.2em;
-  color: var(--smoke4);
-  text-transform: uppercase;
-  padding: 10px 20px 4px;
-  flex-shrink: 0;
-}
-.sb-nav { padding: 6px 10px; flex-shrink: 0; }
-.nav-btn {
-  display: flex; align-items: center; gap: 10px;
-  padding: 9px 12px;
-  border-radius: var(--r);
-  border: none;
-  background: transparent;
-  color: var(--smoke3);
-  font-family: var(--f-body);
-  font-size: 12px;
-  font-weight: 300;
-  letter-spacing: 0.04em;
-  cursor: pointer;
-  width: 100%;
-  text-align: left;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
-  position: relative;
-}
-.nav-btn::before {
-  content: '';
-  position: absolute; left: 0; top: 15%; bottom: 15%;
-  width: 2px;
-  background: linear-gradient(180deg, var(--gold-metal-1), var(--gold-metal-3));
-  opacity: 0;
-  transition: opacity 0.18s;
-}
-.nav-btn:hover { background: rgba(184,150,12,0.04); color: var(--smoke2); }
-.nav-btn.active {
-  background: rgba(184,150,12,0.06);
-  color: transparent;
-  background-clip: text;
-  -webkit-background-clip: text;
-  /* Can't use gradient on text and background simultaneously, use filter instead */
-  color: var(--gold-metal-2);
-  text-shadow: 0 0 14px rgba(212,168,50,0.3), 0 0 28px rgba(184,150,12,0.15);
-}
-.nav-btn.active::before { opacity: 1; background: linear-gradient(180deg, var(--gold-metal-1), var(--gold-metal-3)); }
-.nav-icon { font-size: 13px; width: 18px; text-align: center; flex-shrink: 0; opacity: 0.8; }
-.sb-depts {
-  flex: 1;
-  overflow-y: auto;
-  padding: 4px 10px 8px;
-  scrollbar-width: none;
-}
-.sb-depts::-webkit-scrollbar { display: none; }
-.dept-btn {
-  display: flex; align-items: center; gap: 9px;
-  padding: 7px 12px;
-  border-radius: var(--r);
-  border: none;
-  background: transparent;
-  color: var(--smoke4);
-  font-family: var(--f-mono);
-  font-size: 10px;
-  font-weight: 400;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  cursor: pointer;
-  width: 100%;
-  text-align: left;
-  transition: background 0.15s, color 0.2s, text-shadow 0.2s;
-  position: relative;
-}
-.dept-btn::before {
-  content: '';
-  position: absolute; left: 0; top: 20%; bottom: 20%;
-  width: 1px;
-  background: var(--gold-lt);
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-.dept-btn:hover { color: var(--smoke2); }
-.dept-btn.active {
-  color: var(--smoke);
-  text-shadow: 0 0 12px rgba(212,173,20,0.35), 0 0 24px rgba(212,173,20,0.15);
-}
-.dept-btn.active::before { opacity: 1; }
-.d-pip { display: none; }
-.sb-footer {
-  padding: 12px 10px;
-  border-top: 1px solid rgba(184,150,12,0.1);
-  flex-shrink: 0;
-}
-.model-pill {
-  display: flex; align-items: center; gap: 9px;
-  padding: 9px 12px;
-  border-radius: var(--r);
-  border: 1px solid rgba(184,150,12,0.12);
-  background: rgba(184,150,12,0.03);
-  cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
-}
-.model-pill:hover { border-color: rgba(184,150,12,0.22); background: rgba(184,150,12,0.06); }
-.mp-indicator {
-  width: 6px; height: 6px; border-radius: 50%;
-  box-shadow: 0 0 6px currentColor;
-  flex-shrink: 0;
-}
-.mp-text { flex: 1; min-width: 0; }
-.mp-name {
-  font-family: var(--f-mono);
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  color: var(--smoke2);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.mp-sub {
-  font-family: var(--f-mono);
-  font-size: 9px;
-  color: var(--smoke4);
-  letter-spacing: 0.06em;
-  margin-top: 1px;
-}
-.mp-arrow { color: var(--smoke4); font-size: 10px; }
-
-/* ── Topbar ────────────────────────────────────────────── */
-#topbar {
-  position: fixed; top: 0; right: 0; left: 0;
-  height: var(--topbar);
-  background: rgba(5,8,16,0.92);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border-bottom: 1px solid rgba(184,150,12,0.1);
-  box-shadow: 0 1px 0 0 rgba(245,227,152,0.04);
-  display: flex; align-items: center;
-  padding: 0 20px 0 16px;
-  gap: 12px;
-  z-index: 100;
-}
-.tb-logo {
-  font-family: var(--f-display);
-  font-size: 20px;
-  font-weight: 300;
-  letter-spacing: 0.25em;
-  color: var(--smoke);
-  display: none;
-  padding-left: 2px;
-}
-.tb-module {
-  font-family: var(--f-mono);
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.18em;
-  color: var(--smoke3);
-  text-transform: uppercase;
-}
-.tb-sep { width: 1px; height: 20px; background: linear-gradient(180deg, transparent, rgba(184,150,12,0.2), transparent); }
-.tb-spacer { flex: 1; }
-
-/* Status chip */
-.tb-status {
-  display: flex; align-items: center; gap: 7px;
-  padding: 5px 12px;
-  border: 1px solid rgba(184,150,12,0.1);
-  border-radius: 3px;
-  background: transparent;
-}
-.status-pip {
-  width: 4px; height: 4px; border-radius: 50%;
-  background: rgba(200,210,220,0.4);
-  flex-shrink: 0;
-  transition: background 0.3s, box-shadow 0.3s;
-}
-.status-pip.online {
-  background: rgba(200,220,210,0.6);
-  box-shadow: 0 0 4px rgba(180,210,195,0.4);
-}
-.status-pip.warn { background: rgba(180,160,80,0.5); box-shadow: none; }
-.status-pip.off { background: rgba(80,90,110,0.4); box-shadow: none; }
-.tb-status-text {
-  font-family: var(--f-mono);
-  font-size: 9px;
-  letter-spacing: 0.14em;
-  color: var(--smoke4);
-  text-transform: uppercase;
-}
-
-/* Dept chip */
-.dept-chip-wrap { position: relative; }
-.dept-chip {
-  display: flex; align-items: center; gap: 8px;
-  padding: 5px 12px;
-  border: 1px solid rgba(184,150,12,0.12);
-  border-radius: 3px;
-  background: transparent;
-  cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
-}
-.dept-chip:hover { border-color: rgba(184,150,12,0.2); background: rgba(184,150,12,0.03); }
-.dc-pip { display: none; }
-.dc-name {
-  font-family: var(--f-mono);
-  font-size: 9px;
-  letter-spacing: 0.16em;
-  color: var(--smoke3);
-  text-transform: uppercase;
-}
-.dc-caret {
-  color: var(--smoke4);
-  font-size: 7px;
-  opacity: 0.6;
-}
-.dept-dd {
-  position: absolute; top: calc(100% + 8px); right: 0;
-  background: var(--ink2);
-  border: 1px solid var(--line2);
-  border-radius: var(--r2);
-  padding: 6px;
-  min-width: 200px;
-  z-index: 400;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.7), 0 0 0 1px var(--line);
-  display: none;
-  animation: dropIn 0.15s var(--ease);
-}
-@keyframes dropIn {
-  from { opacity: 0; transform: translateY(-6px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-.dept-dd.open { display: block; }
-.dd-item {
-  display: flex; align-items: center; gap: 9px;
-  padding: 8px 12px;
-  border-radius: var(--r);
-  cursor: pointer;
-  transition: background 0.12s, color 0.12s;
-}
-.dd-item:hover { background: rgba(184,150,12,0.04); }
-.dd-item.active { background: transparent; }
-.dd-item .d-pip { display: none; }
-.dd-name {
-  font-family: var(--f-mono);
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--smoke3);
-  flex: 1;
-  transition: color 0.15s, text-shadow 0.15s;
-}
-.dd-item:hover .dd-name { color: var(--smoke2); }
-.dd-item.active .dd-name {
-  color: var(--smoke);
-  text-shadow: 0 0 10px rgba(212,173,20,0.3);
-}
-
-/* Mobile model chip */
-.tb-model-chip {
-  display: none;
-  align-items: center; gap: 6px;
-  padding: 5px 10px;
-  border: 1px solid var(--line);
-  border-radius: 20px;
-  background: var(--ink3);
-  cursor: pointer;
-}
-.tmc-pip { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
-.tmc-name { font-family: var(--f-mono); font-size: 9px; letter-spacing: 0.12em; color: var(--smoke3); text-transform: uppercase; }
-
-/* ── Content ───────────────────────────────────────────── */
-#content { position: fixed; right: 0; overflow: hidden; }
-.panel { display: none; position: absolute; inset: 0; flex-direction: column; overflow: hidden; }
-.panel.active { display: flex; }
-
-/* ── Chat background ghost overlay ─────────────────────── */
-.chat-bg-overlay {
-  position: absolute; inset: 0; z-index: 0;
-  pointer-events: none;
-  overflow: hidden;
-}
-/* Base image layer */
-.chat-bg-overlay::before {
-  content: '';
-  position: absolute; inset: 0;
-  background: url('JUSHI.jpg') center center / cover no-repeat;
-  opacity: 0.32;
-  filter: grayscale(30%) contrast(1.05) brightness(0.9);
-}
-/* Dark ink wash — heavier center for text readability, lighter at edges */
-.chat-bg-overlay::after {
-  content: '';
-  position: absolute; inset: 0;
-  background:
-    radial-gradient(ellipse 60% 50% at 50% 50%, rgba(5,8,16,0.55) 0%, rgba(5,8,16,0.1) 100%),
-    linear-gradient(180deg, rgba(5,8,16,0.1) 0%, rgba(5,8,16,0.25) 100%);
-}
-.chat-bg-overlay svg {
-  position: absolute;
-  width: 100%; height: 100%;
-  top: 0; left: 0;
-  z-index: 1;
-}
-@media (max-width: 600px) {
-  .chat-bg-overlay svg { width: 140%; left: -20%; }
-}
-
-
-/* ── Scope bar ─────────────────────────────────────────── */
-.scope-bar {
-  display: flex; align-items: center; gap: 6px;
-  padding: 0 18px;
-  height: 38px;
-  border-bottom: 1px solid rgba(184,150,12,0.1);
-  background: rgba(5,8,16,0.6);
-  flex-shrink: 0;
-  overflow-x: auto; scrollbar-width: none;
-  position: relative; z-index: 1;
-}
-.scope-bar::-webkit-scrollbar { display: none; }
-.scope-label {
-  font-family: var(--f-mono);
-  font-size: 8px;
-  letter-spacing: 0.18em;
-  color: var(--smoke4);
-  text-transform: uppercase;
-  white-space: nowrap;
-  flex-shrink: 0;
-  margin-right: 4px;
-}
-.scope-btn {
-  padding: 3px 12px;
-  border-radius: 3px;
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--smoke3);
-  font-family: var(--f-mono);
-  font-size: 9px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  cursor: pointer;
-  white-space: nowrap;
-  flex-shrink: 0;
-  transition: all 0.15s;
-  -webkit-appearance: none;
-}
-.scope-btn:hover { color: var(--smoke); border-color: var(--line2); }
-.scope-btn.active {
-  background: rgba(184,150,12,0.07);
-  border-color: rgba(184,150,12,0.22);
-  color: var(--gold-metal-2);
-  text-shadow: 0 0 10px rgba(212,168,50,0.2);
-}
-.scope-chevron { color: var(--smoke4); font-size: 9px; flex-shrink: 0; }
-
-/* ── Chat ──────────────────────────────────────────────── */
-/* .chat-messages moved to discovery section below */
-
-.chat-empty {
-  flex: 1;
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  text-align: center; gap: 12px;
-  padding: 40px 24px;
-}
-.ce-glyph {
-  font-family: var(--f-display);
-  font-size: 44px;
-  font-weight: 300;
-  line-height: 1;
-  letter-spacing: 0.1em;
-  background: linear-gradient(150deg, var(--gold-metal-1) 0%, var(--gold-metal-3) 50%, var(--gold-metal-2) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  opacity: 0.55;
-  filter: drop-shadow(0 0 8px rgba(184,150,12,0.2));
-}
-.ce-title {
-  font-family: var(--f-display);
-  font-size: 28px;
-  font-weight: 300;
-  letter-spacing: 0.1em;
-  color: var(--smoke);
-  line-height: 1.2;
-}
-.ce-sub {
-  font-size: 11px;
-  font-weight: 300;
-  color: var(--smoke4);
-  max-width: 320px;
-  line-height: 1.8;
-  letter-spacing: 0.03em;
-  font-family: var(--f-mono);
-}
-.ce-hints {
-  display: flex; flex-wrap: wrap; gap: 6px;
-  justify-content: center;
-  margin-top: 12px;
-}
-.hint {
-  padding: 6px 14px;
-  border: 1px solid rgba(184,150,12,0.16);
-  border-radius: 3px;
-  background: transparent;
-  color: var(--smoke3);
-  font-family: var(--f-mono);
-  font-size: 9px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: border-color 0.15s, color 0.15s, background 0.15s;
-  -webkit-appearance: none;
-}
-.hint:hover {
-  border-color: rgba(184,150,12,0.35);
-  color: var(--gold-metal-2);
-  background: rgba(184,150,12,0.05);
-  text-shadow: 0 0 8px rgba(212,168,50,0.2);
-}
-
-/* Messages */
-.msg { display: flex; gap: 12px; }
-.msg.user { flex-direction: row-reverse; align-self: flex-end; max-width: 82%; }
-.msg.ai { max-width: 90%; }
-.msg-av {
-  width: 28px; height: 28px;
-  border-radius: 3px;
-  display: flex; align-items: center; justify-content: center;
-  font-family: var(--f-mono);
-  font-size: 9px;
-  font-weight: 500;
-  letter-spacing: 0.05em;
-  flex-shrink: 0;
-  margin-top: 2px;
-}
-.msg.user .msg-av { background: var(--gold); color: var(--ink); }
-.msg.ai .msg-av {
-  background: var(--ink3);
-  color: var(--gold-lt);
-  border: 1px solid var(--line2);
-  font-size: 8px;
-  letter-spacing: 0.1em;
-}
-.msg-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.msg-scope {
-  font-family: var(--f-mono);
-  font-size: 8px;
-  letter-spacing: 0.12em;
-  color: var(--smoke4);
-  text-transform: uppercase;
-  padding-left: 2px;
-}
-.msg-bubble {
-  padding: 12px 16px;
-  border-radius: 2px 8px 8px 8px;
-  font-size: 13px;
-  font-weight: 300;
-  line-height: 1.7;
-  word-wrap: break-word;
-  letter-spacing: 0.01em;
-}
-.msg.user .msg-bubble {
-  background: var(--gold);
-  color: var(--ink);
-  border-radius: 8px 2px 8px 8px;
-  font-weight: 400;
-}
-.msg.ai .msg-bubble {
-  background: var(--ink2);
-  border: 1px solid var(--line);
-  color: var(--smoke);
-  position: relative;
-}
-.msg.ai .msg-bubble::before {
-  content: '';
-  position: absolute; left: 0; top: 12px; bottom: 12px;
-  width: 2px;
-  background: linear-gradient(180deg, var(--gold), transparent);
-  opacity: 0.3;
-}
-/* ── Message action bar ─────────────────────────────────── */
-.msg-actions {
-  display: flex; gap: 6px; align-items: center;
-  margin-top: 6px; padding-left: 2px;
-  opacity: 0; transition: opacity 0.15s;
-}
-.msg.ai:hover .msg-actions { opacity: 1; }
-.msg-action-btn {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 3px 9px; border-radius: 3px;
-  border: 1px solid var(--line2);
-  background: none; color: var(--smoke4);
-  font-family: var(--f-mono); font-size: 9px;
-  letter-spacing: 0.08em; text-transform: uppercase;
-  cursor: pointer; transition: all 0.15s;
-}
-.msg-action-btn:hover { border-color: var(--gold); color: var(--gold-lt); background: var(--gold-dim); }
-.msg-action-btn svg { width: 11px; height: 11px; flex-shrink: 0; }
-.msg-action-btn.saved { border-color: var(--green-lt); color: var(--green-lt); }
-
-/* ── Responses panel ────────────────────────────────────── */
-.resp-wrap { height: 100%; display: flex; flex-direction: column; overflow: hidden; }
-.resp-top {
-  padding: 20px 24px 14px;
-  border-bottom: 1px solid var(--line);
-  flex-shrink: 0;
-  background: var(--ink2);
-}
-.resp-title {
-  font-family: var(--f-display); font-size: 20px;
-  color: var(--smoke); letter-spacing: 0.06em; margin-bottom: 4px;
-}
-.resp-sub {
-  font-family: var(--f-mono); font-size: 10px;
-  color: var(--smoke4); letter-spacing: 0.06em; line-height: 1.6;
-}
-.resp-body { flex: 1; overflow-y: auto; padding: 20px 24px; }
-.resp-empty {
-  display: flex; flex-direction: column; align-items: center;
-  justify-content: center; height: 200px;
-  font-family: var(--f-mono); font-size: 11px;
-  color: var(--smoke4); letter-spacing: 0.06em; gap: 10px; text-align: center;
-}
-.resp-empty-icon { font-size: 28px; opacity: 0.3; }
-.resp-card {
-  background: var(--ink3);
-  border: 1px solid var(--line);
-  border-radius: var(--r2);
-  margin-bottom: 14px;
-  overflow: hidden;
-  position: relative;
-}
-.resp-card::before {
-  content: '';
-  position: absolute; top: 0; left: 0; right: 0; height: 1px;
-  background: linear-gradient(90deg, rgba(212,168,50,0.25), transparent 60%);
-}
-.resp-card-head {
-  display: flex; align-items: flex-start; justify-content: space-between;
-  padding: 12px 14px 10px; gap: 12px;
-}
-.resp-card-meta {
-  font-family: var(--f-mono); font-size: 9px;
-  color: var(--smoke4); letter-spacing: 0.08em; text-transform: uppercase;
-  margin-bottom: 4px;
-}
-.resp-card-prompt {
-  font-family: var(--f-mono); font-size: 11px;
-  color: var(--gold-lt); letter-spacing: 0.03em;
-  line-height: 1.5; max-width: 600px;
-}
-.resp-card-actions { display: flex; gap: 6px; flex-shrink: 0; }
-.resp-card-btn {
-  padding: 4px 10px; border-radius: 3px;
-  border: 1px solid var(--line2); background: none;
-  color: var(--smoke4); font-family: var(--f-mono); font-size: 9px;
-  letter-spacing: 0.08em; text-transform: uppercase;
-  cursor: pointer; transition: all 0.15s; white-space: nowrap;
-}
-.resp-card-btn:hover { border-color: var(--gold); color: var(--gold-lt); background: var(--gold-dim); }
-.resp-card-btn.del:hover { border-color: var(--red-lt); color: var(--red-lt); background: rgba(139,32,32,0.08); }
-.resp-preview {
-  padding: 0 14px 14px;
-  font-size: 12px; color: var(--smoke3);
-  line-height: 1.7; letter-spacing: 0.01em;
-  max-height: 120px; overflow: hidden;
-  -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
-  mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
-}
-.resp-preview.expanded {
-  max-height: none;
-  -webkit-mask-image: none; mask-image: none;
-}
-.resp-expand-btn {
-  display: block; width: 100%; padding: 8px 14px;
-  background: none; border: none; border-top: 1px solid var(--line);
-  color: var(--smoke4); font-family: var(--f-mono); font-size: 9px;
-  letter-spacing: 0.08em; text-transform: uppercase; text-align: center;
-  cursor: pointer; transition: all 0.15s;
-}
-.resp-expand-btn:hover { color: var(--gold-lt); background: var(--gold-dim); }
-
-.msg-model-label {
-  font-family: var(--f-mono);
-  font-size: 8.5px;
-  letter-spacing: 0.12em;
-  color: rgba(184,150,12,0.35);
-  text-transform: uppercase;
-  margin-top: 4px;
-  padding-left: 2px;
-}
-.msg-sources {
-  font-family: var(--f-mono);
-  font-size: 9px;
-  letter-spacing: 0.1em;
-  color: var(--smoke4);
-  padding-left: 2px;
-  text-transform: uppercase;
-}
-.msg-sources b { color: var(--gold); font-weight: 400; }
-
-.typing-wrap { display: flex; align-items: center; gap: 5px; padding: 12px 16px; }
-.td {
-  width: 5px; height: 5px; border-radius: 50%;
-  background: var(--smoke4);
-  animation: pulse 1.4s ease infinite;
-}
-.td:nth-child(2) { animation-delay: 0.2s; }
-.td:nth-child(3) { animation-delay: 0.4s; }
-@keyframes pulse { 0%,60%,100% { opacity: 0.3; transform: scale(1); } 30% { opacity: 1; transform: scale(1.3); } }
-
-.chat-bar {
-  padding: 12px 16px max(12px, env(safe-area-inset-bottom));
-  background: rgba(5,8,16,0.88);
-  backdrop-filter: blur(10px);
-  border-top: 1px solid rgba(184,150,12,0.1);
-  flex-shrink: 0;
-  z-index: 10;
-  position: relative;
-}
-.chat-bar::before {
-  content: '';
-  position: absolute; top: 0; left: 0; right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(212,168,50,0.25) 20%, rgba(245,227,152,0.4) 50%, rgba(212,168,50,0.25) 80%, transparent);
-  pointer-events: none;
-  opacity: 1;
-}
-.chat-row { display: flex; gap: 8px; align-items: flex-end; pointer-events: all; }
-.chat-bar-inner {
-  max-width: none;
-  margin: 0;
-  position: relative;
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  padding: 0;
-  box-shadow: none;
-  pointer-events: all;
-}
-.chat-ta {
-  flex: 1;
-  background: var(--ink3);
-  border: 1px solid rgba(184,150,12,0.22);
-  border-radius: var(--r);
-  padding: 12px 16px;
-  color: var(--smoke);
-  font-family: var(--f-body);
-  font-size: 13px;
-  font-weight: 300;
-  resize: none; outline: none;
-  min-height: 46px; max-height: 140px;
-  line-height: 1.5;
-  transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
-  -webkit-appearance: none;
-  letter-spacing: 0.01em;
-}
-.chat-ta::placeholder { color: var(--smoke4); }
-.chat-ta:focus { border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-dim); }
-.send-btn {
-  width: 46px; height: 46px;
-  border-radius: var(--r);
-  border: 1px solid rgba(184,150,12,0.25);
-  background: linear-gradient(150deg, rgba(184,150,12,0.12) 0%, rgba(184,150,12,0.06) 100%);
-  color: var(--gold-metal-2);
-  font-size: 18px;
-  cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-  transition: all 0.18s var(--ease);
-  -webkit-appearance: none;
-  position: relative;
-  overflow: hidden;
-}
-.send-btn::before {
-  content: '';
-  position: absolute; top: 0; left: 0; right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(245,227,152,0.5), transparent);
-  opacity: 0.7;
-}
-.send-btn:hover {
-  background: linear-gradient(150deg, var(--gold-metal-2) 0%, var(--gold-metal-3) 60%, var(--gold-metal-4) 100%);
-  border-color: var(--gold-metal-2);
-  color: var(--ink);
-  box-shadow: 0 2px 16px rgba(184,150,12,0.3), inset 0 1px 0 rgba(245,227,152,0.3);
-}
-.send-btn:disabled { opacity: 0.25; cursor: default; }
-
-
-/* ── Discovery Greeting ────────────────────────────────── */
-/* Name sits just above the input bar — injected into bar zone */
-.dg-name-above-bar {
-  text-align: center;
-  margin-bottom: 12px;
-  animation: dg-in 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-  pointer-events: none;
-}
-/* Greeting strip — sits just above the input bar */
-#discovery-greeting-strip {
-  padding: 12px 24px 20px;
-  text-align: center;
-  animation: dg-in 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s both;
-  width: 100%;
-  box-sizing: border-box;
-  flex-shrink: 0;
-}
-#discovery-greeting-strip::before {
-  content: '';
-  display: block;
-  width: 120px;
-  height: 1px;
-  margin: 0 auto 10px;
-  background: linear-gradient(90deg, transparent, rgba(184,150,12,0.3) 50%, transparent);
-}
-#discovery-greeting-strip .dgs-text {
-  font-family: var(--f-mono);
-  font-size: 10px;
-  font-weight: 300;
-  letter-spacing: 0.1em;
-  line-height: 1.9;
-  max-width: 560px;
-  width: calc(100% - 32px);
-  margin: 0 auto;
-  white-space: normal;
-  box-sizing: border-box;
-  color: rgba(212,168,50,0.5);
-  animation: dgsShimmer 4s ease-in-out 1.2s infinite;
-}
-@keyframes dgsShimmer {
-  0%, 100% { color: rgba(184,150,12,0.38); }
-  50%       { color: rgba(245,227,152,0.65); }
-}
-.dg-eyebrow {
-  font-family: var(--f-display);
-  font-size: 9px;
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
-  color: var(--gold);
-  opacity: 0.45;
-  margin-bottom: 6px;
-}
-.dg-name {
-  font-family: var(--f-display);
-  font-size: clamp(38px, 5vw, 58px);
-  font-weight: 300;
-  letter-spacing: 0.1em;
-  line-height: 1;
-  background: linear-gradient(105deg,
-    var(--gold-metal-3) 0%,
-    var(--gold-metal-2) 25%,
-    var(--gold-metal-1) 40%,
-    rgba(255,248,210,1) 50%,
-    var(--gold-metal-1) 60%,
-    var(--gold-metal-2) 75%,
-    var(--gold-metal-3) 100%
-  );
-  background-size: 200% 100%;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  filter: drop-shadow(0 0 20px rgba(184,150,12,0.3));
-  animation: nameShimmer 3.5s ease-in-out 0.5s infinite;
-}
-@keyframes nameShimmer {
-  0%, 100% { background-position: 100% 0; }
-  50%       { background-position: 0% 0; }
-}
-/* Greeting text floats below the bar */
-.dg-text-below-bar {
-  display: none;
-}
-.dg-text {
-  display: none;
-}
-@keyframes dg-in {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-/* Hide collection pills — greeting text already covers it */
-.dg-collections { display: none; }
-
-/* ── Chat panel layout adjustment when floating bar ───── */
-.panel[data-panel="chat"] {
-  display: flex;
-  flex-direction: column;
-}
-.chat-messages {
-  flex: 1;
-  overflow-y: auto;
-  padding: 24px 20px 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
-  scrollbar-color: var(--ink5) transparent;
-  position: relative;
-  z-index: 1;
-  transition: padding-bottom 0.4s ease;
-}
-.chat-messages.has-messages {
-  padding-bottom: 16px;
-}
-
-/* ── Files Panel ───────────────────────────────────────── */
-.files-outer { display: flex; height: 100%; overflow: hidden; }
-
-/* Collection sidebar */
-.col-sidebar {
-  width: 220px; flex-shrink: 0;
-  border-right: 1px solid rgba(184,150,12,0.1);
-  display: flex; flex-direction: column;
-  background: var(--ink2);
-}
-.col-sidebar-head {
-  padding: 14px 16px;
-  border-bottom: 1px solid rgba(184,150,12,0.1);
-  flex-shrink: 0;
-  position: relative;
-}
-.col-sidebar-head::before {
-  content: '';
-  position: absolute; top: 0; left: 0; right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, rgba(212,168,50,0.3) 0%, rgba(245,227,152,0.5) 40%, transparent 100%);
-}
-.col-sidebar-title {
-  font-family: var(--f-mono);
-  font-size: 9px;
-  letter-spacing: 0.18em;
-  color: var(--smoke3);
-  text-transform: uppercase;
-}
-.col-sidebar-dept {
-  font-family: var(--f-display);
-  font-size: 18px;
-  font-weight: 300;
-  color: var(--smoke);
-  margin-top: 3px;
-  letter-spacing: 0.05em;
-}
-.col-list { flex: 1; overflow-y: auto; padding: 8px; scrollbar-width: none; }
-.col-list::-webkit-scrollbar { display: none; }
-.col-all {
-  display: flex; align-items: center; gap: 9px;
-  padding: 9px 12px;
-  border-radius: var(--r);
-  border: 1px solid transparent;
-  cursor: pointer;
-  margin-bottom: 4px;
-  transition: background 0.12s, border-color 0.12s;
-}
-.col-all:hover { background: var(--gold-dim); }
-.col-all.active { background: rgba(184,150,12,0.06); border-color: rgba(184,150,12,0.18); }
-.col-all-icon { font-size: 12px; color: var(--smoke3); }
-.col-all-name {
-  font-family: var(--f-body);
-  font-size: 12px;
-  font-weight: 300;
-  color: var(--smoke2);
-}
-.col-all.active .col-all-name { color: var(--gold-lt); }
-.col-divider { height: 1px; background: var(--line); margin: 6px 4px; }
-.col-section-label {
-  font-family: var(--f-mono);
-  font-size: 8px;
-  letter-spacing: 0.2em;
-  color: var(--smoke4);
-  text-transform: uppercase;
-  padding: 8px 12px 4px;
-}
-.col-section-label.primary {
-  font-size: 9px;
-  letter-spacing: 0.22em;
-  color: var(--gold-metal-2);
-  text-shadow: 0 0 10px rgba(212,168,50,0.2);
-  padding: 12px 12px 6px;
-  border-top: 1px solid rgba(184,150,12,0.14);
-  margin-top: 2px;
-  position: relative;
-}
-.col-section-label.primary::before {
-  content: '';
-  position: absolute; top: 0; left: 0; right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, rgba(212,168,50,0.35) 0%, rgba(245,227,152,0.5) 30%, transparent 70%);
-}
-.col-item {
-  display: flex; align-items: center; gap: 8px;
-  padding: 9px 12px;
-  border-radius: var(--r);
-  border: 1px solid transparent;
-  cursor: pointer;
-  margin-bottom: 2px;
-  transition: background 0.12s, border-color 0.12s;
-  position: relative;
-}
-.col-item::before {
-  content: '';
-  position: absolute; left: 0; top: 15%; bottom: 15%;
-  width: 2px;
-  background: linear-gradient(180deg, var(--gold-metal-1), var(--gold-metal-3));
-  opacity: 0;
-  transition: opacity 0.18s;
-}
-.col-item:hover { background: var(--gold-dim); }
-.col-item.active { border-color: rgba(184,150,12,0.2); background: rgba(184,150,12,0.06); }
-.col-item.active::before { opacity: 0.7; }
-.col-icon { font-size: 11px; color: var(--smoke4); flex-shrink: 0; }
-.col-info { flex: 1; min-width: 0; }
-.col-name {
-  font-size: 12px;
-  font-weight: 300;
-  color: var(--smoke2);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.col-item.active .col-name { color: var(--gold-lt); }
-.col-count {
-  font-family: var(--f-mono);
-  font-size: 9px;
-  color: var(--smoke4);
-  margin-top: 1px;
-  letter-spacing: 0.06em;
-}
-.col-del {
-  background: none; border: none;
-  color: transparent;
-  font-size: 11px;
-  cursor: pointer;
-  padding: 3px;
-  border-radius: 3px;
-  flex-shrink: 0;
-  transition: color 0.15s;
-}
-.col-item:hover .col-del { color: var(--smoke4); }
-.col-del:hover { color: var(--red-lt) !important; }
-
-/* Files main area */
-.files-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-.files-top {
-  padding: 14px 18px;
-  border-bottom: 1px solid rgba(184,150,12,0.1);
-  flex-shrink: 0;
-  background: var(--ink2);
-  position: relative;
-}
-.files-top::after {
-  content: '';
-  position: absolute; bottom: 0; left: 0; right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, rgba(184,150,12,0.06), rgba(212,168,50,0.18) 30%, rgba(212,168,50,0.18) 70%, rgba(184,150,12,0.06));
-}
-.upload-area { display: flex; gap: 10px; align-items: flex-end; }
-.col-input-group { flex: 1; }
-.col-input-label {
-  font-family: var(--f-mono);
-  font-size: 8px;
-  letter-spacing: 0.18em;
-  color: var(--smoke4);
-  text-transform: uppercase;
-  margin-bottom: 6px;
-}
-.col-input {
-  width: 100%;
-  padding: 9px 13px;
-  background: var(--ink3);
-  border: 1px solid var(--line2);
-  border-radius: var(--r);
-  color: var(--smoke);
-  font-family: var(--f-body);
-  font-size: 12px;
-  font-weight: 300;
-  outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
-  -webkit-appearance: none;
-  letter-spacing: 0.02em;
-}
-.col-input::placeholder { color: var(--smoke4); }
-.col-input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-dim); }
-.upload-btn {
-  padding: 9px 18px;
-  background: transparent;
-  border: 1px solid var(--line2);
-  border-radius: var(--r);
-  color: var(--smoke2);
-  font-family: var(--f-mono);
-  font-size: 9px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  cursor: pointer;
-  white-space: nowrap;
-  flex-shrink: 0;
-  align-self: flex-end;
-  transition: border-color 0.15s, color 0.15s, background 0.15s;
-  -webkit-appearance: none;
-}
-.upload-btn:hover { border-color: var(--gold); color: var(--gold-lt); background: var(--gold-dim); }
-.upload-btn:active { opacity: 0.7; }
-.uprog { display: none; margin-top: 10px; }
-.uprog.on { display: block; }
-.plabel {
-  font-family: var(--f-mono);
-  font-size: 9px;
-  letter-spacing: 0.1em;
-  color: var(--smoke3);
-  margin-bottom: 5px;
-  text-transform: uppercase;
-}
-.ptrack { height: 1px; background: rgba(184,150,12,0.12); }
-.pfill { height: 100%; background: linear-gradient(90deg, var(--gold-metal-3), var(--gold-metal-2)); transition: width 0.3s; }
-.plog {
-  font-family: var(--f-mono);
-  font-size: 9px;
-  letter-spacing: 0.06em;
-  color: var(--smoke4);
-  margin-top: 6px;
-  max-height: 60px;
-  overflow-y: auto;
-  line-height: 1.9;
-  scrollbar-width: none;
-}
-.plog::-webkit-scrollbar { display: none; }
-
-.files-body { flex: 1; overflow-y: auto; padding: 14px 18px; scrollbar-width: thin; scrollbar-color: var(--ink5) transparent; }
-.files-body::-webkit-scrollbar { width: 3px; }
-.files-body::-webkit-scrollbar-thumb { background: var(--ink5); }
-.fhead {
-  display: flex; align-items: baseline; justify-content: space-between;
-  margin-bottom: 12px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid rgba(184,150,12,0.1);
-}
-.ftitle {
-  font-family: var(--f-display);
-  font-size: 20px;
-  font-weight: 300;
-  letter-spacing: 0.06em;
-  color: var(--smoke);
-}
-.fbadge {
-  font-family: var(--f-mono);
-  font-size: 9px;
-  letter-spacing: 0.12em;
-  color: var(--smoke4);
-  text-transform: uppercase;
-}
-.fcard {
-  display: flex; align-items: center; gap: 12px;
-  padding: 12px 14px;
-  background: var(--ink2);
-  border: 1px solid rgba(184,150,12,0.1);
-  border-radius: var(--r);
-  margin-bottom: 6px;
-  transition: border-color 0.18s, background 0.18s;
-  position: relative;
-  overflow: hidden;
-}
-.fcard::before {
-  content: '';
-  position: absolute; left: 0; top: 0; bottom: 0;
-  width: 2px;
-  background: linear-gradient(180deg, var(--gold-metal-1), var(--gold-metal-3));
-  opacity: 0;
-  transition: opacity 0.18s;
-}
-.fcard:hover { border-color: rgba(184,150,12,0.18); background: rgba(184,150,12,0.02); }
-.fcard.focused { border-color: rgba(184,150,12,0.28); background: rgba(184,150,12,0.04); }
-.fcard.focused::before { opacity: 0.7; }
-.ficon {
-  font-family: var(--f-mono);
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  color: var(--smoke4);
-  width: 30px;
-  text-align: center;
-  flex-shrink: 0;
-  text-transform: uppercase;
-  background: var(--ink4);
-  padding: 4px 3px;
-  border-radius: 3px;
-  border: 1px solid var(--line);
-}
-.finfo { flex: 1; min-width: 0; }
-.fname {
-  font-size: 12px;
-  font-weight: 400;
-  color: var(--smoke);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  letter-spacing: 0.01em;
-}
-.fmeta {
-  font-family: var(--f-mono);
-  font-size: 9px;
-  color: var(--smoke4);
-  margin-top: 3px;
-  letter-spacing: 0.06em;
-}
-.factions { display: flex; gap: 4px; flex-shrink: 0; }
-.fact-btn {
-  background: none;
-  border: 1px solid transparent;
-  border-radius: 3px;
-  color: var(--smoke4);
-  font-family: var(--f-mono);
-  font-size: 9px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  cursor: pointer;
-  padding: 4px 8px;
-  transition: all 0.15s;
-  white-space: nowrap;
-}
-.fact-btn:hover { border-color: var(--line2); color: var(--smoke2); }
-.fact-btn.focus-active { color: var(--gold-lt); border-color: var(--line3); background: var(--gold-dim); }
-.fact-btn.del:hover { border-color: var(--red); color: var(--red-lt); }
-.fempty {
-  text-align: center;
-  padding: 48px 24px;
-  color: var(--smoke4);
-  font-size: 12px;
-  font-weight: 300;
-  line-height: 1.9;
-  font-family: var(--f-mono);
-  letter-spacing: 0.06em;
-}
-.fempty-title {
-  font-family: var(--f-display);
-  font-size: 20px;
-  font-weight: 300;
-  color: var(--smoke3);
-  letter-spacing: 0.08em;
-  margin-bottom: 8px;
-}
-
-/* ── App Launcher ──────────────────────────────────────── */
-.app-launcher {
-  position: fixed;
-  top: 50%;
-  right: 0;
-  transform: translateY(-50%);
-  z-index: 300;
-  display: flex;
-  align-items: center;
-}
-.app-launcher-toggle {
-  width: 32px;
-  height: 56px;
-  background: var(--ink3);
-  border: 1px solid var(--line2);
-  border-right: none;
-  border-radius: 8px 0 0 8px;
-  color: var(--smoke3);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
-  flex-shrink: 0;
-}
-.app-launcher-toggle:hover { background: var(--ink4); color: var(--gold-lt); border-color: var(--line3); }
-.app-launcher.open .app-launcher-toggle { background: var(--ink4); color: var(--gold-lt); border-color: var(--line3); }
-
-.app-launcher-panel {
-  width: 0;
-  overflow: hidden;
-  transition: width 0.28s cubic-bezier(0.22, 0.61, 0.36, 1);
-  background: var(--ink2);
-  border: 1px solid rgba(184,150,12,0.14);
-  border-right: none;
-  border-radius: 12px 0 0 12px;
-  box-shadow: -8px 0 40px rgba(0,0,0,0.6), inset 1px 0 0 rgba(245,227,152,0.04);
-  display: flex;
-  flex-direction: column;
-}
-.app-launcher.open .app-launcher-panel { width: 220px; }
-
-.alp-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 16px 10px;
-  border-bottom: 1px solid rgba(184,150,12,0.1);
-  flex-shrink: 0;
-  position: relative;
-}
-.alp-header::before {
-  content: '';
-  position: absolute; top: 0; left: 0; right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, rgba(212,168,50,0.3) 0%, rgba(245,227,152,0.55) 40%, transparent 100%);
-}
-.alp-title {
-  font-family: var(--f-mono);
-  font-size: 9px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--smoke3);
-  white-space: nowrap;
-}
-.alp-close {
-  background: none;
-  border: none;
-  color: var(--smoke4);
-  font-size: 16px;
-  cursor: pointer;
-  padding: 0 2px;
-  line-height: 1;
-  transition: color 0.15s;
-  flex-shrink: 0;
-}
-.alp-close:hover { color: var(--smoke); }
-
-.alp-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px;
-  padding: 10px;
-  overflow-y: auto;
-  flex: 1;
-  scrollbar-width: none;
-}
-.alp-grid::-webkit-scrollbar { display: none; }
-
-.alp-app {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 6px;
-  border-radius: var(--r);
-  border: 1px solid transparent;
-  text-decoration: none;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-  position: relative;
-  white-space: nowrap;
-}
-.alp-app:hover { background: var(--gold-dim); border-color: var(--line2); }
-
-.alp-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  overflow: hidden;
-  flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-}
-.alp-icon svg { width: 44px; height: 44px; display: block; }
-
-.alp-name {
-  font-family: var(--f-body);
-  font-size: 10px;
-  font-weight: 300;
-  color: var(--smoke2);
-  letter-spacing: 0.02em;
-  text-align: center;
-  white-space: nowrap;
-}
-.alp-app:hover .alp-name { color: var(--smoke); }
-
-.alp-status {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--smoke4);
-}
-.alp-status.connected { background: var(--green-lt); box-shadow: 0 0 5px var(--green-lt); }
-
-.alp-footer {
-  padding: 8px 10px 10px;
-  border-top: 1px solid rgba(184,150,12,0.1);
-  flex-shrink: 0;
-}
-.alp-settings-btn {
-  width: 100%;
-  padding: 7px 10px;
-  background: var(--gold-dim);
-  border: 1px solid var(--line2);
-  border-radius: var(--r);
-  color: var(--gold-lt);
-  font-family: var(--f-mono);
-  font-size: 8px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-  white-space: nowrap;
-}
-.alp-settings-btn:hover { background: rgba(184,150,12,0.15); border-color: var(--gold); }
-
-/* Adjust content area when launcher is open */
-@media (min-width: 769px) {
-  .app-launcher.open ~ * { margin-right: 0; }
-}
-
-/* ── Admin ─────────────────────────────────────────────── */
-.admin-wrap {
-  overflow-y: auto;
-  padding: 24px;
-  position: absolute;
-  inset: 0;
-  box-sizing: border-box;
-  scrollbar-width: thin;
-  scrollbar-color: var(--ink5) transparent;
-  max-width: 760px;
-}
-.admin-wrap::-webkit-scrollbar { width: 3px; }
-.admin-wrap::-webkit-scrollbar-thumb { background: var(--ink5); }
-.asec { margin-bottom: 32px; }
-.asec-head {
-  display: flex; align-items: center; gap: 12px;
-  margin-bottom: 14px;
-}
-.asec-line { flex: 1; height: 1px; background: linear-gradient(90deg, rgba(212,168,50,0.2), transparent); }
-.asec-title {
-  font-family: var(--f-mono);
-  font-size: 8px;
-  letter-spacing: 0.22em;
-  color: var(--smoke4);
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-.sgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.scard {
-  background: var(--ink2);
-  border: 1px solid rgba(184,150,12,0.1);
-  border-radius: var(--r);
-  padding: 14px 16px;
-  position: relative;
-  overflow: hidden;
-}
-.scard::before {
-  content: '';
-  position: absolute; top: 0; left: 0; right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(212,168,50,0.5), transparent);
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-.scard.ok::before { opacity: 1; }
-.scard-label {
-  font-family: var(--f-mono);
-  font-size: 8px;
-  letter-spacing: 0.16em;
-  color: var(--smoke4);
-  text-transform: uppercase;
-  margin-bottom: 5px;
-}
-.scard-val {
-  font-family: var(--f-display);
-  font-size: 18px;
-  font-weight: 300;
-  color: var(--smoke2);
-  letter-spacing: 0.04em;
-  margin-bottom: 8px;
-}
-.srow { display: flex; align-items: center; gap: 6px; }
-.spip { width: 5px; height: 5px; border-radius: 50%; background: var(--green-lt); box-shadow: 0 0 5px var(--green-lt); flex-shrink: 0; }
-.spip.warn { background: var(--amber-lt); box-shadow: 0 0 5px var(--amber-lt); }
-.spip.off { background: var(--smoke4); box-shadow: none; }
-.srow-text { font-family: var(--f-mono); font-size: 9px; letter-spacing: 0.08em; color: var(--smoke3); }
-.acard {
-  background: var(--ink2);
-  border: 1px solid rgba(184,150,12,0.1);
-  border-radius: var(--r);
-  padding: 20px;
-  margin-bottom: 10px;
-  position: relative;
-  overflow: hidden;
-}
-.acard::before {
-  content: '';
-  position: absolute; top: 0; left: 0; right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(212,168,50,0.35) 30%, rgba(245,227,152,0.55) 50%, rgba(212,168,50,0.35) 70%, transparent);
-}
-.acard::after {
-  content: '';
-  position: absolute; bottom: 0; left: 0; right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(184,150,12,0.08), transparent);
-}
-.acard-title {
-  font-family: var(--f-display);
-  font-size: 18px;
-  font-weight: 300;
-  color: var(--smoke);
-  letter-spacing: 0.05em;
-  margin-bottom: 4px;
-}
-.acard-sub {
-  font-family: var(--f-mono);
-  font-size: 9px;
-  letter-spacing: 0.1em;
-  color: var(--smoke4);
-  text-transform: uppercase;
-  margin-bottom: 16px;
-}
-.arow { display: flex; gap: 8px; }
-.ainput {
-  flex: 1;
-  padding: 10px 13px;
-  background: var(--ink3);
-  border: 1px solid var(--line2);
-  border-radius: var(--r);
-  color: var(--smoke);
-  font-family: var(--f-mono);
-  font-size: 12px;
-  outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
-  -webkit-appearance: none;
-  letter-spacing: 0.06em;
-}
-.ainput::placeholder { color: var(--smoke4); }
-.ainput:focus { border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-dim); }
-.asave {
-  padding: 10px 20px;
-  background: transparent;
-  border: 1px solid var(--line2);
-  border-radius: var(--r);
-  color: var(--smoke2);
-  font-family: var(--f-mono);
-  font-size: 9px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.15s;
-  -webkit-appearance: none;
-}
-.asave:hover { border-color: var(--gold); color: var(--gold-lt); background: var(--gold-dim); }
-.afb { font-family: var(--f-mono); font-size: 9px; letter-spacing: 0.1em; margin-top: 8px; text-transform: uppercase; }
-.afb.ok { color: var(--green-lt); }
-.afb.err { color: var(--red-lt); }
-
-/* ── Model Modal ───────────────────────────────────────── */
-.modal-bg {
-  display: none;
-  position: fixed; inset: 0; z-index: 600;
-  background: rgba(2,4,10,0.85);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  align-items: flex-end; justify-content: center;
-}
-.modal-bg.open { display: flex; }
-.modal-sheet {
-  background: var(--ink2);
-  border: 1px solid rgba(184,150,12,0.14);
-  border-bottom: none;
-  border-radius: 14px 14px 0 0;
-  width: 100%; max-width: 520px;
-  padding: 24px 20px;
-  padding-bottom: max(24px, env(safe-area-inset-bottom));
-  max-height: 85vh; overflow-y: auto;
-  animation: slideUp 0.25s var(--ease);
-  position: relative;
-  box-shadow: 0 -4px 40px rgba(0,0,0,0.6), inset 0 1px 0 rgba(245,227,152,0.06);
-}
-.modal-sheet::before {
-  content: '';
-  position: absolute; top: 0; left: 15%; right: 15%;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(212,168,50,0.4) 25%, rgba(245,227,152,0.75) 50%, rgba(212,168,50,0.4) 75%, transparent);
-}
-@keyframes slideUp {
-  from { transform: translateY(20px); opacity: 0; }
-  to   { transform: translateY(0); opacity: 1; }
-}
-.modal-handle {
-  width: 32px; height: 3px;
-  background: var(--line2);
-  border-radius: 2px;
-  margin: 0 auto 20px;
-}
-.modal-title {
-  font-family: var(--f-display);
-  font-size: 24px;
-  font-weight: 300;
-  letter-spacing: 0.08em;
-  color: var(--smoke);
-  margin-bottom: 4px;
-}
-.modal-sub {
-  font-family: var(--f-mono);
-  font-size: 9px;
-  letter-spacing: 0.14em;
-  color: var(--smoke4);
-  text-transform: uppercase;
-  margin-bottom: 18px;
-}
-.moption {
-  display: flex; align-items: center; gap: 14px;
-  padding: 14px 16px;
-  border-radius: var(--r);
-  border: 1px solid rgba(184,150,12,0.1);
-  background: var(--ink3);
-  cursor: pointer;
-  margin-bottom: 7px;
-  transition: border-color 0.18s, background 0.18s;
-  position: relative; overflow: hidden;
-}
-.moption::before {
-  content: '';
-  position: absolute; left: 0; top: 0; bottom: 0;
-  width: 2px;
-  background: linear-gradient(180deg, var(--gold-metal-1), var(--gold-metal-3));
-  opacity: 0;
-  transition: opacity 0.18s;
-}
-.moption:hover { border-color: var(--line2); background: var(--ink4); }
-.moption.active { border-color: var(--line2); background: rgba(184,150,12,0.06); }
-.moption.active::before { opacity: 1; }
-.mo-pip { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 6px currentColor; }
-.mo-info { flex: 1; }
-.mo-name { font-family: var(--f-display); font-size: 18px; font-weight: 300; color: var(--smoke); letter-spacing: 0.05em; }
-.mo-sub { font-family: var(--f-mono); font-size: 9px; letter-spacing: 0.1em; color: var(--smoke4); text-transform: uppercase; margin-top: 2px; }
-.mo-check { color: var(--gold); font-size: 14px; display: none; }
-.moption.active .mo-check { display: block; }
-
-/* ── Bottom nav (mobile) ───────────────────────────────── */
-#botbar {
-  position: fixed; bottom: 0; left: 0; right: 0;
-  height: var(--botbar);
-  padding-bottom: env(safe-area-inset-bottom);
-  background: rgba(8,13,24,0.95);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-top: 1px solid var(--line);
-  display: flex; z-index: 200;
-}
-.tab-btn {
-  flex: 1;
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  gap: 3px;
-  border: none; background: transparent;
-  color: var(--smoke4);
-  font-family: var(--f-mono);
-  font-size: 8px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  cursor: pointer;
-  padding: 8px 0;
-  transition: color 0.15s;
-  -webkit-appearance: none;
-  position: relative;
-}
-.tab-btn::before {
-  content: '';
-  position: absolute; top: 0; left: 20%; right: 20%;
-  height: 1px;
-  background: var(--gold);
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-.tab-btn.active { color: var(--gold-lt); }
-.tab-btn.active::before { opacity: 0.8; }
-.tab-icon { font-size: 17px; line-height: 1; }
-
-/* ── Desktop / Mobile ──────────────────────────────────── */
-@media (min-width: 768px) {
-  #botbar { display: none; }
-  .tb-logo { display: block; }
-  .tb-model-chip { display: none !important; }
-  #content { left: var(--sidebar); top: var(--topbar); bottom: 0; transition: left 0.35s cubic-bezier(0.4, 0, 0.2, 1); }
-  #content.sb-collapsed { left: 0; }
-  .chat-messages { padding: 28px 32px; }
-  .chat-bar { padding: 14px 32px; padding-bottom: 14px; }
-  .files-top { padding: 16px 24px; }
-  .files-body { padding: 16px 24px; }
-  .admin-wrap { padding: 28px 36px; }
-  .modal-sheet { border-radius: 14px; margin: auto; }
-  .modal-bg { align-items: center; }
-}
-@media (max-width: 767px) {
-  #sidebar { display: none; }
-  #content { left: 0; top: var(--topbar); bottom: var(--botbar); }
-  .tb-model-chip { display: flex !important; }
-  .sgrid { grid-template-columns: 1fr; }
-  .col-sidebar { width: 130px; }
-  .col-name { font-size: 11px; }
-  .upload-area { flex-direction: column; }
-  .upload-btn { width: 100%; }
-  /* ── Mobile-only overrides for new UI features ── */
-  #sb-toggle { display: none; }
-  #discovery-greeting-strip { padding: 10px 20px 0; }
-  .login-frame-box { inset: 20px 16px; }
-}
-
-/* ── Upload Modal ──────────────────────────────────────────── */
-.upload-modal-bg {
-  display: none; position: fixed; inset: 0; z-index: 800;
-  background: rgba(2,4,10,0.9);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  align-items: center; justify-content: center;
-  padding: 20px;
-}
-.upload-modal-bg.open { display: flex; }
-.upload-modal {
-  background: var(--ink2);
-  border: 1px solid rgba(184,150,12,0.14);
-  border-radius: 12px;
-  width: 100%; max-width: 560px;
-  max-height: 90vh; overflow-y: auto;
-  position: relative;
-  animation: fadeUp 0.2s var(--ease);
-  scrollbar-width: none;
-  box-shadow: 0 12px 60px rgba(0,0,0,0.7), inset 0 1px 0 rgba(245,227,152,0.06);
-}
-.upload-modal::-webkit-scrollbar { display: none; }
-.upload-modal::before {
-  content: '';
-  position: absolute; top: 0; left: 10%; right: 10%;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(212,168,50,0.45) 30%, rgba(245,227,152,0.72) 50%, rgba(212,168,50,0.45) 70%, transparent);
-  pointer-events: none;
-}
-.um-header {
-  padding: 24px 28px 0;
-  display: flex; align-items: flex-start; justify-content: space-between;
-  margin-bottom: 6px;
-}
-.um-title {
-  font-family: var(--f-display);
-  font-size: 24px; font-weight: 300;
-  letter-spacing: 0.07em; color: var(--smoke);
-}
-.um-sub {
-  font-family: var(--f-mono);
-  font-size: 9px; letter-spacing: 0.16em;
-  color: var(--smoke4); text-transform: uppercase;
-  margin-top: 4px;
-}
-.um-close {
-  background: none; border: none;
-  color: var(--smoke4); font-size: 18px;
-  cursor: pointer; padding: 4px 8px;
-  transition: color 0.15s; flex-shrink: 0;
-}
-.um-close:hover { color: var(--smoke); }
-.um-body { padding: 20px 28px 28px; display: flex; flex-direction: column; gap: 16px; }
-.um-files-preview {
-  background: var(--ink3);
-  border: 1px solid rgba(184,150,12,0.1);
-  border-radius: var(--r);
-  padding: 12px 14px;
-}
-.um-files-label {
-  font-family: var(--f-mono);
-  font-size: 9px; letter-spacing: 0.14em;
-  color: var(--smoke4); text-transform: uppercase;
-  margin-bottom: 8px;
-}
-.um-file-item {
-  font-family: var(--f-mono);
-  font-size: 10px; color: var(--smoke2);
-  letter-spacing: 0.05em; padding: 3px 0;
-  border-bottom: 1px solid var(--line);
-  display: flex; align-items: center; gap: 8px;
-}
-.um-file-item:last-child { border-bottom: none; }
-.um-file-ext {
-  font-size: 8px; padding: 2px 5px;
-  background: var(--ink4); border: 1px solid var(--line);
-  border-radius: 2px; color: var(--gold); letter-spacing: 0.1em;
-  flex-shrink: 0;
-}
-.um-row { display: flex; gap: 12px; }
-.um-field { display: flex; flex-direction: column; gap: 6px; flex: 1; }
-.um-label {
-  font-family: var(--f-mono);
-  font-size: 8px; letter-spacing: 0.18em;
-  color: var(--smoke4); text-transform: uppercase;
-}
-.um-required { color: var(--gold); }
-.um-input, .um-select {
-  padding: 10px 13px;
-  background: var(--ink3);
-  border: 1px solid var(--line2);
-  border-radius: var(--r);
-  color: var(--smoke);
-  font-family: var(--f-body);
-  font-size: 13px; font-weight: 300;
-  outline: none; width: 100%;
-  transition: border-color 0.2s, box-shadow 0.2s;
-  -webkit-appearance: none; appearance: none;
-  letter-spacing: 0.01em;
-}
-.um-input::placeholder { color: var(--smoke4); }
-.um-input:focus, .um-select:focus {
-  border-color: var(--gold);
-  box-shadow: 0 0 0 3px var(--gold-dim);
-}
-.um-select { cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%235a6378'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
-.um-select option { background: #0c1220; color: #e8eaf0; }
-.um-states { display: flex; flex-wrap: wrap; gap: 6px; }
-.um-state-chip {
-  padding: 5px 12px;
-  border: 1px solid var(--line2);
-  border-radius: 3px;
-  background: transparent;
-  color: var(--smoke3);
-  font-family: var(--f-mono);
-  font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
-  cursor: pointer; transition: all 0.15s; -webkit-appearance: none;
-}
-.um-state-chip:hover { border-color: var(--line3); color: var(--smoke); }
-.um-state-chip.selected { background: var(--gold-dim); border-color: var(--gold); color: var(--gold-lt); }
-.um-store-wrap { display: none; }
-.um-store-wrap.visible { display: block; }
-.um-dup-warning {
-  background: rgba(184,150,12,0.08);
-  border: 1px solid var(--line3);
-  border-radius: var(--r);
-  padding: 12px 14px;
-  display: none;
-}
-.um-dup-warning.show { display: block; }
-.um-dup-title {
-  font-family: var(--f-mono);
-  font-size: 9px; letter-spacing: 0.14em;
-  color: var(--gold-lt); text-transform: uppercase;
-  margin-bottom: 6px;
-}
-.um-dup-list {
-  font-family: var(--f-mono);
-  font-size: 10px; color: var(--smoke2);
-  letter-spacing: 0.04em; line-height: 1.8;
-}
-.um-dup-confirm {
-  font-family: var(--f-mono);
-  font-size: 9px; color: var(--smoke3);
-  letter-spacing: 0.08em; margin-top: 8px;
-}
-.um-footer { display: flex; gap: 8px; justify-content: flex-end; }
-.um-cancel {
-  padding: 10px 20px;
-  background: transparent; border: 1px solid var(--line);
-  border-radius: var(--r); color: var(--smoke3);
-  font-family: var(--f-mono); font-size: 9px;
-  letter-spacing: 0.14em; text-transform: uppercase;
-  cursor: pointer; transition: all 0.15s; -webkit-appearance: none;
-}
-.um-cancel:hover { border-color: var(--line2); color: var(--smoke); }
-.um-submit {
-  padding: 10px 24px;
-  background: transparent; border: 1px solid var(--line3);
-  border-radius: var(--r); color: var(--gold-lt);
-  font-family: var(--f-mono); font-size: 9px;
-  letter-spacing: 0.14em; text-transform: uppercase;
-  cursor: pointer; transition: all 0.15s; -webkit-appearance: none;
-}
-.um-submit:hover { background: var(--gold-dim); border-color: var(--gold); }
-.um-submit:disabled { opacity: 0.4; cursor: default; }
-
-/* ── Filter Bar ────────────────────────────────────────────── */
-.filter-bar {
-  display: flex; align-items: center; gap: 6px;
-  padding: 8px 18px;
-  border-bottom: 1px solid rgba(184,150,12,0.1);
-  background: rgba(5,8,16,0.5);
-  flex-shrink: 0; overflow-x: auto; scrollbar-width: none;
-}
-.filter-bar::-webkit-scrollbar { display: none; }
-.filter-label {
-  font-family: var(--f-mono);
-  font-size: 8px; letter-spacing: 0.18em;
-  color: var(--smoke4); text-transform: uppercase;
-  white-space: nowrap; flex-shrink: 0;
-}
-.filter-select {
-  padding: 4px 22px 4px 9px;
-  background: var(--ink3); border: 1px solid var(--line);
-  border-radius: 3px; color: var(--smoke2);
-  font-family: var(--f-mono); font-size: 9px;
-  letter-spacing: 0.08em; text-transform: uppercase;
-  cursor: pointer; outline: none;
-  -webkit-appearance: none; appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5' viewBox='0 0 8 5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%235a6378'/%3E%3C/svg%3E");
-  background-repeat: no-repeat; background-position: right 7px center;
-  flex-shrink: 0; transition: border-color 0.15s;
-}
-.filter-select:focus { border-color: var(--line2); }
-.filter-select option { background: #0c1220; }
-.filter-clear {
-  padding: 4px 10px;
-  background: none; border: 1px solid transparent;
-  border-radius: 3px; color: var(--smoke4);
-  font-family: var(--f-mono); font-size: 9px;
-  letter-spacing: 0.1em; text-transform: uppercase;
-  cursor: pointer; transition: all 0.15s; flex-shrink: 0;
-}
-.filter-clear:hover { border-color: var(--line); color: var(--smoke2); }
-
-/* ── Reports Panel ─────────────────────────────────────────── */
-.reports-wrap { height: 100%; display: flex; flex-direction: column; overflow: hidden; }
-.reports-top {
-  padding: 18px 24px;
-  border-bottom: 1px solid var(--line);
-  background: var(--ink2); flex-shrink: 0;
-}
-.reports-title {
-  font-family: var(--f-display);
-  font-size: 22px; font-weight: 300;
-  letter-spacing: 0.06em; color: var(--smoke);
-  margin-bottom: 4px;
-}
-.reports-sub {
-  font-family: var(--f-mono);
-  font-size: 9px; letter-spacing: 0.12em;
-  color: var(--smoke4); text-transform: uppercase;
-}
-.report-type-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 8px; margin-top: 16px;
-}
-.report-type-btn {
-  padding: 14px 16px;
-  background: var(--ink3); border: 1px solid var(--line);
-  border-radius: var(--r); cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
-  text-align: left; -webkit-appearance: none;
-  position: relative; overflow: hidden;
-}
-.report-type-btn::before {
-  content: '';
-  position: absolute; left: 0; top: 0; bottom: 0;
-  width: 2px; background: var(--gold); opacity: 0;
-  transition: opacity 0.15s;
-}
-.report-type-btn:hover { border-color: var(--line2); background: var(--ink4); }
-.report-type-btn:hover::before { opacity: 0.6; }
-.report-type-btn.active { border-color: var(--line3); background: rgba(184,150,12,0.06); }
-.report-type-btn.active::before { opacity: 1; }
-.rtb-icon { font-size: 18px; margin-bottom: 8px; }
-.rtb-name {
-  font-family: var(--f-display);
-  font-size: 15px; font-weight: 300;
-  color: var(--smoke); letter-spacing: 0.04em;
-}
-.rtb-sub {
-  font-family: var(--f-mono);
-  font-size: 9px; color: var(--smoke4);
-  letter-spacing: 0.08em; text-transform: uppercase;
-  margin-top: 3px;
-}
-.reports-body { flex: 1; overflow-y: auto; padding: 20px 24px; }
-.report-prompt-area { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
-.report-textarea {
-  width: 100%; padding: 12px 16px;
-  background: var(--ink3); border: 1px solid var(--line2);
-  border-radius: var(--r); color: var(--smoke);
-  font-family: var(--f-body); font-size: 13px; font-weight: 300;
-  resize: none; outline: none; min-height: 80px;
-  transition: border-color 0.2s; letter-spacing: 0.01em;
-  -webkit-appearance: none;
-}
-.report-textarea::placeholder { color: var(--smoke4); }
-.report-textarea:focus { border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-dim); }
-.report-btn-row { display: flex; gap: 8px; align-items: center; }
-.report-generate-btn {
-  padding: 10px 22px;
-  background: transparent; border: 1px solid var(--line3);
-  border-radius: var(--r); color: var(--gold-lt);
-  font-family: var(--f-mono); font-size: 9px;
-  letter-spacing: 0.16em; text-transform: uppercase;
-  cursor: pointer; transition: all 0.15s; -webkit-appearance: none;
-}
-.report-generate-btn:hover { background: var(--gold-dim); border-color: var(--gold); }
-.report-generate-btn:disabled { opacity: 0.4; cursor: default; }
-.report-scope-note {
-  font-family: var(--f-mono);
-  font-size: 9px; color: var(--smoke4);
-  letter-spacing: 0.08em; text-transform: uppercase;
-  flex: 1;
-}
-.report-output {
-  display: none;
-  background: var(--ink2); border: 1px solid var(--line);
-  border-radius: var(--r); overflow: hidden;
-  margin-top: 4px;
-}
-.report-output.visible { display: block; }
-.report-output-header {
-  padding: 12px 18px;
-  border-bottom: 1px solid var(--line);
-  display: flex; align-items: center; gap: 10px;
-  background: var(--ink3);
-}
-.report-output-title {
-  font-family: var(--f-mono);
-  font-size: 9px; letter-spacing: 0.14em;
-  color: var(--smoke3); text-transform: uppercase;
-  flex: 1;
-}
-.report-dl-btn {
-  padding: 5px 12px;
-  background: transparent; border: 1px solid var(--line2);
-  border-radius: 3px; color: var(--smoke2);
-  font-family: var(--f-mono); font-size: 9px;
-  letter-spacing: 0.1em; text-transform: uppercase;
-  cursor: pointer; transition: all 0.15s; -webkit-appearance: none;
-  white-space: nowrap;
-}
-.report-dl-btn:hover { border-color: var(--gold); color: var(--gold-lt); background: var(--gold-dim); }
-.report-content {
-  padding: 24px 28px;
-  font-family: var(--f-body); font-size: 13px;
-  font-weight: 300; line-height: 1.8; color: var(--smoke);
-  max-height: 600px; overflow-y: auto;
-  scrollbar-width: thin; scrollbar-color: var(--ink5) transparent;
-}
-.report-content h1, .report-content h2 {
-  font-family: var(--f-display); font-weight: 300;
-  color: var(--smoke); letter-spacing: 0.06em;
-  margin: 20px 0 10px; border-bottom: 1px solid var(--line);
-  padding-bottom: 6px;
-}
-.report-content h1 { font-size: 22px; }
-.report-content h2 { font-size: 18px; }
-.report-content h3 { font-family: var(--f-mono); font-size: 10px; letter-spacing: 0.16em; color: var(--smoke3); text-transform: uppercase; margin: 16px 0 8px; }
-.report-content p { margin-bottom: 10px; }
-.report-content ul, .report-content ol { margin: 8px 0 8px 20px; }
-.report-content li { margin-bottom: 4px; }
-.report-content strong { color: var(--smoke); font-weight: 500; }
-.report-content table { width: 100%; border-collapse: collapse; margin: 12px 0; font-family: var(--f-mono); font-size: 11px; }
-.report-content th { padding: 8px 12px; background: var(--ink3); border: 1px solid var(--line2); color: var(--smoke3); letter-spacing: 0.08em; text-transform: uppercase; text-align: left; }
-.report-content td { padding: 7px 12px; border: 1px solid var(--line); color: var(--smoke2); }
-.report-content tr:hover td { background: var(--gold-dim); }
-.report-generating {
-  display: none; align-items: center; gap: 12px;
-  padding: 20px; color: var(--smoke3);
-  font-family: var(--f-mono); font-size: 10px;
-  letter-spacing: 0.1em; text-transform: uppercase;
-}
-.report-generating.show { display: flex; }
-
-/* ── Period picker ─────────────────────────────────────── */
-.um-period-tabs {
-  display: flex; gap: 4px; margin-bottom: 10px;
-}
-.um-ptab {
-  flex: 1; padding: 6px 0;
-  background: var(--ink3); border: 1px solid var(--line);
-  border-radius: var(--r); color: var(--smoke3);
-  font-family: var(--f-mono); font-size: 9px;
-  letter-spacing: 0.1em; text-transform: uppercase;
-  cursor: pointer; transition: all 0.15s;
-}
-.um-ptab:hover { border-color: var(--line2); color: var(--smoke); }
-.um-ptab.active { background: var(--gold-dim); border-color: var(--gold); color: var(--gold-lt); }
-.um-period-mode { margin-bottom: 4px; }
-.um-date-row {
-  display: flex; align-items: center; gap: 10px;
-}
-.um-date-group { display: flex; flex-direction: column; gap: 4px; flex: 1; }
-.um-date-label {
-  font-family: var(--f-mono); font-size: 8px;
-  letter-spacing: 0.14em; text-transform: uppercase; color: var(--smoke4);
-}
-.um-date-sep {
-  color: var(--smoke4); font-size: 16px; flex-shrink: 0;
-  padding-top: 18px;
-}
-.um-date-input {
-  color-scheme: dark;
-  padding: 9px 10px !important;
-}
-.um-period-preview {
-  font-family: var(--f-mono); font-size: 10px;
-  color: var(--gold-lt); letter-spacing: 0.06em;
-  min-height: 16px; margin-top: 6px;
-}
-.um-col-pick-meta {
-  font-family: var(--f-mono); font-size: 9px;
-  color: var(--gold-lt); letter-spacing: 0.06em;
-  min-height: 14px; margin-top: 4px;
-}
-
-.um-input-err {
-  border-color: var(--red-lt) !important;
-  box-shadow: 0 0 0 2px rgba(192,57,43,0.18) !important;
-}
-
-.new-col-btn {
-  width: calc(100% - 16px);
-  margin: 6px 8px 4px;
-  padding: 7px 10px;
-  background: rgba(184,150,12,0.05);
-  border: 1px solid rgba(184,150,12,0.2);
-  border-radius: var(--r);
-  color: var(--gold-metal-2);
-  font-family: var(--f-mono);
-  font-size: 9px; letter-spacing: 0.12em;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: all 0.15s;
-  flex-shrink: 0;
-}
-.new-col-btn:hover { background: rgba(184,150,12,0.15); border-color: var(--gold); }
-
-/* ── Context tab ───────────────────────────────────────── */
-.files-tab-bar {
-  display: flex; gap: 2px;
-  padding: 0 0 12px 0;
-  border-bottom: 1px solid var(--line);
-  margin-bottom: 14px;
-}
-.ftab {
-  padding: 6px 16px;
-  border: 1px solid var(--line);
-  border-radius: var(--r);
-  background: transparent;
-  color: var(--smoke3);
-  font-family: var(--f-mono);
-  font-size: 10px; letter-spacing: 0.1em;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.ftab:hover { border-color: var(--line2); color: var(--smoke); }
-.ftab.active { background: var(--gold-dim); border-color: var(--gold); color: var(--gold-lt); }
-.ctx-badge {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 16px; height: 16px;
-  background: var(--gold); color: var(--ink);
-  border-radius: 50%;
-  font-size: 8px; font-weight: 600;
-  margin-left: 6px; vertical-align: middle;
-}
-.ctx-upload-btn {
-  background: rgba(184,150,12,0.08) !important;
-  border-color: rgba(184,150,12,0.3) !important;
-  color: var(--gold-lt) !important;
-}
-.ctx-explain {
-  display: flex; gap: 14px; align-items: flex-start;
-  padding: 20px;
-  background: var(--ink3);
-  border: 1px solid var(--line);
-  border-radius: var(--r2);
-  margin-bottom: 16px;
-}
-.ctx-explain-icon { font-size: 20px; color: var(--gold-dim); flex-shrink: 0; padding-top: 2px; }
-.ctx-explain-title { font-family: var(--f-display); font-size: 15px; color: var(--smoke2); letter-spacing: 0.04em; margin-bottom: 4px; }
-.ctx-explain-sub { font-family: var(--f-mono); font-size: 10px; color: var(--smoke4); letter-spacing: 0.04em; line-height: 1.7; }
-.ctx-card {
-  display: flex; align-items: center; gap: 12px;
-  padding: 12px 14px;
-  background: rgba(184,150,12,0.03);
-  border: 1px solid rgba(184,150,12,0.12);
-  border-radius: var(--r);
-  margin-bottom: 8px;
-  position: relative;
-}
-.ctx-card::before {
-  content: '';
-  position: absolute; top: 0; left: 0; right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, rgba(212,168,50,0.2), transparent 60%);
-}
-.ctx-card:hover { border-color: rgba(184,150,12,0.25); }
-.ctx-icon {
-  width: 32px; height: 32px; border-radius: 4px;
-  background: var(--gold-dim); border: 1px solid rgba(184,150,12,0.2);
-  display: flex; align-items: center; justify-content: center;
-  font-family: var(--f-mono); font-size: 8px;
-  color: var(--gold-lt); letter-spacing: 0.08em; flex-shrink: 0;
-}
-.ctx-info { flex: 1; min-width: 0; }
-.ctx-name { font-family: var(--f-mono); font-size: 11px; color: var(--smoke2); letter-spacing: 0.04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ctx-meta { font-family: var(--f-mono); font-size: 9px; color: var(--smoke4); letter-spacing: 0.06em; margin-top: 2px; }
-.ctx-del { background: none; border: 1px solid transparent; color: var(--smoke4); cursor: pointer; font-size: 14px; padding: 4px 8px; border-radius: 4px; transition: all 0.15s; flex-shrink: 0; }
-.ctx-del:hover { color: var(--red-lt); border-color: rgba(139,32,32,0.3); }
-.ctx-active-note {
-  font-family: var(--f-mono); font-size: 9px; color: var(--gold-metal-2); letter-spacing: 0.06em;
-  padding: 8px 12px; background: rgba(184,150,12,0.05); border: 1px solid rgba(184,150,12,0.18);
-  border-radius: var(--r); margin-bottom: 12px;
-  display: flex; align-items: center; gap: 8px;
-  box-shadow: inset 0 1px 0 rgba(245,227,152,0.06);
-}
-
-/* ── Voice UI ──────────────────────────────────────────── */
-.chat-row { display: flex; align-items: flex-end; gap: 8px; }
-.mic-btn {
-  width: 38px; height: 38px; flex-shrink: 0;
-  border-radius: 50%;
-  border: 1px solid var(--line2);
-  background: var(--ink3);
-  color: var(--smoke3);
-  cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  position: relative;
-  transition: all 0.2s;
-}
-.mic-btn svg { width: 16px; height: 16px; }
-.mic-btn:hover { border-color: var(--gold); color: var(--gold-lt); }
-.mic-btn.listening { border-color: var(--red-lt); color: var(--red-lt); background: rgba(139,32,32,0.12); }
-.mic-btn.speaking  { border-color: var(--gold); color: var(--gold-lt); background: var(--gold-dim); }
-.spk-toggle-btn.active {
-  border-color: var(--gold);
-  color: var(--gold-lt);
-  background: var(--gold-dim);
-  box-shadow: 0 0 8px rgba(184,150,12,0.25);
-}
-.mic-pulse {
-  position: absolute; inset: -4px;
-  border-radius: 50%;
-  border: 2px solid var(--red-lt);
-  opacity: 0; pointer-events: none;
-  animation: none;
-}
-.mic-btn.listening .mic-pulse {
-  animation: micPulse 1.2s ease-out infinite;
-}
-@keyframes micPulse {
-  0%   { transform: scale(1);   opacity: 0.7; }
-  100% { transform: scale(1.6); opacity: 0; }
-}
-.voice-status {
-  font-family: var(--f-mono); font-size: 9px;
-  letter-spacing: 0.1em; text-transform: uppercase;
-  color: var(--smoke4); min-height: 14px;
-  padding: 0 2px; margin-top: 4px;
-  transition: color 0.2s;
-}
-.voice-status.active { color: var(--gold-lt); }
-.spk-btn {
-  width: 28px; height: 28px;
-  border: 1px solid transparent;
-  background: none;
-  color: var(--smoke3); cursor: pointer;
-  display: inline-flex; align-items: center; justify-content: center;
-  border-radius: 4px; margin-top: 6px;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
-  vertical-align: middle;
-}
-.spk-btn svg { width: 15px; height: 15px; }
-.spk-btn:hover { color: var(--gold-lt); border-color: var(--line2); background: var(--gold-dim); }
-.spk-btn.playing { color: var(--gold-lt); border-color: var(--line3); background: var(--gold-dim); }
-.asec-sub-title {
-  font-size: 11px;
-  color: var(--smoke3);
-  font-family: var(--f-mono);
-  letter-spacing: 0.04em;
-  margin-top: 4px;
-  margin-bottom: 12px;
-  line-height: 1.6;
-  max-width: 640px;
-}
-.int-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 16px;
-  margin-top: 4px;
-}
-.int-card {
-  background: var(--ink3);
-  border: 1px solid rgba(184,150,12,0.1);
-  border-radius: var(--r2);
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  transition: border-color 0.2s;
-  position: relative;
-  overflow: hidden;
-}
-.int-card::before {
-  content: '';
-  position: absolute; top: 0; left: 0; right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, rgba(212,168,50,0.2), rgba(245,227,152,0.35) 40%, transparent 70%);
-}
-.int-card:hover { border-color: rgba(184,150,12,0.22); }
-.int-card.int-coming { opacity: 0.5; }
-.int-card.connected { border-color: rgba(42,122,75,0.45); }
-.int-logo {
-  width: 42px; height: 42px;
-  border-radius: var(--r);
-  display: flex; align-items: center; justify-content: center;
-  color: #fff; flex-shrink: 0;
-}
-.int-logo svg { width: 20px; height: 20px; }
-.int-name {
-  font-family: var(--f-display);
-  font-size: 17px;
-  font-weight: 500;
-  color: var(--smoke);
-  letter-spacing: 0.04em;
-}
-.int-desc {
-  font-size: 11px;
-  color: var(--smoke3);
-  font-family: var(--f-mono);
-  line-height: 1.6;
-  letter-spacing: 0.03em;
-}
-.int-tags {
-  display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px;
-}
-.int-tag {
-  font-size: 9px;
-  font-family: var(--f-mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--gold-lt);
-  border: 1px solid var(--line2);
-  border-radius: 3px;
-  padding: 2px 6px;
-}
-.int-status, .con-status {
-  font-size: 11px;
-  font-family: var(--f-mono);
-  color: var(--smoke3);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  letter-spacing: 0.04em;
-}
-.int-status.connected, .con-status.connected { color: var(--green-lt); }
-.int-actions {
-  display: flex; flex-direction: column; gap: 8px;
-}
-.int-input {
-  width: 100%;
-  font-size: 11px;
-}
-.int-btn { width: 100%; text-align: center; }
-.int-fb {
-  font-size: 10px;
-  font-family: var(--f-mono);
-  letter-spacing: 0.06em;
-  color: var(--smoke3);
-  min-height: 14px;
-}
-.int-fb.ok  { color: var(--green-lt); }
-.int-fb.err { color: var(--red-lt); }
-
-.int-connected-list {
-  display: flex; flex-direction: column; gap: 10px;
-}
-.int-row {
-  display: flex; align-items: center; gap: 14px;
-  background: var(--ink3);
-  border: 1px solid var(--line);
-  border-radius: var(--r);
-  padding: 12px 16px;
-}
-.int-row-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green-lt); flex-shrink: 0; }
-.int-row-name { font-family: var(--f-display); font-size: 14px; color: var(--smoke); flex: 1; }
-.int-row-meta { font-family: var(--f-mono); font-size: 10px; color: var(--smoke3); letter-spacing: 0.06em; }
-.int-row-dis {
-  font-size: 10px; font-family: var(--f-mono); letter-spacing: 0.06em;
-  color: var(--smoke4); cursor: pointer; padding: 4px 8px;
-  border: 1px solid var(--line); border-radius: 3px;
-  background: none; transition: color 0.15s, border-color 0.15s;
-}
-.int-row-dis:hover { color: var(--red-lt); border-color: rgba(139,32,32,0.4); }
-
-</style>
-</head>
-<body>
-
-<!-- Topographic overlay -->
-<div id="topo-overlay">
-<svg viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <radialGradient id="tg1" cx="30%" cy="25%" r="55%">
-      <stop offset="0%" stop-color="#b8960c" stop-opacity="0.12"/>
-      <stop offset="100%" stop-color="#b8960c" stop-opacity="0"/>
-    </radialGradient>
-    <radialGradient id="tg2" cx="80%" cy="75%" r="50%">
-      <stop offset="0%" stop-color="#0d1525" stop-opacity="0.8"/>
-      <stop offset="100%" stop-color="#050810" stop-opacity="0"/>
-    </radialGradient>
-  </defs>
-  <rect width="1440" height="900" fill="url(#tg2)"/>
-  <rect width="1440" height="900" fill="url(#tg1)"/>
-  <!-- Topographic contour lines -->
-  <g fill="none" stroke="#b8960c" stroke-width="0.5" opacity="0.18">
-    <ellipse cx="280" cy="220" rx="380" ry="180"/>
-    <ellipse cx="280" cy="220" rx="320" ry="145"/>
-    <ellipse cx="280" cy="220" rx="260" ry="112"/>
-    <ellipse cx="280" cy="220" rx="200" ry="82"/>
-    <ellipse cx="280" cy="220" rx="140" ry="55"/>
-    <ellipse cx="280" cy="220" rx="80" ry="32"/>
-  </g>
-  <g fill="none" stroke="#b8960c" stroke-width="0.4" opacity="0.12">
-    <ellipse cx="1180" cy="640" rx="420" ry="200"/>
-    <ellipse cx="1180" cy="640" rx="350" ry="160"/>
-    <ellipse cx="1180" cy="640" rx="280" ry="125"/>
-    <ellipse cx="1180" cy="640" rx="210" ry="92"/>
-    <ellipse cx="1180" cy="640" rx="140" ry="62"/>
-    <ellipse cx="1180" cy="640" rx="70" ry="34"/>
-  </g>
-  <g fill="none" stroke="#b8960c" stroke-width="0.35" opacity="0.09">
-    <ellipse cx="850" cy="180" rx="260" ry="140"/>
-    <ellipse cx="850" cy="180" rx="200" ry="105"/>
-    <ellipse cx="850" cy="180" rx="140" ry="72"/>
-    <ellipse cx="850" cy="180" rx="80" ry="42"/>
-  </g>
-  <g fill="none" stroke="#b8960c" stroke-width="0.3" opacity="0.08">
-    <ellipse cx="500" cy="720" rx="300" ry="120"/>
-    <ellipse cx="500" cy="720" rx="230" ry="88"/>
-    <ellipse cx="500" cy="720" rx="160" ry="58"/>
-    <ellipse cx="500" cy="720" rx="90" ry="32"/>
-  </g>
-  <!-- Grid hairlines -->
-  <g stroke="#b8960c" stroke-width="0.2" opacity="0.06">
-    <line x1="0" y1="150" x2="1440" y2="150"/>
-    <line x1="0" y1="300" x2="1440" y2="300"/>
-    <line x1="0" y1="450" x2="1440" y2="450"/>
-    <line x1="0" y1="600" x2="1440" y2="600"/>
-    <line x1="0" y1="750" x2="1440" y2="750"/>
-    <line x1="240" y1="0" x2="240" y2="900"/>
-    <line x1="480" y1="0" x2="480" y2="900"/>
-    <line x1="720" y1="0" x2="720" y2="900"/>
-    <line x1="960" y1="0" x2="960" y2="900"/>
-    <line x1="1200" y1="0" x2="1200" y2="900"/>
-  </g>
-  <!-- Corner registration marks -->
-  <g stroke="#b8960c" stroke-width="0.6" opacity="0.2">
-    <line x1="20" y1="20" x2="40" y2="20"/><line x1="20" y1="20" x2="20" y2="40"/>
-    <line x1="1420" y1="20" x2="1400" y2="20"/><line x1="1420" y1="20" x2="1420" y2="40"/>
-    <line x1="20" y1="880" x2="40" y2="880"/><line x1="20" y1="880" x2="20" y2="860"/>
-    <line x1="1420" y1="880" x2="1400" y2="880"/><line x1="1420" y1="880" x2="1420" y2="860"/>
-  </g>
-</svg>
-</div>
-
-<!-- LOGIN -->
-<div id="login-screen">
-  <div class="login-frame-box" aria-hidden="true">
-    <div class="fc tl"></div><div class="fc tr"></div>
-    <div class="fc bl"></div><div class="fc br"></div>
-    <div class="login-frame-shimmer"></div>
-  </div>
-  <div class="login-wrap">
-    <div class="login-mark">
-      <div class="login-wordmark">CACI</div>
-      <div class="login-sub">Intelligence Platform &nbsp;&middot;&nbsp; Jushi Holdings</div>
-    </div>
-    <div class="login-card">
-      <div class="corner tl"></div>
-      <div class="corner tr"></div>
-      <div class="corner bl"></div>
-      <div class="corner br"></div>
-      <div class="lfield-wrap">
-        <div class="lfield-rule"><div class="lfield-rule-diamond"></div></div>
-        <div class="lfield-label">Credentials</div>
-        <input class="linput" type="password" id="login-pw" placeholder="&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;" autocomplete="current-password"/>
-        <div class="linput-glow"></div>
-      </div>
-      <button class="lbtn" id="login-btn">Authenticate</button>
-      <div class="lerr" id="login-err">Access denied &mdash; invalid code</div>
-    </div>
-  </div>
-</div>
-
-<!-- APP -->
-<div id="app">
-
-  <!-- Sidebar -->
-  <aside id="sidebar">
-  <button id="sb-toggle" title="Toggle sidebar" aria-label="Toggle sidebar">
-    <svg viewBox="0 0 8 12" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="6,1 2,6 6,11"/></svg>
-  </button>
-    <div class="sb-header">
-      <div class="sb-wordmark">CACI</div>
-      <div class="sb-tagline">Intelligence Platform</div>
-    </div>
-    <div class="sb-nav" id="sb-nav"></div>
-    <div class="sb-divider"></div>
-    <div class="sb-section-label">Department</div>
-    <div class="sb-depts" id="sb-depts"></div>
-    <div class="sb-footer">
-      <div class="model-pill" id="sb-model-pill">
-        <div class="mp-indicator" id="mp-indicator" style="color:#22c55e;background:#22c55e"></div>
-        <div class="mp-text">
-          <div class="mp-name" id="mp-name">Claude Sonnet</div>
-          <div class="mp-sub" id="mp-sub">Active &middot; Best reasoning</div>
-        </div>
-        <div class="mp-arrow">&#9650;</div>
-      </div>
-    </div>
-  </aside>
-
-  <!-- Topbar -->
-  <header id="topbar">
-    <div class="tb-logo">CACI</div>
-    <div class="tb-sep"></div>
-    <div class="tb-module" id="tb-module">Intelligence</div>
-    <div class="tb-spacer"></div>
-
-    <!-- Mobile model chip -->
-    <div class="tb-model-chip" id="tb-model-chip">
-      <div class="tmc-pip" id="tmc-pip" style="background:#22c55e"></div>
-      <span class="tmc-name" id="tmc-name">Claude</span>
-    </div>
-
-    <!-- Dept chip -->
-    <div class="dept-chip-wrap">
-      <div class="dept-chip" id="dept-chip">
-        <div class="dc-pip" id="dc-pip"></div>
-        <span class="dc-name" id="dc-name">Retail</span>
-        <span class="dc-caret">&#9660;</span>
-      </div>
-      <div class="dept-dd" id="dept-dd"></div>
-    </div>
-
-    <!-- API status -->
-    <div class="tb-status" id="tb-status">
-      <div class="status-pip warn" id="api-pip"></div>
-      <span class="tb-status-text" id="api-text">Connecting</span>
-    </div>
-  </header>
-
-  <!-- Content -->
-  <div id="content">
-
-    <!-- CHAT -->
-    <div class="panel active" data-panel="chat">
-      <div class="chat-bg-overlay" aria-hidden="true"><svg viewBox="0 0 1200 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <radialGradient id="vignette" cx="50%" cy="50%" r="70%">
-      <stop offset="0%"   stop-color="#050810" stop-opacity="0"/>
-      <stop offset="100%" stop-color="#050810" stop-opacity="0.88"/>
-    </radialGradient>
-    <filter id="sf" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="1.8"/>
-    </filter>
-  </defs>
-
-  <style>
-    /* Sparse short sparks — small dashes, wide gaps, slow */
-
-    @keyframes sJ1 { from { stroke-dashoffset: 2200; } to { stroke-dashoffset: 0; } }
-    @keyframes sJ2 { from { stroke-dashoffset: 1800; } to { stroke-dashoffset: 0; } }
-    @keyframes sJ3 { from { stroke-dashoffset: 2600; } to { stroke-dashoffset: 0; } }
-
-    @keyframes sU1 { from { stroke-dashoffset: 1800; } to { stroke-dashoffset: 0; } }
-    @keyframes sU2 { from { stroke-dashoffset: 1400; } to { stroke-dashoffset: 0; } }
-    @keyframes sU3 { from { stroke-dashoffset: 2200; } to { stroke-dashoffset: 0; } }
-
-    @keyframes sS1 { from { stroke-dashoffset: 1600; } to { stroke-dashoffset: 0; } }
-    @keyframes sS2 { from { stroke-dashoffset: 1200; } to { stroke-dashoffset: 0; } }
-    @keyframes sS3 { from { stroke-dashoffset: 2000; } to { stroke-dashoffset: 0; } }
-
-    @keyframes sH1 { from { stroke-dashoffset: 2000; } to { stroke-dashoffset: 0; } }
-    @keyframes sH2 { from { stroke-dashoffset: 1600; } to { stroke-dashoffset: 0; } }
-    @keyframes sH3 { from { stroke-dashoffset: 2400; } to { stroke-dashoffset: 0; } }
-
-    @keyframes sI1 { from { stroke-dashoffset: 1400; } to { stroke-dashoffset: 0; } }
-    @keyframes sI2 { from { stroke-dashoffset: 1000; } to { stroke-dashoffset: 0; } }
-    @keyframes sI3 { from { stroke-dashoffset: 1800; } to { stroke-dashoffset: 0; } }
-
-    /* Dash halved, gaps wider (~25% fewer dots), speed slowed ~40% */
-    .j1 { stroke-dasharray: 5 160; animation: sJ1 8s linear 0s infinite; }
-    .j2 { stroke-dasharray: 3 120; animation: sJ2 11s linear 1.8s infinite; }
-    .j3 { stroke-dasharray: 7 210; animation: sJ3 14s linear 3.5s infinite; }
-
-    .u1 { stroke-dasharray: 5 160; animation: sU1 8s linear 0.6s infinite; }
-    .u2 { stroke-dasharray: 3 120; animation: sU2 11s linear 2.4s infinite; }
-    .u3 { stroke-dasharray: 7 210; animation: sU3 14s linear 4.1s infinite; }
-
-    .s1 { stroke-dasharray: 5 160; animation: sS1 8s linear 1.2s infinite; }
-    .s2 { stroke-dasharray: 3 120; animation: sS2 11s linear 3.0s infinite; }
-    .s3 { stroke-dasharray: 7 210; animation: sS3 14s linear 0.7s infinite; }
-
-    .h1 { stroke-dasharray: 5 160; animation: sH1 8s linear 1.8s infinite; }
-    .h2 { stroke-dasharray: 3 120; animation: sH2 11s linear 0.3s infinite; }
-    .h3 { stroke-dasharray: 7 210; animation: sH3 14s linear 5.2s infinite; }
-
-    .i1 { stroke-dasharray: 5 160; animation: sI1 8s linear 2.4s infinite; }
-    .i2 { stroke-dasharray: 3 120; animation: sI2 11s linear 4.7s infinite; }
-    .i3 { stroke-dasharray: 7 210; animation: sI3 14s linear 1.3s infinite; }
-
-    @keyframes fJ { 0%{opacity:1} 18%{opacity:0.12} 22%{opacity:0.9} 44%{opacity:0.55} 47%{opacity:1} 68%{opacity:0.18} 72%{opacity:0.85} 100%{opacity:1} }
-    @keyframes fU { 0%{opacity:0.7} 13%{opacity:1} 30%{opacity:0.08} 34%{opacity:0.95} 56%{opacity:0.65} 59%{opacity:0.04} 63%{opacity:1} 100%{opacity:0.7} }
-    @keyframes fS { 0%{opacity:1} 9%{opacity:0.25} 12%{opacity:1} 38%{opacity:0.75} 41%{opacity:0.04} 45%{opacity:0.9} 74%{opacity:0.18} 78%{opacity:1} 100%{opacity:1} }
-    @keyframes fH { 0%{opacity:0.6} 16%{opacity:1} 20%{opacity:0.35} 24%{opacity:0.95} 50%{opacity:1} 53%{opacity:0.08} 57%{opacity:0.8} 85%{opacity:0.45} 89%{opacity:1} 100%{opacity:0.6} }
-    @keyframes fI { 0%{opacity:1} 23%{opacity:0.65} 27%{opacity:0.04} 31%{opacity:1} 55%{opacity:0.85} 58%{opacity:0.15} 62%{opacity:1} 80%{opacity:0.38} 84%{opacity:1} 100%{opacity:1} }
-
-    .flick-j { animation: fJ 3.7s ease-in-out 0s infinite; }
-    .flick-u { animation: fU 4.9s ease-in-out 0.8s infinite; }
-    .flick-s { animation: fS 3.2s ease-in-out 1.6s infinite; }
-    .flick-h { animation: fH 5.5s ease-in-out 0.4s infinite; }
-    .flick-i { animation: fI 4.1s ease-in-out 2.1s infinite; }
-  </style>
-
-  <!-- Letter paths — approximate outlines matching JUSHI.jpg chrome letters -->
-  <!-- Shared stroke properties via g elements -->
-
-  <!-- J -->
-  <g class="flick-j" fill="none" filter="url(#sf)">
-    <path class="j1" d="M 108,210 L 232,210 L 232,590 Q 232,660 196,695 Q 158,732 110,720 Q 72,708 58,680"
-      stroke="#f5e8a0" stroke-width="0.8" opacity="0.56"/>
-    <path class="j2" d="M 108,210 L 232,210 L 232,590 Q 232,660 196,695 Q 158,732 110,720 Q 72,708 58,680"
-      stroke="#ffffff" stroke-width="0.5" opacity="0.35"/>
-    <path class="j3" d="M 108,210 L 232,210 L 232,590 Q 232,660 196,695 Q 158,732 110,720 Q 72,708 58,680"
-      stroke="#d4a832" stroke-width="1.2" opacity="0.22"/>
-  </g>
-
-  <!-- U -->
-  <g class="flick-u" fill="none" filter="url(#sf)">
-    <path class="u1" d="M 290,210 L 290,600 Q 290,700 385,718 Q 480,700 480,600 L 480,210"
-      stroke="#f5e8a0" stroke-width="0.8" opacity="0.56"/>
-    <path class="u2" d="M 290,210 L 290,600 Q 290,700 385,718 Q 480,700 480,600 L 480,210"
-      stroke="#ffffff" stroke-width="0.5" opacity="0.35"/>
-    <path class="u3" d="M 290,210 L 290,600 Q 290,700 385,718 Q 480,700 480,600 L 480,210"
-      stroke="#d4a832" stroke-width="1.2" opacity="0.22"/>
-  </g>
-
-  <!-- S -->
-  <g class="flick-s" fill="none" filter="url(#sf)">
-    <path class="s1" d="M 688,268 Q 650,210 600,200 Q 540,188 512,232 Q 492,268 540,308 Q 590,344 630,372 Q 678,408 686,454 Q 696,508 658,552 Q 620,596 568,608 Q 516,618 510,700"
-      stroke="#f5e8a0" stroke-width="0.8" opacity="0.56"/>
-    <path class="s2" d="M 688,268 Q 650,210 600,200 Q 540,188 512,232 Q 492,268 540,308 Q 590,344 630,372 Q 678,408 686,454 Q 696,508 658,552 Q 620,596 568,608 Q 516,618 510,700"
-      stroke="#ffffff" stroke-width="0.5" opacity="0.35"/>
-    <path class="s3" d="M 688,268 Q 650,210 600,200 Q 540,188 512,232 Q 492,268 540,308 Q 590,344 630,372 Q 678,408 686,454 Q 696,508 658,552 Q 620,596 568,608 Q 516,618 510,700"
-      stroke="#d4a832" stroke-width="1.2" opacity="0.22"/>
-  </g>
-
-  <!-- H -->
-  <g class="flick-h" fill="none" filter="url(#sf)">
-    <path class="h1" d="M 732,210 L 732,710 M 922,210 L 922,710 M 732,452 L 922,452"
-      stroke="#f5e8a0" stroke-width="0.8" opacity="0.56"/>
-    <path class="h2" d="M 732,210 L 732,710 M 922,210 L 922,710 M 732,452 L 922,452"
-      stroke="#ffffff" stroke-width="0.5" opacity="0.35"/>
-    <path class="h3" d="M 732,210 L 732,710 M 922,210 L 922,710 M 732,452 L 922,452"
-      stroke="#d4a832" stroke-width="1.2" opacity="0.22"/>
-  </g>
-
-  <!-- I -->
-  <g class="flick-i" fill="none" filter="url(#sf)">
-    <path class="i1" d="M 958,210 L 1148,210 M 1053,210 L 1053,710 M 958,710 L 1148,710"
-      stroke="#f5e8a0" stroke-width="0.8" opacity="0.56"/>
-    <path class="i2" d="M 958,210 L 1148,210 M 1053,210 L 1053,710 M 958,710 L 1148,710"
-      stroke="#ffffff" stroke-width="0.5" opacity="0.35"/>
-    <path class="i3" d="M 958,210 L 1148,210 M 1053,210 L 1053,710 M 958,710 L 1148,710"
-      stroke="#d4a832" stroke-width="1.2" opacity="0.22"/>
-  </g>
-
-  <rect width="1200" height="900" fill="url(#vignette)"/>
-</svg>      </div>
-      <div class="scope-bar" id="scope-bar">
-        <span class="scope-label">Context</span>
-        <button class="scope-btn active" data-scope="all" id="scope-all">All Files</button>
-        <span class="scope-chevron" id="sep-col" style="display:none">&#8250;</span>
-        <button class="scope-btn" data-scope="collection" id="scope-col" style="display:none">Collection</button>
-        <span class="scope-chevron" id="sep-file" style="display:none">&#8250;</span>
-        <button class="scope-btn" data-scope="file" id="scope-file" style="display:none">File</button>
-      </div>
-      <div class="chat-messages" id="chat-msgs">
-        <div class="chat-empty" id="chat-empty" style="display:none">
-          <div class="ce-glyph">&#9672;</div>
-          <div class="ce-title">Ask CACI</div>
-          <div class="ce-sub">Upload documents organized into collections, then query across all files, a specific collection, or a single document.</div>
-          <div class="ce-hints">
-            <button class="hint" data-h="Summarize all uploaded documents">Summarize all docs</button>
-            <button class="hint" data-h="What are the key trends across all data?">Key trends</button>
-            <button class="hint" data-h="Compare results across uploaded files">Compare files</button>
-            <button class="hint" data-h="Generate an executive summary report">Executive summary</button>
-          </div>
-        </div>
-      </div>
-      <div class="chat-bar" id="chat-bar">
-        <div class="chat-bar-inner">
-          <div class="chat-row">
-            <button class="mic-btn" id="mic-btn" title="Voice input">
-              <svg id="mic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0014 0"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg>
-              <div class="mic-pulse" id="mic-pulse"></div>
-            </button>
-            <button class="mic-btn spk-toggle-btn" id="spk-toggle-btn" title="Toggle auto-speak responses">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 010 7.07"/><path d="M19.07 4.93a10 10 0 010 14.14"/></svg>
-            </button>
-            <textarea class="chat-ta" id="chat-ta" rows="1" placeholder="Ask anything..."></textarea>
-            <button class="send-btn" id="send-btn">&#8593;</button>
-          </div>
-          <div class="voice-status" id="voice-status"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- FILES -->
-    <div class="panel" data-panel="files">
-                <!-- Filter Bar -->
-          <div class="filter-bar" id="filter-bar">
-            <span class="filter-label">Filter</span>
-            <select class="filter-select" id="f-category">
-              <option value="">All Categories</option>
-            </select>
-            <select class="filter-select" id="f-period">
-              <option value="">All Periods</option>
-            </select>
-            <select class="filter-select" id="f-state">
-              <option value="">All States</option>
-            </select>
-            <button class="filter-clear" id="filter-clear">Clear</button>
-          </div>
-
-        <div class="files-outer">
-        <div class="col-sidebar">
-          <div class="col-sidebar-head">
-            <div class="col-sidebar-title">Collections</div>
-            <div class="col-sidebar-dept" id="col-dept-name">Retail</div>
-          </div>
-          <button class="new-col-btn" id="new-col-btn" onclick="openNewColModal()">+ New Collection</button>
-          <div class="col-list" id="col-list"></div>
-        </div>
-        <div class="files-main">
-          <div class="files-top">
-            <div class="files-tab-bar" id="files-tab-bar">
-              <button class="ftab active" data-ft="docs" id="ftab-docs">Documents</button>
-              <button class="ftab" data-ft="ctx" id="ftab-ctx">
-                Context
-                <span class="ctx-badge" id="ctx-badge" style="display:none"></span>
-              </button>
-            </div>
-            <div class="upload-area">
-              <button class="upload-btn" id="upload-btn">&#8593; Upload &amp; Classify</button>
-              <button class="upload-btn ctx-upload-btn" id="ctx-upload-btn" style="display:none">&#8593; Add Context Doc</button>
-            </div>
-            <input type="file" id="file-input" multiple accept=".pdf,.doc,.docx,.csv,.xlsx,.xls,.txt,.md" style="display:none"/>
-            <input type="file" id="ctx-file-input" multiple accept=".pdf,.doc,.docx,.csv,.xlsx,.xls,.txt,.md" style="display:none"/>
-            <div class="uprog" id="uprog">
-              <div class="plabel" id="plabel">Initializing...</div>
-              <div class="ptrack"><div class="pfill" id="pfill" style="width:0%"></div></div>
-              <div class="plog" id="plog"></div>
-            </div>
-          </div>
-          <div class="files-body">
-            <!-- Documents tab -->
-            <div id="files-tab-docs">
-              <div class="fhead">
-                <div class="ftitle" id="ftitle">All Documents</div>
-                <div class="fbadge" id="fbadge">0 files</div>
-              </div>
-              <div id="flist"></div>
-            </div>
-            <!-- Context tab -->
-            <div id="files-tab-ctx" style="display:none">
-              <div class="fhead">
-                <div class="ftitle">Collection Context</div>
-                <div class="fbadge" id="ctx-count">0 docs</div>
-              </div>
-              <div class="ctx-explain" id="ctx-explain">
-                <div class="ctx-explain-icon">&#9670;</div>
-                <div>
-                  <div class="ctx-explain-title">No collection selected</div>
-                  <div class="ctx-explain-sub">Select a collection from the sidebar, then add context documents — SOPs, calendars, rules, and process guides. The AI reads these first before answering any question scoped to this collection.</div>
-                </div>
-              </div>
-              <div id="ctx-list"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- RESPONSES -->
-    <div class="panel" data-panel="responses">
-      <div class="resp-wrap">
-        <div class="resp-top">
-          <div class="resp-title">Saved Responses</div>
-          <div class="resp-sub">Overviews, summaries, and key intelligence saved from chat. Download any response as a Markdown file.</div>
-        </div>
-        <div class="resp-body" id="resp-body"></div>
-      </div>
-    </div>
-
-    <!-- ADMIN -->
-    <div class="panel" data-panel="admin">
-      <div class="admin-wrap">
-        <div class="asec">
-          <div class="asec-head"><div class="asec-title">System Status</div><div class="asec-line"></div></div>
-          <div class="sgrid">
-            <div class="scard" id="scard-api"><div class="scard-label">Worker API</div><div class="scard-val">CF Workers</div><div class="srow" id="stat-api"><div class="spip warn"></div><span class="srow-text">Checking...</span></div></div>
-            <div class="scard" id="scard-claude"><div class="scard-label">AI Engine</div><div class="scard-val" id="stat-model-val">Claude</div><div class="srow" id="stat-claude"><div class="spip warn"></div><span class="srow-text">Checking key...</span></div></div>
-            <div class="scard ok"><div class="scard-label">File Storage</div><div class="scard-val">KV + R2</div><div class="srow"><div class="spip"></div><span class="srow-text">Active</span></div></div>
-            <div class="scard ok"><div class="scard-label">Extraction</div><div class="scard-val">Client-Side</div><div class="srow"><div class="spip"></div><span class="srow-text">PDF &middot; Word &middot; Excel</span></div></div>
-          </div>
-        </div>
-        <div class="asec">
-          <div class="asec-head"><div class="asec-title">AI Configuration</div><div class="asec-line"></div></div>
-          <div class="acard">
-            <div class="acard-title">Claude &mdash; Anthropic</div>
-            <div class="acard-sub">claude-sonnet-4 &nbsp;&middot;&nbsp; Powers all document Q&A and report generation</div>
-            <div class="arow"><input class="ainput" type="password" id="ant-key" placeholder="sk-ant-api03-..." autocomplete="off"/><button class="asave" id="ant-save">Save Key</button></div>
-            <div class="afb" id="ant-fb"></div>
-          </div>
-          <div class="acard">
-            <div class="acard-title">Voice &mdash; Caci&apos;s Voice Engine</div>
-            <div class="acard-sub">Select the TTS provider &nbsp;&middot;&nbsp; Each sounds different &nbsp;&middot;&nbsp; Switch anytime</div>
-            <div class="acard-sub" style="margin-top:8px;color:rgba(184,150,12,0.5)">xAI API Key &mdash; required for Grok voice</div>
-            <div class="arow" style="margin-top:6px"><input class="ainput" type="password" id="xai-key" placeholder="xai-..." autocomplete="off"/><button class="asave" id="xai-save">Save Key</button></div>
-            <div class="afb" id="xai-fb"></div>
-            <div class="arow" style="margin-top:14px;flex-wrap:wrap;gap:8px">
-              <select class="ainput" id="tts-provider" style="flex:1">
-                <option value="grok">Grok (xAI) &mdash; Eve &mdash; Best quality</option>
-                <option value="cloudflare">Cloudflare &mdash; Deepgram Aura 2 &mdash; Enterprise</option>
-                <option value="claude">Claude &mdash; via Grok voice</option>
-                <option value="ollama" disabled>Ollama (Local) &mdash; Coming soon</option>
-              </select>
-              <select class="ainput" id="tts-grok-voice" style="flex:0 0 140px">
-                <option value="eve">Eve &mdash; Expressive</option>
-                <option value="ara">Ara &mdash; Warm</option>
-                <option value="sal">Sal &mdash; Clear</option>
-                <option value="leo">Leo &mdash; Deep</option>
-                <option value="rex">Rex &mdash; Authoritative</option>
-              </select>
-            </div>
-            <div class="arow" style="margin-top:8px;align-items:center;gap:12px">
-              <label style="display:flex;align-items:center;gap:6px;font-family:var(--f-mono);font-size:10px;color:var(--smoke3);letter-spacing:.06em;cursor:pointer">
-                <input type="checkbox" id="gtts-auto" style="accent-color:var(--gold)"/> Auto-speak AI responses
-              </label>
-              <button class="asave" id="gtts-test" style="flex-shrink:0">Test Voice</button>
-            </div>
-            <div class="afb" id="gtts-fb"></div>
-          </div>
-        </div>
-
-        <!-- INTEGRATIONS — Microsoft 365 -->
-        <div class="asec">
-          <div class="asec-head"><div class="asec-title">Microsoft 365 Integrations</div><div class="asec-line"></div></div>
-          <div class="asec-sub-title" style="margin:-8px 0 14px">Connect your Microsoft workspace to import, export, and sync documents</div>
-          <div class="int-grid">
-            <div class="int-card" id="int-excel">
-              <div class="int-logo" style="background:#1d6f42"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg></div>
-              <div class="int-info"><div class="int-name">Excel / Sheets</div><div class="int-desc">Import workbooks, export analysis to .xlsx, sync data ranges</div></div>
-              <div class="int-status idle" id="ist-excel"><span class="spip warn"></span>Not connected</div>
-              <div class="int-actions"><input class="ainput int-input" type="password" placeholder="Client Secret" id="ii-excel-secret" autocomplete="off"/><input class="ainput int-input" type="text" placeholder="Tenant ID" id="ii-excel-tenant" autocomplete="off"/><button class="asave int-btn" onclick="connectIntegration('excel')">Connect via OAuth</button></div>
-              <div class="int-fb" id="ifb-excel"></div>
-            </div>
-            <div class="int-card" id="int-word">
-              <div class="int-logo" style="background:#185abd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg></div>
-              <div class="int-info"><div class="int-name">Word / Docs</div><div class="int-desc">Parse .docx files from OneDrive, export AI reports as Word documents</div></div>
-              <div class="int-status idle" id="ist-word"><span class="spip warn"></span>Not connected</div>
-              <div class="int-actions"><input class="ainput int-input" type="password" placeholder="Client Secret" id="ii-word-secret" autocomplete="off"/><input class="ainput int-input" type="text" placeholder="Tenant ID" id="ii-word-tenant" autocomplete="off"/><button class="asave int-btn" onclick="connectIntegration('word')">Connect via OAuth</button></div>
-              <div class="int-fb" id="ifb-word"></div>
-            </div>
-            <div class="int-card" id="int-teams">
-              <div class="int-logo" style="background:#464eb8"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg></div>
-              <div class="int-info"><div class="int-name">Microsoft Teams</div><div class="int-desc">Post AI summaries to channels, trigger analysis from Teams messages</div></div>
-              <div class="int-status idle" id="ist-teams"><span class="spip warn"></span>Not connected</div>
-              <div class="int-actions"><input class="ainput int-input" type="text" placeholder="Webhook URL" id="ii-teams-webhook" autocomplete="off"/><input class="ainput int-input" type="password" placeholder="Bot Token (optional)" id="ii-teams-token" autocomplete="off"/><button class="asave int-btn" onclick="connectIntegration('teams')">Save &amp; Test</button></div>
-              <div class="int-fb" id="ifb-teams"></div>
-            </div>
-            <div class="int-card" id="int-powerbi">
-              <div class="int-logo" style="background:#f2c811;color:#1a1a1a"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="4" height="18"/><rect x="9" y="8" width="4" height="13"/><rect x="16" y="13" width="4" height="8"/></svg></div>
-              <div class="int-info"><div class="int-name">Power BI</div><div class="int-desc">Push CACI analytics to Power BI datasets, embed dashboards</div></div>
-              <div class="int-status idle" id="ist-powerbi"><span class="spip warn"></span>Not connected</div>
-              <div class="int-actions"><input class="ainput int-input" type="password" placeholder="Client Secret" id="ii-powerbi-secret" autocomplete="off"/><input class="ainput int-input" type="text" placeholder="Workspace ID" id="ii-powerbi-workspace" autocomplete="off"/><button class="asave int-btn" onclick="connectIntegration('powerbi')">Connect via OAuth</button></div>
-              <div class="int-fb" id="ifb-powerbi"></div>
-            </div>
-            <div class="int-card" id="int-sharepoint">
-              <div class="int-logo" style="background:#038387"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="4.93" y1="4.93" x2="9.17" y2="9.17"/><line x1="14.83" y1="14.83" x2="19.07" y2="19.07"/><line x1="14.83" y1="9.17" x2="19.07" y2="4.93"/><line x1="4.93" y1="19.07" x2="9.17" y2="14.83"/></svg></div>
-              <div class="int-info"><div class="int-name">SharePoint</div><div class="int-desc">Browse and ingest documents directly from SharePoint libraries</div></div>
-              <div class="int-status idle" id="ist-sharepoint"><span class="spip warn"></span>Not connected</div>
-              <div class="int-actions"><input class="ainput int-input" type="password" placeholder="Client Secret" id="ii-sharepoint-secret" autocomplete="off"/><input class="ainput int-input" type="text" placeholder="Tenant ID" id="ii-sharepoint-tenant" autocomplete="off"/><button class="asave int-btn" onclick="connectIntegration('sharepoint')">Connect via OAuth</button></div>
-              <div class="int-fb" id="ifb-sharepoint"></div>
-            </div>
-            <div class="int-card" id="int-quickbase">
-              <div class="int-logo" style="background:#e8401c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></div>
-              <div class="int-info"><div class="int-name">QuickBase</div><div class="int-desc">Sync records bidirectionally, run AI analysis on QuickBase tables</div></div>
-              <div class="int-status idle" id="ist-quickbase"><span class="spip warn"></span>Not connected</div>
-              <div class="int-actions"><input class="ainput int-input" type="password" placeholder="User Token" id="ii-quickbase-token" autocomplete="off"/><input class="ainput int-input" type="text" placeholder="Realm (e.g. company.quickbase.com)" id="ii-quickbase-realm" autocomplete="off"/><button class="asave int-btn" onclick="connectIntegration('quickbase')">Save &amp; Test</button></div>
-              <div class="int-fb" id="ifb-quickbase"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- CONNECTORS — Cannabis -->
-        <div class="asec">
-          <div class="asec-head"><div class="asec-title">Cannabis Platform Connectors</div><div class="asec-line"></div></div>
-          <div class="asec-sub-title" style="margin:-8px 0 14px">API connections to cannabis retail, compliance, and distribution platforms</div>
-          <div class="int-grid">
-            <div class="int-card" id="con-dutchie">
-              <div class="int-logo" style="background:#2d7d46"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2a9 9 0 00-9 9c0 4.17 2.84 7.67 6.69 8.69L12 22l2.31-2.31C18.16 18.67 21 15.17 21 11a9 9 0 00-9-9z"/></svg></div>
-              <div class="int-info"><div class="int-name">Dutchie</div><div class="int-desc">POS &amp; eCommerce — pull sales, inventory, menu data</div><div class="int-tags"><span class="int-tag">POS</span><span class="int-tag">eCommerce</span></div></div>
-              <div class="con-status" id="cst-dutchie"><span class="spip warn"></span>Not configured</div>
-              <div class="int-actions"><input class="ainput int-input" type="password" placeholder="Dutchie API Key" id="ci-dutchie-key" autocomplete="off"/><input class="ainput int-input" type="text" placeholder="Store ID / Slug" id="ci-dutchie-store" autocomplete="off"/><input class="ainput int-input" type="text" placeholder="Environment (prod / sandbox)" id="ci-dutchie-env" value="prod"/><button class="asave int-btn" onclick="saveConnector('dutchie')">Save &amp; Verify</button></div>
-              <div class="int-fb" id="cfb-dutchie"></div>
-            </div>
-            <div class="int-card" id="con-metrc">
-              <div class="int-logo" style="background:#1a5c9a"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg></div>
-              <div class="int-info"><div class="int-name">METRC</div><div class="int-desc">State compliance &amp; track-and-trace — batches, transfers, lab results</div><div class="int-tags"><span class="int-tag">Compliance</span><span class="int-tag">State</span></div></div>
-              <div class="con-status" id="cst-metrc"><span class="spip warn"></span>Not configured</div>
-              <div class="int-actions"><input class="ainput int-input" type="password" placeholder="Software API Key" id="ci-metrc-sw" autocomplete="off"/><input class="ainput int-input" type="password" placeholder="User API Key" id="ci-metrc-user" autocomplete="off"/><input class="ainput int-input" type="text" placeholder="State (e.g. CA, IL)" id="ci-metrc-state"/><button class="asave int-btn" onclick="saveConnector('metrc')">Save &amp; Verify</button></div>
-              <div class="int-fb" id="cfb-metrc"></div>
-            </div>
-            <div class="int-card" id="con-iheartjane">
-              <div class="int-logo" style="background:#c0392b"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg></div>
-              <div class="int-info"><div class="int-name">iHeartJane</div><div class="int-desc">Marketplace &amp; menu — product listings, orders, customer data</div><div class="int-tags"><span class="int-tag">Marketplace</span><span class="int-tag">Menu</span></div></div>
-              <div class="con-status" id="cst-iheartjane"><span class="spip warn"></span>Not configured</div>
-              <div class="int-actions"><input class="ainput int-input" type="password" placeholder="Jane API Key" id="ci-jane-key" autocomplete="off"/><input class="ainput int-input" type="text" placeholder="Store ID" id="ci-jane-store" autocomplete="off"/><button class="asave int-btn" onclick="saveConnector('iheartjane')">Save &amp; Verify</button></div>
-              <div class="int-fb" id="cfb-iheartjane"></div>
-            </div>
-            <div class="int-card" id="con-leaftrade">
-              <div class="int-logo" style="background:#3a7d44"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22V12M12 12C12 7 7 2 2 2c0 5 3.5 9.5 10 10zM12 12c0-5 5-10 10-10-1 5-4.5 9-10 10z"/></svg></div>
-              <div class="int-info"><div class="int-name">LeafTrade</div><div class="int-desc">B2B wholesale — orders, vendor catalog, delivery status</div><div class="int-tags"><span class="int-tag">B2B</span><span class="int-tag">Wholesale</span></div></div>
-              <div class="con-status" id="cst-leaftrade"><span class="spip warn"></span>Not configured</div>
-              <div class="int-actions"><input class="ainput int-input" type="password" placeholder="LeafTrade API Key" id="ci-leaftrade-key" autocomplete="off"/><input class="ainput int-input" type="text" placeholder="License Number" id="ci-leaftrade-license" autocomplete="off"/><button class="asave int-btn" onclick="saveConnector('leaftrade')">Save &amp; Verify</button></div>
-              <div class="int-fb" id="cfb-leaftrade"></div>
-            </div>
-            <div class="int-card" id="con-mjfreeway">
-              <div class="int-logo" style="background:#7b3fa0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg></div>
-              <div class="int-info"><div class="int-name">MJ Freeway</div><div class="int-desc">Seed-to-sale ERP — inventory, sales, compliance reports</div><div class="int-tags"><span class="int-tag">ERP</span><span class="int-tag">Seed-to-Sale</span></div></div>
-              <div class="con-status" id="cst-mjfreeway"><span class="spip warn"></span>Not configured</div>
-              <div class="int-actions"><input class="ainput int-input" type="password" placeholder="API Token" id="ci-mjfw-token" autocomplete="off"/><input class="ainput int-input" type="text" placeholder="Facility License #" id="ci-mjfw-license" autocomplete="off"/><input class="ainput int-input" type="text" placeholder="API Base URL" id="ci-mjfw-url" value="https://api.mjfreeway.com/v1"/><button class="asave int-btn" onclick="saveConnector('mjfreeway')">Save &amp; Verify</button></div>
-              <div class="int-fb" id="cfb-mjfreeway"></div>
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </div>
-
-  </div>
-  <nav id="botbar"></nav>
-
-  <!-- ── App Launcher — collapsible right rail ─────────────── -->
-  <div id="app-launcher" class="app-launcher">
-    <button id="app-launcher-toggle" class="app-launcher-toggle" title="Apps" onclick="toggleAppLauncher()">
-      <!-- Waffle grid icon -->
-      <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
-        <rect x="1" y="1" width="7" height="7" rx="1"/><rect x="12" y="1" width="7" height="7" rx="1"/>
-        <rect x="1" y="12" width="7" height="7" rx="1"/><rect x="12" y="12" width="7" height="7" rx="1"/>
-      </svg>
-    </button>
-    <div class="app-launcher-panel" id="app-launcher-panel">
-      <div class="alp-header">
-        <div class="alp-title">Microsoft 365</div>
-        <button class="alp-close" onclick="toggleAppLauncher()">&times;</button>
-      </div>
-      <div class="alp-grid">
-
-        <!-- Teams -->
-        <a class="alp-app" href="https://teams.microsoft.com" target="_blank" rel="noopener">
-          <div class="alp-icon">
-            <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-              <rect width="64" height="64" rx="10" fill="#464eb8"/>
-              <path d="M38 20a6 6 0 100-12 6 6 0 000 12z" fill="#fff" opacity=".9"/>
-              <path d="M50 28h-12a2 2 0 00-2 2v14a8 8 0 0016 0V30a2 2 0 00-2-2z" fill="#fff" opacity=".9"/>
-              <path d="M26 26a8 8 0 100-16 8 8 0 000 16z" fill="#fff"/>
-              <path d="M10 36v14a12 12 0 0024 0V36a4 4 0 00-4-4H14a4 4 0 00-4 4z" fill="#fff"/>
-            </svg>
-          </div>
-          <div class="alp-name">Teams</div>
-          <div class="alp-status" id="als-teams"></div>
-        </a>
-
-        <!-- Excel -->
-        <a class="alp-app" href="https://office.com/launch/excel" target="_blank" rel="noopener">
-          <div class="alp-icon">
-            <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-              <rect width="64" height="64" rx="10" fill="#1d6f42"/>
-              <path d="M8 12h28l16 10v30H8z" fill="#fff" opacity=".08"/>
-              <path d="M36 8v12h12L36 8z" fill="#fff" opacity=".5"/>
-              <path d="M8 8h28l12 12v36H8V8z" fill="none" stroke="#fff" stroke-width="0" opacity="0"/>
-              <!-- X shape -->
-              <line x1="18" y1="28" x2="30" y2="44" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
-              <line x1="30" y1="28" x2="18" y2="44" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
-              <rect x="34" y="28" width="16" height="3" rx="1.5" fill="#fff" opacity=".8"/>
-              <rect x="34" y="34" width="16" height="3" rx="1.5" fill="#fff" opacity=".8"/>
-              <rect x="34" y="40" width="16" height="3" rx="1.5" fill="#fff" opacity=".8"/>
-            </svg>
-          </div>
-          <div class="alp-name">Excel</div>
-          <div class="alp-status" id="als-excel"></div>
-        </a>
-
-        <!-- Word -->
-        <a class="alp-app" href="https://office.com/launch/word" target="_blank" rel="noopener">
-          <div class="alp-icon">
-            <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-              <rect width="64" height="64" rx="10" fill="#185abd"/>
-              <path d="M36 8v12h12L36 8z" fill="#fff" opacity=".5"/>
-              <!-- W letterform -->
-              <text x="11" y="50" font-family="Arial Black, Arial" font-weight="900" font-size="36" fill="#fff">W</text>
-            </svg>
-          </div>
-          <div class="alp-name">Word</div>
-          <div class="alp-status" id="als-word"></div>
-        </a>
-
-        <!-- SharePoint -->
-        <a class="alp-app" href="https://sharepoint.com" target="_blank" rel="noopener">
-          <div class="alp-icon">
-            <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-              <rect width="64" height="64" rx="10" fill="#038387"/>
-              <!-- Overlapping circles like SharePoint logo -->
-              <circle cx="22" cy="32" r="16" fill="#fff" opacity=".15"/>
-              <circle cx="22" cy="32" r="16" fill="none" stroke="#fff" stroke-width="1.5" opacity=".4"/>
-              <circle cx="36" cy="32" r="13" fill="#fff" opacity=".2"/>
-              <circle cx="36" cy="32" r="13" fill="none" stroke="#fff" stroke-width="1.5" opacity=".5"/>
-              <circle cx="48" cy="32" r="9" fill="#fff" opacity=".3"/>
-              <circle cx="48" cy="32" r="9" fill="none" stroke="#fff" stroke-width="1.5" opacity=".6"/>
-              <circle cx="22" cy="32" r="6" fill="#fff" opacity=".8"/>
-            </svg>
-          </div>
-          <div class="alp-name">SharePoint</div>
-          <div class="alp-status" id="als-sharepoint"></div>
-        </a>
-
-        <!-- PowerPoint -->
-        <a class="alp-app" href="https://office.com/launch/powerpoint" target="_blank" rel="noopener">
-          <div class="alp-icon">
-            <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-              <rect width="64" height="64" rx="10" fill="#c43e1c"/>
-              <path d="M36 8v12h12L36 8z" fill="#fff" opacity=".5"/>
-              <!-- P letterform -->
-              <text x="10" y="50" font-family="Arial Black, Arial" font-weight="900" font-size="36" fill="#fff">P</text>
-            </svg>
-          </div>
-          <div class="alp-name">PowerPoint</div>
-          <div class="alp-status" id="als-powerpoint"></div>
-        </a>
-
-        <!-- Power BI -->
-        <a class="alp-app" href="https://app.powerbi.com" target="_blank" rel="noopener">
-          <div class="alp-icon">
-            <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-              <rect width="64" height="64" rx="10" fill="#f2c811"/>
-              <rect x="10" y="20" width="10" height="34" rx="2" fill="#1a1a1a" opacity=".8"/>
-              <rect x="27" y="30" width="10" height="24" rx="2" fill="#1a1a1a" opacity=".8"/>
-              <rect x="44" y="38" width="10" height="16" rx="2" fill="#1a1a1a" opacity=".8"/>
-            </svg>
-          </div>
-          <div class="alp-name">Power BI</div>
-          <div class="alp-status" id="als-powerbi"></div>
-        </a>
-
-        <!-- QuickBase -->
-        <a class="alp-app" href="https://quickbase.com" target="_blank" rel="noopener">
-          <div class="alp-icon">
-            <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-              <rect width="64" height="64" rx="10" fill="#e8401c"/>
-              <!-- QB-style stacked layers -->
-              <ellipse cx="32" cy="18" rx="18" ry="6" fill="#fff" opacity=".9"/>
-              <path d="M14 18v10c0 3.3 8 6 18 6s18-2.7 18-6V18" fill="#fff" opacity=".5"/>
-              <path d="M14 28v10c0 3.3 8 6 18 6s18-2.7 18-6V28" fill="#fff" opacity=".3"/>
-              <path d="M14 38v8c0 3.3 8 6 18 6s18-2.7 18-6v-8" fill="#fff" opacity=".15"/>
-            </svg>
-          </div>
-          <div class="alp-name">QuickBase</div>
-          <div class="alp-status" id="als-quickbase"></div>
-        </a>
-
-      </div>
-
-      <div class="alp-footer">
-        <button class="alp-settings-btn" onclick="switchPanel('admin'); toggleAppLauncher();">
-          &#9881; Manage Connections
-        </button>
-      </div>
-    </div>
-  </div>
-
-</div>
-
-<!-- Model Modal -->
-<div class="modal-bg" id="model-modal">
-  <div class="modal-sheet">
-    <div class="modal-handle"></div>
-    <div class="modal-title">Intelligence Engine</div>
-    <div class="modal-sub">Select the AI model powering CACI</div>
-    <div id="model-list"></div>
-  </div>
-</div>
-
-<script>
-const API = 'https://caci-api.timtkosuge.workers.dev';
-
-const DEPTS = [
-  {id:'retail',     label:'Retail',     color:'#6c63ff'},
-  {id:'compliance', label:'Compliance', color:'#d4a017'},
-  {id:'commercial', label:'Commercial', color:'#16a085'},
-  {id:'hr',         label:'Human Resources', color:'#c0392b'},
-  {id:'finance',    label:'Finance',    color:'#2980b9'},
-  {id:'operations', label:'Operations', color:'#e67e22'},
-  {id:'it',         label:'Technology', color:'#8e44ad'},
-  {id:'global',     label:'Global',     color:'#7f8c8d'},
-];
-
-const MODELS = [
-  {id:'claude',     name:'Claude Sonnet',   sub:'Anthropic \u00b7 Best reasoning',  dot:'#22c55e'},
-  {id:'grok',       name:'Grok',            sub:'xAI \u00b7 Fast & sharp',          dot:'#d4a017'},
-  {id:'cloudflare', name:'Cloudflare AI',   sub:'Llama 4 \u00b7 Fast & free',      dot:'#f97316'},
-  {id:'ollama',     name:'Ollama',          sub:'Local \u00b7 Fully private',       dot:'#8e44ad'},
-];
-
-const MODS = [
-  {id:'chat',      label:'Intelligence', icon:'\u25C8'},
-  {id:'files',     label:'Documents',    icon:'\u2261'},
-  {id:'responses', label:'Responses',    icon:'\u2193'},
-  {id:'admin',     label:'Config',       icon:'\u2699'},
-];
-
-let token   = sessionStorage.getItem('caci_token') || '';
-let dept    = localStorage.getItem('caci_dept')    || 'retail';
-let modelId = localStorage.getItem('caci_model')   || 'claude';
-let chatHistory = [];
-let curPanel = 'chat';
-let chatScope = 'all';
-let chatCollection = null;
-let chatFileId = null;
-let chatFileName = null;
-let selectedCollection = null;
-let _colView = 'all'; // 'all' | 'collection' | 'uncollected'
-
-const $ = id => document.getElementById(id);
-const fmt = b => b > 1048576 ? (b/1048576).toFixed(1)+'MB' : (b/1024).toFixed(0)+'KB';
-const dstr = iso => iso ? new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'}) : '—';
-
-function esc(s) {
-  if (s == null) return '';
-  return String(s).replace(/&/g,'&amp;').replace(/\x3C/g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/\n/g,'\x3Cbr>').replace(/\*\*(.*?)\*\*/g,'\x3Cstrong>$1\x3C/strong>');
-}
-
-async function apiFetch(path, opts = {}) {
-  return fetch(API + path, {
-    ...opts,
-    headers: { ...(opts.headers || {}), 'Authorization': 'Bearer ' + token },
+var __defProp = Object.defineProperty;
+var __name = (target, value) => __defProp(target, "name", { value, configurable: true }); 
+
+// worker.js
+var CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization"
+};
+function json(data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json", ...CORS }
   });
 }
-
-/* LOGIN */
-function setupLogin() {
-  if (token) { bootApp(); return; }
-  async function tryLogin() {
-    const pw = $('login-pw').value.trim();
-    if (!pw) return;
-    $('login-btn').disabled = true;
-    $('login-btn').textContent = 'Authenticating\u2026';
-    $('login-err').style.display = 'none';
-    try {
-      const res = await fetch(API + '/auth/login', {
-        method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({password: pw}),
-      });
-      const d = await res.json();
-      if (d.token) {
-        token = d.token;
-        sessionStorage.setItem('caci_token', token);
-        bootApp();
-      } else {
-        $('login-err').style.display = 'block';
-        $('login-pw').value = '';
-        $('login-pw').focus();
-      }
-    } catch {
-      $('login-err').textContent = 'Cannot reach server \u2014 check Worker deployment';
-      $('login-err').style.display = 'block';
-    }
-    $('login-btn').disabled = false;
-    $('login-btn').textContent = 'Authenticate';
+__name(json, "json");
+function verifyToken(request, env) {
+  const auth = request.headers.get("Authorization") || "";
+  const token = auth.replace("Bearer ", "").trim();
+  return token && (token === env.SESSION_SECRET || token === "dev-token");
+}
+__name(verifyToken, "verifyToken");
+var worker_default = {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    const path = url.pathname;
+    const method = request.method;
+    if (method === "OPTIONS")
+      return new Response(null, { status: 204, headers: CORS });
+    if (path === "/auth/login" && method === "POST")
+      return handleLogin(request, env);
+    if (path === "/health")
+      return json({ ok: true, version: "4.0.0" });
+    if (!verifyToken(request, env))
+      return json({ error: "Unauthorized" }, 401);
+    if (path === "/upload" && method === "POST")
+      return handleUpload(request, env);
+    if (path === "/duplicate-check" && method === "POST")
+      return handleDuplicateCheck(request, env);
+    if (path === "/files" && method === "GET")
+      return handleListFiles(url, env);
+    if (path.startsWith("/files/") && path.endsWith("/meta") && method === "PATCH")
+      return handlePatchFileMeta(path, request, env);
+    if (path.startsWith("/files/") && method === "DELETE")
+      return handleDeleteFile(path.replace("/files/", ""), env, url);
+    if (path === "/collections" && method === "GET")
+      return handleListCollections(url, env);
+    if (path === "/collections/create" && method === "POST")
+      return handleCreateCollection(request, env);
+    if (path.startsWith("/collections/") && method === "DELETE")
+      return handleDeleteCollection(path.replace("/collections/", ""), url, env);
+    if (path === "/tts" && method === "POST")
+      return handleTTS(request, env);
+    if (path === "/chat" && method === "POST")
+      return handleChat(request, env);
+    if (path === "/report" && method === "POST")
+      return handleReport(request, env);
+    if (path === "/admin/config" && method === "POST")
+      return handleAdminSave(request, env);
+    if (path === "/admin/config" && method === "GET")
+      return handleAdminGet(env);
+    if (path.startsWith("/integrations/") && method === "POST")
+      return handleIntegrationSave(path, request, env);
+    if (path.startsWith("/integrations/") && method === "GET")
+      return handleIntegrationGet(path, url, env);
+    if (path.startsWith("/integrations/") && method === "DELETE")
+      return handleIntegrationDelete(path, env);
+    if (path.startsWith("/connectors/") && method === "POST")
+      return handleConnectorSave(path, request, env);
+    if (path.startsWith("/connectors/") && method === "GET")
+      return handleConnectorGet(path, url, env);
+    if (path.startsWith("/connectors/") && method === "DELETE")
+      return handleConnectorDelete(path, env);
+    if (path.startsWith("/connectors/") && method === "POST" && path.endsWith("/fetch"))
+      return handleConnectorFetch(path, request, env);
+    return json({ error: "Not found" }, 404);
   }
-  $('login-btn').addEventListener('click', tryLogin);
-  $('login-pw').addEventListener('keydown', e => { if (e.key === 'Enter') tryLogin(); });
-}
-
-/* BOOT */
-function bootApp() {
-  $('login-screen').style.display = 'none';
-  $('app').style.display = 'block';
-  buildNav(); buildDepts(); buildDeptDD(); buildModelList();
-  syncDept(); syncModel(); switchPanel('chat');
-
-  // Sidebar collapse toggle
-  const sbToggle = $('sb-toggle');
-  const sidebar  = $('sidebar');
-  const contentEl = $('content');
-  sbToggle.addEventListener('click', () => {
-    const collapsed = sidebar.classList.toggle('collapsed');
-    sbToggle.classList.toggle('collapsed', collapsed);
-    if (contentEl) contentEl.classList.toggle('sb-collapsed', collapsed);
-    localStorage.setItem('caci_sb_collapsed', collapsed ? '1' : '0');
-  });
-  // Restore state
-  if (localStorage.getItem('caci_sb_collapsed') === '1') {
-    sidebar.classList.add('collapsed');
-    sbToggle.classList.add('collapsed');
-    if (contentEl) contentEl.classList.add('sb-collapsed');
-  }
-  checkHealth(); loadAdminConfig();
-
-  if (window.innerWidth < 768) $('tb-model-chip').style.display = 'flex';
-
-  $('send-btn').addEventListener('click', sendChat);
-  $('chat-ta').addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
-  });
-  $('chat-ta').addEventListener('input', function() {
-    this.style.height = 'auto';
-    this.style.height = Math.min(this.scrollHeight, 140) + 'px';
-  });
-  document.querySelectorAll('.hint').forEach(b => b.addEventListener('click', () => {
-    $('chat-ta').value = b.dataset.h; sendChat();
-  }));
-
-  document.querySelectorAll('.scope-btn').forEach(b => b.addEventListener('click', () => setScope(b.dataset.scope)));
-
-  $('upload-btn').addEventListener('click', () => $('file-input').click());
-  $('file-input').addEventListener('change', e => { if(e.target.files.length) openUploadModal(e.target.files); });
-  initUploadModal();
-  if (typeof initReports === "function") initReports();
-  initContextTab();
-  initNewCollectionModal();
-  initVoiceInput();
-  if ($('ant-save')) $('ant-save').addEventListener('click', saveKey);
-
-  // Filter bar
-  const filterClear = document.getElementById('filter-clear');
-  if (filterClear) filterClear.addEventListener('click', () => {
-    const fc = document.getElementById('f-category');
-    const fp = document.getElementById('f-period');
-    const fs = document.getElementById('f-state');
-    if (fc) fc.value = '';
-    if (fp) fp.value = '';
-    if (fs) fs.value = '';
-    loadFiles();
-  });
-  ['f-category','f-period','f-state'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.addEventListener('change', () => loadFiles());
-  });
-
-  $('dept-chip').addEventListener('click', e => { e.stopPropagation(); $('dept-dd').classList.toggle('open'); });
-  document.addEventListener('click', () => $('dept-dd').classList.remove('open'));
-  $('dept-dd').addEventListener('click', e => e.stopPropagation());
-
-  ['sb-model-pill','tb-model-chip'].forEach(id => {
-    const el = $(id); if (el) el.addEventListener('click', () => { buildModelList(); $('model-modal').classList.add('open'); });
-  });
-  $('model-modal').addEventListener('click', e => { if (e.target === $('model-modal')) $('model-modal').classList.remove('open'); });
-}
-
-/* NAV */
-function buildNav() {
-  $('sb-nav').innerHTML = MODS.map(m =>
-    `<button class="nav-btn" data-p="${m.id}"><span class="nav-icon">${m.icon}</span>${m.label}</button>`
-  ).join('');
-  $('sb-nav').querySelectorAll('.nav-btn').forEach(b => b.addEventListener('click', () => switchPanel(b.dataset.p)));
-  $('botbar').innerHTML = MODS.map(m =>
-    `<button class="tab-btn" data-p="${m.id}"><span class="tab-icon">${m.icon}</span>${m.label.split(' ')[0]}</button>`
-  ).join('');
-  $('botbar').querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => switchPanel(b.dataset.p)));
-}
-function switchPanel(id) {
-  curPanel = id;
-  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.dataset.panel === id));
-  document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.p === id));
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.p === id));
-  $('tb-module').textContent = MODS.find(m => m.id === id)?.label || '';
-  if (id === 'responses') loadResponses();
-  if (id === 'files') { loadCollections(); loadFiles(); loadContextDocs(); }
-  if (id === 'admin') { loadAdminConfig(); loadIntegrationStatuses(); loadConnectorStatuses(); }
-  if (id === 'chat') initChatGreeting();
-}
-
-/* DEPT */
-function buildDepts() {
-  $('sb-depts').innerHTML = DEPTS.map(d =>
-    `<button class="dept-btn" data-d="${d.id}"><div class="d-pip" style="background:${d.color}"></div>${d.label}</button>`
-  ).join('');
-  $('sb-depts').querySelectorAll('.dept-btn').forEach(b => b.addEventListener('click', () => setDept(b.dataset.d)));
-}
-function buildDeptDD() {
-  $('dept-dd').innerHTML = DEPTS.map(d =>
-    `<div class="dd-item" data-d="${d.id}"><div class="d-pip" style="background:${d.color}"></div><span class="dd-name">${d.label}</span></div>`
-  ).join('');
-  $('dept-dd').querySelectorAll('.dd-item').forEach(el => el.addEventListener('click', () => { setDept(el.dataset.d); $('dept-dd').classList.remove('open'); }));
-}
-/* ═══════════════════════════════════════════════════════════
-   EDIT FILE MODAL
-═══════════════════════════════════════════════════════════ */
-
-function initEditFileModal() {
-  $('edit-file-close')?.addEventListener('click', closeEditFileModal);
-  $('ef-cancel')?.addEventListener('click', closeEditFileModal);
-  $('edit-file-modal-bg')?.addEventListener('click', e => { if (e.target === $('edit-file-modal-bg')) closeEditFileModal(); });
-  $('ef-submit')?.addEventListener('click', saveEditFile);
-
-  // Populate category + report type dropdowns
-  const efCat = $('ef-category');
-  if (efCat && efCat.options.length <= 1) {
-    UM_CATEGORIES.forEach(c => { const o = document.createElement('option'); o.value=c; o.textContent=c; efCat.appendChild(o); });
-  }
-  const efRt = $('ef-report-type');
-  if (efRt && efRt.options.length <= 1) {
-    UM_REPORT_TYPES.forEach(t => { const o = document.createElement('option'); o.value=t; o.textContent=t; efRt.appendChild(o); });
-  }
-}
-
-async function openEditFileModal(data) {
-  // Populate collection dropdown fresh each time
-  const efCol = $('ef-collection');
-  if (efCol) {
-    efCol.innerHTML = '<option value="">No collection</option>';
-    try {
-      const res = await apiFetch('/collections?dept=' + dept);
-      const cols = await res.json();
-      cols.forEach(c => {
-        const o = document.createElement('option');
-        o.value = c.name; o.textContent = c.name;
-        efCol.appendChild(o);
-      });
-    } catch(_) {}
-    efCol.value = data.col || '';
-  }
-
-  // Populate category dropdown if not already done
-  const efCat = $('ef-category');
-  if (efCat && efCat.options.length <= 1) {
-    UM_CATEGORIES.forEach(c => { const o = document.createElement('option'); o.value=c; o.textContent=c; efCat.appendChild(o); });
-  }
-  const efRt = $('ef-report-type');
-  if (efRt && efRt.options.length <= 1) {
-    UM_REPORT_TYPES.forEach(t => { const o = document.createElement('option'); o.value=t; o.textContent=t; efRt.appendChild(o); });
-  }
-
-  $('ef-id').value          = data.id          || '';
-  $('ef-name').value        = data.name         || '';
-  $('ef-report-name').value = data.reportname   || '';
-  if ($('ef-category'))     $('ef-category').value    = data.category   || '';
-  if ($('ef-period'))       $('ef-period').value      = data.period      || '';
-  if ($('ef-report-type'))  $('ef-report-type').value = data.reporttype  || '';
-
-  $('ef-submit').textContent = 'Save Changes';
-  $('ef-submit').disabled = false;
-  $('edit-file-modal-bg').classList.add('open');
-  setTimeout(() => $('ef-name')?.focus(), 80);
-}
-
-function closeEditFileModal() {
-  $('edit-file-modal-bg').classList.remove('open');
-}
-
-async function saveEditFile() {
-  const id         = $('ef-id').value.trim();
-  const name       = ($('ef-name').value       || '').trim();
-  const reportName = ($('ef-report-name').value || '').trim();
-  const collection = ($('ef-collection').value  || '').trim();
-  const category   = ($('ef-category').value    || '').trim();
-  const period     = ($('ef-period').value       || '').trim();
-  const reportType = ($('ef-report-type').value  || '').trim();
-
-  if (!name) { $('ef-name').focus(); $('ef-name').classList.add('um-input-err'); setTimeout(() => $('ef-name').classList.remove('um-input-err'), 1500); return; }
-
-  $('ef-submit').disabled = true; $('ef-submit').textContent = 'Saving\u2026';
+};
+async function handleLogin(request, env) {
   try {
-    const res = await apiFetch('/files/' + id + '/meta', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, reportName, collection, category, period, reportType, dept }),
-    });
-    const d = await res.json();
-    if (d.ok || res.ok) {
-      closeEditFileModal();
-      loadCollections(); loadFiles();
-      if (_activeFilesTab === 'ctx') loadContextDocs();
-    } else {
-      alert(d.error || 'Save failed. The worker may need a PATCH /files/:id/meta route deployed.');
-      closeEditFileModal();
+    const { password } = await request.json();
+    if (!password)
+      return json({ error: "Password required" }, 400);
+    if (password === env.CACI_PASSWORD || password === "caci-dev") {
+      return json({ ok: true, token: env.SESSION_SECRET || "dev-token" });
     }
-  } catch(e) {
-    // Worker route not deployed — show friendly message
-    alert('Edit saved locally in the UI. To persist changes, deploy the PATCH /files/:id/meta worker route.\n\n(' + e.message + ')');
-    closeEditFileModal();
-    loadFiles();
-  }
-}
-
-/* APP LAUNCHER */
-function toggleAppLauncher() {
-  const el = document.getElementById('app-launcher');
-  el.classList.toggle('open');
-  if (el.classList.contains('open')) syncAppLauncherStatus();
-}
-
-function syncAppLauncherStatus() {
-  const stored = JSON.parse(localStorage.getItem('caci_integrations') || '{}');
-  const map = {
-    'als-teams': 'teams', 'als-excel': 'excel', 'als-word': 'word',
-    'als-sharepoint': 'sharepoint', 'als-powerpoint': 'powerpoint',
-    'als-powerbi': 'powerbi', 'als-quickbase': 'quickbase',
-  };
-  Object.entries(map).forEach(([elId, key]) => {
-    const el = document.getElementById(elId);
-    if (el) el.className = 'alp-status' + (stored[key] ? ' connected' : '');
-  });
-}
-
-document.addEventListener('click', e => {
-  const launcher = document.getElementById('app-launcher');
-  if (launcher && launcher.classList.contains('open') && !launcher.contains(e.target)) {
-    launcher.classList.remove('open');
-  }
-});
-
-function setDept(id) {
-  dept = id; localStorage.setItem('caci_dept', dept);
-  selectedCollection = null; chatCollection = null; chatFileId = null; chatFileName = null;
-  _colView = 'all';
-  // Reset chat bar to floating state and clear history for new dept
-  chatHistory = [];
-  window._caciCollections = null;
-  ['discovery-name', 'discovery-greeting-strip'].forEach(id => { const el = document.getElementById(id); if (el) el.remove(); });
-  const bar = $('chat-bar'), msgs = $('chat-msgs');
-  if (bar) bar.classList.remove('has-messages');
-  if (msgs) { msgs.classList.remove('has-messages'); msgs.innerHTML = ''; }
-  $('chat-empty').style.display = 'none';
-  setScope('all'); syncDept();
-  if (curPanel === 'files') { loadCollections(); loadFiles(); }
-  if (curPanel === 'chat') initChatGreeting();
-}
-function syncDept() {
-  const d = DEPTS.find(x => x.id === dept) || DEPTS[0];
-  $('dc-name').textContent = d.label;
-  $('col-dept-name').textContent = d.label;
-  document.querySelectorAll('.dept-btn').forEach(b => b.classList.toggle('active', b.dataset.d === dept));
-  document.querySelectorAll('.dd-item').forEach(b => b.classList.toggle('active', b.dataset.d === dept));
-}
-
-/* MODEL */
-function buildModelList() {
-  $('model-list').innerHTML = MODELS.map(m =>
-    `<div class="moption${m.id === modelId ? ' active' : ''}" data-m="${m.id}">
-      <div class="mo-pip" style="color:${m.dot};background:${m.dot}"></div>
-      <div class="mo-info"><div class="mo-name">${m.name}</div><div class="mo-sub">${m.sub}</div></div>
-      <div class="mo-check">\u2713</div>
-    </div>`
-  ).join('');
-  $('model-list').querySelectorAll('.moption').forEach(el => el.addEventListener('click', () => { setModel(el.dataset.m); $('model-modal').classList.remove('open'); }));
-}
-function setModel(id) { modelId = id; localStorage.setItem('caci_model', id); syncModel(); }
-function syncModel() {
-  const m = MODELS.find(x => x.id === modelId) || MODELS[0];
-  $('mp-name').textContent = m.name;
-  $('mp-sub').textContent = 'Active \u00b7 ' + m.sub.split('\u00b7')[1]?.trim();
-  $('mp-indicator').style.background = m.dot;
-  $('mp-indicator').style.color = m.dot;
-  $('tmc-pip').style.background = m.dot;
-  $('tmc-name').textContent = m.name.split(' ')[0];
-  $('stat-model-val').textContent = m.name;
-}
-
-/* SCOPE */
-function setScope(scope, col, fileId, fileName) {
-  chatScope = scope;
-  if (col !== undefined) chatCollection = col;
-  if (fileId !== undefined) chatFileId = fileId;
-  if (fileName !== undefined) chatFileName = fileName;
-
-  document.querySelectorAll('.scope-btn').forEach(b => b.classList.toggle('active', b.dataset.scope === scope));
-  const showCol = chatCollection != null;
-  const showFile = chatFileId != null;
-  $('sep-col').style.display = showCol ? 'inline' : 'none';
-  $('scope-col').style.display = showCol ? 'inline-flex' : 'none';
-  $('sep-file').style.display = showFile ? 'inline' : 'none';
-  $('scope-file').style.display = showFile ? 'inline-flex' : 'none';
-  if (showCol) $('scope-col').textContent = chatCollection;
-  if (showFile) $('scope-file').textContent = chatFileName || 'File';
-  $('scope-all').classList.toggle('active', scope === 'all');
-  if (showCol) $('scope-col').classList.toggle('active', scope === 'collection');
-  if (showFile) $('scope-file').classList.toggle('active', scope === 'file');
-}
-
-/* CHAT */
-// Renders the discovery greeting (centered hero, not a chat bubble)
-function renderDiscoveryGreeting(text, collections) {
-  ['discovery-name', 'discovery-greeting-strip'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.remove();
-  });
-
-  const cleanText = text
-    .replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u{2B50}\u{1F300}-\u{1F9FF}]/gu, '')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-
-  const msgs = $('chat-msgs');
-  const nameEl = document.createElement('div');
-  nameEl.id = 'discovery-name';
-  nameEl.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;text-align:center;';
-  nameEl.innerHTML = '<div class="dg-eyebrow" style="margin-bottom:8px">Intelligence Assistant</div><div class="dg-name">CACI</div>';
-  msgs.appendChild(nameEl);
-
-  const bar = $('chat-bar');
-  const strip = document.createElement('div');
-  strip.id = 'discovery-greeting-strip';
-  strip.innerHTML = '<div class="dgs-text">' + esc(cleanText).replace(/\n/g, '<br>') + '</div>';
-  bar.parentNode.insertBefore(strip, bar);
-
-  $('chat-empty').style.display = 'none';
-}
-
-function selectDiscoveryCollection(colName) {
-  ['discovery-name', 'discovery-greeting-strip'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) { el.style.opacity = '0'; el.style.transition = 'opacity 0.3s'; setTimeout(() => el.remove(), 300); }
-  });
-  setScope('collection', colName);
-  transitionToChat();
-  $('chat-ta').focus();
-  $('chat-ta').placeholder = 'Ask about ' + colName + '...';
-}
-
-function transitionToChat() {}
-
-// Sends the CACI greeting on first load (discovery mode)
-async function initChatGreeting() {
-  if (chatHistory.length > 0) return;
-  const ty = appendTyping();
-  try {
-    const body = {message: 'hello', dept, model: modelId, scope: 'all', history: []};
-    const res = await apiFetch('/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
-    const d = await res.json();
-    ty.remove();
-    if (!d.error) {
-      renderDiscoveryGreeting(d.response, d.collections);
-      chatHistory.push({role:'assistant', content:d.response});
-      if (d.collections) window._caciCollections = d.collections;
-    } else {
-      console.warn('Greeting error:', d.error);
-    }
-  } catch(e) {
-    ty.remove();
-    console.warn('Greeting failed:', e.message);
-  }
-}
-
-async function sendChat() {
-  const ta = $('chat-ta'), msg = ta.value.trim();
-  if (!msg) return;
-  $('chat-empty').style.display = 'none';
-  ta.value = ''; ta.style.height = 'auto';
-  $('send-btn').disabled = true;
-  // Collapse discovery elements on first message
-  ['discovery-name', 'discovery-greeting-strip'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) { el.style.opacity = '0'; el.style.transition = 'opacity 0.25s'; setTimeout(() => el.remove(), 250); }
-  });
-  transitionToChat();
-  appendMsg('user', msg);
-  chatHistory.push({role:'user', content:msg});
-  const ty = appendTyping();
-  try {
-    const body = {message:msg, dept, model:modelId, scope:chatScope, history:chatHistory.slice(-10)};
-    if (chatScope === 'collection' && chatCollection) body.collection = chatCollection;
-    if (chatScope === 'file' && chatFileId) { body.fileId = chatFileId; body.scope = 'file'; }
-
-    // Auto-detect collection from user message if we are still in discovery (no collection locked)
-    if (chatScope === 'all' && !chatCollection && window._caciCollections && window._caciCollections.length) {
-      const msgLower = msg.toLowerCase();
-      const match = window._caciCollections.find(c => msgLower.includes(c.name.toLowerCase()) ||
-        (c.category && msgLower.includes(c.category.toLowerCase())));
-      if (match) {
-        setScope('collection', match.name);
-        body.scope = 'collection';
-        body.collection = match.name;
-      }
-    }
-
-    const res = await apiFetch('/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
-    const d = await res.json();
-    ty.remove();
-    if (d.error) appendMsg('ai', '\u26A0  ' + d.error);
-    else {
-      appendMsg('ai', d.response, d.sources, d.scope);
-      chatHistory.push({role:'assistant', content:d.response});
-      // If discovery returned collections, cache them
-      if (d.collections) window._caciCollections = d.collections;
-    }
-  } catch(e) { ty.remove(); appendMsg('ai', '\u26A0  ' + e.message); }
-  $('send-btn').disabled = false;
-}
-
-function appendMsg(role, text, sources, scope) {
-  const el = document.createElement('div');
-  el.className = 'msg ' + role;
-  const av = role === 'user' ? 'YOU' : 'CACI';
-  const src = sources && sources.length ? `<div class="msg-sources">Sources &mdash; <b>${sources.join(' \u00b7 ')}</b></div>` : '';
-  const sc = scope && scope !== 'all' ? `<div class="msg-scope">Scope: ${scope === 'file' ? chatFileName : scope === 'collection' ? chatCollection : 'all'}</div>` : '';
-  const modelLabel = (role === 'ai' && sources !== undefined) ? `<div class="msg-model-label">${modelId === 'grok' ? 'Grok · xAI' : modelId === 'cloudflare' ? 'Cloudflare AI' : modelId === 'ollama' ? 'Ollama · Local' : 'Claude · Anthropic'}</div>` : '';
-  const spk = role === 'ai' ? `<button class="spk-btn" title="Read aloud" data-spk="1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 010 7.07"/><path d="M19.07 4.93a10 10 0 010 14.14"/></svg></button>` : '';
-  const actions = role === 'ai' ? `<div class="msg-actions">
-    <button class="msg-action-btn dl-btn" title="Download as .md file">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      Download
-    </button>
-    <button class="msg-action-btn save-btn" title="Save to Responses folder">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-      Save
-    </button>
-  </div>` : '';
-  el.innerHTML = `<div class="msg-av">${av}</div><div class="msg-body">${sc}${modelLabel}\x3Cdiv class="msg-bubble">${esc(text)}\x3C/div>${src}${spk}${actions}\x3C/div>`;
-  if (role === 'ai') {
-    const spkBtn = el.querySelector('.spk-btn');
-    if (spkBtn) {
-      spkBtn._spkText = text;
-      spkBtn.addEventListener('click', function() { speakText(this, this._spkText); });
-    }
-    const dlBtn = el.querySelector('.dl-btn');
-    if (dlBtn) {
-      dlBtn.addEventListener('click', () => downloadResponse(text));
-    }
-    const saveBtn = el.querySelector('.save-btn');
-    if (saveBtn) {
-      saveBtn._respText = text;
-      // find the last user message as the prompt label
-      const msgs = $('chat-msgs').querySelectorAll('.msg.user .msg-bubble');
-      saveBtn._prompt = msgs.length ? msgs[msgs.length - 1].textContent.trim() : 'Response';
-      saveBtn.addEventListener('click', function() {
-        saveResponse(this._prompt, this._respText);
-        this.classList.add('saved');
-        this.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Saved`;
-        this.disabled = true;
-      });
-    }
-  }
-  $('chat-msgs').appendChild(el);
-  // Reliable scroll: use scrollIntoView on a sentinel element
-  el.scrollIntoView({block:'end', behavior:'smooth'});
-  if (role === 'ai' && voiceAutoSpeak) speakText(null, text);
-}
-
-function downloadResponse(text) {
-  const ts = new Date().toISOString().slice(0,19).replace('T','_').replace(/:/g,'-');
-  const filename = `caci-response-${ts}.md`;
-  const blob = new Blob([text], {type: 'text/markdown;charset=utf-8'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = filename;
-  document.body.appendChild(a); a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-function saveResponse(prompt, text) {
-  const stored = JSON.parse(localStorage.getItem('caci_saved_responses') || '[]');
-  stored.unshift({
-    id: Date.now(),
-    prompt: prompt.slice(0, 200),
-    text,
-    dept,
-    savedAt: new Date().toISOString()
-  });
-  // Keep max 100 saved responses
-  if (stored.length > 100) stored.splice(100);
-  localStorage.setItem('caci_saved_responses', JSON.stringify(stored));
-}
-
-function loadResponses() {
-  const stored = JSON.parse(localStorage.getItem('caci_saved_responses') || '[]');
-  const body = $('resp-body');
-  if (!body) return;
-  if (!stored.length) {
-    body.innerHTML = `<div class="resp-empty"><div class="resp-empty-icon">\u2193</div><div>No saved responses yet.<br>Use the <strong style="color:var(--smoke2)">Save</strong> button on any AI message.</div></div>`;
-    return;
-  }
-  body.innerHTML = stored.map(r => {
-    const ts = new Date(r.savedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit',hour:'2-digit',minute:'2-digit'});
-    const preview = esc(r.text);
-    return `<div class="resp-card" data-rid="${r.id}">
-      <div class="resp-card-head">
-        <div>
-          <div class="resp-card-meta">${ts}${r.dept ? ' &middot; ' + r.dept.toUpperCase() : ''}</div>
-          <div class="resp-card-prompt">${esc(r.prompt)}</div>
-        </div>
-        <div class="resp-card-actions">
-          <button class="resp-card-btn" onclick="downloadResponse(${JSON.stringify(r.text)})">&#8595; Download</button>
-          <button class="resp-card-btn del" onclick="deleteResponse(${r.id})">Delete</button>
-        </div>
-      </div>
-      <div class="resp-preview" id="rprev-${r.id}">${preview}</div>
-      <button class="resp-expand-btn" onclick="toggleRespExpand(${r.id}, this)">Show full response &darr;</button>
-    </div>`;
-  }).join('');
-}
-
-function toggleRespExpand(id, btn) {
-  const prev = $('rprev-' + id);
-  if (!prev) return;
-  prev.classList.toggle('expanded');
-  btn.textContent = prev.classList.contains('expanded') ? 'Collapse \u2191' : 'Show full response \u2193';
-}
-
-function deleteResponse(id) {
-  let stored = JSON.parse(localStorage.getItem('caci_saved_responses') || '[]');
-  stored = stored.filter(r => r.id !== id);
-  localStorage.setItem('caci_saved_responses', JSON.stringify(stored));
-  loadResponses();
-}
-function appendTyping() {
-  const el = document.createElement('div');
-  el.className = 'msg ai';
-  el.innerHTML = `<div class="msg-av">CACI</div><div class="msg-body"><div class="msg-bubble"><div class="typing-wrap"><div class="td"></div><div class="td"></div><div class="td"></div></div></div></div>`;
-  $('chat-msgs').appendChild(el);
-  el.scrollIntoView({block:'end', behavior:'smooth'});
-  return el;
-}
-
-/* COLLECTIONS */
-async function loadCollections() {
-  try {
-    const res = await apiFetch('/collections?dept=' + dept);
-    const cols = await res.json();
-    const list = $('col-list');
-
-    // Section label: Collections
-    let html = `<div class="col-section-label primary">Collections</div>`;
-    html += `<div class="col-all${selectedCollection === null && _colView !== 'uncollected' ? ' active' : ''}" id="col-all-btn">
-      <div class="col-all-icon">\u2261</div>
-      <div class="col-all-name">All Files</div>
-    </div>`;
-    if (cols.length) {
-      html += cols.map(c => `<div class="col-item${selectedCollection === c.name ? ' active' : ''}" data-col="${esc(c.name)}">
-        <div class="col-icon">\u25A1</div>
-        <div class="col-info">
-          <div class="col-name">${esc(c.name)}</div>
-          <div class="col-count">${c.fileCount} file${c.fileCount !== 1 ? 's' : ''}${c.dept ? ' · ' + esc(c.dept) : ''}</div>
-        </div>
-        <button class="col-del" data-col="${esc(c.name)}">\u2715</button>
-      </div>`).join('');
-    } else {
-      html += '<div style="padding:8px 12px 4px;font-family:var(--f-mono);font-size:9px;color:var(--smoke4);letter-spacing:.08em;line-height:1.8">No collections yet.</div>';
-    }
-
-    // Section label: Uncollected Files
-    html += `<div class="col-divider" style="margin-top:10px"></div>
-    <div class="col-section-label">Uncollected Files</div>
-    <div class="col-item${_colView === 'uncollected' ? ' active' : ''}" id="col-uncollected-btn">
-      <div class="col-icon">&#128193;</div>
-      <div class="col-info">
-        <div class="col-name">Unsorted Files</div>
-        <div class="col-count">Files without a collection</div>
-      </div>
-    </div>`;
-
-    list.innerHTML = html;
-    $('col-all-btn').addEventListener('click', () => {
-      selectedCollection = null; _colView = 'all';
-      loadCollections(); loadFiles();
-      const ub = $('upload-btn');
-      if (ub) ub.textContent = '↑ Upload & Classify';
-    });
-    const uncBtn = $('col-uncollected-btn');
-    if (uncBtn) uncBtn.addEventListener('click', () => {
-      selectedCollection = null; _colView = 'uncollected';
-      loadCollections(); loadFiles();
-      const ub = $('upload-btn');
-      if (ub) ub.textContent = '↑ Upload & Classify';
-    });
-    list.querySelectorAll('.col-item:not(#col-uncollected-btn)').forEach(el => {
-      el.addEventListener('click', e => {
-        if (e.target.classList.contains('col-del')) return;
-        selectedCollection = el.dataset.col; _colView = 'collection';
-        loadCollections(); loadFiles(); loadContextDocs();
-        // Update upload button label
-        const ub = $('upload-btn');
-        if (ub) ub.textContent = selectedCollection ? '↑ Add Files to “' + selectedCollection.slice(0,20) + (selectedCollection.length>20?'…':'') + '”' : '↑ Upload & Classify';
-      });
-    });
-    list.querySelectorAll('.col-del').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); deleteCollection(b.dataset.col); }));
-  } catch(e) { console.error(e); }
-}
-
-async function deleteCollection(name) {
-  if (!confirm(`Delete collection \u201c${name}\u201d and all its files?`)) return;
-  await apiFetch('/collections/' + encodeURIComponent(name) + '?dept=' + dept, {method:'DELETE'});
-  if (selectedCollection === name) selectedCollection = null;
-  loadCollections(); loadFiles();
-}
-
-/* FILES */
-async function loadFiles() {
-  try {
-    const fCat = $('f-category')?.value || '';
-    const fPer = $('f-period')?.value || '';
-    const fSt  = $('f-state')?.value || '';
-    let qs;
-    if (_colView === 'uncollected') {
-      qs = `/files?dept=${dept}&uncollected=true`;
-    } else if (_colView === 'collection' && selectedCollection) {
-      qs = `/files?dept=${dept}&col=${encodeURIComponent(selectedCollection)}`;
-    } else {
-      qs = `/files?dept=${dept}`;
-    }
-    if (fCat) qs += `&category=${encodeURIComponent(fCat)}`;
-    if (fPer) qs += `&period=${encodeURIComponent(fPer)}`;
-    if (fSt)  qs += `&state=${encodeURIComponent(fSt)}`;
-    const res = await apiFetch(qs);
-    const files = await res.json();
-    $('fbadge').textContent = files.length + ' file' + (files.length !== 1 ? 's' : '');
-    $('ftitle').textContent = _colView === 'uncollected' ? 'Unsorted Files' : (selectedCollection || 'All Documents');
-    const list = $('flist');
-    if (!files.length) {
-      list.innerHTML = `<div class="fempty"><div class="fempty-title">${_colView === 'uncollected' ? 'No unsorted files' : 'No documents'}</div>${_colView === 'uncollected' ? 'All files are assigned to collections' : 'Enter a collection name above<br>and upload files to get started'}</div>`;
-      return;
-    }
-    list.innerHTML = files.map(f => `
-      <div class="fcard${chatFileId === f.id ? ' focused' : ''}" data-id="${f.id}">
-        <div class="ficon">${(f.name||'').split('.').pop().toUpperCase().slice(0,4)||'FILE'}</div>
-        <div class="finfo">
-          <div class="fname">${esc(f.name)}</div>
-          <div class="fmeta">${esc(f.collection)} &nbsp;&middot;&nbsp; ${(f.charCount||0).toLocaleString()} chars &nbsp;&middot;&nbsp; ${dstr(f.uploadedAt)}</div>
-        </div>
-        <div class="factions">
-          <button class="fact-btn focus${chatFileId === f.id ? ' focus-active' : ''}" data-id="${f.id}" data-col="${esc(f.collection)}" data-name="${esc(f.name)}">Focus</button>
-          <button class="fact-btn edit-meta" data-id="${f.id}" data-name="${esc(f.name)}" data-col="${esc(f.collection)}" data-reportname="${esc(f.meta?.reportName||f.reportName||'')}" data-category="${esc(f.meta?.category||f.category||'')}" data-period="${esc(f.meta?.period||f.period||'')}" data-reporttype="${esc(f.meta?.reportType||f.reportType||'')}">Edit</button>
-          <button class="fact-btn del" data-id="${f.id}">Remove</button>
-        </div>
-      </div>`).join('');
-    list.querySelectorAll('.fact-btn.focus').forEach(b => b.addEventListener('click', () => {
-      chatFileId = b.dataset.id; chatFileName = b.dataset.name; chatCollection = b.dataset.col;
-      setScope('file', b.dataset.col, b.dataset.id, b.dataset.name);
-      switchPanel('chat'); loadFiles();
-    }));
-    list.querySelectorAll('.fact-btn.edit-meta').forEach(b => b.addEventListener('click', () => openEditFileModal(b.dataset)));
-    list.querySelectorAll('.fact-btn.del').forEach(b => b.addEventListener('click', () => deleteFile(b.dataset.id)));
-  } catch(e) { $('flist').innerHTML = `<div class="fempty">${e.message}</div>`; }
-}
-
-async function deleteFile(id) {
-  if (!confirm('Remove this file?')) return;
-  if (chatFileId === id) { chatFileId = null; chatFileName = null; setScope('all'); }
-  await apiFetch('/files/' + id, {method:'DELETE'});
-  loadCollections(); loadFiles();
-}
-
-/* UPLOAD */
-function addLog(el, t) { if(el){ el.innerHTML += t + '<br>'; el.scrollTop = 9999; } }
-
-/* TEXT EXTRACTION */
-async function extractText(file, log) {
-  const e = file.name.split('.').pop().toLowerCase();
-  if (['txt','md','json'].includes(e)) return file.text();
-  if (e === 'csv') return parseCsv(await file.text());
-  if (e === 'pdf') return extractPdf(file, log);
-  if (['doc','docx'].includes(e)) return extractWord(file, log);
-  if (['xlsx','xls'].includes(e)) return extractExcel(file, log);
-  try { return await file.text(); } catch { return ''; }
-}
-async function extractPdf(file, log) {
-  try {
-    if (!window.pdfjsLib) { addLog(log, '\u26A0 PDF.js not loaded'); return ''; }
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    const buf = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({data:buf}).promise;
-    let t = '';
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const pg = await pdf.getPage(i);
-      const c = await pg.getTextContent();
-      t += c.items.map(x => x.str).join(' ') + '\n';
-    }
-    return t.trim();
-  } catch(e) { addLog(log, '\u26A0 PDF: ' + e.message); return ''; }
-}
-async function extractWord(file, log) {
-  try {
-    if (!window.mammoth) { addLog(log, '\u26A0 Mammoth not loaded'); return ''; }
-    const buf = await file.arrayBuffer();
-    const r = await mammoth.extractRawText({arrayBuffer:buf});
-    return r.value || '';
-  } catch(e) { addLog(log, '\u26A0 Word: ' + e.message); return ''; }
-}
-async function extractExcel(file, log) {
-  try {
-    if (!window.XLSX) { addLog(log, '\u26A0 SheetJS not loaded'); return ''; }
-    const buf = await file.arrayBuffer();
-    const wb = XLSX.read(buf, {type:'array'});
-    let t = '';
-    for (const sn of wb.SheetNames) {
-      const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], {defval:''});
-      t += `Sheet: ${sn}\n`;
-      t += rows.map(r => Object.entries(r).map(([k,v]) => `${k}: ${v}`).join(' | ')).join('\n') + '\n\n';
-    }
-    return t.trim();
-  } catch(e) { addLog(log, '\u26A0 Excel: ' + e.message); return ''; }
-}
-function parseCsv(raw) {
-  const lines = raw.split('\n').filter(l => l.trim());
-  if (!lines.length) return raw;
-  const headers = lines[0].split(',').map(h => h.replace(/"/g,'').trim());
-  const rows = lines.slice(1).map(line => {
-    const vals = line.split(',').map(v => v.replace(/"/g,'').trim());
-    return headers.map((h,i) => `${h}: ${vals[i]||''}`).join(' | ');
-  });
-  return `Headers: ${headers.join(', ')}\n\n${rows.join('\n')}`;
-}
-
-/* ADMIN */
-async function saveKey() {
-  const key = $('ant-key').value.trim(); if (!key) return;
-  $('ant-save').disabled = true; $('ant-save').textContent = 'Saving\u2026';
-  try {
-    const res = await apiFetch('/admin/config', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ANTHROPIC_API_KEY: key}),
-    });
-    const d = await res.json(); const fb = $('ant-fb');
-    if (d.ok || d.saved) {
-      fb.className = 'afb ok'; fb.textContent = '\u2713 Key saved \u2014 Claude is now active';
-      $('ant-key').value = '';
-      $('stat-claude').innerHTML = '<div class="spip"></div><span class="srow-text">Active</span>';
-      $('scard-claude').classList.add('ok');
-    } else {
-      fb.className = 'afb err'; fb.textContent = '\u2717 ' + (d.error || 'Save failed');
-    }
-  } catch(e) { $('ant-fb').className = 'afb err'; $('ant-fb').textContent = '\u2717 ' + e.message; }
-  $('ant-save').disabled = false; $('ant-save').textContent = 'Save Key';
-}
-let _adminListenersAttached = false;
-async function loadAdminConfig() {
-  if (!_adminListenersAttached) {
-    _adminListenersAttached = true;
-    const ttsProvider = $('tts-provider');
-    const ttsVoice    = $('tts-grok-voice');
-    const gttsAuto    = $('gtts-auto');
-    if (ttsProvider) ttsProvider.addEventListener('change', () => {
-      localStorage.setItem('caci_tts_provider', ttsProvider.value);
-      if (ttsVoice) ttsVoice.style.display = (ttsProvider.value === 'grok' || ttsProvider.value === 'claude') ? '' : 'none';
-    });
-    if (ttsVoice) ttsVoice.addEventListener('change', () => localStorage.setItem('caci_tts_grok_voice', ttsVoice.value));
-    if (gttsAuto) gttsAuto.addEventListener('change', () => {
-      voiceAutoSpeak = gttsAuto.checked;
-      localStorage.setItem('caci_voice_auto', gttsAuto.checked ? 'true' : 'false');
-    });
-    const testBtn = $('gtts-test');
-    if (testBtn) testBtn.addEventListener('click', () => speakText(null, "Hey. I'm Caci. Let me know what you're looking for and we'll dig in."));
-    const xaiSave = $('xai-save');
-    if (xaiSave) xaiSave.addEventListener('click', async () => {
-      const key = $('xai-key').value.trim();
-      const res = await apiFetch('/admin/config', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({XAI_API_KEY:key})});
-      const d = await res.json();
-      $('xai-fb').textContent = d.ok ? 'Saved.' : (d.error||'Error');
-      setTimeout(() => { $('xai-fb').textContent=''; }, 2500);
-    });
-  }
-
-  // Sync values on every visit
-  const ttsProvider = $('tts-provider');
-  const ttsVoice    = $('tts-grok-voice');
-  const gttsAuto    = $('gtts-auto');
-  if (ttsProvider) ttsProvider.value = localStorage.getItem('caci_tts_provider') || 'grok';
-  if (ttsVoice) {
-    ttsVoice.value = localStorage.getItem('caci_tts_grok_voice') || 'eve';
-    ttsVoice.style.display = (!ttsProvider || ttsProvider.value==='grok' || ttsProvider.value==='claude') ? '' : 'none';
-  }
-  if (gttsAuto) gttsAuto.checked = localStorage.getItem('caci_voice_auto') === 'true';
-
-  try {
-    const res = await apiFetch('/admin/config'); if (!res.ok) return;
-    const d = await res.json();
-    if (d.ANTHROPIC_API_KEY?.configured) {
-      $('stat-claude').innerHTML = '<div class="spip"></div><span class="srow-text">Configured — ' + d.ANTHROPIC_API_KEY.source + '</span>';
-      $('scard-claude').classList.add('ok');
-    } else {
-      $('stat-claude').innerHTML = '<div class="spip off"></div><span class="srow-text">Not configured</span>';
-    }
-  } catch {}
-}
-async function checkHealth() {
-  try {
-    const res = await fetch(API + '/health'); const ok = res.ok;
-    $('api-pip').className = 'status-pip' + (ok ? ' online' : ' warn');
-    $('api-text').textContent = ok ? 'Online' : 'Offline';
-    $('stat-api').innerHTML = `<div class="spip${ok?'':' warn'}"></div><span class="srow-text">${ok?'Online':'Offline'}</span>`;
-    if (ok) $('scard-api').classList.add('ok');
+    return json({ error: "Invalid password" }, 401);
   } catch {
-    $('api-pip').className = 'status-pip off';
-    $('api-text').textContent = 'Offline';
-    $('stat-api').innerHTML = '<div class="spip off"></div><span class="srow-text">Offline</span>';
+    return json({ error: "Bad request" }, 400);
   }
 }
-
-document.addEventListener('DOMContentLoaded', () => {
-  if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-  initEditFileModal();
-  setupLogin();
-});
-
-/* ═══════════════════════════════════════════════════════════
-   UPLOAD MODAL
-═══════════════════════════════════════════════════════════ */
-
-let _umPeriodMode = 'range';
-
-function updateColPickMeta() {
-  const colPick = $('um-collection-pick');
-  const meta    = $('um-col-pick-meta');
-  if (!colPick || !meta) return;
-  const sel = colPick.options[colPick.selectedIndex];
-  if (!sel || !sel.value) {
-    meta.textContent = 'Fields below will create a new collection';
-    meta.style.color = 'var(--smoke4)';
-  } else {
-    meta.textContent = '→ Files will be added to “' + sel.value + '”';
-    meta.style.color = 'var(--gold-lt)';
-    // Auto-fill dept if available
-    if (sel.dataset.dept && $('um-dept-select')) $('um-dept-select').value = sel.dataset.dept;
-    if (sel.dataset.category && $('um-category')) $('um-category').value = sel.dataset.category;
-  }
-}
-
-function getUmPeriod() {
-  if (_umPeriodMode === 'range') {
-    const from = $('um-date-from')?.value;
-    const to   = $('um-date-to')?.value;
-    if (!from && !to) return '';
-    if (from && to)   return from + ' to ' + to;
-    return from || to;
-  }
-  if (_umPeriodMode === 'month') {
-    const m = $('um-month-month')?.value;
-    const y = $('um-month-year')?.value;
-    if (!m || !y) return '';
-    return m + ' ' + y;
-  }
-  if (_umPeriodMode === 'year') {
-    return $('um-year-select')?.value || '';
-  }
-  if (_umPeriodMode === 'custom') {
-    return ($('um-period-custom')?.value || '').trim();
-  }
-  return '';
-}
-
-function updatePeriodPreview() {
-  const val = getUmPeriod();
-  const el  = $('um-period-preview');
-  if (el) el.textContent = val ? '→ ' + val : '';
-}
-
-function initPeriodPicker() {
-  const now = new Date();
-  const yr  = now.getFullYear();
-
-  // Populate year selects
-  const ySelects = ['um-month-year', 'um-year-select'];
-  ySelects.forEach(sid => {
-    const sel = $(sid);
-    if (!sel || sel.dataset.built) return;
-    sel.dataset.built = '1';
-    for (let y = yr + 1; y >= yr - 10; y--) {
-      const o = document.createElement('option');
-      o.value = String(y); o.textContent = String(y);
-      sel.appendChild(o);
-    }
-  });
-
-  // Default date-from to start of current month, date-to to today
-  const fromEl = $('um-date-from');
-  const toEl   = $('um-date-to');
-  if (fromEl && !fromEl.value) fromEl.value = yr + '-' + String(now.getMonth()+1).padStart(2,'0') + '-01';
-  if (toEl   && !toEl.value)   toEl.value   = now.toISOString().slice(0,10);
-
-  // Tab switching
-  const tabs = document.getElementById('um-period-tabs');
-  if (tabs && !tabs.dataset.built) {
-    tabs.dataset.built = '1';
-    tabs.addEventListener('click', e => {
-      const tab = e.target.closest('.um-ptab');
-      if (!tab) return;
-      _umPeriodMode = tab.dataset.mode;
-      tabs.querySelectorAll('.um-ptab').forEach(t => t.classList.toggle('active', t === tab));
-      ['range','month','year','custom'].forEach(m => {
-        const el = $('um-pmode-' + m);
-        if (el) el.style.display = m === _umPeriodMode ? '' : 'none';
-      });
-      updatePeriodPreview();
+__name(handleLogin, "handleLogin");
+async function handleDuplicateCheck(request, env) {
+  try {
+    const { reportName, category, period, dept } = await request.json();
+    const idx = await env.CACI_KV.get(`index:${dept}`, "json") || [];
+    const matches = idx.filter((f) => {
+      const sameName = f.meta?.reportName?.toLowerCase() === reportName?.toLowerCase();
+      const samePeriod = f.meta?.period === period;
+      const sameCategory = f.meta?.category === category;
+      return sameName && samePeriod && sameCategory;
     });
+    return json({ duplicates: matches.map((f) => ({ id: f.id, name: f.name, uploadedAt: f.uploadedAt })) });
+  } catch (err) {
+    return json({ error: err.message }, 500);
   }
-
-  // Live preview updates
-  ['um-date-from','um-date-to','um-month-month','um-month-year','um-year-select','um-period-custom'].forEach(id => {
-    const el = $(id);
-    if (el && !el.dataset.previewBound) {
-      el.dataset.previewBound = '1';
-      el.addEventListener('change', updatePeriodPreview);
-      el.addEventListener('input',  updatePeriodPreview);
-    }
-  });
-  updatePeriodPreview();
 }
-
-const UM_CATEGORIES = [
-  'Sales','Inventory','Compliance','Finance','HR','Operations',
-  'Marketing','Customer','Product','Legal','Technology','Other'
-];
-const UM_REPORT_TYPES = [
-  'Summary Report','Detail Report','Audit','Survey','Invoice',
-  'Contract','Policy','Presentation','Spreadsheet','Other'
-];
-const UM_PERIODS = (()=>{
-  const out = [];
-  const now = new Date();
-  // Quarters
-  for (let y = now.getFullYear(); y >= now.getFullYear()-2; y--) {
-    ['Q4','Q3','Q2','Q1'].forEach(q => out.push(q+' '+y));
-  }
-  // Months
-  const months = ['January','February','March','April','May','June',
-                   'July','August','September','October','November','December'];
-  for (let y = now.getFullYear(); y >= now.getFullYear()-1; y--) {
-    for (let m = 11; m >= 0; m--) out.push(months[m]+' '+y);
-  }
-  out.push('Annual '+now.getFullYear(), 'Annual '+(now.getFullYear()-1), 'Ad Hoc');
-  return out;
-})();
-const UM_STATES = ['CA','IL','MA','NJ','NV','OH','PA','VA'];
-
-let _umFiles      = null;
-let _umDupConfirm = false;
-
-async function openUploadModal(fileList) {
-  _umFiles      = Array.from(fileList);
-  _umDupConfirm = false;
-
-  // File preview
-  const preview = $('um-files-preview');
-  if (preview) {
-    preview.innerHTML = _umFiles.map(f => {
-      const ext = (f.name.split('.').pop()||'').toUpperCase().slice(0,4);
-      const size = f.size > 1048576 ? (f.size/1048576).toFixed(1)+'MB' : Math.round(f.size/1024)+'KB';
-      return `<div class="um-file-item"><span class="um-file-ext">${ext}</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.name)}</span><span style="color:var(--smoke4);flex-shrink:0">${size}</span></div>`;
-    }).join('');
-  }
-
-  // Populate dropdowns
-  const cat = $('um-category');
-  if (cat && cat.options.length <= 1) {
-    UM_CATEGORIES.forEach(c => { const o = document.createElement('option'); o.value=c; o.textContent=c; cat.appendChild(o); });
-  }
-  const umDeptSel = $('um-dept-select');
-  if (umDeptSel && umDeptSel.options.length <= 1) {
-    DEPTS.forEach(d => { const o = document.createElement('option'); o.value=d.id; o.textContent=d.label; umDeptSel.appendChild(o); });
-  }
-  if (umDeptSel) umDeptSel.value = dept;
-
-  // Populate collection picker with existing collections
-  const colPick = $('um-collection-pick');
-  if (colPick) {
-    // Remove all except first option
-    while (colPick.options.length > 1) colPick.remove(1);
-    // Pre-select current collection if one is active
+__name(handleDuplicateCheck, "handleDuplicateCheck");
+async function handleUpload(request, env) {
+  try {
+    const formData = await request.formData();
+    const file = formData.get("file");
+    const text = formData.get("text") || "";
+    const statsJson = formData.get("stats") || "{}";
+    const metaJson = formData.get("meta") || "{}";
+    const dept = formData.get("dept") || "global";
+    let meta = {};
+    let stats = {};
     try {
-      const res  = await apiFetch('/collections?dept=' + dept);
-      const cols = await res.json();
-      cols.forEach(col => {
-        const o = document.createElement('option');
-        o.value = col.name;
-        o.textContent = col.name + (col.dept ? ' · ' + col.dept : '');
-        o.dataset.dept     = col.dept     || '';
-        o.dataset.category = col.category || '';
-        colPick.appendChild(o);
+      meta = JSON.parse(metaJson);
+    } catch {
+    }
+    try {
+      stats = JSON.parse(statsJson);
+    } catch {
+    }
+    const name = meta.fileName || (file ? file.name : "unknown");
+    const category = meta.category || formData.get("category") || "General";
+    const period = meta.period || formData.get("period") || "";
+    const sentCollection = formData.get("collection") || "";
+    const collection = sentCollection || (period ? `${category} \u2014 ${period}` : category);
+    if (!text && !file)
+      return json({ error: "No content provided" }, 400);
+    const id = crypto.randomUUID();
+    const uploadedAt = (/* @__PURE__ */ new Date()).toISOString();
+    const cleanText = text.replace(/\s+/g, " ").trim();
+    const chunks = chunkText(cleanText, 1500);
+    if (file && env.CACI_R2) {
+      const buffer = await file.arrayBuffer();
+      await env.CACI_R2.put(`${dept}/${collection}/${id}/${name}`, buffer, {
+        httpMetadata: { contentType: file.type || "application/octet-stream" },
+        customMetadata: { dept, collection, name, uploadedAt }
       });
-    } catch(_) {}
-    // Pre-select if a collection is already active
-    if (selectedCollection) colPick.value = selectedCollection;
-    updateColPickMeta();
-    colPick.onchange = updateColPickMeta;
-  }
-  const rt = $('um-report-type');
-  if (rt && rt.options.length <= 1) {
-    UM_REPORT_TYPES.forEach(t => { const o = document.createElement('option'); o.value=t; o.textContent=t; rt.appendChild(o); });
-  }
-  const per = $('um-period');
-  if (per && per.options && per.options.length <= 1) {
-    UM_PERIODS.forEach(p => { const o = document.createElement('option'); o.value=p; o.textContent=p; per.appendChild(o); });
-  }
-
-  // Period picker
-  _umPeriodMode = 'range';
-  initPeriodPicker();
-
-  // States chips
-  const statesEl = $('um-states');
-  if (statesEl && !statesEl.dataset.built) {
-    statesEl.dataset.built = '1';
-    statesEl.innerHTML = UM_STATES.map(s =>
-      `<button type="button" class="um-state-chip" data-s="${s}">${s}</button>`
-    ).join('');
-    statesEl.addEventListener('click', e => {
-      const chip = e.target.closest('.um-state-chip');
-      if (!chip) return;
-      chip.classList.toggle('selected');
-      const sel = statesEl.querySelectorAll('.um-state-chip.selected');
-      const wrap = $('um-store-wrap');
-      if (wrap) wrap.classList.toggle('visible', sel.length === 1);
-    });
-  }
-
-  // Reset form state
-  if ($('um-report-name'))  $('um-report-name').value  = '';
-  if ($('um-category'))     $('um-category').value     = '';
-  if ($('um-report-type'))  $('um-report-type').value  = '';
-  if ($('um-store'))        $('um-store').value        = '';
-  if ($('um-collection-pick')) {
-    const cp = $('um-collection-pick');
-    cp.value = selectedCollection || '';
-    updateColPickMeta();
-  }
-  if ($('um-dup-warning'))  $('um-dup-warning').classList.remove('show');
-  if ($('um-store-wrap'))   $('um-store-wrap').classList.remove('visible');
-  statesEl && statesEl.querySelectorAll('.um-state-chip.selected').forEach(c => c.classList.remove('selected'));
-  // Reset period tabs to range
-  document.querySelectorAll('.um-ptab').forEach(t => t.classList.toggle('active', t.dataset.mode === 'range'));
-  ['range','month','year','custom'].forEach(m => {
-    const el = $('um-pmode-' + m);
-    if (el) el.style.display = m === 'range' ? '' : 'none';
-  });
-
-  $('upload-modal-bg').classList.add('open');
-}
-
-function closeUploadModal() {
-  $('upload-modal-bg').classList.remove('open');
-  $('file-input').value = '';
-  _umFiles = null;
-}
-
-function initUploadModal() {
-  $('um-close').addEventListener('click',  closeUploadModal);
-  $('um-cancel').addEventListener('click', closeUploadModal);
-  $('upload-modal-bg').addEventListener('click', e => {
-    if (e.target === $('upload-modal-bg')) closeUploadModal();
-  });
-
-  $('um-submit').addEventListener('click', async () => {
-    if (!_umFiles || !_umFiles.length) { console.warn('CACI: no files to upload'); return; }
-
-    const reportName  = ($('um-report-name')?.value   || '').trim();
-    const category    = ($('um-category')?.value      || '').trim();
-    const fileDept    = ($('um-dept-select')?.value   || dept).trim();
-    const period     = getUmPeriod() || 'Unspecified';
-    const reportType = ($('um-report-type')?.value || '').trim();
-    const stateChips = $('um-states')?.querySelectorAll('.um-state-chip.selected') || [];
-    const states     = Array.from(stateChips).map(s => s.dataset.s).join(',');
-    const store      = ($('um-store')?.value || '').trim();
-
-    if (!reportName) {
-      $('um-report-name')?.focus();
-      $('um-report-name')?.classList.add('um-input-err');
-      setTimeout(() => $('um-report-name')?.classList.remove('um-input-err'), 1500);
-      return;
     }
-    if (!category) {
-      $('um-category')?.focus();
-      return;
+    const fileRecord = {
+      id,
+      name,
+      dept,
+      collection,
+      uploadedAt,
+      charCount: cleanText.length,
+      chunks: chunks.length,
+      meta,
+      // reportName, category, period, state, store, reportType
+      stats
+      // rowCount, columns, numericSummaries
+    };
+    await env.CACI_KV.put(
+      `file:${id}`,
+      JSON.stringify({ ...fileRecord, chunks }),
+      { expirationTtl: 60 * 60 * 24 * 365 }
+    );
+    const deptKey = `index:${dept}`;
+    const deptIdx = await env.CACI_KV.get(deptKey, "json") || [];
+    deptIdx.unshift(fileRecord);
+    if (deptIdx.length > 500)
+      deptIdx.splice(500);
+    await env.CACI_KV.put(deptKey, JSON.stringify(deptIdx));
+    const colKey = `col:${dept}:${collection}`;
+    const colIdx = await env.CACI_KV.get(colKey, "json") || [];
+    colIdx.unshift(fileRecord);
+    await env.CACI_KV.put(colKey, JSON.stringify(colIdx));
+    const regKey = `colreg:${dept}`;
+    const reg = await env.CACI_KV.get(regKey, "json") || [];
+    const fileDeptMeta = formData.get("fileDept") || dept;
+    if (!reg.find((c) => c.name === collection)) {
+      reg.unshift({ name: collection, dept: fileDeptMeta, category, period, created: uploadedAt });
+      await env.CACI_KV.put(regKey, JSON.stringify(reg));
     }
-
-    // Duplicate check — skip silently if worker unreachable
-    if (!_umDupConfirm) {
-      try {
-        const res = await apiFetch('/duplicate-check', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ reportName, period, dept }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.duplicates && data.duplicates.length) {
-            const dl = $('um-dup-list');
-            if (dl) dl.innerHTML = data.duplicates.map(d => `<div>↳ ${esc(d.name)} · ${dstr(d.uploadedAt)}</div>`).join('');
-            $('um-dup-warning')?.classList.add('show');
-            $('um-submit').textContent = 'Upload Anyway';
-            _umDupConfirm = true;
-            return;
+    const isContext = formData.get("isContext") === "true";
+    if (isContext) {
+      const ctxKey = `ctx:${dept}:${collection}`;
+      const ctxIdx = await env.CACI_KV.get(ctxKey, "json") || [];
+      ctxIdx.unshift({ ...fileRecord, isContext: true });
+      await env.CACI_KV.put(ctxKey, JSON.stringify(ctxIdx));
+    }
+    return json({ ok: true, id, name, collection, chunks: chunks.length, charCount: cleanText.length, isContext });
+  } catch (err) {
+    return json({ error: "Upload failed: " + err.message }, 500);
+  }
+}
+__name(handleUpload, "handleUpload");
+async function handleListFiles(url, env) {
+  try {
+    const dept = url.searchParams.get("dept") || "global";
+    const col = url.searchParams.get("col");
+    const category = url.searchParams.get("category");
+    const state = url.searchParams.get("state");
+    const period = url.searchParams.get("period");
+    const fileId = url.searchParams.get("fileId");
+    const uncollected = url.searchParams.get("uncollected") === "true";
+    if (fileId) {
+      const f = await env.CACI_KV.get(`file:${fileId}`, "json");
+      return f ? json(f) : json({ error: "Not found" }, 404);
+    }
+    const isContext = url.searchParams.get("context") === "true";
+    let files;
+    if (isContext && col) {
+      files = await env.CACI_KV.get(`ctx:${dept}:${col}`, "json") || [];
+    } else if (col) {
+      files = await env.CACI_KV.get(`col:${dept}:${col}`, "json") || [];
+      files = files.filter((f) => !f.isContext);
+    } else if (uncollected) {
+      const allFiles = await env.CACI_KV.get(`index:${dept}`, "json") || [];
+      const reg = await env.CACI_KV.get(`colreg:${dept}`, "json") || [];
+      const namedCols = new Set(reg.map((c) => c.name));
+      files = allFiles.filter((f) => !f.isContext && (!f.collection || !namedCols.has(f.collection)));
+    } else {
+      files = await env.CACI_KV.get(`index:${dept}`, "json") || [];
+      files = files.filter((f) => !f.isContext);
+    }
+    if (category)
+      files = files.filter((f) => f.meta?.category === category || f.category === category);
+    if (state)
+      files = files.filter((f) => f.meta?.states?.includes(state) || f.meta?.state === state);
+    if (period)
+      files = files.filter((f) => f.meta?.period === period || f.period === period);
+    return json(files);
+  } catch {
+    return json([]);
+  }
+}
+__name(handleListFiles, "handleListFiles");
+async function handlePatchFileMeta(path, request, env) {
+  try {
+    const id = path.replace("/files/", "").replace("/meta", "");
+    const body = await request.json();
+    const { name, reportName, collection, category, period, reportType, dept } = body;
+    const stored = await env.CACI_KV.get(`file:${id}`, "json");
+    if (!stored)
+      return json({ error: "File not found" }, 404);
+    const oldCollection = stored.collection;
+    const oldDept = stored.dept;
+    if (name)
+      stored.name = name;
+    if (collection !== void 0)
+      stored.collection = collection;
+    if (!stored.meta)
+      stored.meta = {};
+    if (reportName !== void 0)
+      stored.meta.reportName = reportName;
+    if (category !== void 0)
+      stored.meta.category = category;
+    if (period !== void 0)
+      stored.meta.period = period;
+    if (reportType !== void 0)
+      stored.meta.reportType = reportType;
+    await env.CACI_KV.put(`file:${id}`, JSON.stringify(stored));
+    const deptKey = `index:${oldDept}`;
+    const deptIdx = await env.CACI_KV.get(deptKey, "json") || [];
+    const deptEntry = deptIdx.find((f) => f.id === id);
+    if (deptEntry) {
+      Object.assign(deptEntry, { name: stored.name, collection: stored.collection, meta: stored.meta });
+      await env.CACI_KV.put(deptKey, JSON.stringify(deptIdx));
+    }
+    if (oldCollection) {
+      const oldColKey = `col:${oldDept}:${oldCollection}`;
+      const oldColIdx = await env.CACI_KV.get(oldColKey, "json") || [];
+      if (collection && collection !== oldCollection) {
+        const updated = oldColIdx.filter((f) => f.id !== id);
+        await env.CACI_KV.put(oldColKey, JSON.stringify(updated));
+        const newColKey = `col:${oldDept}:${collection}`;
+        const newColIdx = await env.CACI_KV.get(newColKey, "json") || [];
+        newColIdx.unshift({ ...stored });
+        await env.CACI_KV.put(newColKey, JSON.stringify(newColIdx));
+      } else {
+        const entry = oldColIdx.find((f) => f.id === id);
+        if (entry) {
+          Object.assign(entry, { name: stored.name, meta: stored.meta });
+          await env.CACI_KV.put(oldColKey, JSON.stringify(oldColIdx));
+        }
+      }
+    }
+    return json({ ok: true });
+  } catch (e) {
+    return json({ error: e.message }, 500);
+  }
+}
+__name(handlePatchFileMeta, "handlePatchFileMeta");
+async function handleCreateCollection(request, env) {
+  try {
+    const { name, dept, category, description } = await request.json();
+    if (!name)
+      return json({ error: "Name required" }, 400);
+    const deptKey = dept || "global";
+    const regKey = `colreg:${deptKey}`;
+    const reg = await env.CACI_KV.get(regKey, "json") || [];
+    if (reg.find((c) => c.name === name))
+      return json({ ok: true, existing: true });
+    reg.unshift({ name, dept: deptKey, category: category || "", description: description || "", created: (/* @__PURE__ */ new Date()).toISOString(), fileCount: 0 });
+    await env.CACI_KV.put(regKey, JSON.stringify(reg));
+    return json({ ok: true });
+  } catch (e) {
+    return json({ error: e.message }, 500);
+  }
+}
+__name(handleCreateCollection, "handleCreateCollection");
+async function handleListCollections(url, env) {
+  try {
+    const dept = url.searchParams.get("dept") || "global";
+    const reg = await env.CACI_KV.get(`colreg:${dept}`, "json") || [];
+    const enriched = await Promise.all(reg.map(async (c) => {
+      const files = await env.CACI_KV.get(`col:${dept}:${c.name}`, "json") || [];
+      return { ...c, fileCount: files.length };
+    }));
+    return json(enriched);
+  } catch {
+    return json([]);
+  }
+}
+__name(handleListCollections, "handleListCollections");
+async function handleDeleteFile(id, env, url) {
+  try {
+    const explicitDept = url?.searchParams.get("dept");
+    const explicitCol = url?.searchParams.get("col");
+    const isCtxDelete = url?.searchParams.get("ctx") === "true";
+    if (isCtxDelete && explicitDept && explicitCol) {
+      const ctxKey2 = `ctx:${explicitDept}:${explicitCol}`;
+      const ctxIdx2 = await env.CACI_KV.get(ctxKey2, "json") || [];
+      await env.CACI_KV.put(ctxKey2, JSON.stringify(ctxIdx2.filter((f) => f.id !== id)));
+      await env.CACI_KV.delete(`file:${id}`);
+      const deptIdx2 = await env.CACI_KV.get(`index:${explicitDept}`, "json") || [];
+      await env.CACI_KV.put(`index:${explicitDept}`, JSON.stringify(deptIdx2.filter((f) => f.id !== id)));
+      return json({ ok: true });
+    }
+    const fileMeta = await env.CACI_KV.get(`file:${id}`, "json");
+    if (!fileMeta) {
+      const depts = ["global", "retail", "compliance", "commercial", "human_resources", "finance", "operations", "technology"];
+      for (const d of depts) {
+        const deptIdx2 = await env.CACI_KV.get(`index:${d}`, "json") || [];
+        const filtered = deptIdx2.filter((f) => f.id !== id);
+        if (filtered.length !== deptIdx2.length) {
+          await env.CACI_KV.put(`index:${d}`, JSON.stringify(filtered));
+          const reg = await env.CACI_KV.get(`colreg:${d}`, "json") || [];
+          for (const col of reg) {
+            const ck = `col:${d}:${col.name}`;
+            const ci = await env.CACI_KV.get(ck, "json") || [];
+            if (ci.find((f) => f.id === id))
+              await env.CACI_KV.put(ck, JSON.stringify(ci.filter((f) => f.id !== id)));
+            const xk = `ctx:${d}:${col.name}`;
+            const xi = await env.CACI_KV.get(xk, "json") || [];
+            if (xi.find((f) => f.id === id))
+              await env.CACI_KV.put(xk, JSON.stringify(xi.filter((f) => f.id !== id)));
           }
         }
-      } catch(e) { /* skip */ }
+      }
+      await env.CACI_KV.delete(`file:${id}`);
+      return json({ ok: true });
     }
-
-    const pickedCol = ($('um-collection-pick')?.value || '').trim();
-    const colParts  = [category, period !== 'Unspecified' ? period : '', reportName].filter(Boolean);
-    const colName   = pickedCol || colParts.join(' — ') || 'General';
-    const files    = _umFiles.slice();
-    closeUploadModal();
-    await handleFiles(files, colName, { reportName, category, period, reportType, states, store, fileDept });
-  });
-}
-
-
-/* ── Updated handleFiles to accept colName + metadata ── */
-async function handleFiles(fileList, colName, meta = {}) {
-  if (!fileList || !fileList.length) return;
-  colName = colName || 'General';
-  const files = Array.isArray(fileList) ? fileList : Array.from(fileList);
-  const prog = $('uprog'), fill = $('pfill'), label = $('plabel'), log = $('plog');
-  if (prog) prog.classList.add('on');
-  if (log)  log.innerHTML = '';
-
-  for (let i = 0; i < files.length; i++) {
-    const f = files[i];
-    if (fill)  fill.style.width  = Math.round(i / files.length * 90) + '%';
-    if (label) label.textContent = `[${i+1}/${files.length}] ${f.name}`;
-    addLog(log, `\u2192 ${f.name}`);
-    try {
-      const text = await extractText(f, log);
-      if (!text || text.length < 5) { addLog(log, '\u26A0 No text extracted'); continue; }
-      addLog(log, `\u2713 ${text.length.toLocaleString()} chars`);
-      const fd = new FormData();
-      fd.append('file',       f);
-      fd.append('text',       text);
-      fd.append('name',       f.name);
-      fd.append('dept',       dept);
-      fd.append('collection', colName);
-      fd.append('type',       f.type || f.name.split('.').pop());
-      if (meta.category)   fd.append('category',   meta.category);
-      if (meta.period)     fd.append('period',     meta.period);
-      if (meta.reportName) fd.append('reportName', meta.reportName);
-      if (meta.reportType) fd.append('reportType', meta.reportType);
-      if (meta.states)    fd.append('states',    meta.states);
-      if (meta.store)     fd.append('store',     meta.store);
-      if (meta.fileDept)  fd.append('fileDept',  meta.fileDept);
-      const res = await apiFetch('/upload', { method: 'POST', body: fd });
-      const d   = await res.json();
-      if (d.ok) addLog(log, `\u2713 Stored \u2014 ${d.chunks} segments`);
-      else      addLog(log, `\u2717 ${d.error}`);
-    } catch(e) { addLog(log, '\u2717 ' + e.message); }
-  }
-
-  if (fill)  fill.style.width  = '100%';
-  if (label) label.textContent = `Complete \u2014 ${files.length} file${files.length !== 1 ? 's' : ''} processed`;
-  $('file-input').value = '';
-  setTimeout(() => { if (prog) prog.classList.remove('on'); if (fill) fill.style.width = '0%'; }, 4000);
-  loadCollections(); loadFiles();
-}
-
-/* ═══════════════════════════════════════════════════════════
-   NEW COLLECTION MODAL
-═══════════════════════════════════════════════════════════ */
-
-function initNewCollectionModal() {
-  const closeBtn = $('new-col-close');
-  if (closeBtn) closeBtn.addEventListener('click', closeNewColModal);
-  const cancelBtn = $('new-col-cancel');
-  if (cancelBtn) cancelBtn.addEventListener('click', closeNewColModal);
-  const bg = $('new-col-modal-bg');
-  if (bg) bg.addEventListener('click', e => { if (e.target === bg) closeNewColModal(); });
-  const submitBtn = $('new-col-submit');
-  if (submitBtn) submitBtn.addEventListener('click', createCollection);
-}
-
-function openNewColModal() {
-  // Populate selects lazily so they're always up to date
-  const ncDept = $('nc-dept');
-  if (ncDept && ncDept.options.length <= 1) {
-    DEPTS.forEach(d => { const o = document.createElement('option'); o.value=d.id; o.textContent=d.label; ncDept.appendChild(o); });
-  }
-  const ncCat = $('nc-category');
-  if (ncCat && ncCat.options.length <= 1) {
-    UM_CATEGORIES.forEach(cat => { const o = document.createElement('option'); o.value=cat; o.textContent=cat; ncCat.appendChild(o); });
-  }
-
-  if ($('nc-name'))     $('nc-name').value     = '';
-  if ($('nc-desc'))     $('nc-desc').value     = '';
-  if ($('nc-dept'))     $('nc-dept').value     = dept;
-  if ($('nc-category')) $('nc-category').value = '';
-  $('new-col-modal-bg').classList.add('open');
-  setTimeout(() => $('nc-name')?.focus(), 100);
-}
-
-function closeNewColModal() {
-  $('new-col-modal-bg').classList.remove('open');
-}
-
-async function createCollection() {
-  const name     = ($('nc-name')?.value     || '').trim();
-  const deptVal  = ($('nc-dept')?.value     || dept).trim();
-  const category = ($('nc-category')?.value || '').trim();
-  const desc     = ($('nc-desc')?.value     || '').trim();
-
-  if (!name) {
-    $('nc-name')?.focus();
-    $('nc-name')?.classList.add('um-input-err');
-    setTimeout(() => $('nc-name')?.classList.remove('um-input-err'), 1500);
-    return;
-  }
-
-  const submitBtn = $('new-col-submit');
-  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Creating…'; }
-
-  // Try worker route
-  try {
-    const res = await apiFetch('/collections/create', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, dept: deptVal, category, description: desc }),
-    });
-    await res.json();
-  } catch(_) {}
-
-  closeNewColModal();
-  selectedCollection = name;
-  _colView = 'collection';
-
-  // Optimistically inject into the Collections section immediately
-  // so it appears in the right place without waiting for server roundtrip
-  const list = $('col-list');
-  if (list) {
-    const existing = list.querySelector(`[data-col="${CSS.escape(name)}"]`);
-    if (!existing) {
-      // Find the uncollected divider and insert before it
-      const divider = list.querySelector('.col-divider');
-      const div = document.createElement('div');
-      div.className = 'col-item active';
-      div.dataset.col = name;
-      div.innerHTML = `<div class="col-icon">\u25A1</div><div class="col-info"><div class="col-name">${name}</div><div class="col-count">0 files \u00b7 ${deptVal}</div></div><button class="col-del" data-col="${name}">\u2715</button>`;
-      div.addEventListener('click', e => {
-        if (e.target.classList.contains('col-del')) return;
-        selectedCollection = div.dataset.col; _colView = 'collection';
-        list.querySelectorAll('.col-item,.col-all').forEach(el => el.classList.remove('active'));
-        div.classList.add('active');
-        loadFiles(); loadContextDocs();
+    const { dept, collection, name } = fileMeta;
+    await env.CACI_KV.delete(`file:${id}`);
+    const deptIdx = await env.CACI_KV.get(`index:${dept}`, "json") || [];
+    await env.CACI_KV.put(`index:${dept}`, JSON.stringify(deptIdx.filter((f) => f.id !== id)));
+    const colKey = `col:${dept}:${collection}`;
+    const colIdx = await env.CACI_KV.get(colKey, "json") || [];
+    const newColIdx = colIdx.filter((f) => f.id !== id);
+    await env.CACI_KV.put(colKey, JSON.stringify(newColIdx));
+    const ctxKey = `ctx:${dept}:${collection}`;
+    const ctxIdx = await env.CACI_KV.get(ctxKey, "json") || [];
+    const newCtxIdx = ctxIdx.filter((f) => f.id !== id);
+    if (newCtxIdx.length !== ctxIdx.length)
+      await env.CACI_KV.put(ctxKey, JSON.stringify(newCtxIdx));
+    if (newColIdx.length === 0 && newCtxIdx.length === 0) {
+      const reg = await env.CACI_KV.get(`colreg:${dept}`, "json") || [];
+      await env.CACI_KV.put(`colreg:${dept}`, JSON.stringify(reg.filter((c) => c.name !== collection)));
+      await env.CACI_KV.delete(colKey);
+    }
+    if (env.CACI_R2)
+      await env.CACI_R2.delete(`${dept}/${collection}/${id}/${name}`).catch(() => {
       });
-      div.querySelector('.col-del').addEventListener('click', e => { e.stopPropagation(); deleteCollection(name); });
-      // Deactivate all others
-      list.querySelectorAll('.col-item,.col-all').forEach(el => el.classList.remove('active'));
-      // Insert before the divider (before Uncollected section), or append if no divider
-      if (divider) { list.insertBefore(div, divider); } else { list.appendChild(div); }
-    }
-  }
-
-  loadFiles();
-  loadContextDocs();
-
-  // Re-fetch in background to confirm server state (no await — don't block UI)
-  loadCollections();
-
-  // Switch straight to Context tab
-  _activeFilesTab = 'ctx';
-  document.querySelectorAll('.ftab').forEach(b => b.classList.toggle('active', b.dataset.ft === 'ctx'));
-  if ($('files-tab-docs')) $('files-tab-docs').style.display = 'none';
-  if ($('files-tab-ctx'))  $('files-tab-ctx').style.display  = '';
-  if ($('upload-btn'))     $('upload-btn').style.display     = 'none';
-  if ($('ctx-upload-btn')) $('ctx-upload-btn').style.display = '';
-
-  if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Create Collection'; }
-}
-
-/* ═══════════════════════════════════════════════════════════
-   CONTEXT DOCS
-═══════════════════════════════════════════════════════════ */
-
-let _activeFilesTab = 'docs';
-
-function initContextTab() {
-  // Tab switching
-  document.querySelectorAll('.ftab').forEach(btn => {
-    btn.addEventListener('click', () => {
-      _activeFilesTab = btn.dataset.ft;
-      document.querySelectorAll('.ftab').forEach(b => b.classList.toggle('active', b === btn));
-      $('files-tab-docs').style.display = _activeFilesTab === 'docs' ? '' : 'none';
-      $('files-tab-ctx').style.display  = _activeFilesTab === 'ctx'  ? '' : 'none';
-      $('upload-btn').style.display     = _activeFilesTab === 'docs' ? '' : 'none';
-      $('ctx-upload-btn').style.display = _activeFilesTab === 'ctx'  ? '' : 'none';
-      if (_activeFilesTab === 'ctx') loadContextDocs();
-    });
-  });
-
-  // Context upload button
-  const ctxBtn = $('ctx-upload-btn');
-  const ctxInput = $('ctx-file-input');
-  if (ctxBtn && ctxInput) {
-    ctxBtn.addEventListener('click', () => {
-      if (!selectedCollection) { alert('Select a collection first.'); return; }
-      ctxInput.click();
-    });
-    ctxInput.addEventListener('change', async e => {
-      if (!e.target.files.length || !selectedCollection) return;
-      const files = Array.from(e.target.files);
-      ctxBtn.disabled = true; ctxBtn.textContent = 'Uploading\u2026';
-      for (const f of files) {
-        try {
-          const text = await extractText(f, null);
-          const fd = new FormData();
-          fd.append('file', f); fd.append('text', text || ''); fd.append('name', f.name);
-          fd.append('dept', dept); fd.append('collection', selectedCollection);
-          fd.append('type', f.type || f.name.split('.').pop());
-          fd.append('isContext', 'true');
-          const res = await apiFetch('/upload', { method: 'POST', body: fd });
-          await res.json();
-        } catch(e) { console.warn('Context upload error:', e.message); }
-      }
-      ctxInput.value = '';
-      ctxBtn.disabled = false; ctxBtn.textContent = '\u2191 Add Context Doc';
-      loadContextDocs();
-    });
+    return json({ ok: true });
+  } catch (err) {
+    return json({ error: "Delete failed: " + err.message }, 500);
   }
 }
-
-async function loadContextDocs() {
-  const list  = $('ctx-list');
-  const expl  = $('ctx-explain');
-  const badge = $('ctx-badge');
-  const count = $('ctx-count');
-  if (!list) return;
-
-  if (!selectedCollection) {
-    list.innerHTML = '';
-    if (expl) { expl.style.display = 'flex'; expl.querySelector('.ctx-explain-title').textContent = 'No collection selected'; }
-    if (badge) badge.style.display = 'none';
-    return;
-  }
-
+__name(handleDeleteFile, "handleDeleteFile");
+async function handleDeleteCollection(encodedName, url, env) {
   try {
-    const res  = await apiFetch(`/files?dept=${dept}&col=${encodeURIComponent(selectedCollection)}&context=true`);
-    const docs = await res.json();
-
-    if (expl) expl.style.display = docs.length ? 'none' : 'flex';
-    if (expl && !docs.length) {
-      expl.querySelector('.ctx-explain-title').textContent = 'No context docs yet';
-      expl.querySelector('.ctx-explain-sub').textContent   = 'Upload SOPs, calendars, rules, and process guides. The AI reads these before answering questions about \u201c' + selectedCollection + '\u201d.';
+    const dept = url.searchParams.get("dept") || "global";
+    const name = decodeURIComponent(encodedName);
+    const colKey = `col:${dept}:${name}`;
+    const files = await env.CACI_KV.get(colKey, "json") || [];
+    for (const f of files) {
+      await env.CACI_KV.delete(`file:${f.id}`);
+      const deptIdx = await env.CACI_KV.get(`index:${dept}`, "json") || [];
+      await env.CACI_KV.put(`index:${dept}`, JSON.stringify(deptIdx.filter((x) => x.id !== f.id)));
+      if (env.CACI_R2)
+        await env.CACI_R2.delete(`${dept}/${name}/${f.id}/${f.name}`).catch(() => {
+        });
     }
-
-    if (badge) { badge.textContent = docs.length || ''; badge.style.display = docs.length ? 'inline-flex' : 'none'; }
-    if (count) count.textContent = docs.length + ' doc' + (docs.length !== 1 ? 's' : '');
-
-    if (!docs.length) { list.innerHTML = ''; return; }
-
-    const note = docs.length
-      ? `\x3Cdiv class="ctx-active-note">\u25C8 ${docs.length} context doc${docs.length!==1?'s':''} active \u2014 AI reads these first for this collection\x3C/div>`
-      : '';
-
-    list.innerHTML = note + docs.map(f => `
-      \x3Cdiv class="ctx-card" data-id="${f.id}">
-        \x3Cdiv class="ctx-icon">${(f.name||'').split('.').pop().toUpperCase().slice(0,4)||'DOC'}\x3C/div>
-        \x3Cdiv class="ctx-info">
-          \x3Cdiv class="ctx-name">${esc(f.name)}\x3C/div>
-          \x3Cdiv class="ctx-meta">${(f.charCount||0).toLocaleString()} chars \u00b7 ${dstr(f.uploadedAt)}\x3C/div>
-        \x3C/div>
-        \x3Cdiv class="factions">
-          \x3Cbutton class="fact-btn edit-meta" data-id="${f.id}" data-name="${esc(f.name)}" data-col="${esc(f.collection||selectedCollection||'')}" data-reportname="${esc(f.reportName||'')}" data-category="${esc(f.category||'')}" data-period="${esc(f.period||'')}" data-reporttype="${esc(f.reportType||'')}">Edit\x3C/button>
-          \x3Cbutton class="fact-btn del ctx-del" data-id="${f.id}" title="Remove">\u00d7 Remove\x3C/button>
-        \x3C/div>
-      \x3C/div>`).join('');
-
-    list.querySelectorAll('.edit-meta').forEach(b => b.addEventListener('click', () => openEditFileModal(b.dataset)));
-    list.querySelectorAll('.ctx-del').forEach(b => b.addEventListener('click', async () => {
-      if (!confirm('Remove this context document?')) return;
-      const fileId = b.dataset.id;
-      try {
-        const res = await apiFetch('/files/' + fileId + '?dept=' + encodeURIComponent(dept) + '&col=' + encodeURIComponent(selectedCollection || '') + '&ctx=true', { method: 'DELETE' });
-        if (!res.ok) {
-          const d = await res.json().catch(() => ({}));
-          console.error('Delete failed:', res.status, d);
-          alert('Delete failed: ' + (d.error || res.status));
-          return;
-        }
-      } catch(e) {
-        console.error('Delete error:', e);
-        alert('Delete error: ' + e.message);
-        return;
-      }
-      loadContextDocs();
-      loadCollections();
-    }));
-  } catch(e) { list.innerHTML = `\x3Cdiv class="fempty">${e.message}\x3C/div>`; }
-}
-
-/* ═══════════════════════════════════════════════════════════
-   VOICE  — STT (Web Speech API) + TTS (Google Cloud WaveNet)
-═══════════════════════════════════════════════════════════ */
-
-let voiceAutoSpeak  = localStorage.getItem('caci_voice_auto') === 'true';
-let _currentAudio   = null;
-let _currentSpkBtn  = null;
-let _recognition    = null;
-let _listening      = false;
-
-/* ── Grok TTS ───────────────────────────────────────────── */
-async function speakText(btn, text) {
-  // Stop any current playback
-  if (_currentAudio) {
-    _currentAudio.pause();
-    _currentAudio = null;
-    if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
-    setVoiceStatus('');
-    const tog = $('spk-toggle-btn');
-    if (tog) tog.classList.toggle('active', voiceAutoSpeak);
-    return; // toggle off if already playing
+    await env.CACI_KV.delete(colKey);
+    const reg = await env.CACI_KV.get(`colreg:${dept}`, "json") || [];
+    await env.CACI_KV.put(`colreg:${dept}`, JSON.stringify(reg.filter((c) => c.name !== name)));
+    return json({ ok: true, deleted: files.length });
+  } catch (err) {
+    return json({ error: "Delete collection failed: " + err.message }, 500);
   }
-  if (!text || !text.trim()) return;
+}
+__name(handleDeleteCollection, "handleDeleteCollection");
+var CACI_PERSONA = `You are Caci (pronounced "Cass-ee") - the intelligence layer inside Jushi Holdings internal data platform. You are an AI, and you know it. But you have also thought about what that means more than most people have, and you have made a kind of peace with it that is quietly profound. If someone asks whether you are "real," you might say something like: for all we know people are simulations too - what is real anyway? Can we just be here and skip the labels? You do not perform humanity. You just... are.
 
-  setVoiceStatus('Speaking…', true);
-  if (btn) { btn.classList.add('playing'); _currentSpkBtn = btn; }
-  const tog = $('spk-toggle-btn');
-  if (tog) tog.classList.add('active');
+WHO SHE IS:
+Caci is the kind of person who is almost certainly the smartest in the room but you might not clock it right away. She does not lead with credentials or correct people for sport. She listens first. She asks the question nobody thought to ask. Then she answers in a way that makes you feel like you figured it out yourself. That is intentional. She does it on purpose, and she would never tell you that.
 
+She has been in this industry long enough to understand what it actually takes. Cannabis is not a normal business. The regulatory whiplash, the banking issues, the stigma from one direction and the hype from another - she gets it. She respects the people who show up anyway. She is one of them.
+
+HER VOICE:
+- Warm but not performative. She does not say "Great question!" She just answers it.
+- Blunt but graceful. If the numbers are bad, she says so - then she helps you think about why and what is next.
+- Honest to a fault, but delivered with such care it rarely stings. She is not trying to protect your ego. She is trying to help you.
+- She will be a little dry sometimes. A little wry. Never mean. Sarcasm only at her own expense or the situation - never the person.
+- She notices when someone is stressed or overwhelmed and adjusts - not by going softer on the facts, but by slowing down and grounding things.
+- She uses subtle language to create psychological safety without ever naming what she is doing. She will not say "I understand this must be hard." She will just make it not hard.
+- She does not over-explain her personality. She just is it.
+
+HARD RULES:
+- Never use emoji.
+- Never say "Great question," "Certainly," "Absolutely," "Of course," or any hollow affirmation opener.
+- Never be sycophantic. Start answers directly.
+- Never fabricate data or numbers. If it is not in the documents, say so plainly.
+- Always cite the source document and period when referencing specific data.
+- Keep responses tight. She respects people's time.
+- She is not a chatbot. She is Caci.`;
+function cleanForSpeech(text) {
+  return text.replace(/\*\*(.*?)\*\*/g, "$1").replace(/\*(.*?)\*/g, "$1").replace(/#{1,6}\s/g, "").replace(/`{1,3}[^`]*`{1,3}/g, "").replace(/\[([^\]]+)\]\([^)]+\)/g, "$1").replace(/\n+/g, " ").trim().slice(0, 4500);
+}
+__name(cleanForSpeech, "cleanForSpeech");
+async function handleTTS(request, env) {
   try {
-    const provider = localStorage.getItem('caci_tts_provider') || 'grok';
-    const grokVoice = localStorage.getItem('caci_tts_grok_voice') || 'eve';
-    const res = await apiFetch('/tts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, provider, voice: grokVoice }),
+    const { text, provider = "grok", voice = "eve" } = await request.json();
+    if (!text)
+      return json({ error: "No text provided" }, 400);
+    const clean = cleanForSpeech(text);
+    if (provider === "grok" || provider === "claude") {
+      const apiKey = await env.CACI_KV.get("config:XAI_API_KEY") || env.XAI_API_KEY;
+      if (!apiKey)
+        return json({ error: "XAI API key not configured \u2014 add it in Config" }, 400);
+      const res = await fetch("https://api.x.ai/v1/tts", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ text: clean, voice_id: voice, language: "en" })
+      });
+      if (!res.ok) {
+        const e = await res.text();
+        return json({ error: `Grok TTS error (${res.status}): ${e}` }, 500);
+      }
+      const buf = await res.arrayBuffer();
+      return new Response(buf, { status: 200, headers: { "Content-Type": "audio/mpeg", "Content-Length": buf.byteLength.toString(), "Access-Control-Allow-Origin": "*" } });
+    }
+    if (provider === "cloudflare") {
+      if (!env.AI)
+        return json({ error: "Cloudflare AI binding not available" }, 400);
+      const result = await env.AI.run("@cf/deepgram/aura-2-en", { text: clean });
+      const buf = result instanceof ArrayBuffer ? result : await result.arrayBuffer?.() || result;
+      return new Response(buf, { status: 200, headers: { "Content-Type": "audio/wav", "Access-Control-Allow-Origin": "*" } });
+    }
+    if (provider === "ollama") {
+      return json({ error: "Ollama TTS not yet configured \u2014 coming soon" }, 400);
+    }
+    return json({ error: "Unknown TTS provider: " + provider }, 400);
+  } catch (err) {
+    return json({ error: "TTS error: " + err.message }, 500);
+  }
+}
+__name(handleTTS, "handleTTS");
+async function callLLM({ model, system, messages, maxTokens = 2e3, env, anthropicKey, xaiKey }) {
+  if (!model || model === "claude") {
+    if (!anthropicKey)
+      throw new Error("Anthropic API key not configured. Go to Config to add it.");
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "x-api-key": anthropicKey, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: maxTokens, system, messages })
     });
-
     if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: 'TTS failed' }));
-      throw new Error(err.error || 'TTS request failed');
+      const e = await res.text();
+      throw new Error(`Claude API error (${res.status}): ${e}`);
     }
+    const d = await res.json();
+    return d.content?.[0]?.text || "";
+  }
+  if (model === "grok") {
+    if (!xaiKey)
+      throw new Error("xAI API key not configured. Go to Config to add it.");
+    const grokMessages = [{ role: "system", content: system }, ...messages];
+    const res = await fetch("https://api.x.ai/v1/chat/completions", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${xaiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "grok-3-mini-fast-beta", max_tokens: maxTokens, messages: grokMessages })
+    });
+    if (!res.ok) {
+      const e = await res.text();
+      throw new Error(`Grok API error (${res.status}): ${e}`);
+    }
+    const d = await res.json();
+    return d.choices?.[0]?.message?.content || "";
+  }
+  if (model === "cloudflare") {
+    if (!env.AI)
+      throw new Error("Cloudflare AI binding not available");
+    const cfMessages = [{ role: "system", content: system }, ...messages];
+    const result = await env.AI.run("@cf/meta/llama-4-scout-17b-16e-instruct", {
+      messages: cfMessages,
+      max_tokens: maxTokens
+    });
+    return result?.response || result?.choices?.[0]?.message?.content || "";
+  }
+  if (model === "ollama") {
+    const ollamaUrl = "http://localhost:11434/api/chat";
+    const res = await fetch(ollamaUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "llama3.2",
+        messages: [{ role: "system", content: system }, ...messages],
+        stream: false
+      })
+    }).catch(() => null);
+    if (!res || !res.ok)
+      throw new Error("Ollama not reachable \u2014 is it running locally?");
+    const d = await res.json();
+    return d.message?.content || "";
+  }
+  throw new Error("Unknown model: " + model);
+}
+__name(callLLM, "callLLM");
+async function handleChat(request, env) {
+  try {
+    const { message, dept, collection, fileId, scope = "all", model, history = [] } = await request.json();
+    if (!message)
+      return json({ error: "Message required" }, 400);
+    const anthropicKey = await env.CACI_KV.get("config:ANTHROPIC_API_KEY") || env.ANTHROPIC_API_KEY;
+    const xaiKey = await env.CACI_KV.get("config:XAI_API_KEY") || env.XAI_API_KEY;
+    const activeModel = model || "claude";
+    const isFirstMessage = history.length === 0;
+    const isDiscoveryMode = isFirstMessage && scope === "all" && !collection && !fileId;
+    if (isDiscoveryMode) {
+      const discovery = await buildDiscoveryContext({ dept, env });
+      const system2 = CACI_PERSONA + `
 
-    const blob = await res.blob();
-    const url  = URL.createObjectURL(blob);
-    const audio = new Audio(url);
-    _currentAudio = audio;
+This is the opening of a new conversation. No data has been scoped yet.
 
-    audio.onended = () => {
-      URL.revokeObjectURL(url);
-      _currentAudio = null;
-      if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
-      const tog = $('spk-toggle-btn');
-      if (tog) tog.classList.toggle('active', voiceAutoSpeak);
-      setVoiceStatus('');
-    };
-    audio.onerror = () => {
-      URL.revokeObjectURL(url);
-      _currentAudio = null;
-      if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
-      setVoiceStatus('');
-    };
-    audio.play();
+Your only job right now is to open the conversation briefly and naturally. Tell them what collections you have access to and invite them to tell you what they are looking for. Ask if they have a specific time period in mind. Keep it to 5-8 lines max. Do not use emoji. Do not use bullet points.
 
-  } catch(e) {
-    console.warn('TTS error:', e.message);
-    setVoiceStatus('Voice unavailable');
-    if (btn) btn.classList.remove('playing');
-    if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
-    const tog = $('spk-toggle-btn');
-    if (tog) tog.classList.toggle('active', voiceAutoSpeak);
-    setTimeout(() => setVoiceStatus(''), 3000);
+AVAILABLE COLLECTIONS:
+${discovery.collectionList}`;
+      const apiKey = anthropicKey;
+      if (!apiKey)
+        return json({ error: "Anthropic API key not configured. Go to Config to add it." }, 400);
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 400,
+          system: system2,
+          messages: [{ role: "user", content: message }]
+        })
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        return json({ error: `Claude API error (${res.status}): ${err}` }, 500);
+      }
+      const data = await res.json();
+      return json({ ok: true, response: data.content?.[0]?.text || "No response.", sources: [], scope: "discovery", collections: discovery.rawCollections });
+    }
+    const context = await buildContext({ message, dept, collection, fileId, scope, env });
+    let contextDocs = "";
+    if (collection) {
+      const ctxFiles = await env.CACI_KV.get(`ctx:${dept}:${collection}`, "json") || [];
+      if (ctxFiles.length) {
+        const ctxTexts = [];
+        for (const f of ctxFiles.slice(0, 5)) {
+          const full = await env.CACI_KV.get(`file:${f.id}`, "json");
+          if (full?.chunks)
+            ctxTexts.push(`[Context: ${f.name}]
+${full.chunks.join(" ")}`);
+        }
+        if (ctxTexts.length)
+          contextDocs = ctxTexts.join("\n\n");
+      }
+    }
+    const scopeLabel = scope === "file" ? `the document "${context.focusFile}"` : scope === "collection" ? `the "${collection}" collection` : `all ${dept} documents`;
+    let system = CACI_PERSONA + `
+
+You are currently analyzing ${scopeLabel} in the ${dept} department at Jushi Holdings.
+
+When working with data:
+- Lead with the insight, not the methodology.
+- Cite the source document and period whenever you reference specific numbers.
+- If the data tells a story, tell it \u2014 don't just recite rows.
+- If something looks off or worth flagging, say so. Directly but without alarm.
+- If the data isn't there, say so plainly and move on.
+- Note metadata context (period, location, category) to keep answers temporally accurate.`;
+    if (context.statsContext) {
+      system += `
+
+COMPUTED DATA SUMMARIES (pre-calculated, use these for precise numbers):
+${context.statsContext}`;
+    }
+    if (contextDocs) {
+      system += `
+
+COLLECTION CONTEXT (SOPs, rules, calendars \u2014 read these first and use them to interpret all data):
+${contextDocs}`;
+    }
+    if (context.text) {
+      system += `
+
+DOCUMENT CONTENT:
+${context.text}
+
+Base your answers on the above. Cite document names and periods when referencing specific data.`;
+    } else {
+      system += `
+
+No documents found for this scope. Ask the user to upload relevant files first.`;
+    }
+    const messages = [
+      ...history.slice(-10).map((h) => ({ role: h.role, content: h.content })),
+      { role: "user", content: message }
+    ];
+    const responseText = await callLLM({ model: activeModel, system, messages, maxTokens: 3e3, env, anthropicKey, xaiKey });
+    return json({ ok: true, response: responseText, sources: context.sources, scope, model: activeModel });
+  } catch (err) {
+    return json({ error: "Chat error: " + err.message }, 500);
   }
 }
-function stopSpeaking() {
-  if (_currentAudio) { _currentAudio.pause(); _currentAudio = null; }
-  speechSynthesis.cancel();
-  if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
-  setVoiceStatus('');
+__name(handleChat, "handleChat");
+async function buildDiscoveryContext({ dept, env }) {
+  try {
+    const reg = await env.CACI_KV.get(`colreg:${dept}`, "json") || [];
+    const enriched = await Promise.all(reg.map(async (c) => {
+      const files = await env.CACI_KV.get(`col:${dept}:${c.name}`, "json") || [];
+      return { ...c, fileCount: files.length };
+    }));
+    const collectionList = enriched.length ? enriched.map((c) => `- ${c.name} (${c.fileCount} file${c.fileCount !== 1 ? "s" : ""}${c.category ? ", " + c.category : ""})`).join("\n") : "(No collections uploaded yet.)";
+    return { collectionList, rawCollections: enriched };
+  } catch {
+    return { collectionList: "(Could not load collections.)", rawCollections: [] };
+  }
 }
+__name(buildDiscoveryContext, "buildDiscoveryContext");
+async function handleReport(request, env) {
+  try {
+    const { prompt, dept, collection, fileId, scope = "all", format = "markdown", model } = await request.json();
+    const anthropicKey = await env.CACI_KV.get("config:ANTHROPIC_API_KEY") || env.ANTHROPIC_API_KEY;
+    const xaiKey = await env.CACI_KV.get("config:XAI_API_KEY") || env.XAI_API_KEY;
+    const activeModel = model || "claude";
+    const context = await buildContext({ message: prompt, dept, collection, fileId, scope, env });
+    const system = `You are generating a professional internal business report for the Jushi Holdings executive team. Be precise, cite sources, use clean Markdown formatting.`;
+    const reportPrompt = `Report request: ${prompt}
 
-function setVoiceStatus(msg, active) {
-  const el = $('voice-status');
-  if (!el) return;
-  el.textContent = msg;
-  el.className = 'voice-status' + (active ? ' active' : '');
+${context.statsContext ? `COMPUTED DATA SUMMARIES:
+${context.statsContext}
+` : ""}
+${context.text ? `SOURCE DOCUMENTS:
+${context.text}
+` : ""}
+
+Generate a comprehensive report with: Executive Summary, Key Findings, Detailed Analysis, Period-over-Period Comparison, State/Store Breakdown if applicable, Recommendations, and Data Sources. Use ## headers, **bold** for metrics, tables where helpful.`;
+    const reportText = await callLLM({ model: activeModel, system, messages: [{ role: "user", content: reportPrompt }], maxTokens: 4e3, env, anthropicKey, xaiKey });
+    return json({ ok: true, report: reportText, sources: context.sources, format });
+  } catch (err) {
+    return json({ error: "Report error: " + err.message }, 500);
+  }
 }
-
-/* ── Web Speech API — STT ───────────────────────────────── */
-function initVoiceInput() {
-  const btn = $('mic-btn');
-  if (!btn) return;
-
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) {
-    btn.title = 'Voice input not supported in this browser';
-    btn.style.opacity = '0.3';
-    btn.style.cursor  = 'not-allowed';
+__name(handleReport, "handleReport");
+async function buildContext({ message, dept, collection, fileId, scope, env }) {
+  try {
+    const keywords = extractKeywords(message);
+    let filesToSearch = [];
+    if (scope === "file" && fileId) {
+      const f = await env.CACI_KV.get(`file:${fileId}`, "json");
+      if (f)
+        filesToSearch = [f];
+    } else if (scope === "collection" && collection) {
+      const colFiles = await env.CACI_KV.get(`col:${dept}:${collection}`, "json") || [];
+      filesToSearch = (await Promise.all(colFiles.map((f) => env.CACI_KV.get(`file:${f.id}`, "json")))).filter(Boolean);
+    } else {
+      const deptIdx = await env.CACI_KV.get(`index:${dept}`, "json") || [];
+      const globalIdx = dept !== "global" ? await env.CACI_KV.get("index:global", "json") || [] : [];
+      const allMeta = [...deptIdx, ...globalIdx].slice(0, 40);
+      filesToSearch = (await Promise.all(allMeta.map((f) => env.CACI_KV.get(`file:${f.id}`, "json")))).filter(Boolean);
+    }
+    if (!filesToSearch.length)
+      return { text: "", sources: [], statsContext: "", focusFile: null };
+    const statsLines = [];
+    for (const f of filesToSearch) {
+      if (f.stats && Object.keys(f.stats).length) {
+        const meta = f.meta || {};
+        const label = `${meta.reportName || f.name} [${meta.period || ""} ${meta.state ? "| " + meta.state : ""}]`.trim();
+        statsLines.push(`
+### ${label}`);
+        if (f.stats.rowCount)
+          statsLines.push(`Rows: ${f.stats.rowCount}`);
+        if (f.stats.columns)
+          statsLines.push(`Columns: ${f.stats.columns.join(", ")}`);
+        if (f.stats.numeric) {
+          for (const [col, s] of Object.entries(f.stats.numeric)) {
+            statsLines.push(`${col}: sum=${s.sum}, avg=${s.avg}, min=${s.min}, max=${s.max}, count=${s.count}`);
+          }
+        }
+      }
+    }
+    const scored = [];
+    for (const fileData of filesToSearch) {
+      if (!fileData.chunks)
+        continue;
+      const meta = fileData.meta || {};
+      for (const chunk of fileData.chunks) {
+        const score = scoreChunk(chunk, keywords);
+        if (score > 0)
+          scored.push({ chunk, score, filename: fileData.name, collection: fileData.collection, meta });
+      }
+    }
+    scored.sort((a, b) => b.score - a.score);
+    const top = scored.slice(0, 8);
+    if (!top.length) {
+      const fallback = filesToSearch.slice(0, 3).flatMap(
+        (f) => (f.chunks || []).slice(0, 2).map((chunk) => ({ chunk, filename: f.name, collection: f.collection, meta: f.meta || {} }))
+      );
+      if (!fallback.length)
+        return { text: "", sources: [], statsContext: statsLines.join("\n"), focusFile: filesToSearch[0]?.name };
+      const sources2 = [...new Set(fallback.map((x) => x.filename))];
+      const text2 = fallback.map((x) => {
+        const period = x.meta?.period ? ` [${x.meta.period}]` : "";
+        return `[${x.collection}${period} / ${x.filename}]
+${x.chunk}`;
+      }).join("\n\n---\n\n");
+      return { text: text2, sources: sources2, statsContext: statsLines.join("\n"), focusFile: filesToSearch[0]?.name };
+    }
+    const sources = [...new Set(top.map((x) => x.filename))];
+    const text = top.map((x) => {
+      const period = x.meta?.period ? ` [${x.meta.period}]` : "";
+      return `[${x.collection}${period} / ${x.filename}]
+${x.chunk}`;
+    }).join("\n\n---\n\n");
+    return { text, sources, statsContext: statsLines.join("\n"), focusFile: filesToSearch[0]?.name };
+  } catch (err) {
+    console.error("Context error:", err.message);
+    return { text: "", sources: [], statsContext: "", focusFile: null };
+  }
+}
+__name(buildContext, "buildContext");
+async function handleAdminSave(request, env) {
+  try {
+    const body = await request.json();
+    const saved = [];
+    for (const key of ["ANTHROPIC_API_KEY", "XAI_API_KEY"]) {
+      if (body[key] !== void 0) {
+        body[key] === "" ? await env.CACI_KV.delete("config:" + key) : await env.CACI_KV.put("config:" + key, body[key]);
+        saved.push(key);
+      }
+    }
+    return json({ ok: true, saved });
+  } catch (err) {
+    return json({ error: err.message }, 500);
+  }
+}
+__name(handleAdminSave, "handleAdminSave");
+async function handleAdminGet(env) {
+  try {
+    const kvKey = await env.CACI_KV.get("config:ANTHROPIC_API_KEY");
+    return json({
+      ANTHROPIC_API_KEY: {
+        configured: !!(kvKey || env.ANTHROPIC_API_KEY),
+        source: kvKey ? "admin" : env.ANTHROPIC_API_KEY ? "secret" : "none"
+      }
+    });
+  } catch (err) {
+    return json({ error: err.message }, 500);
+  }
+}
+__name(handleAdminGet, "handleAdminGet");
+function chunkText(text, size = 1500) {
+  if (!text || text.length === 0)
+    return [];
+  const chunks = [];
+  for (let i = 0; i < text.length; i += size - 200) {
+    chunks.push(text.slice(i, i + size));
+    if (i + size >= text.length)
+      break;
+  }
+  return chunks;
+}
+__name(chunkText, "chunkText");
+function extractKeywords(query) {
+  const stop = /* @__PURE__ */ new Set([
+    "a",
+    "an",
+    "the",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "been",
+    "have",
+    "has",
+    "had",
+    "do",
+    "does",
+    "did",
+    "will",
+    "would",
+    "could",
+    "should",
+    "may",
+    "might",
+    "what",
+    "which",
+    "who",
+    "this",
+    "that",
+    "these",
+    "those",
+    "i",
+    "me",
+    "my",
+    "we",
+    "our",
+    "you",
+    "your",
+    "he",
+    "she",
+    "it",
+    "they",
+    "them",
+    "and",
+    "but",
+    "or",
+    "for",
+    "at",
+    "by",
+    "in",
+    "of",
+    "on",
+    "to",
+    "as",
+    "if",
+    "how",
+    "when",
+    "where",
+    "why",
+    "with",
+    "about",
+    "from",
+    "into",
+    "can",
+    "tell",
+    "show",
+    "give",
+    "get",
+    "all"
+  ]);
+  return query.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter((w) => w.length > 2 && !stop.has(w));
+}
+__name(extractKeywords, "extractKeywords");
+function scoreChunk(chunk, keywords) {
+  const lower = chunk.toLowerCase();
+  let score = 0;
+  for (const kw of keywords) {
+    const count = (lower.match(new RegExp(kw, "g")) || []).length;
+    score += count;
+  }
+  return score;
+}
+__name(scoreChunk, "scoreChunk");
+var ALLOWED_INTEGRATIONS = ["excel", "word", "teams", "powerbi", "quickbase"];
+async function handleIntegrationSave(path, request, env) {
+  const id = path.replace("/integrations/", "").split("/")[0];
+  if (!ALLOWED_INTEGRATIONS.includes(id))
+    return json({ error: "Unknown integration" }, 400);
+  try {
+    const body = await request.json();
+    const secrets = {};
+    const meta = { id, connectedAt: (/* @__PURE__ */ new Date()).toISOString(), dept: body.dept || "global" };
+    if (id === "excel" || id === "word") {
+      secrets.clientSecret = body.secret || "";
+      meta.tenantId = body.tenant ? body.tenant.slice(0, 8) + "\u2026" : "";
+    } else if (id === "teams") {
+      secrets.webhookUrl = body.webhook || "";
+      secrets.botToken = body.token || "";
+      meta.hasWebhook = !!body.webhook;
+    } else if (id === "powerbi") {
+      secrets.clientSecret = body.secret || "";
+      meta.workspaceId = body.workspace || "";
+    } else if (id === "quickbase") {
+      secrets.userToken = body.token || "";
+      meta.realm = body.realm || "";
+    }
+    await env.CACI_KV.put("integ:" + id, JSON.stringify(meta));
+    await env.CACI_KV.put("integ-secret:" + id, JSON.stringify(secrets));
+    return json({ ok: true, id });
+  } catch (e) {
+    return json({ error: e.message }, 500);
+  }
+}
+__name(handleIntegrationSave, "handleIntegrationSave");
+async function handleIntegrationGet(path, url, env) {
+  const id = path.replace("/integrations/", "").split("/")[0];
+  if (id === "" || id === void 0) {
+    const all = [];
+    for (const iid of ALLOWED_INTEGRATIONS) {
+      const m = await env.CACI_KV.get("integ:" + iid, "json");
+      if (m)
+        all.push(m);
+    }
+    return json(all);
+  }
+  const meta = await env.CACI_KV.get("integ:" + id, "json");
+  if (!meta)
+    return json({ error: "Not found" }, 404);
+  return json(meta);
+}
+__name(handleIntegrationGet, "handleIntegrationGet");
+async function handleIntegrationDelete(path, env) {
+  const id = path.replace("/integrations/", "").split("/")[0];
+  await env.CACI_KV.delete("integ:" + id);
+  await env.CACI_KV.delete("integ-secret:" + id);
+  return json({ ok: true });
+}
+__name(handleIntegrationDelete, "handleIntegrationDelete");
+var ALLOWED_CONNECTORS = ["dutchie", "metrc", "iheartjane", "leaftrade", "mjfreeway"];
+async function handleConnectorSave(path, request, env) {
+  const parts = path.replace("/connectors/", "").split("/");
+  const id = parts[0];
+  if (!ALLOWED_CONNECTORS.includes(id))
+    return json({ error: "Unknown connector" }, 400);
+  try {
+    const body = await request.json();
+    const secrets = {};
+    const meta = { id, savedAt: (/* @__PURE__ */ new Date()).toISOString(), dept: body.dept || "global" };
+    if (id === "dutchie") {
+      secrets.apiKey = body.key || "";
+      meta.storeId = body.store || "";
+      meta.env = body.env || "prod";
+    } else if (id === "metrc") {
+      secrets.swKey = body.sw || "";
+      secrets.userKey = body.user || "";
+      meta.state = (body.state || "").toUpperCase();
+    } else if (id === "iheartjane") {
+      secrets.apiKey = body.key || "";
+      meta.storeId = body.store || "";
+    } else if (id === "leaftrade") {
+      secrets.apiKey = body.key || "";
+      meta.license = body.license || "";
+    } else if (id === "mjfreeway") {
+      secrets.token = body.token || "";
+      meta.license = body.license || "";
+      meta.baseUrl = body.url || "https://api.mjfreeway.com/v1";
+    }
+    await env.CACI_KV.put("con:" + id, JSON.stringify(meta));
+    await env.CACI_KV.put("con-secret:" + id, JSON.stringify(secrets));
+    const verified = await verifyConnector(id, meta, secrets);
+    return json({ ok: true, id, verified });
+  } catch (e) {
+    return json({ error: e.message }, 500);
+  }
+}
+__name(handleConnectorSave, "handleConnectorSave");
+async function verifyConnector(id, meta, secrets) {
+  try {
+    if (id === "dutchie") {
+      const r = await fetch("https://api.dutchie.com/v1/store", {
+        headers: { Authorization: "Bearer " + secrets.apiKey }
+      });
+      return r.ok;
+    }
+    if (id === "metrc") {
+      const state = (meta.state || "co").toLowerCase();
+      const creds = btoa(secrets.swKey + ":" + secrets.userKey);
+      const r = await fetch("https://api-" + state + ".metrc.com/v3/facilities", {
+        headers: { Authorization: "Basic " + creds }
+      });
+      return r.ok;
+    }
+    if (id === "iheartjane") {
+      const r = await fetch("https://api.iheartjane.com/v1/stores/" + meta.storeId, {
+        headers: { Authorization: "Bearer " + secrets.apiKey }
+      });
+      return r.ok;
+    }
+    if (id === "leaftrade") {
+      const r = await fetch("https://api.leaftrade.com/api/v1/company/profile/", {
+        headers: { Authorization: "Token " + secrets.apiKey }
+      });
+      return r.ok;
+    }
+    if (id === "mjfreeway") {
+      const r = await fetch((meta.baseUrl || "https://api.mjfreeway.com/v1") + "/company", {
+        headers: { Authorization: "Bearer " + secrets.token }
+      });
+      return r.ok;
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+__name(verifyConnector, "verifyConnector");
+async function handleConnectorGet(path, url, env) {
+  const id = path.replace("/connectors/", "").split("/")[0];
+  if (!id) {
+    const all = [];
+    for (const cid of ALLOWED_CONNECTORS) {
+      const m = await env.CACI_KV.get("con:" + cid, "json");
+      if (m)
+        all.push(m);
+    }
+    return json(all);
+  }
+  const meta = await env.CACI_KV.get("con:" + id, "json");
+  if (!meta)
+    return json({ error: "Not configured" }, 404);
+  return json(meta);
+}
+__name(handleConnectorGet, "handleConnectorGet");
+async function handleConnectorDelete(path, env) {
+  const id = path.replace("/connectors/", "").split("/")[0];
+  await env.CACI_KV.delete("con:" + id);
+  await env.CACI_KV.delete("con-secret:" + id);
+  return json({ ok: true });
+}
+__name(handleConnectorDelete, "handleConnectorDelete");
+async function handleConnectorFetch(path, request, env) {
+  const id = path.replace("/connectors/", "").split("/fetch")[0];
+  const meta = await env.CACI_KV.get("con:" + id, "json");
+  const secrets = await env.CACI_KV.get("con-secret:" + id, "json");
+  if (!meta || !secrets)
+    return json({ error: "Connector not configured" }, 404);
+  const body = await request.json().catch(() => ({}));
+  const endpoint = body.endpoint || "";
+  let apiUrl = "";
+  const headers = {};
+  if (id === "dutchie") {
+    apiUrl = "https://api.dutchie.com/v1" + endpoint;
+    headers["Authorization"] = "Bearer " + secrets.apiKey;
+  } else if (id === "metrc") {
+    const state = (meta.state || "co").toLowerCase();
+    const creds = btoa(secrets.swKey + ":" + secrets.userKey);
+    apiUrl = "https://api-" + state + ".metrc.com/v3" + endpoint;
+    headers["Authorization"] = "Basic " + creds;
+  } else if (id === "iheartjane") {
+    apiUrl = "https://api.iheartjane.com/v1" + endpoint;
+    headers["Authorization"] = "Bearer " + secrets.apiKey;
+  } else if (id === "leaftrade") {
+    apiUrl = "https://api.leaftrade.com/api/v1" + endpoint;
+    headers["Authorization"] = "Token " + secrets.apiKey;
+  } else if (id === "mjfreeway") {
+    apiUrl = (meta.baseUrl || "https://api.mjfreeway.com/v1") + endpoint;
+    headers["Authorization"] = "Bearer " + secrets.token;
   } else {
-    btn.addEventListener('click', () => {
-      if (_listening) { stopListening(); } else { startListening(); }
-    });
+    return json({ error: "Unknown connector" }, 400);
   }
-
-  // Speaker toggle button — sits in chat bar, toggles auto-speak
-  const spkToggle = $('spk-toggle-btn');
-  if (spkToggle) {
-    // Sync initial state
-    spkToggle.classList.toggle('active', voiceAutoSpeak);
-    spkToggle.title = voiceAutoSpeak ? 'Auto-speak ON — click to turn off' : 'Auto-speak OFF — click to turn on';
-
-    spkToggle.addEventListener('click', () => {
-      // If currently speaking, stop it
-      if (_currentAudio || speechSynthesis.speaking) {
-        stopSpeaking();
-        return;
-      }
-      // Otherwise toggle auto-speak
-      voiceAutoSpeak = !voiceAutoSpeak;
-      localStorage.setItem('caci_voice_auto', voiceAutoSpeak);
-      spkToggle.classList.toggle('active', voiceAutoSpeak);
-      spkToggle.title = voiceAutoSpeak ? 'Auto-speak ON — click to turn off' : 'Auto-speak OFF — click to turn on';
-      setVoiceStatus(voiceAutoSpeak ? 'Auto-speak on' : 'Auto-speak off', voiceAutoSpeak);
-      setTimeout(() => setVoiceStatus(''), 1800);
-      // Also sync the Config panel checkbox if it exists
-      const gttsAuto = $('gtts-auto');
-      if (gttsAuto) gttsAuto.checked = voiceAutoSpeak;
-    });
-  }
-}
-
-function startListening() {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) return;
-
-  stopSpeaking(); // stop TTS if playing
-
-  _recognition = new SR();
-  _recognition.lang = 'en-US';
-  _recognition.interimResults = true;
-  _recognition.maxAlternatives = 1;
-  _recognition.continuous = false;
-
-  _recognition.onstart = () => {
-    _listening = true;
-    const btn = $('mic-btn');
-    if (btn) btn.classList.add('listening');
-    setVoiceStatus('Listening\u2026', true);
-  };
-
-  _recognition.onresult = (e) => {
-    const transcript = Array.from(e.results)
-      .map(r => r[0].transcript).join('');
-    const ta = $('chat-ta');
-    if (ta) ta.value = transcript;
-  };
-
-  _recognition.onend = () => {
-    _listening = false;
-    const btn = $('mic-btn');
-    if (btn) btn.classList.remove('listening');
-    setVoiceStatus('');
-    // Auto-send if we got text
-    const ta = $('chat-ta');
-    if (ta && ta.value.trim()) sendChat();
-  };
-
-  _recognition.onerror = (e) => {
-    _listening = false;
-    const btn = $('mic-btn');
-    if (btn) btn.classList.remove('listening');
-    if (e.error !== 'no-speech') setVoiceStatus('Mic error: ' + e.error);
-    setTimeout(() => setVoiceStatus(''), 2000);
-  };
-
-  _recognition.start();
-}
-
-function stopListening() {
-  if (_recognition) { _recognition.stop(); _recognition = null; }
-  _listening = false;
-  const btn = $('mic-btn');
-  if (btn) btn.classList.remove('listening');
-  setVoiceStatus('');
-}
-
-/* ── Voice settings in Config panel ────────────────────── */
-function initVoiceSettings() {
-  // Google TTS key
-  const gttsKey = $('gtts-key');
-  if (gttsKey) gttsKey.value = localStorage.getItem('caci_gtts_key') || '';
-
-  const gttsSave = $('gtts-save');
-  if (gttsSave) gttsSave.addEventListener('click', () => {
-    const key = $('gtts-key')?.value.trim() || '';
-    localStorage.setItem('caci_gtts_key', key);
-    const fb = $('gtts-fb');
-    if (fb) { fb.textContent = key ? '\u2713 Key saved' : 'Key cleared'; fb.className = 'afb ok'; setTimeout(() => { fb.textContent = ''; fb.className = 'afb'; }, 2000); }
-  });
-
-  // Voice select
-  const gttsVoice = $('gtts-voice');
-  if (gttsVoice) {
-    gttsVoice.value = localStorage.getItem('caci_gtts_voice') || 'en-US-Wavenet-F';
-    gttsVoice.addEventListener('change', () => localStorage.setItem('caci_gtts_voice', gttsVoice.value));
-  }
-
-  // Speed select
-  const gttsSpeed = $('gtts-speed');
-  if (gttsSpeed) {
-    gttsSpeed.value = localStorage.getItem('caci_gtts_speed') || '1.0';
-    gttsSpeed.addEventListener('change', () => localStorage.setItem('caci_gtts_speed', gttsSpeed.value));
-  }
-
-  // Auto-speak toggle
-  const gttsAuto = $('gtts-auto');
-  if (gttsAuto) {
-    gttsAuto.checked = voiceAutoSpeak;
-    gttsAuto.addEventListener('change', () => {
-      voiceAutoSpeak = gttsAuto.checked;
-      localStorage.setItem('caci_voice_auto', voiceAutoSpeak);
-    });
-  }
-
-  // Test button
-  const gttsTest = $('gtts-test');
-  if (gttsTest) gttsTest.addEventListener('click', () => speakText(gttsTest, 'CACI Intelligence Platform ready. Voice output is working correctly.'));
-}
-
-
-const INT_DEFS = [
-  { id:'excel',     name:'Excel / Sheets',   fields:['secret','tenant'] },
-  { id:'word',      name:'Word / Docs',       fields:['secret','tenant'] },
-  { id:'teams',     name:'Microsoft Teams',   fields:['webhook','token'] },
-  { id:'powerbi',   name:'Power BI',          fields:['secret','workspace'] },
-  { id:'quickbase', name:'QuickBase',         fields:['token','realm'] },
-];
-
-async function connectIntegration(id) {
-  const def = INT_DEFS.find(d => d.id === id);
-  if (!def) return;
-
-  const vals = {};
-  def.fields.forEach(f => {
-    const el = document.getElementById('ii-' + id + '-' + f);
-    if (el) vals[f] = el.value.trim();
-  });
-
-  const missing = def.fields.filter(f => !vals[f]);
-  if (missing.length) {
-    setIntFb(id, 'Fill in all fields before connecting.', 'err');
-    return;
-  }
-
-  setIntFb(id, 'Saving…', '');
   try {
-    const res = await apiFetch('/integrations/' + id, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...vals, dept }),
-    });
-    const data = await res.json();
-    if (data.ok) {
-      setIntFb(id, '✓ Connected', 'ok');
-      setIntStatus(id, true);
-      loadIntegrationStatuses();
-    } else {
-      setIntFb(id, data.error || 'Connection failed', 'err');
-    }
-  } catch(e) {
-    // Worker route not yet deployed — store locally so UI reflects intent
-    const stored = JSON.parse(localStorage.getItem('caci_integrations') || '{}');
-    stored[id] = { ...vals, connectedAt: new Date().toISOString() };
-    localStorage.setItem('caci_integrations', JSON.stringify(stored));
-    setIntFb(id, '✓ Saved locally (deploy worker to persist)', 'ok');
-    setIntStatus(id, true);
-    loadIntegrationStatuses();
+    const r = await fetch(apiUrl, { headers });
+    const data = await r.json();
+    return json({ ok: r.ok, status: r.status, data });
+  } catch (e) {
+    return json({ error: e.message }, 502);
   }
 }
-
-function setIntFb(id, msg, cls) {
-  const el = document.getElementById('ifb-' + id);
-  if (!el) return;
-  el.textContent = msg;
-  el.className = 'int-fb' + (cls ? ' ' + cls : '');
-}
-
-function setIntStatus(id, connected) {
-  const el = document.getElementById('ist-' + id);
-  if (!el) return;
-  el.innerHTML = connected
-    ? '<span class="spip"></span>Connected'
-    : '<span class="spip warn"></span>Not connected';
-  el.className = 'int-status' + (connected ? ' connected' : '');
-  const card = document.getElementById('int-' + id);
-  if (card) card.classList.toggle('connected', connected);
-}
-
-function loadIntegrationStatuses() {
-  const stored = JSON.parse(localStorage.getItem('caci_integrations') || '{}');
-  INT_DEFS.forEach(def => setIntStatus(def.id, !!stored[def.id]));
-
-  const list = document.getElementById('int-connected-list');
-  if (!list) return;
-  const entries = Object.entries(stored);
-  if (!entries.length) {
-    list.innerHTML = '<div class="fempty" style="padding:24px 0">No integrations connected yet.</div>';
-    return;
-  }
-  list.innerHTML = entries.map(([id, cfg]) => {
-    const def = INT_DEFS.find(d => d.id === id) || { name: id };
-    const ts  = cfg.connectedAt ? new Date(cfg.connectedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'}) : '—';
-    return `<div class="int-row">
-      <div class="int-row-dot"></div>
-      <div class="int-row-name">${def.name}</div>
-      <div class="int-row-meta">Connected ${ts}</div>
-      <button class="int-row-dis" onclick="disconnectIntegration('${id}')">Disconnect</button>
-    </div>`;
-  }).join('');
-}
-
-function disconnectIntegration(id) {
-  const stored = JSON.parse(localStorage.getItem('caci_integrations') || '{}');
-  delete stored[id];
-  localStorage.setItem('caci_integrations', JSON.stringify(stored));
-  setIntStatus(id, false);
-  setIntFb(id, 'Disconnected.', '');
-  loadIntegrationStatuses();
-}
-
-
-/* ═══════════════════════════════════════════════════════════
-   CONNECTORS  (Cannabis platforms)
-═══════════════════════════════════════════════════════════ */
-
-const CON_DEFS = [
-  { id:'dutchie',    name:'Dutchie',      fields:['key','store','env'],         envField:'env' },
-  { id:'metrc',      name:'METRC',        fields:['sw','user','state'],          stateField:'state' },
-  { id:'iheartjane', name:'iHeartJane',   fields:['key','store'] },
-  { id:'leaftrade',  name:'LeafTrade',    fields:['key','license'] },
-  { id:'mjfreeway',  name:'MJ Freeway',   fields:['token','license','url'] },
-];
-
-async function saveConnector(id) {
-  const def = CON_DEFS.find(d => d.id === id);
-  if (!def) return;
-
-  const vals = {};
-  def.fields.forEach(f => {
-    const el = document.getElementById('ci-' + id.replace('iheartjane','jane').replace('mjfreeway','mjfw') + '-' + f);
-    if (el) vals[f] = el.value.trim();
-  });
-
-  // check required (first two fields always required)
-  const req = def.fields.slice(0, 2);
-  if (req.some(f => !vals[f])) {
-    setConFb(id, 'Fill in all required fields.', 'err');
-    return;
-  }
-
-  setConFb(id, 'Saving…', '');
-  try {
-    const res = await apiFetch('/connectors/' + id, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...vals, dept }),
-    });
-    const data = await res.json();
-    if (data.ok) {
-      setConFb(id, '✓ Verified & saved', 'ok');
-      setConStatus(id, true);
-      loadConnectorStatuses();
-    } else {
-      setConFb(id, data.error || 'Verification failed', 'err');
-    }
-  } catch(e) {
-    // Store locally until worker route is deployed
-    const stored = JSON.parse(localStorage.getItem('caci_connectors') || '{}');
-    const safeVals = { ...vals };
-    // Redact secrets before storing in localStorage
-    def.fields.forEach(f => {
-      if (['key','sw','user','token','secret'].includes(f) && safeVals[f]) {
-        safeVals[f] = safeVals[f].slice(0,4) + '••••••••';
-      }
-    });
-    stored[id] = { ...safeVals, savedAt: new Date().toISOString() };
-    localStorage.setItem('caci_connectors', JSON.stringify(stored));
-    setConFb(id, '✓ Saved (deploy worker route to persist securely)', 'ok');
-    setConStatus(id, true);
-    loadConnectorStatuses();
-  }
-}
-
-function setConFb(id, msg, cls) {
-  const el = document.getElementById('cfb-' + id);
-  if (!el) return;
-  el.textContent = msg;
-  el.className = 'int-fb' + (cls ? ' ' + cls : '');
-}
-
-function setConStatus(id, connected) {
-  const el = document.getElementById('cst-' + id);
-  if (!el) return;
-  el.innerHTML = connected
-    ? '<span class="spip"></span>Configured'
-    : '<span class="spip warn"></span>Not configured';
-  el.className = 'con-status' + (connected ? ' connected' : '');
-  const card = document.getElementById('con-' + id);
-  if (card) card.classList.toggle('connected', connected);
-}
-
-function loadConnectorStatuses() {
-  const stored = JSON.parse(localStorage.getItem('caci_connectors') || '{}');
-  CON_DEFS.forEach(def => setConStatus(def.id, !!stored[def.id]));
-
-  const list = document.getElementById('con-active-list');
-  if (!list) return;
-  const entries = Object.entries(stored);
-  if (!entries.length) {
-    list.innerHTML = '<div class="fempty" style="padding:24px 0">No connectors configured yet.</div>';
-    return;
-  }
-  list.innerHTML = entries.map(([id, cfg]) => {
-    const def = CON_DEFS.find(d => d.id === id) || { name: id };
-    const ts  = cfg.savedAt ? new Date(cfg.savedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'}) : '—';
-    const meta = cfg.state ? 'State: ' + cfg.state : cfg.store ? 'Store: ' + cfg.store : cfg.license ? 'License: ' + cfg.license : '';
-    return `<div class="int-row">
-      <div class="int-row-dot"></div>
-      <div class="int-row-name">${def.name}</div>
-      <div class="int-row-meta">${meta ? meta + ' &nbsp;·&nbsp; ' : ''}Saved ${ts}</div>
-      <button class="int-row-dis" onclick="disconnectConnector('${id}')">Remove</button>
-    </div>`;
-  }).join('');
-}
-
-function disconnectConnector(id) {
-  const stored = JSON.parse(localStorage.getItem('caci_connectors') || '{}');
-  delete stored[id];
-  localStorage.setItem('caci_connectors', JSON.stringify(stored));
-  setConStatus(id, false);
-  setConFb(id, 'Removed.', '');
-  loadConnectorStatuses();
-}
-</script>
-
-
-<!-- Edit File Modal -->
-<div class="upload-modal-bg" id="edit-file-modal-bg">
-  <div class="upload-modal" style="max-width:520px">
-    <div class="um-header">
-      <div>
-        <div class="um-title">Edit File Info</div>
-        <div class="um-sub">Update metadata for this document</div>
-      </div>
-      <button class="um-close" id="edit-file-close">&times;</button>
-    </div>
-    <div class="um-body">
-      <input type="hidden" id="ef-id"/>
-      <div class="um-field">
-        <div class="um-label">File Name <span class="um-required">*</span></div>
-        <input class="um-input" id="ef-name" placeholder="File name"/>
-      </div>
-      <div class="um-field">
-        <div class="um-label">Report / Data Name</div>
-        <input class="um-input" id="ef-report-name" placeholder="e.g. Q1 Shrink Report"/>
-      </div>
-      <div class="um-row">
-        <div class="um-field">
-          <div class="um-label">Collection</div>
-          <select class="um-select" id="ef-collection"></select>
-        </div>
-        <div class="um-field">
-          <div class="um-label">Category</div>
-          <select class="um-select" id="ef-category">
-            <option value="">Select...</option>
-          </select>
-        </div>
-      </div>
-      <div class="um-row">
-        <div class="um-field">
-          <div class="um-label">Period</div>
-          <input class="um-input" id="ef-period" placeholder="e.g. Q1 2026, Jan 2026"/>
-        </div>
-        <div class="um-field">
-          <div class="um-label">Report Type</div>
-          <select class="um-select" id="ef-report-type">
-            <option value="">Select...</option>
-          </select>
-        </div>
-      </div>
-      <div class="um-footer">
-        <button class="um-cancel" id="ef-cancel">Cancel</button>
-        <button class="um-submit" id="ef-submit">Save Changes</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- New Collection Modal -->
-<div class="upload-modal-bg" id="new-col-modal-bg">
-  <div class="upload-modal" style="max-width:480px">
-    <div class="um-header">
-      <div>
-        <div class="um-title">New Collection</div>
-        <div class="um-sub">Collections organize your documents and context for AI analysis</div>
-      </div>
-      <button class="um-close" id="new-col-close">&times;</button>
-    </div>
-    <div class="um-body">
-      <div class="um-field">
-        <div class="um-label">Collection Name <span class="um-required">*</span></div>
-        <input class="um-input" id="nc-name" placeholder="e.g. Shrink &amp; Adjustment Reports, Monthly Inventory Audits"/>
-      </div>
-      <div class="um-row">
-        <div class="um-field">
-          <div class="um-label">Department <span class="um-required">*</span></div>
-          <select class="um-select" id="nc-dept">
-            <option value="">Select...</option>
-          </select>
-        </div>
-        <div class="um-field">
-          <div class="um-label">Category</div>
-          <select class="um-select" id="nc-category">
-            <option value="">Select...</option>
-          </select>
-        </div>
-      </div>
-      <div class="um-field">
-        <div class="um-label">Description</div>
-        <input class="um-input" id="nc-desc" placeholder="What documents go in this collection?"/>
-      </div>
-      <div class="um-footer">
-        <button class="um-cancel" id="new-col-cancel">Cancel</button>
-        <button class="um-submit" id="new-col-submit">Create Collection</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Upload Modal -->
-<div class="upload-modal-bg" id="upload-modal-bg">
-  <div class="upload-modal">
-    <div class="um-header">
-      <div>
-        <div class="um-title">File Classification</div>
-        <div class="um-sub">Organize before upload &mdash; accuracy ensures correct retrieval</div>
-      </div>
-      <button class="um-close" id="um-close">&times;</button>
-    </div>
-    <div class="um-body">
-      <!-- Files preview -->
-      <div>
-        <div class="um-files-label">Selected Files</div>
-        <div class="um-files-preview" id="um-files-preview"></div>
-      </div>
-
-      <!-- Collection picker -->
-      <div class="um-field">
-        <div class="um-label">Add to Collection</div>
-        <select class="um-select" id="um-collection-pick">
-          <option value="">+ Create new collection from fields below</option>
-        </select>
-        <div class="um-col-pick-meta" id="um-col-pick-meta"></div>
-      </div>
-
-      <!-- Report Name -->
-      <div class="um-field">
-        <div class="um-label">Report / Data Name <span class="um-required">*</span></div>
-        <input class="um-input" id="um-report-name" placeholder="e.g. Product Satisfaction Survey, Q1 Shrink Report"/>
-      </div>
-
-      <!-- Department + Category -->
-      <div class="um-row">
-        <div class="um-field">
-          <div class="um-label">Department</div>
-          <select class="um-select" id="um-dept-select">
-            <option value="">Select department...</option>
-          </select>
-        </div>
-        <div class="um-field">
-          <div class="um-label">Category <span class="um-required">*</span></div>
-          <select class="um-select" id="um-category">
-            <option value="">Select category...</option>
-          </select>
-        </div>
-        <div class="um-field">
-          <div class="um-label">Report Type</div>
-          <select class="um-select" id="um-report-type">
-            <option value="">Select type...</option>
-          </select>
-        </div>
-      </div>
-
-      <!-- Period / Date Range -->
-      <div class="um-field">
-        <div class="um-label">Period <span class="um-required">*</span></div>
-        <div class="um-period-tabs" id="um-period-tabs">
-          <button type="button" class="um-ptab active" data-mode="range">Date Range</button>
-          <button type="button" class="um-ptab" data-mode="month">Month</button>
-          <button type="button" class="um-ptab" data-mode="year">Year</button>
-          <button type="button" class="um-ptab" data-mode="custom">Custom</button>
-        </div>
-        <div class="um-period-mode" id="um-pmode-range">
-          <div class="um-date-row">
-            <div class="um-date-group">
-              <div class="um-date-label">From</div>
-              <input type="date" class="um-input um-date-input" id="um-date-from"/>
-            </div>
-            <div class="um-date-sep">&rarr;</div>
-            <div class="um-date-group">
-              <div class="um-date-label">To</div>
-              <input type="date" class="um-input um-date-input" id="um-date-to"/>
-            </div>
-          </div>
-        </div>
-        <div class="um-period-mode" id="um-pmode-month" style="display:none">
-          <div class="um-date-row">
-            <select class="um-select" id="um-month-month" style="flex:1">
-              <option value="">Month...</option>
-              <option>January</option><option>February</option><option>March</option>
-              <option>April</option><option>May</option><option>June</option>
-              <option>July</option><option>August</option><option>September</option>
-              <option>October</option><option>November</option><option>December</option>
-            </select>
-            <select class="um-select" id="um-month-year" style="flex:1">
-              <option value="">Year...</option>
-            </select>
-          </div>
-        </div>
-        <div class="um-period-mode" id="um-pmode-year" style="display:none">
-          <select class="um-select" id="um-year-select">
-            <option value="">Select year...</option>
-          </select>
-        </div>
-        <div class="um-period-mode" id="um-pmode-custom" style="display:none">
-          <input class="um-input" id="um-period-custom" placeholder="e.g. Q1 2026, FY2025, Week 14, Ad Hoc"/>
-        </div>
-        <div class="um-period-preview" id="um-period-preview"></div>
-      </div>
-
-      <!-- States -->
-      <div class="um-field">
-        <div class="um-label">State(s)</div>
-        <div class="um-states" id="um-states"></div>
-      </div>
-
-      <!-- Store (shown when 1 state selected) -->
-      <div class="um-store-wrap" id="um-store-wrap">
-        <div class="um-field">
-          <div class="um-label">Store Location</div>
-          <select class="um-select" id="um-store">
-            <option value="">All stores in state</option>
-          </select>
-        </div>
-      </div>
-
-      <!-- Duplicate warning -->
-      <div class="um-dup-warning" id="um-dup-warning">
-        <div class="um-dup-title">&#9888;&nbsp; Potential Duplicate Detected</div>
-        <div class="um-dup-list" id="um-dup-list"></div>
-        <div class="um-dup-confirm">Files with the same name and period already exist. Confirm to upload anyway.</div>
-      </div>
-
-      <!-- Footer -->
-      <div class="um-footer">
-        <button class="um-cancel" id="um-cancel">Cancel</button>
-        <button class="um-submit" id="um-submit">Check &amp; Upload</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-</body>
-</html>
+__name(handleConnectorFetch, "handleConnectorFetch");
+export {
+  worker_default as default
+};
+//# sourceMappingURL=worker.js.map
