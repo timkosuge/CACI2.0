@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-//  CACI Worker v5.9 — Adaptive chunk depth for large single-file docs
+//  CACI Worker v5.9 — Adaptive chunk depth + configurable chunk size on upload
 // ─────────────────────────────────────────────────────────────
 
 const CORS = {
@@ -153,8 +153,10 @@ async function handleUpload(request, env) {
 
     const id         = crypto.randomUUID();
     const uploadedAt = new Date().toISOString();
+    // Allow caller to specify chunk size — smaller = more granular retrieval (good for legal/regulatory docs)
+    const chunkSize  = parseInt(formData.get('chunkSize') || '1500', 10) || 1500;
     const cleanText  = text.replace(/\s+/g, ' ').trim();
-    const chunks     = chunkText(cleanText, 1500);
+    const chunks     = chunkText(cleanText, chunkSize);
 
     if (file && env.CACI_R2) {
       const buffer = await file.arrayBuffer();
@@ -168,6 +170,7 @@ async function handleUpload(request, env) {
       id, name, dept, collection, uploadedAt,
       charCount: cleanText.length,
       chunks: chunks.length,
+      chunkSize,
       meta,
       stats,
     };
