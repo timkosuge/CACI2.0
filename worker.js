@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-//  CACI Worker v6.0 — AI Auto-Classification on Upload
+//  CACI Worker v6.1 — Collection Analysis + AI Auto-Classification
 // ─────────────────────────────────────────────────────────────
 
 const CORS = {
@@ -28,7 +28,7 @@ export default {
 
     if (method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
     if (path === '/auth/login' && method === 'POST') return handleLogin(request, env);
-    if (path === '/health') return json({ ok: true, version: '6.0.0' });
+    if (path === '/health') return json({ ok: true, version: '6.1.0' });
 
     if (!verifyToken(request, env)) return json({ error: 'Unauthorized' }, 401);
 
@@ -69,7 +69,9 @@ export default {
     }
     if (path === '/chat'      && method === 'POST')   return handleChat(request, env);
     if (path === '/report'    && method === 'POST')   return handleReport(request, env);
-    if (path === '/ai-classify' && method === 'POST') return handleAiClassify(request, env);
+    if (path === '/ai-classify'         && method === 'POST') return handleAiClassify(request, env);
+    if (path === '/collection-analyze'  && method === 'POST') return handleCollectionAnalyze(request, env);
+    if (path === '/collections/describe'&& method === 'POST') return handleCollectionDescribe(request, env);
     if (path === '/admin/config' && method === 'POST') return handleAdminSave(request, env);
     if (path === '/admin/config' && method === 'GET')  return handleAdminGet(env);
 
@@ -656,7 +658,15 @@ async function buildDiscoveryContext({ dept, env }) {
       return { ...c, fileCount: files.length };
     }));
     const collectionList = enriched.length
-      ? enriched.map(c => `- ${c.name} (${c.fileCount} file${c.fileCount !== 1 ? 's' : ''}${c.category ? ', ' + c.category : ''})`).join('\n')
+      ? enriched.map(c => {
+          const meta = [
+            c.fileCount + ' file' + (c.fileCount !== 1 ? 's' : ''),
+            c.category || '',
+            c.summary  || '',
+          ].filter(Boolean).join(', ');
+          const desc = c.description ? `\n    ${c.description}` : '';
+          return `- ${c.name} (${meta})${desc}`;
+        }).join('\n')
       : '(No collections uploaded yet.)';
     return { collectionList, rawCollections: enriched };
   } catch {
@@ -1057,6 +1067,77 @@ async function buildContext({ message, dept, collection, fileId, scope, env }) {
   } catch (err) {
     console.error('Context error:', err.message);
     return { text: '', sources: [], statsContext: '', focusFile: null };
+  }
+}
+
+// ── Collection Analysis ───────────────────────────────────────
+async function handleCollectionAnalyze(request, env) {
+  try {
+    const { colName, dept, manifest } = await request.json();
+    if (!colName || !manifest) return json({ error: 'colName and manifest required' }, 400);
+
+    const apiKey = (await env.CACI_KV.get('config:ANTHROPIC_API_KEY')) || env.ANTHROPIC_API_KEY;
+    if (!apiKey) return json({ error: 'Anthropic API key not configured' }, 400);
+
+    const prompt = `You are analyzing a document collection for a cannabis company (Jushi Holdings).
+
+Collection name: "${colName}"
+
+Files in this collection:
+${manifest}
+
+Based on the file names and their periods/categories, return ONLY valid JSON:
+{
+  "description": "1-2 sentence plain-English description of what this collection contains and covers (e.g. 'Monthly product return and credit reports tracking customer complaints by state and product type, covering Jan 2024 through Feb 2026.')",
+  "category": "the primary category: Sales, Inventory, Compliance, Finance, HR, Operations, Marketing, Customer, Product, Legal, Technology, or Other",
+  "summary": "ultra-short 5-8 word summary (e.g. 'Monthly product return data by state')"
+}`;
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 200,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+
+    if (!res.ok) { const e = await res.text(); return json({ error: e }, 500); }
+    const data   = await res.json();
+    const result = data.content?.[0]?.text || '';
+
+    let parsed;
+    try { parsed = JSON.parse(result.replace(/```json|```/g, '').trim()); }
+    catch { return json({ error: 'Failed to parse AI response' }, 500); }
+
+    return json({ ok: true, ...parsed });
+  } catch(err) {
+    return json({ error: 'Collection analyze error: ' + err.message }, 500);
+  }
+}
+
+// ── Collection Describe (PATCH description onto registry entry) ─
+async function handleCollectionDescribe(request, env) {
+  try {
+    const { name, dept, description, category, summary } = await request.json();
+    if (!name || !dept) return json({ error: 'name and dept required' }, 400);
+
+    const regKey = `colreg:${dept}`;
+    const reg    = await env.CACI_KV.get(regKey, 'json') || [];
+    const entry  = reg.find(c => c.name === name);
+
+    if (!entry) return json({ error: 'Collection not found' }, 404);
+
+    if (description) entry.description = description;
+    if (category)    entry.category    = category;
+    if (summary)     entry.summary     = summary;
+    entry.analyzedAt = new Date().toISOString();
+
+    await env.CACI_KV.put(regKey, JSON.stringify(reg));
+    return json({ ok: true });
+  } catch(err) {
+    return json({ error: 'Collection describe error: ' + err.message }, 500);
   }
 }
 
