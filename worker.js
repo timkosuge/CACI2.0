@@ -42,6 +42,7 @@ export default {
     if (path === '/collections/create' && method === 'POST') return handleCreateCollection(request, env);
     if (path.startsWith('/collections/') && method === 'DELETE') return handleDeleteCollection(path.replace('/collections/', ''), url, env);
     if (path === '/tts'       && method === 'POST')   return handleTTS(request, env);
+    if (path === '/tts-debug'  && method === 'POST')   return handleTTSDebug(request, env);
     if (path === '/chat'      && method === 'POST')   return handleChat(request, env);
     if (path === '/report'    && method === 'POST')   return handleReport(request, env);
     if (path === '/admin/config' && method === 'POST') return handleAdminSave(request, env);
@@ -941,6 +942,22 @@ async function handleConnectorFetch(path, request, env) {
 
 
 // ── TTS (Grok / Cloudflare) ───────────────────────────────────
+async function handleTTSDebug(request, env) {
+  try {
+    const { text = 'test', voice = 'eve' } = await request.json().catch(() => ({}));
+    const apiKey = (await env.CACI_KV.get('config:XAI_API_KEY')) || env.XAI_API_KEY;
+    if (!apiKey) return json({ error: 'No xAI key found', kv: 'empty', env: typeof env.XAI_API_KEY });
+    const keyPreview = apiKey.slice(0, 8) + '...' + apiKey.slice(-4);
+    const res = await fetch('https://api.x.ai/v1/tts', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, voice_id: voice, language: 'en' }),
+    });
+    const body = await res.text();
+    return json({ status: res.status, ok: res.ok, body, keyPreview });
+  } catch(e) { return json({ error: e.message }); }
+}
+
 async function handleTTS(request, env) {
   try {
     const { text, provider = 'grok', voice = 'eve' } = await request.json();
@@ -948,7 +965,7 @@ async function handleTTS(request, env) {
     if (provider === 'grok' || provider === 'claude') {
       const apiKey = (await env.CACI_KV.get('config:XAI_API_KEY')) || env.XAI_API_KEY;
       if (!apiKey) return json({ error: 'xAI API key not configured.' }, 400);
-      const res = await fetch('https://api.x.ai/v1/audio/speech', {
+      const res = await fetch('https://api.x.ai/v1/tts', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: text, voice_id: voice, language: 'en' }),
