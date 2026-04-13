@@ -4064,8 +4064,14 @@ async function sendChat() {
     // Auto-detect collection from user message if we are still in discovery (no collection locked)
     if (chatScope === 'all' && !chatCollection && window._caciCollections && window._caciCollections.length) {
       const msgLower = msg.toLowerCase();
-      const match = window._caciCollections.find(c => msgLower.includes(c.name.toLowerCase()) ||
-        (c.category && msgLower.includes(c.category.toLowerCase())));
+      // Match full name, category, OR any significant word from the collection name (3+ chars, not stop words)
+      const stopWords = new Set(['the','and','for','all','from','with','that','this','are','was','were','has','have']);
+      const match = window._caciCollections.find(c => {
+        if (msgLower.includes(c.name.toLowerCase())) return true;
+        if (c.category && msgLower.includes(c.category.toLowerCase())) return true;
+        const words = c.name.toLowerCase().split(/[\s&,\/]+/).filter(w => w.length >= 4 && !stopWords.has(w));
+        return words.some(w => msgLower.includes(w));
+      });
       if (match) {
         setScope('collection', match.name);
         body.scope = 'collection';
