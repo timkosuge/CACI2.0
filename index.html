@@ -13,6 +13,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 <style>
 /* ── Variables ─────────────────────────────────────────── */
 :root {
@@ -3225,6 +3226,8 @@ body::before {
             <div class="upload-area">
               <button class="upload-btn" id="upload-btn">&#8593; Upload &amp; Classify</button>
               <button class="upload-btn ctx-upload-btn" id="ctx-upload-btn" style="display:none">&#8593; Add Context Doc</button>
+              <button class="upload-btn" id="split-pdf-btn" style="display:none" title="Split a large PDF into sections and upload each as a separate file">&#9986; Split &amp; Upload PDF</button>
+              <input type="file" id="split-pdf-input" accept=".pdf" style="display:none"/>
             </div>
             <input type="file" id="file-input" multiple accept=".pdf,.doc,.docx,.csv,.xlsx,.xls,.txt,.md" style="display:none"/>
             <input type="file" id="ctx-file-input" multiple accept=".pdf,.doc,.docx,.csv,.xlsx,.xls,.txt,.md" style="display:none"/>
@@ -3719,6 +3722,7 @@ function bootApp() {
   initNewCollectionModal();
   initVoiceInput();
   initVoiceSettings();
+  initSplitPdf();
 
   // Filter bar
   const filterClear = document.getElementById('filter-clear');
@@ -4339,6 +4343,7 @@ async function loadCollections() {
         // Update upload button label
         const ub = $('upload-btn');
         if (ub) ub.textContent = selectedCollection ? '↑ Add Files to “' + selectedCollection.slice(0,20) + (selectedCollection.length>20?'…':'') + '”' : '↑ Upload & Classify';
+        const sb = $('split-pdf-btn'); if (sb) sb.style.display = selectedCollection ? '' : 'none';
       });
     });
     list.querySelectorAll('.col-del').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); deleteCollection(b.dataset.col); }));
@@ -5582,6 +5587,180 @@ function disconnectConnector(id) {
   setConFb(id, 'Removed.', '');
   loadConnectorStatuses();
 }
+
+/* ═══════════════════════════════════════════════════════════
+   PDF SPLITTER — Split large PDFs by section and re-upload
+   Uses pdf-lib (client-side) + PDF.js for text extraction
+   to detect section/article breaks, then uploads each part.
+═══════════════════════════════════════════════════════════ */
+
+function initSplitPdf() {
+  const btn   = $('split-pdf-btn');
+  const input = $('split-pdf-input');
+  if (!btn || !input) return;
+  btn.addEventListener('click', () => {
+    if (!selectedCollection) { alert('Select a collection first.'); return; }
+    input.value = '';
+    input.click();
+  });
+  input.addEventListener('change', async e => {
+    const file = e.target.files[0];
+    if (!file || !file.name.toLowerCase().endsWith('.pdf')) return;
+    input.value = '';
+    await runPdfSplitter(file);
+  });
+}
+
+async function runPdfSplitter(file) {
+  const prog  = $('uprog');
+  const fill  = $('pfill');
+  const label = $('plabel');
+  const log   = $('plog');
+  if (prog) prog.classList.add('on');
+  if (log)  log.innerHTML = '';
+  addLog(log, 'Analyzing PDF structure...');
+
+  try {
+    // Load PDF with PDF.js for text extraction (section detection)
+    if (!window.pdfjsLib) throw new Error('PDF.js not loaded');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    const arrayBuffer = await file.arrayBuffer();
+    const pdfDoc      = await pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise;
+    const totalPages  = pdfDoc.numPages;
+    addLog(log, `${totalPages} pages detected. Scanning for sections...`);
+
+    // Detect section breaks by scanning first few lines of each page
+    const sectionBreaks = []; // { pageIndex: 0-based, label: 'Article 15' }
+
+    // Patterns for common legal/regulatory section breaks
+    const sectionPatterns = [
+      { re: /^Article\s+(\d+)\./i,               label: m => 'Article ' + m[1] },
+      { re: /^ARTICLE\s+(\d+)/i,                 label: m => 'Article ' + m[1] },
+      { re: /^Chapter\s+(\d+[\.\-]?\d*)/i,       label: m => 'Chapter ' + m[1] },
+      { re: /^CHAPTER\s+(\d+)/i,                 label: m => 'Chapter ' + m[1] },
+      { re: /^Part\s+(\d+[\.\-]?\d*)/i,          label: m => 'Part ' + m[1] },
+      { re: /^PART\s+(\d+)/i,                    label: m => 'Part ' + m[1] },
+      { re: /^Title\s+(\d+[\.\-]?\d*)/i,         label: m => 'Title ' + m[1] },
+      { re: /^Section\s+(\d+[\.\-]?\d+)/i,       label: m => 'Section ' + m[1] },
+      { re: /^§\s*(\d+[\.\-]\d+)/,               label: m => 'Section ' + m[1] },
+    ];
+
+    for (let i = 0; i < totalPages; i++) {
+      const page    = await pdfDoc.getPage(i + 1);
+      const content = await page.getTextContent();
+      const lines   = content.items.map(item => item.str).join(' ')
+                       .split(/\n|(?<=[.!?])\s+/)
+                       .map(l => l.trim()).filter(Boolean);
+
+      for (const line of lines.slice(0, 8)) {
+        let matched = false;
+        for (const pat of sectionPatterns) {
+          const m = line.match(pat.re);
+          if (m) {
+            sectionBreaks.push({ pageIndex: i, label: pat.label(m) });
+            matched = true;
+            break;
+          }
+        }
+        if (matched) break;
+      }
+    }
+
+    if (sectionBreaks.length < 2) {
+      addLog(log, 'Could not detect section breaks automatically.');
+      addLog(log, 'Falling back to equal-size splitting (30 pages per section)...');
+      // Fall back to equal splits of 30 pages
+      for (let i = 0; i < totalPages; i += 30) {
+        sectionBreaks.push({ pageIndex: i, label: 'Pages ' + (i+1) + '-' + Math.min(i+30, totalPages) });
+      }
+    }
+
+    addLog(log, `Found ${sectionBreaks.length} sections: ${sectionBreaks.map(s => s.label).join(', ')}`);
+
+    // Build page ranges
+    const splits = sectionBreaks.map((s, idx) => {
+      const startPage = s.pageIndex;                                         // 0-based
+      const endPage   = idx + 1 < sectionBreaks.length
+                        ? sectionBreaks[idx + 1].pageIndex - 1
+                        : totalPages - 1;                                    // 0-based
+      return { label: s.label, startPage, endPage };
+    });
+
+    // Load with pdf-lib for actual splitting
+    if (!window.PDFLib) throw new Error('pdf-lib not loaded. Check your network connection.');
+    const { PDFDocument } = window.PDFLib;
+    const srcDoc = await PDFDocument.load(arrayBuffer);
+
+    addLog(log, `Splitting into ${splits.length} files and uploading...`);
+
+    const baseName = file.name.replace(/\.pdf$/i, '');
+
+    for (let i = 0; i < splits.length; i++) {
+      const split = splits[i];
+      const pct   = Math.round((i / splits.length) * 85);
+      if (fill)  fill.style.width  = pct + '%';
+      if (label) label.textContent = `[${i+1}/${splits.length}] ${split.label}`;
+      addLog(log, `\u2192 ${split.label} (pages ${split.startPage+1}-${split.endPage+1})`);
+
+      // Create sub-document
+      const subDoc  = await PDFDocument.create();
+      const pageNums = [];
+      for (let p = split.startPage; p <= split.endPage; p++) pageNums.push(p);
+      const copiedPages = await subDoc.copyPages(srcDoc, pageNums);
+      copiedPages.forEach(pg => subDoc.addPage(pg));
+
+      const subBytes = await subDoc.save();
+      const subBlob  = new Blob([subBytes], { type: 'application/pdf' });
+      const subName  = `${baseName} - ${split.label}.pdf`;
+      const subFile  = new File([subBlob], subName, { type: 'application/pdf' });
+
+      // Extract text from sub-document pages using PDF.js
+      const subArrayBuffer = await subFile.arrayBuffer();
+      const subPdfDoc      = await pdfjsLib.getDocument({ data: subArrayBuffer }).promise;
+      let   subText        = '';
+      for (let p = 1; p <= subPdfDoc.numPages; p++) {
+        const pg      = await subPdfDoc.getPage(p);
+        const content = await pg.getTextContent();
+        subText      += content.items.map(item => item.str).join(' ') + '\n';
+      }
+      subText = subText.replace(/\s+/g, ' ').trim();
+      addLog(log, `  \u2713 ${subText.length.toLocaleString()} chars extracted`);
+
+      // Upload
+      const fd = new FormData();
+      fd.append('file',        subFile);
+      fd.append('text',        subText);
+      fd.append('name',        subName);
+      fd.append('dept',        dept);
+      fd.append('collection',  selectedCollection);
+      fd.append('category',    'Compliance');
+      fd.append('reportName',  split.label + ' — ' + baseName);
+      fd.append('chunkSize',   '800'); // fine chunking for legal docs
+
+      const res = await apiFetch('/upload', { method: 'POST', body: fd });
+      const d   = await res.json();
+      if (d.ok) addLog(log, `  \u2713 Uploaded \u2014 ${d.chunks} segments`);
+      else      addLog(log, `  \u2717 Upload failed: ${d.error}`);
+
+      // Small delay
+      await new Promise(r => setTimeout(r, 200));
+    }
+
+    if (fill)  fill.style.width  = '100%';
+    if (label) label.textContent = `Done \u2014 ${splits.length} sections uploaded to "${selectedCollection}"`;
+    addLog(log, `\u2705 Split complete. ${splits.length} files uploaded.`);
+    setTimeout(() => { if (prog) prog.classList.remove('on'); if (fill) fill.style.width = '0%'; }, 5000);
+    loadCollections(); loadFiles();
+
+  } catch(err) {
+    addLog(log, '\u2717 Split failed: ' + err.message);
+    if (fill)  fill.style.width  = '0%';
+    if (label) label.textContent = 'Split failed';
+    setTimeout(() => { if (prog) prog.classList.remove('on'); }, 3000);
+  }
+}
+
 </script>
 
 
