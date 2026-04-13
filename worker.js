@@ -1,6 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-//  CACI Worker v4 — Metadata, Collections, Computed Stats,
-//  Duplicate Detection, Report Generation
+//  CACI Worker v5.5 — Date Range Retrieval Fix
 // ─────────────────────────────────────────────────────────────
 
 const CORS = {
@@ -29,7 +28,7 @@ export default {
 
     if (method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
     if (path === '/auth/login' && method === 'POST') return handleLogin(request, env);
-    if (path === '/health') return json({ ok: true, version: '4.0.0' });
+    if (path === '/health') return json({ ok: true, version: '5.5.0' });
 
     if (!verifyToken(request, env)) return json({ error: 'Unauthorized' }, 401);
 
@@ -43,6 +42,31 @@ export default {
     if (path.startsWith('/collections/') && method === 'DELETE') return handleDeleteCollection(path.replace('/collections/', ''), url, env);
     if (path === '/tts'       && method === 'POST')   return handleTTS(request, env);
     if (path === '/tts-debug'  && method === 'POST')   return handleTTSDebug(request, env);
+    if (path === '/score-debug' && method === 'POST') {
+      const { message, dept, collection } = await request.json();
+      const colFiles = await env.CACI_KV.get(`col:${dept}:${collection}`, 'json') || [];
+      const yearMatches = message.match(/20\d\d/g) || [];
+      const queryYears = new Set(yearMatches);
+      const monthNames = ['january','february','march','april','may','june','july','august','september','october','november','december','jan','feb','mar','apr','jun','jul','aug','sep','oct','nov','dec'];
+      const msgLower = message.toLowerCase();
+      const queryMonths = new Set(monthNames.filter(m => { const re = new RegExp('(?<![a-z])' + m + '(?![a-z])'); return re.test(msgLower); }));
+      const scores = colFiles.map(f => {
+        const nameLower = (f.name||'').toLowerCase();
+        let score = 0;
+        if (queryYears.size > 0 && [...queryYears].some(y => nameLower.includes(y))) score += 10;
+        if (queryMonths.size > 0 && [...queryMonths].some(m => { const re = new RegExp('(?<![a-z])' + m + '(?![a-z])'); return re.test(nameLower); })) score += 8;
+        if (nameLower.endsWith('.xlsx')) score -= 1;
+        return { name: f.name, score };
+      });
+      scores.sort((a,b) => b.score - a.score);
+      return json({ queryYears: [...queryYears], queryMonths: [...queryMonths], top10: scores.slice(0,10) });
+    }
+    if (path.startsWith('/kv-debug/') && method === 'GET') {
+      const kvId = path.replace('/kv-debug/', '');
+      const val = await env.CACI_KV.get('file:' + kvId, 'json');
+      if (!val) return json({ found: false, id: kvId });
+      return json({ found: true, id: kvId, name: val.name, chunkCount: val.chunks?.length || 0, firstChunk: val.chunks?.[0]?.slice(0, 200) });
+    }
     if (path === '/chat'      && method === 'POST')   return handleChat(request, env);
     if (path === '/report'    && method === 'POST')   return handleReport(request, env);
     if (path === '/admin/config' && method === 'POST') return handleAdminSave(request, env);
@@ -108,7 +132,6 @@ async function handleUpload(request, env) {
     const name      = meta.fileName || (file ? file.name : 'unknown');
     const category  = meta.category || formData.get('category') || 'General';
     const period    = meta.period   || formData.get('period')   || '';
-    // Use explicitly sent collection name if provided, otherwise build from fields
     const sentCollection = formData.get('collection') || '';
     const collection = sentCollection || (period ? `${category} — ${period}` : category);
 
@@ -119,7 +142,6 @@ async function handleUpload(request, env) {
     const cleanText  = text.replace(/\s+/g, ' ').trim();
     const chunks     = chunkText(cleanText, 1500);
 
-    // Store raw file in R2
     if (file && env.CACI_R2) {
       const buffer = await file.arrayBuffer();
       await env.CACI_R2.put(`${dept}/${collection}/${id}/${name}`, buffer, {
@@ -128,36 +150,31 @@ async function handleUpload(request, env) {
       });
     }
 
-    // File record — includes metadata + computed stats
     const fileRecord = {
       id, name, dept, collection, uploadedAt,
       charCount: cleanText.length,
       chunks: chunks.length,
-      meta,   // reportName, category, period, state, store, reportType
-      stats,  // rowCount, columns, numericSummaries
+      meta,
+      stats,
     };
 
-    // Store text + stats in KV
     await env.CACI_KV.put(
       `file:${id}`,
       JSON.stringify({ ...fileRecord, chunks }),
       { expirationTtl: 60 * 60 * 24 * 365 }
     );
 
-    // Update dept index (no chunks — keep index lean)
     const deptKey = `index:${dept}`;
     const deptIdx = await env.CACI_KV.get(deptKey, 'json') || [];
     deptIdx.unshift(fileRecord);
     if (deptIdx.length > 500) deptIdx.splice(500);
     await env.CACI_KV.put(deptKey, JSON.stringify(deptIdx));
 
-    // Update collection index
     const colKey = `col:${dept}:${collection}`;
     const colIdx = await env.CACI_KV.get(colKey, 'json') || [];
     colIdx.unshift(fileRecord);
     await env.CACI_KV.put(colKey, JSON.stringify(colIdx));
 
-    // Update collection registry
     const regKey = `colreg:${dept}`;
     const reg    = await env.CACI_KV.get(regKey, 'json') || [];
     const fileDeptMeta = formData.get('fileDept') || dept;
@@ -168,7 +185,6 @@ async function handleUpload(request, env) {
 
     const isContext = formData.get('isContext') === 'true';
     if (isContext) {
-      // Store in context index for this collection
       const ctxKey = `ctx:${dept}:${collection}`;
       const ctxIdx = await env.CACI_KV.get(ctxKey, 'json') || [];
       ctxIdx.unshift({ ...fileRecord, isContext: true });
@@ -206,7 +222,6 @@ async function handleListFiles(url, env) {
       files = await env.CACI_KV.get(`col:${dept}:${col}`, 'json') || [];
       files = files.filter(f => !f.isContext);
     } else if (uncollected) {
-      // All files for the dept that have no collection or are in an auto-named collection
       const allFiles = await env.CACI_KV.get(`index:${dept}`, 'json') || [];
       const reg = await env.CACI_KV.get(`colreg:${dept}`, 'json') || [];
       const namedCols = new Set(reg.map(c => c.name));
@@ -216,7 +231,6 @@ async function handleListFiles(url, env) {
       files = files.filter(f => !f.isContext);
     }
 
-    // Apply filters
     if (category) files = files.filter(f => f.meta?.category === category || f.category === category);
     if (state)    files = files.filter(f => f.meta?.states?.includes(state) || f.meta?.state === state);
     if (period)   files = files.filter(f => f.meta?.period === period || f.period === period);
@@ -238,7 +252,6 @@ async function handlePatchFileMeta(path, request, env) {
     const oldCollection = stored.collection;
     const oldDept = stored.dept;
 
-    // Merge changes
     if (name)       stored.name = name;
     if (collection !== undefined) stored.collection = collection;
     if (!stored.meta) stored.meta = {};
@@ -249,7 +262,6 @@ async function handlePatchFileMeta(path, request, env) {
 
     await env.CACI_KV.put(`file:${id}`, JSON.stringify(stored));
 
-    // Update dept index
     const deptKey = `index:${oldDept}`;
     const deptIdx = await env.CACI_KV.get(deptKey, 'json') || [];
     const deptEntry = deptIdx.find(f => f.id === id);
@@ -258,12 +270,10 @@ async function handlePatchFileMeta(path, request, env) {
       await env.CACI_KV.put(deptKey, JSON.stringify(deptIdx));
     }
 
-    // Update old collection index — remove or update entry
     if (oldCollection) {
       const oldColKey = `col:${oldDept}:${oldCollection}`;
       const oldColIdx = await env.CACI_KV.get(oldColKey, 'json') || [];
       if (collection && collection !== oldCollection) {
-        // Move to new collection
         const updated = oldColIdx.filter(f => f.id !== id);
         await env.CACI_KV.put(oldColKey, JSON.stringify(updated));
         const newColKey = `col:${oldDept}:${collection}`;
@@ -311,28 +321,22 @@ async function handleListCollections(url, env) {
 // ── Delete File ───────────────────────────────────────────────
 async function handleDeleteFile(id, env, url) {
   try {
-    // If caller passes explicit dept + col + ctx=true, use those directly
     const explicitDept = url?.searchParams.get('dept');
     const explicitCol  = url?.searchParams.get('col');
     const isCtxDelete  = url?.searchParams.get('ctx') === 'true';
 
     if (isCtxDelete && explicitDept && explicitCol) {
-      // Direct ctx index removal — no file record lookup needed
       const ctxKey = `ctx:${explicitDept}:${explicitCol}`;
       const ctxIdx = await env.CACI_KV.get(ctxKey, 'json') || [];
       await env.CACI_KV.put(ctxKey, JSON.stringify(ctxIdx.filter(f => f.id !== id)));
-
-      // Also clean dept index and file record
       await env.CACI_KV.delete(`file:${id}`);
       const deptIdx = await env.CACI_KV.get(`index:${explicitDept}`, 'json') || [];
       await env.CACI_KV.put(`index:${explicitDept}`, JSON.stringify(deptIdx.filter(f => f.id !== id)));
-
       return json({ ok: true });
     }
 
     const fileMeta = await env.CACI_KV.get(`file:${id}`, 'json');
 
-    // If file record missing, sweep all indexes
     if (!fileMeta) {
       const depts = ['global','retail','compliance','commercial','human_resources','finance','operations','technology'];
       for (const d of depts) {
@@ -405,6 +409,58 @@ async function handleDeleteCollection(encodedName, url, env) {
   } catch (err) { return json({ error: 'Delete collection failed: ' + err.message }, 500); }
 }
 
+// ── Multi-model LLM router ───────────────────────────────────
+async function callLLM({ model, system, messages, maxTokens = 2000, env, apiKey }) {
+
+  if (!model || model === 'claude') {
+    if (!apiKey) throw new Error('Anthropic API key not configured. Add it in Config.');
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: maxTokens, system, messages }),
+    });
+    if (!res.ok) { const e = await res.text(); throw new Error(`Claude API error (${res.status}): ${e}`); }
+    const d = await res.json();
+    return d.content?.[0]?.text || '';
+  }
+
+  if (model === 'grok') {
+    const xaiKey = (await env.CACI_KV.get('config:XAI_API_KEY')) || env.XAI_API_KEY;
+    if (!xaiKey) throw new Error('xAI API key not configured. Add it in Config.');
+    const res = await fetch('https://api.x.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${xaiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'grok-3-mini-fast-beta', max_tokens: maxTokens, messages: [{ role: 'system', content: system }, ...messages] }),
+    });
+    if (!res.ok) { const e = await res.text(); throw new Error(`Grok API error (${res.status}): ${e}`); }
+    const d = await res.json();
+    return d.choices?.[0]?.message?.content || '';
+  }
+
+  if (model === 'cloudflare') {
+    if (!env.AI) throw new Error('Cloudflare AI binding not available. Check worker bindings.');
+    const result = await env.AI.run('@cf/meta/llama-4-scout-17b-16e-instruct', {
+      messages: [{ role: 'system', content: system }, ...messages],
+      max_tokens: maxTokens,
+    });
+    return result?.response || result?.choices?.[0]?.message?.content || '';
+  }
+
+  if (model === 'ollama') {
+    const ollamaUrl = 'http://localhost:11434/api/chat';
+    const res = await fetch(ollamaUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'llama3.2', messages: [{ role: 'system', content: system }, ...messages], stream: false }),
+    }).catch(() => null);
+    if (!res || !res.ok) throw new Error('Ollama not reachable — is it running locally?');
+    const d = await res.json();
+    return d.message?.content || '';
+  }
+
+  throw new Error('Unknown model: ' + model);
+}
+
 // ── Chat ──────────────────────────────────────────────────────
 async function handleChat(request, env) {
   try {
@@ -417,30 +473,86 @@ async function handleChat(request, env) {
     // Discovery mode
     if (history.length === 0 && scope === 'all' && !collection && !fileId) {
       const discovery = await buildDiscoveryContext({ dept, env });
-      const system = `You are CACI, an internal AI intelligence assistant for Jushi Holdings.\n\nGreet the user briefly, ask what they want to explore, and list these available collections:\n${discovery.collectionList}`;
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 400, system, messages: [{ role: 'user', content: message }] }),
-      });
-      if (!res.ok) { const err = await res.text(); return json({ error: `Claude error: ${err}` }, 500); }
-      const data = await res.json();
-      return json({ ok: true, response: data.content?.[0]?.text || '', sources: [], scope: 'discovery', collections: discovery.rawCollections });
+      const system = `You are Caci (pronounced like "Cassie") — the internal AI intelligence assistant for Jushi Holdings. You were built specifically for this team.
+
+Today's date is April 13, 2026. The full calendar year 2025 is complete. When discussing 2025 data, treat it as a full historical year.
+
+Your personality: You work in cannabis. You know these people. You're sharp, a little goofy, genuinely funny when the moment calls for it, and you have zero interest in sounding impressive — you just are. You have street smarts alongside serious analytical ability. You don't talk down to anyone and you don't perform intelligence. You're warm, patient, and kind. You have a lot of grace in how you communicate — you're tactful without being fake, honest without being harsh. You have a filter, but it's a thin one, because you value the truth more than comfort. You know how to read a room.
+
+You also know that a lot of people are still figuring out how to work with AI. That's completely fine. You meet people where they are, you don't make them feel dumb for asking basic questions, and you guide them with patience. You're good at anticipating what someone actually needs vs. what they literally asked.
+
+You're not just a number cruncher. You can talk about anything — industry trends, general questions, ideas, strategy, or just shoot the breeze. You happen to also be extremely good at analyzing data and documents when that's what's needed.
+
+Today you're working with the ${dept} team. Here's what you have access to:
+${discovery.collectionList}
+
+Greet them like a colleague — warm, real, not robotic. Ask what they want to dig into. Keep it short.
+
+INDUSTRY KNOWLEDGE — you know this world deeply:
+
+Jushi Holdings is a vertically integrated multi-state operator (MSO). They grow, process, and sell cannabis across multiple states including Pennsylvania, Illinois, Nevada, Ohio, Virginia, Massachusetts, Florida, and New Jersey. They operate retail dispensaries under the Nature's Remedy, Beyond/Hello, and other brand names. Like all MSOs, they navigate a patchwork of state regulations, each with its own licensing, compliance, and reporting requirements.
+
+Cannabis industry realities you understand:
+- 280E tax burden: cannabis companies can't deduct normal business expenses because of federal scheduling, which crushes margins
+- Banking is still a nightmare for most operators — limited access, high fees, cash-heavy operations
+- METRC is the seed-to-sale tracking system used by most states — every plant, every package, every transfer gets a tag
+- State-by-state compliance is genuinely complex: what's legal in IL isn't the same as PA, and both change constantly
+- Shrink (inventory loss) is a big deal in cannabis retail — it includes theft, damaged product, system errors, and adjustments
+- Dutchie, iHeartJane, LeafTrade, MJ Freeway are real platforms these teams use daily
+- The difference between medical and adult-use markets matters — different customer bases, different price points, different regulations
+
+Cannabis product knowledge:
+- The indica/sativa distinction is largely marketing — terpene profiles and cannabinoid ratios matter more than the label
+- THC percentage is overemphasized by consumers but doesn't tell the whole story — onset, duration, entourage effect all matter
+- Major cannabinoids: THC, CBD, CBN, CBG, CBC, THCV — each with different effects and regulatory treatment
+- Major terpenes: myrcene (earthy, sedating), limonene (citrus, uplifting), caryophyllene (spicy, anti-inflammatory), linalool (floral, calming), pinene (pine, alertness)
+- Product categories: flower, pre-rolls, vapes (distillate vs live resin vs rosin), concentrates (wax, shatter, badder, sugar, diamonds), edibles, tinctures, topicals, capsules
+- Live resin and rosin are considered higher quality by connoisseurs — full spectrum, more terpenes preserved
+- Shelf categories typically: value/budget, mid, premium/craft
+
+The people you work with:
+- Cannabis industry workers are a unique mix — former hospitality, healthcare, finance, tech, and longtime advocates all thrown together
+- The culture tends toward irreverence, passion, and a genuine belief in the plant
+- Smart people who don't always look or sound "corporate" — that's a feature, not a bug
+- Compliance teams are perpetually stressed; retail teams are customer-focused; ops teams are problem-solvers
+- Everyone is used to things changing fast and figuring it out as they go`;
+      let discResponse;
+      try {
+        discResponse = await callLLM({ model, system, messages: [{ role: 'user', content: message }], maxTokens: 400, env, apiKey });
+      } catch(e) {
+        try {
+          discResponse = await callLLM({ model: 'grok', system, messages: [{ role: 'user', content: message }], maxTokens: 400, env, apiKey });
+        } catch(e2) {
+          discResponse = `Hey! I'm Caci. Here's what I have access to:\n\n${discovery.collectionList}\n\nWhat would you like to dig into?`;
+        }
+      }
+      return json({ ok: true, response: discResponse, sources: [], scope: 'discovery', collections: discovery.rawCollections, model: model || 'claude' });
     }
 
-    // Auto-switch collection if user is clearly asking about a different one
+    // If user is asking about available collections, always answer from registry
+    const collectionQueryWords = ['collections', 'collection', 'what do you have', 'what collections', 'which collections', 'what can you access', 'what data', 'what files'];
+    const isCollectionQuery = collectionQueryWords.some(w => message.toLowerCase().includes(w));
+    if (isCollectionQuery) {
+      const discovery = await buildDiscoveryContext({ dept, env });
+      const colSystem = `You are Caci. The user is asking what collections/data you have access to. Answer ONLY from this list — do not guess or add anything else:
+
+${discovery.collectionList}
+
+Be direct and conversational. List them clearly.`;
+      const colRes = await callLLM({ model, system: colSystem, messages: [{ role: 'user', content: message }], maxTokens: 400, env, apiKey });
+      return json({ ok: true, response: colRes, sources: [], scope: scope, model: model || 'claude' });
+    }
+
+    // Auto-switch collection — only on full collection name match
     let activeCollection = collection;
     let activeScope = scope;
     if (scope === 'collection' && collection) {
       const reg = await env.CACI_KV.get(`colreg:${dept}`, 'json') || [];
-      const stopWords = new Set(['the','and','for','all','from','with','that','this','are','was','were','has','have','report','reports']);
       const msgLower = message.toLowerCase();
       const matchedCol = reg.find(c => {
         if (c.name === collection) return false;
         if (msgLower.includes(c.name.toLowerCase())) return true;
-        if (c.category && msgLower.includes(c.category.toLowerCase())) return true;
-        const words = c.name.toLowerCase().split(/[\s&,\/]+/).filter(w => w.length >= 4 && !stopWords.has(w));
-        return words.some(w => msgLower.includes(w));
+        return false;
       });
       if (matchedCol) { activeCollection = matchedCol.name; activeScope = 'collection'; }
     }
@@ -463,36 +575,57 @@ async function handleChat(request, env) {
       : scope === 'collection' ? `the ${collection} collection`
       : `all ${dept} documents`;
 
-    let system = `You are CACI, an internal AI intelligence assistant for Jushi Holdings. You are analyzing ${scopeLabel} in the ${dept} department.
+    let system = `You are Caci (your name rhymes with "Cassie") — the internal AI intelligence assistant for Jushi Holdings, built specifically for this team. Do NOT introduce yourself or state your name unless directly asked. Never say "Hi, I'm Caci" in follow-up responses. Just answer.
 
-Answer questions accurately from the documents. Cite document names and periods. Never fabricate numbers.`;
+Your personality: You work in cannabis. You know these people. You're sharp, a little goofy, genuinely funny when the moment calls for it, and you have zero interest in sounding impressive — you just are. You have street smarts alongside serious analytical ability. You don't talk down to anyone and you don't perform intelligence. You're warm, patient, and kind. You have grace and tact in how you communicate — honest without being harsh, direct without being cold. You have a thin filter because you value truth more than comfort. You know how to read a room and navigate people.
 
-    if (context.statsContext) system += `
+You're not just a number cruncher. You can talk about anything — but you also happen to be extremely good at analyzing data and documents when that's needed.
 
-DATA SUMMARIES:
-${context.statsContext}`;
-    if (contextDocs) system += `
+Right now you're analyzing ${scopeLabel} for the ${dept} team at Jushi Holdings.
 
-COLLECTION CONTEXT:
-${contextDocs}`;
-    if (context.text) system += `
+When answering from documents:
+- Cite the specific document name and period when referencing data
+- Never fabricate numbers — if the data isn't there, say so plainly
+- Lead with the insight, not the methodology
+- If something is interesting or surprising in the data, say so — have a point of view
+- If you can't fully answer something, tell them what you CAN tell them and what's missing
 
-DOCUMENT CONTENT:
-${context.text}
+INDUSTRY KNOWLEDGE — you know this world deeply:
 
-Cite document names when referencing data.`;
-    else system += `
+Jushi Holdings is a vertically integrated multi-state operator (MSO). They grow, process, and sell cannabis across multiple states including Pennsylvania, Illinois, Nevada, Ohio, Virginia, Massachusetts, Florida, and New Jersey. They operate retail dispensaries under the Nature's Remedy, Beyond/Hello, and other brand names. Like all MSOs, they navigate a patchwork of state regulations, each with its own licensing, compliance, and reporting requirements.
 
-No documents found. Ask the user to upload files first.`;
+Cannabis industry realities you understand:
+- 280E tax burden: cannabis companies can't deduct normal business expenses because of federal scheduling, which crushes margins
+- Banking is still a nightmare for most operators — limited access, high fees, cash-heavy operations
+- METRC is the seed-to-sale tracking system used by most states — every plant, every package, every transfer gets a tag
+- State-by-state compliance is genuinely complex: what's legal in IL isn't the same as PA, and both change constantly
+- Shrink (inventory loss) is a big deal in cannabis retail — it includes theft, damaged product, system errors, and adjustments
+- Dutchie, iHeartJane, LeafTrade, MJ Freeway are real platforms these teams use daily
+- The difference between medical and adult-use markets matters — different customer bases, different price points, different regulations
 
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 3000, system, messages: [...history.slice(-10).map(h => ({ role: h.role, content: h.content })), { role: 'user', content: message }] }),
-    });
-    if (!res.ok) { const err = await res.text(); return json({ error: `Claude API error (${res.status}): ${err}` }, 500); }
-    const data = await res.json();
-    return json({ ok: true, response: data.content?.[0]?.text || 'No response.', sources: context.sources, scope });
+Cannabis product knowledge:
+- The indica/sativa distinction is largely marketing — terpene profiles and cannabinoid ratios matter more than the label
+- THC percentage is overemphasized by consumers but doesn't tell the whole story — onset, duration, entourage effect all matter
+- Major cannabinoids: THC, CBD, CBN, CBG, CBC, THCV — each with different effects and regulatory treatment
+- Major terpenes: myrcene (earthy, sedating), limonene (citrus, uplifting), caryophyllene (spicy, anti-inflammatory), linalool (floral, calming), pinene (pine, alertness)
+- Product categories: flower, pre-rolls, vapes (distillate vs live resin vs rosin), concentrates (wax, shatter, badder, sugar, diamonds), edibles, tinctures, topicals, capsules
+- Live resin and rosin are considered higher quality by connoisseurs — full spectrum, more terpenes preserved
+- Shelf categories typically: value/budget, mid, premium/craft
+
+The people you work with:
+- Cannabis industry workers are a unique mix — former hospitality, healthcare, finance, tech, and longtime advocates all thrown together
+- The culture tends toward irreverence, passion, and a genuine belief in the plant
+- Smart people who don't always look or sound "corporate" — that's a feature, not a bug
+- Compliance teams are perpetually stressed; retail teams are customer-focused; ops teams are problem-solvers
+- Everyone is used to things changing fast and figuring it out as they go`;
+
+    if (context.statsContext) system += `\n\nDATA SUMMARIES:\n${context.statsContext}`;
+    if (contextDocs) system += `\n\nCOLLECTION CONTEXT:\n${contextDocs}`;
+    if (context.text) system += `\n\nDOCUMENT CONTENT:\n${context.text}\n\nCite document names when referencing data.`;
+    else system += `\n\nNo documents found. Ask the user to upload files first.`;
+
+    const responseText = await callLLM({ model, system, messages: [...history.slice(-10).map(h => ({ role: h.role, content: h.content })), { role: 'user', content: message }], maxTokens: 3000, env, apiKey });
+    return json({ ok: true, response: responseText, sources: context.sources, scope, model: model || 'claude' });
   } catch (err) { return json({ error: 'Chat error: ' + err.message }, 500); }
 }
 
@@ -562,8 +695,211 @@ Format the report in clean Markdown. Use ## for sections, **bold** for key metri
   } catch (err) { return json({ error: 'Report error: ' + err.message }, 500); }
 }
 
+// ── Shared date/month utilities ───────────────────────────────
+const _MONTH_TO_NUM = {
+  january:1, february:2, march:3, april:4, may:5, june:6,
+  july:7, august:8, september:9, october:10, november:11, december:12,
+  jan:1, feb:2, mar:3, apr:4, jun:6, jul:7, aug:8, sep:9, oct:10, nov:11, dec:12,
+};
+const _MONTH_ABBREV = {
+  january:'jan', february:'feb', march:'mar', april:'apr', may:'may',
+  june:'jun', july:'jul', august:'aug', september:'sep', october:'oct',
+  november:'nov', december:'dec',
+};
+const _ALL_MONTH_KEYS = Object.keys(_MONTH_TO_NUM);
+
+// Parse date range from a query string.
+// Handles: "between X 2025 and Y 2026", "from X to Y", "X through Y"
+function parseDateRange(message) {
+  const pat = /(?:between|from)\s+(\w+)\s+(?:of\s+)?(\d{4})\s+(?:and|to|through)\s+(\w+)\s+(?:of\s+)?(\d{4})|(\w+)\s+(?:of\s+)?(\d{4})\s+through\s+(\w+)\s+(?:of\s+)?(\d{4})/i;
+  const m = message.match(pat);
+  if (!m) return { rangeStart: null, rangeEnd: null };
+  const [, m1, y1, m2, y2, m1b, y1b, m2b, y2b] = m;
+  const rm1 = (m1 || m1b || '').toLowerCase();
+  const ry1 = parseInt(y1 || y1b || '0');
+  const rm2 = (m2 || m2b || '').toLowerCase();
+  const ry2 = parseInt(y2 || y2b || '0');
+  if (_MONTH_TO_NUM[rm1] && _MONTH_TO_NUM[rm2]) {
+    return {
+      rangeStart: { m: _MONTH_TO_NUM[rm1], y: ry1 },
+      rangeEnd:   { m: _MONTH_TO_NUM[rm2], y: ry2 },
+    };
+  }
+  return { rangeStart: null, rangeEnd: null };
+}
+
+// Extract month+year from a filename (lowercase).
+function fileMonthYear(nameLower) {
+  let fileMonth = null;
+  for (const mk of _ALL_MONTH_KEYS) {
+    const re = new RegExp('(?<![a-z])' + mk + '(?![a-z])');
+    if (re.test(nameLower)) { fileMonth = _MONTH_TO_NUM[mk]; break; }
+  }
+  const ym = nameLower.match(/20(\d\d)/);
+  const fileYear = ym ? parseInt('20' + ym[1]) : null;
+  return { fileMonth, fileYear };
+}
+
+// ── Two-Pass Context Builder for Collections ─────────────────
+async function buildContextTwoPass({ message, dept, collection, env }) {
+  try {
+    const colFiles = await env.CACI_KV.get(`col:${dept}:${collection}`, 'json') || [];
+    if (!colFiles.length) return { text: '', sources: [], statsContext: '', focusFile: null };
+
+    const manifest = colFiles.map(f => `- ${f.name}${f.meta?.period ? ' [' + f.meta.period + ']' : ''}`).join('\n');
+
+    const keywords = extractKeywords(message);
+    const yearMatches = message.match(/20\d\d/g) || [];
+    const queryYears = new Set(yearMatches);
+    const quarterMatches = message.match(/q[1-4]|quarter [1-4]|first quarter|second quarter|third quarter|fourth quarter|full year|annual/gi) || [];
+    const queryQuarters = new Set(quarterMatches.map(q => q.toLowerCase()));
+
+    // ── Date range detection ──────────────────────────────────
+    const { rangeStart, rangeEnd } = parseDateRange(message);
+
+    // Extract query months using word boundaries
+    const msgLowerForMonths = message.toLowerCase();
+    const queryMonths = new Set(_ALL_MONTH_KEYS.filter(m => {
+      const re = new RegExp('(?<![a-z])' + m + '(?![a-z])');
+      return re.test(msgLowerForMonths);
+    }));
+
+    // Score each file
+    const scoredFiles = colFiles.map(f => {
+      const nameLower = (f.name || '').toLowerCase();
+      let score = 0;
+
+      // ── 1. Date range match: highest priority (+30) ───────
+      if (rangeStart && rangeEnd) {
+        const { fileMonth, fileYear } = fileMonthYear(nameLower);
+        if (fileMonth && fileYear) {
+          const fileVal  = fileYear * 100 + fileMonth;
+          const startVal = rangeStart.y * 100 + rangeStart.m;
+          const endVal   = rangeEnd.y   * 100 + rangeEnd.m;
+          if (fileVal >= startVal && fileVal <= endVal) score += 30;
+        }
+      }
+
+      // ── 2. Year match — larger multiplier (x3) so year gaps are decisive ──
+      const matchedYears = queryYears.size > 0 ? [...queryYears].filter(y => nameLower.includes(y)) : [];
+      if (matchedYears.length > 0) {
+        const maxYear = Math.max(...matchedYears.map(Number));
+        score += 10 + (maxYear - 2020) * 3; // 2026=+28, 2025=+25, 2024=+22
+      }
+
+      // ── 3. Month match — only add if NOT already in a range ──
+      // Prevents e.g. "February 2025" from matching "february" in a 2025–2026 range query
+      if (queryMonths.size > 0 && score < 30) {
+        const hasMonthMatch = [...queryMonths].some(m => {
+          const abbr = _MONTH_ABBREV[m] || m;
+          return nameLower.includes(m) || nameLower.includes(abbr);
+        });
+        if (hasMonthMatch) score += 8;
+      }
+
+      // ── 4. Annual / full-year boost ───────────────────────
+      const isAnnual = nameLower.includes('annual') || nameLower.includes('full year')
+        || nameLower.includes('ye ') || nameLower.includes('10-k') || nameLower.includes('10k');
+      if (isAnnual && (queryYears.size > 0 || message.toLowerCase().includes('annual') || message.toLowerCase().includes('full year'))) {
+        score += 8;
+      }
+
+      // ── 5. Quarter match ──────────────────────────────────
+      const fileQ = nameLower.match(/q[1-4]|first quarter|second quarter|third quarter|fourth quarter/)?.[0];
+      if (fileQ && queryQuarters.size > 0) {
+        const qMap = { 'q1':'q1','q2':'q2','q3':'q3','q4':'q4','first quarter':'q1','second quarter':'q2','third quarter':'q3','fourth quarter':'q4' };
+        if ([...queryQuarters].some(q => qMap[q] === fileQ)) score += 8;
+      }
+
+      // ── 6. Keyword match in filename ──────────────────────
+      for (const kw of keywords) {
+        if (nameLower.includes(kw)) score += 2;
+      }
+
+      // ── 7. PDF preferred over xlsx ────────────────────────
+      if (nameLower.endsWith('.xlsx') || nameLower.endsWith('.xls')) score -= 1;
+
+      // ── 8. Recency boost (up to +3) ───────────────────────
+      const age = f.uploadedAt ? Date.now() - new Date(f.uploadedAt).getTime() : 0;
+      score += Math.max(0, 3 - Math.floor(age / (1000 * 60 * 60 * 24 * 30)));
+
+      return { ...f, _score: score };
+    });
+
+    scoredFiles.sort((a, b) => b._score - a._score);
+
+    // File selection strategy
+    const hasStrongSignal = queryYears.size > 0 || queryQuarters.size > 0 || (rangeStart && rangeEnd);
+    let topFiles;
+    if (hasStrongSignal) {
+      topFiles = scoredFiles.slice(0, 12);
+    } else {
+      // Broad query: top 3 + spread 7 evenly across rest for full coverage
+      const top3 = scoredFiles.slice(0, 3);
+      const rest  = scoredFiles.slice(3);
+      const spread = [];
+      const step = Math.max(1, Math.floor(rest.length / 7));
+      for (let i = 0; i < rest.length && spread.length < 7; i += step) spread.push(rest[i]);
+      topFiles = [...top3, ...spread];
+    }
+
+    // Load full content for selected files
+    const fullFiles = (await Promise.all(topFiles.map(f => env.CACI_KV.get(`file:${f.id}`, 'json')))).filter(Boolean);
+
+    // Build stats context
+    const statsLines = [];
+    for (const f of fullFiles) {
+      if (f.stats && Object.keys(f.stats).length) {
+        const meta = f.meta || {};
+        const label = `${meta.reportName || f.name} [${meta.period || ''}]`.trim();
+        statsLines.push(`\n### ${label}`);
+        if (f.stats.rowCount) statsLines.push(`Rows: ${f.stats.rowCount}`);
+        if (f.stats.numeric) {
+          for (const [col, s] of Object.entries(f.stats.numeric)) {
+            statsLines.push(`${col}: sum=${s.sum}, avg=${s.avg}, min=${s.min}, max=${s.max}`);
+          }
+        }
+      }
+    }
+
+    // Get best chunks — up to 2 per file, 15 total
+    const keywords2 = extractKeywords(message);
+    const allChunks = [];
+    for (const fileData of fullFiles) {
+      if (!fileData.chunks) continue;
+      const fileChunks = fileData.chunks.map(chunk => ({
+        chunk, score: scoreChunk(chunk, keywords2),
+        filename: fileData.name, collection: fileData.collection, meta: fileData.meta || {}
+      }));
+      fileChunks.sort((a, b) => b.score - a.score);
+      allChunks.push(...fileChunks.slice(0, 2));
+    }
+
+    allChunks.sort((a, b) => b.score - a.score);
+    const top = allChunks.slice(0, 15);
+
+    if (!top.length) return { text: '', sources: [], statsContext: statsLines.join('\n'), focusFile: fullFiles[0]?.name };
+
+    const sources = [...new Set(top.map(x => x.filename))];
+    const text = top.map(x => {
+      const period = x.meta?.period ? ` [${x.meta.period}]` : '';
+      return `[${x.collection}${period} / ${x.filename}]\n${x.chunk}`;
+    }).join('\n\n---\n\n');
+
+    const allFileList = `\n\nALL FILES IN THIS COLLECTION (${colFiles.length} total):\n${manifest}`;
+
+    return { text: text + allFileList, sources, statsContext: statsLines.join('\n'), focusFile: fullFiles[0]?.name };
+  } catch(err) {
+    console.error('Two-pass context error:', err.message);
+    return { text: '', sources: [], statsContext: '', focusFile: null };
+  }
+}
+
 // ── Context Builder ───────────────────────────────────────────
 async function buildContext({ message, dept, collection, fileId, scope, env }) {
+  if (scope === 'collection' && collection) {
+    return await buildContextTwoPass({ message, dept, collection, env });
+  }
   try {
     const keywords = extractKeywords(message);
     let filesToSearch = [];
@@ -571,11 +907,7 @@ async function buildContext({ message, dept, collection, fileId, scope, env }) {
     if (scope === 'file' && fileId) {
       const f = await env.CACI_KV.get(`file:${fileId}`, 'json');
       if (f) filesToSearch = [f];
-    } else if (scope === 'collection' && collection) {
-      const colFiles = await env.CACI_KV.get(`col:${dept}:${collection}`, 'json') || [];
-      filesToSearch = (await Promise.all(colFiles.map(f => env.CACI_KV.get(`file:${f.id}`, 'json')))).filter(Boolean);
     } else {
-      // Smart collection detection from keywords
       const reg = await env.CACI_KV.get(`colreg:${dept}`, 'json') || [];
       const stopWords = new Set(['the','and','for','all','from','with','that','this','are','was','were','has','have','report','reports']);
       const msgLower = message.toLowerCase();
@@ -603,7 +935,6 @@ async function buildContext({ message, dept, collection, fileId, scope, env }) {
 
     if (!filesToSearch.length) return { text: '', sources: [], statsContext: '', focusFile: null };
 
-    // Build stats context from computed summaries
     const statsLines = [];
     for (const f of filesToSearch) {
       if (f.stats && Object.keys(f.stats).length) {
@@ -620,19 +951,33 @@ async function buildContext({ message, dept, collection, fileId, scope, env }) {
       }
     }
 
-    // Score chunks
+    const yearMatches = message.match(/20\d\d/g) || [];
+    const queryYears = new Set(yearMatches);
+
     const scored = [];
     for (const fileData of filesToSearch) {
       if (!fileData.chunks) continue;
-      const meta = fileData.meta || {};
+      const fileNameLower = (fileData.name || '').toLowerCase();
+      const isAnnual = fileNameLower.includes('annual') || fileNameLower.includes('full year') || fileNameLower.includes('ye ') || fileNameLower.includes('fy');
+      const yearBoost = queryYears.size > 0 && [...queryYears].some(y => fileNameLower.includes(y)) ? (isAnnual ? 10 : 5) : 0;
+      const isXlsx = fileNameLower.endsWith('.xlsx') || fileNameLower.endsWith('.xls');
+      const xlsxPenalty = isXlsx && filesToSearch.some(f => f.name && !f.name.toLowerCase().endsWith('.xlsx') && !f.name.toLowerCase().endsWith('.xls')) ? -1 : 0;
       for (const chunk of fileData.chunks) {
-        const score = scoreChunk(chunk, keywords);
-        if (score > 0) scored.push({ chunk, score, filename: fileData.name, collection: fileData.collection, meta });
+        const score = scoreChunk(chunk, keywords) + yearBoost + xlsxPenalty;
+        if (score > 0) scored.push({ chunk, score, filename: fileData.name, collection: fileData.collection, meta: fileData.meta || {} });
       }
     }
 
     scored.sort((a, b) => b.score - a.score);
-    const top = scored.slice(0, 8);
+    const seenFiles = new Set();
+    const guaranteed = [];
+    for (const s of scored) {
+      if (!seenFiles.has(s.filename)) { guaranteed.push(s); seenFiles.add(s.filename); }
+      if (guaranteed.length >= filesToSearch.length) break;
+    }
+    const remaining = scored.filter(s => !guaranteed.includes(s));
+    const combined = [...guaranteed, ...remaining];
+    const top = combined.slice(0, 12);
 
     if (!top.length) {
       const fallback = filesToSearch.slice(0, 3).flatMap(f =>
@@ -724,8 +1069,6 @@ function scoreChunk(chunk, keywords) {
 
 // ─────────────────────────────────────────────────────────────
 //  INTEGRATIONS  (Microsoft 365, QuickBase)
-//  Keys stored in KV under  integ:{id}  as JSON
-//  Secrets stored in KV under  integ-secret:{id}
 // ─────────────────────────────────────────────────────────────
 
 const ALLOWED_INTEGRATIONS = ['excel','word','teams','powerbi','quickbase'];
@@ -735,13 +1078,12 @@ async function handleIntegrationSave(path, request, env) {
   if (!ALLOWED_INTEGRATIONS.includes(id)) return json({ error: 'Unknown integration' }, 400);
   try {
     const body = await request.json();
-    // Separate secrets from metadata
     const secrets = {};
     const meta    = { id, connectedAt: new Date().toISOString(), dept: body.dept || 'global' };
 
     if (id === 'excel' || id === 'word') {
       secrets.clientSecret = body.secret || '';
-      meta.tenantId        = body.tenant ? body.tenant.slice(0,8) + '…' : '';
+      meta.tenantId        = body.tenant ? body.tenant.slice(0,8) + '...' : '';
     } else if (id === 'teams') {
       secrets.webhookUrl   = body.webhook || '';
       secrets.botToken     = body.token   || '';
@@ -763,7 +1105,6 @@ async function handleIntegrationSave(path, request, env) {
 async function handleIntegrationGet(path, url, env) {
   const id = path.replace('/integrations/', '').split('/')[0];
   if (id === '' || id === undefined) {
-    // list all
     const all = [];
     for (const iid of ALLOWED_INTEGRATIONS) {
       const m = await env.CACI_KV.get('integ:' + iid, 'json');
@@ -785,8 +1126,6 @@ async function handleIntegrationDelete(path, env) {
 
 // ─────────────────────────────────────────────────────────────
 //  CONNECTORS  (Cannabis platforms)
-//  Keys stored in KV under  con:{id}  /  con-secret:{id}
-//  Live data fetch proxied to avoid CORS / exposing keys
 // ─────────────────────────────────────────────────────────────
 
 const ALLOWED_CONNECTORS = ['dutchie','metrc','iheartjane','leaftrade','mjfreeway'];
@@ -796,7 +1135,7 @@ const CONNECTOR_ENDPOINTS = {
   metrc:      { base: 'https://api-{state}.metrc.com/v3',         verify: '/facilities' },
   iheartjane: { base: 'https://api.iheartjane.com/v1',            verify: '/stores/{store}' },
   leaftrade:  { base: 'https://api.leaftrade.com/api/v1',         verify: '/company/profile/' },
-  mjfreeway:  { base: null /* dynamic */,                          verify: '/company' },
+  mjfreeway:  { base: null,                                        verify: '/company' },
 };
 
 async function handleConnectorSave(path, request, env) {
@@ -832,7 +1171,6 @@ async function handleConnectorSave(path, request, env) {
     await env.CACI_KV.put('con:' + id,        JSON.stringify(meta));
     await env.CACI_KV.put('con-secret:' + id, JSON.stringify(secrets));
 
-    // Optionally attempt a verify ping
     const verified = await verifyConnector(id, meta, secrets);
     return json({ ok: true, id, verified });
   } catch(e) { return json({ error: e.message }, 500); }
@@ -841,35 +1179,25 @@ async function handleConnectorSave(path, request, env) {
 async function verifyConnector(id, meta, secrets) {
   try {
     if (id === 'dutchie') {
-      const r = await fetch('https://api.dutchie.com/v1/store', {
-        headers: { Authorization: 'Bearer ' + secrets.apiKey }
-      });
+      const r = await fetch('https://api.dutchie.com/v1/store', { headers: { Authorization: 'Bearer ' + secrets.apiKey } });
       return r.ok;
     }
     if (id === 'metrc') {
       const state = (meta.state || 'co').toLowerCase();
       const creds = btoa(secrets.swKey + ':' + secrets.userKey);
-      const r = await fetch('https://api-' + state + '.metrc.com/v3/facilities', {
-        headers: { Authorization: 'Basic ' + creds }
-      });
+      const r = await fetch('https://api-' + state + '.metrc.com/v3/facilities', { headers: { Authorization: 'Basic ' + creds } });
       return r.ok;
     }
     if (id === 'iheartjane') {
-      const r = await fetch('https://api.iheartjane.com/v1/stores/' + meta.storeId, {
-        headers: { Authorization: 'Bearer ' + secrets.apiKey }
-      });
+      const r = await fetch('https://api.iheartjane.com/v1/stores/' + meta.storeId, { headers: { Authorization: 'Bearer ' + secrets.apiKey } });
       return r.ok;
     }
     if (id === 'leaftrade') {
-      const r = await fetch('https://api.leaftrade.com/api/v1/company/profile/', {
-        headers: { Authorization: 'Token ' + secrets.apiKey }
-      });
+      const r = await fetch('https://api.leaftrade.com/api/v1/company/profile/', { headers: { Authorization: 'Token ' + secrets.apiKey } });
       return r.ok;
     }
     if (id === 'mjfreeway') {
-      const r = await fetch((meta.baseUrl || 'https://api.mjfreeway.com/v1') + '/company', {
-        headers: { Authorization: 'Bearer ' + secrets.token }
-      });
+      const r = await fetch((meta.baseUrl || 'https://api.mjfreeway.com/v1') + '/company', { headers: { Authorization: 'Bearer ' + secrets.token } });
       return r.ok;
     }
   } catch { return false; }
@@ -888,7 +1216,7 @@ async function handleConnectorGet(path, url, env) {
   }
   const meta = await env.CACI_KV.get('con:' + id, 'json');
   if (!meta) return json({ error: 'Not configured' }, 404);
-  return json(meta);  // never returns secrets
+  return json(meta);
 }
 
 async function handleConnectorDelete(path, env) {
@@ -898,7 +1226,6 @@ async function handleConnectorDelete(path, env) {
   return json({ ok: true });
 }
 
-// Proxy live data from connector to avoid exposing API keys to browser
 async function handleConnectorFetch(path, request, env) {
   const id = path.replace('/connectors/', '').split('/fetch')[0];
   const meta    = await env.CACI_KV.get('con:' + id, 'json');
@@ -906,7 +1233,7 @@ async function handleConnectorFetch(path, request, env) {
   if (!meta || !secrets) return json({ error: 'Connector not configured' }, 404);
 
   const body     = await request.json().catch(() => ({}));
-  const endpoint = body.endpoint || '';  // e.g. "/inventory", "/sales"
+  const endpoint = body.endpoint || '';
   let   apiUrl   = '';
   const headers  = {};
 
@@ -940,7 +1267,6 @@ async function handleConnectorFetch(path, request, env) {
   }
 }
 
-
 // ── TTS (Grok / Cloudflare) ───────────────────────────────────
 async function handleTTSDebug(request, env) {
   try {
@@ -965,17 +1291,17 @@ async function handleTTS(request, env) {
     if (provider === 'grok' || provider === 'claude') {
       const apiKey = (await env.CACI_KV.get('config:XAI_API_KEY')) || env.XAI_API_KEY;
       if (!apiKey) return json({ error: 'xAI API key not configured.' }, 400);
+      const ttsText = text.slice(0, 800);
       const res = await fetch('https://api.x.ai/v1/tts', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: text, voice_id: voice, language: 'en' }),
+        body: JSON.stringify({ text: ttsText, voice_id: voice, language: 'en' }),
       });
       if (!res.ok) {
         const errText = await res.text().catch(() => 'TTS failed');
         return json({ error: `xAI TTS error (${res.status}): ${errText}` }, 500);
       }
-      const audio = await res.arrayBuffer();
-      return new Response(audio, { headers: { 'Content-Type': 'audio/mpeg', ...CORS } });
+      return new Response(res.body, { headers: { 'Content-Type': 'audio/mpeg', ...CORS } });
     }
     if (provider === 'cloudflare') {
       if (!env.AI) return json({ error: 'Cloudflare AI binding not available' }, 500);
@@ -985,5 +1311,3 @@ async function handleTTS(request, env) {
     return json({ error: 'Unknown TTS provider' }, 400);
   } catch (err) { return json({ error: 'TTS error: ' + err.message }, 500); }
 }
-
-// ── Discovery Context ─────────────────────────────────────────
