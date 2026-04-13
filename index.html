@@ -870,7 +870,7 @@ body::before {
 
 /* ── Content ───────────────────────────────────────────── */
 #content { position: fixed; right: 0; overflow: hidden; pointer-events: all; }
-.panel { display: none; position: absolute; inset: 0; flex-direction: column; pointer-events: none; overflow: hidden; }
+.panel { display: none; position: absolute; inset: 0; flex-direction: column; pointer-events: none; overflow: hidden; isolation: isolate; }
 .panel.active { pointer-events: all; }
 .panel.active { display: flex; }
 
@@ -1386,6 +1386,7 @@ body::before {
 .chat-messages {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 24px 20px 24px;
   display: flex;
   flex-direction: column;
@@ -1396,6 +1397,7 @@ body::before {
   position: relative;
   z-index: 1;
   transition: padding-bottom 0.4s ease;
+  max-height: 100%;
 }
 .chat-messages.has-messages {
   padding-bottom: 16px;
@@ -3747,6 +3749,13 @@ function buildNav() {
 }
 function switchPanel(id) {
   curPanel = id;
+  // Always clean up discovery elements when switching away from chat
+  if (id !== 'chat') {
+    ['discovery-name', 'discovery-greeting-strip'].forEach(eid => {
+      const el = document.getElementById(eid);
+      if (el) el.remove();
+    });
+  }
   document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.dataset.panel === id));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.p === id));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.p === id));
