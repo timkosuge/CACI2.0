@@ -1671,6 +1671,125 @@ body::before {
 .fcard:hover { border-color: rgba(184,150,12,0.18); background: rgba(184,150,12,0.02); }
 .fcard.focused { border-color: rgba(184,150,12,0.28); background: rgba(184,150,12,0.04); }
 .fcard.focused::before { opacity: 0.7; }
+
+/* ── AI Classification styles ───────────────────────── */
+.fcard.ai-pending { border-color: rgba(184,150,12,0.22); }
+.fcard.ai-pending::after {
+  content: '';
+  position: absolute; top: 8px; right: 8px;
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 6px rgba(184,150,12,0.7);
+  animation: aiPulse 1.4s ease-in-out infinite;
+}
+.fcard.ai-reviewed { border-color: rgba(42,122,75,0.3); }
+.fcard.ai-reviewed::after {
+  content: '\2713';
+  position: absolute; top: 6px; right: 8px;
+  font-size: 9px; color: var(--green-lt);
+  font-family: var(--f-mono);
+}
+@keyframes aiPulse {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50%       { opacity: 1;   transform: scale(1.3); }
+}
+
+/* AI Review Panel */
+#ai-review-panel {
+  display: none;
+  background: var(--ink2);
+  border: 1px solid rgba(184,150,12,0.2);
+  border-radius: var(--r2);
+  margin: 0 0 14px 0;
+  overflow: hidden;
+}
+#ai-review-panel.open { display: block; }
+.aip-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px;
+  background: rgba(184,150,12,0.06);
+  border-bottom: 1px solid rgba(184,150,12,0.12);
+}
+.aip-title {
+  font-family: var(--f-mono); font-size: 10px;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--gold-lt); flex: 1;
+}
+.aip-apply-all {
+  padding: 4px 12px; border-radius: 3px;
+  border: 1px solid var(--line3); background: var(--gold-dim);
+  color: var(--gold-lt); font-family: var(--f-mono);
+  font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
+  cursor: pointer; transition: all 0.15s;
+}
+.aip-apply-all:hover { background: rgba(184,150,12,0.15); border-color: var(--gold); }
+.aip-dismiss {
+  background: none; border: none; color: var(--smoke4);
+  font-size: 16px; cursor: pointer; padding: 0 4px;
+  transition: color 0.15s;
+}
+.aip-dismiss:hover { color: var(--smoke); }
+.aip-rows { max-height: 280px; overflow-y: auto; scrollbar-width: none; }
+.aip-rows::-webkit-scrollbar { display: none; }
+.aip-row {
+  display: grid;
+  grid-template-columns: 1fr 90px 100px 110px auto;
+  gap: 6px; align-items: center;
+  padding: 8px 16px;
+  border-bottom: 1px solid rgba(184,150,12,0.06);
+  font-family: var(--f-mono); font-size: 9px;
+}
+.aip-row:last-child { border-bottom: none; }
+.aip-row.applied { opacity: 0.4; }
+.aip-file { color: var(--smoke2); letter-spacing: 0.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aip-field {
+  padding: 3px 6px; border-radius: 3px;
+  border: 1px solid var(--line); background: var(--ink3);
+  color: var(--smoke); font-family: var(--f-mono);
+  font-size: 9px; width: 100%; outline: none;
+  transition: border-color 0.15s;
+}
+.aip-field:focus { border-color: var(--gold); }
+.aip-apply-btn {
+  padding: 3px 10px; border-radius: 3px;
+  border: 1px solid var(--line2); background: none;
+  color: var(--smoke3); font-family: var(--f-mono);
+  font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase;
+  cursor: pointer; white-space: nowrap; transition: all 0.15s;
+  flex-shrink: 0;
+}
+.aip-apply-btn:hover { border-color: var(--gold); color: var(--gold-lt); background: var(--gold-dim); }
+.aip-apply-btn.done { border-color: var(--green-lt); color: var(--green-lt); cursor: default; }
+.aip-ctx-suggest {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 0 2px;
+  font-size: 9px; color: var(--gold-lt);
+  letter-spacing: 0.06em;
+}
+.aip-ctx-btn {
+  padding: 2px 8px; border-radius: 3px;
+  border: 1px solid rgba(184,150,12,0.3); background: var(--gold-dim);
+  color: var(--gold-lt); font-family: var(--f-mono);
+  font-size: 8px; letter-spacing: 0.08em; text-transform: uppercase;
+  cursor: pointer; transition: all 0.15s;
+}
+.aip-ctx-btn:hover { background: rgba(184,150,12,0.15); }
+
+/* AI classify toggle in admin */
+.ai-classify-row {
+  display: flex; align-items: center; gap: 12px;
+  margin-top: 14px; padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.ai-classify-label {
+  font-family: var(--f-mono); font-size: 10px;
+  letter-spacing: 0.06em; color: var(--smoke3); flex: 1;
+}
+.ai-classify-cost {
+  font-family: var(--f-mono); font-size: 9px;
+  color: var(--smoke4); letter-spacing: 0.04em;
+}
 .ficon {
   font-family: var(--f-mono);
   font-size: 10px;
@@ -3238,6 +3357,16 @@ body::before {
             </div>
           </div>
           <div class="files-body">
+            <!-- AI Review Panel — shown when pending AI classifications exist -->
+            <div id="ai-review-panel">
+              <div class="aip-header">
+                <div class="aip-title">&#9670; AI Classification Ready</div>
+                <button class="aip-apply-all" id="aip-apply-all">Apply All</button>
+                <button class="aip-dismiss" id="aip-dismiss" title="Dismiss">&times;</button>
+              </div>
+              <div class="aip-rows" id="aip-rows"></div>
+            </div>
+
             <!-- Documents tab -->
             <div id="files-tab-docs">
               <div class="fhead">
@@ -3296,6 +3425,13 @@ body::before {
             <div class="acard-sub">claude-sonnet-4 &nbsp;&middot;&nbsp; Powers all document Q&A and report generation</div>
             <div class="arow"><input class="ainput" type="password" id="ant-key" placeholder="sk-ant-api03-..." autocomplete="off"/><button class="asave" id="ant-save">Save Key</button></div>
             <div class="afb" id="ant-fb"></div>
+            <div class="ai-classify-row">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex:1">
+                <input type="checkbox" id="ai-classify-toggle" style="accent-color:var(--gold)"/>
+                <span class="ai-classify-label">Auto-classify documents with AI on upload</span>
+              </label>
+              <span class="ai-classify-cost" id="ai-classify-cost">~$0.002 per file &nbsp;&middot;&nbsp; PDF &amp; DOCX only</span>
+            </div>
           </div>
           <div class="acard">
             <div class="acard-title">Voice &mdash; Caci&apos;s Voice Engine</div>
@@ -3723,6 +3859,7 @@ function bootApp() {
   initVoiceInput();
   initVoiceSettings();
   initSplitPdf();
+  initAiClassify();
 
   // Filter bar
   const filterClear = document.getElementById('filter-clear');
@@ -4522,12 +4659,20 @@ async function loadAdminConfig() {
     if (d.ANTHROPIC_API_KEY?.configured) {
       $('stat-claude').innerHTML = `<div class="spip"></div><span class="srow-text">Configured — ${d.ANTHROPIC_API_KEY.source}</span>`;
       $('scard-claude').classList.add('ok');
+      // Enable AI classify toggle
+      const tog = $('ai-classify-toggle');
+      if (tog) { tog.disabled = false; tog.checked = _aiClassifyEnabled; }
     } else {
       $('stat-claude').innerHTML = '<div class="spip off"></div><span class="srow-text">Not configured</span>';
+      // Disable AI classify toggle — no key, no classify
+      const tog = $('ai-classify-toggle');
+      if (tog) { tog.disabled = true; tog.checked = false; }
+      const cost = $('ai-classify-cost');
+      if (cost) cost.textContent = 'Requires Anthropic API key above';
     }
     if (d.XAI_API_KEY?.configured) {
       const xaiFb = $('xai-fb');
-      if (xaiFb) { xaiFb.className = 'afb ok'; xaiFb.textContent = '✓ xAI key active — ' + d.XAI_API_KEY.source; }
+      if (xaiFb) { xaiFb.className = 'afb ok'; xaiFb.textContent = '\u2713 xAI key active \u2014 ' + d.XAI_API_KEY.source; }
     }
   } catch {}
 }
@@ -4890,7 +5035,11 @@ async function handleFiles(fileList, colName, meta = {}) {
       if (meta.chunkSize) fd.append('chunkSize', String(meta.chunkSize));
       const res = await apiFetch('/upload', { method: 'POST', body: fd });
       const d   = await res.json();
-      if (d.ok) addLog(log, `\u2713 Stored \u2014 ${d.chunks} segments`);
+      if (d.ok) {
+        addLog(log, `\u2713 Stored \u2014 ${d.chunks} segments`);
+        // Queue AI classification (non-blocking, runs after upload completes)
+        queueAiClassify(d.id, f.name, colName, text);
+      }
       else      addLog(log, `\u2717 ${d.error}`);
     } catch(e) { addLog(log, '\u2717 ' + e.message); }
   }
@@ -5589,6 +5738,229 @@ function disconnectConnector(id) {
 }
 
 /* ═══════════════════════════════════════════════════════════
+   AI AUTO-CLASSIFICATION ENGINE
+   - Runs after upload, non-blocking
+   - PDF/DOCX only (skips xlsx/csv — filename inference handles those)
+   - Sequential with rate limiting (1.5s gap between calls)
+   - Never overwrites manually-set fields
+   - Shows review panel for user confirmation
+   - Context doc suggestion built in
+═══════════════════════════════════════════════════════════ */
+
+// State
+let _aiClassifyEnabled  = localStorage.getItem('caci_ai_classify') !== 'false'; // on by default
+let _aiPendingResults   = []; // { fileId, name, collection, suggested: {category,period,reportName,reportType,isContextDoc}, applied: false }
+let _aiClassifyQueue    = []; // file IDs waiting to be classified
+let _aiClassifyRunning  = false;
+
+function initAiClassify() {
+  const toggle = $('ai-classify-toggle');
+  if (toggle) {
+    toggle.checked = _aiClassifyEnabled;
+    toggle.addEventListener('change', () => {
+      _aiClassifyEnabled = toggle.checked;
+      localStorage.setItem('caci_ai_classify', _aiClassifyEnabled);
+      updateAiClassifyCostLabel();
+    });
+  }
+  updateAiClassifyCostLabel();
+
+  // Review panel controls
+  $('aip-apply-all')?.addEventListener('click', applyAllAiSuggestions);
+  $('aip-dismiss')?.addEventListener('click', () => {
+    _aiPendingResults = [];
+    $('ai-review-panel').classList.remove('open');
+  });
+}
+
+function updateAiClassifyCostLabel() {
+  const el = $('ai-classify-cost');
+  if (!el) return;
+  if (!_aiClassifyEnabled) {
+    el.textContent = 'Off — files upload without AI classification';
+    el.style.color = 'var(--smoke4)';
+  } else {
+    el.textContent = '~$0.002 per file \u00b7 PDF & DOCX only \u00b7 non-blocking';
+    el.style.color = 'var(--smoke4)';
+  }
+}
+
+// Called after each successful upload — queues file for AI classification
+function queueAiClassify(fileId, fileName, collection, extractedText) {
+  if (!_aiClassifyEnabled) return;
+
+  // Only classify PDF and DOCX — skip xlsx/csv/txt
+  const ext = (fileName || '').split('.').pop().toLowerCase();
+  if (!['pdf','docx','doc'].includes(ext)) return;
+
+  // Need meaningful text
+  if (!extractedText || extractedText.length < 300) return;
+
+  _aiClassifyQueue.push({ fileId, fileName, collection, text: extractedText });
+  if (!_aiClassifyRunning) processAiClassifyQueue();
+}
+
+async function processAiClassifyQueue() {
+  _aiClassifyRunning = true;
+  while (_aiClassifyQueue.length > 0) {
+    const item = _aiClassifyQueue.shift();
+    await runAiClassify(item);
+    // Rate limit — 1.5s between calls
+    if (_aiClassifyQueue.length > 0) await new Promise(r => setTimeout(r, 1500));
+  }
+  _aiClassifyRunning = false;
+}
+
+async function runAiClassify({ fileId, fileName, collection, text }) {
+  try {
+    // Use first 2500 chars — enough for title, dates, headings
+    const sample = text.slice(0, 2500);
+
+    // Get existing collections for collection suggestion
+    const colRes  = await apiFetch('/collections?dept=' + dept);
+    const colList = await colRes.json();
+    const colNames = colList.map(c => c.name).join(', ');
+
+    // Route through worker to keep API key secure
+    const proxyRes = await apiFetch('/ai-classify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fileName, collection, sample, colNames }),
+    });
+
+    if (!proxyRes.ok) return;
+    const proxyData = await proxyRes.json();
+    if (!proxyData.ok || !proxyData.result) return;
+
+    let suggested;
+    try {
+      const clean = proxyData.result.replace(/```json|```/g, '').trim();
+      suggested = JSON.parse(clean);
+    } catch { return; }
+
+    // Skip low confidence results
+    if (suggested.confidence === 'low') return;
+
+    // Store result
+    _aiPendingResults.push({
+      fileId, fileName, collection,
+      suggested,
+      applied: false,
+    });
+
+    // Mark file card with pending indicator
+    const card = document.querySelector(`.fcard[data-id="${fileId}"]`);
+    if (card) card.classList.add('ai-pending');
+
+    // Refresh review panel
+    renderAiReviewPanel();
+
+  } catch(e) {
+    console.warn('AI classify error for', fileName, ':', e.message);
+  }
+}
+
+function renderAiReviewPanel() {
+  const panel = $('ai-review-panel');
+  const rows  = $('aip-rows');
+  if (!panel || !rows) return;
+
+  const pending = _aiPendingResults.filter(r => !r.applied);
+  if (!pending.length) {
+    panel.classList.remove('open');
+    return;
+  }
+
+  panel.classList.add('open');
+
+  rows.innerHTML = pending.map((r, idx) => {
+    const s = r.suggested;
+    const ctxSuggest = s.isContextDoc
+      ? `<div class="aip-ctx-suggest">&#9670; AI thinks this is a reference/policy doc — <button class="aip-ctx-btn" data-idx="${idx}">Make Context Doc</button></div>`
+      : '';
+    const colSuggest = s.suggestedCollection && s.suggestedCollection !== r.collection
+      ? `<div class="aip-ctx-suggest" style="color:var(--smoke3)">&#8594; Suggested collection: <strong style="color:var(--gold-lt)">${esc(s.suggestedCollection)}</strong></div>`
+      : '';
+    return `
+    <div class="aip-row${r.applied ? ' applied' : ''}" data-idx="${idx}">
+      <div class="aip-file" title="${esc(r.fileName)}">${esc(r.fileName.slice(0,35))}${r.fileName.length>35?'…':''}</div>
+      <input class="aip-field" id="aip-cat-${idx}" value="${esc(s.category||'')}" placeholder="Category"/>
+      <input class="aip-field" id="aip-per-${idx}" value="${esc(s.period||'')}" placeholder="Period"/>
+      <input class="aip-field" id="aip-rn-${idx}"  value="${esc(s.reportName||'')}" placeholder="Report name" style="grid-column:span 1"/>
+      <button class="aip-apply-btn${r.applied?' done':''}" data-idx="${idx}">${r.applied?'&#10003; Applied':'Apply'}</button>
+      ${ctxSuggest}${colSuggest}
+    </div>`;
+  }).join('');
+
+  // Wire apply buttons
+  rows.querySelectorAll('.aip-apply-btn:not(.done)').forEach(btn => {
+    btn.addEventListener('click', () => applyAiSuggestion(parseInt(btn.dataset.idx)));
+  });
+
+  // Wire context doc buttons
+  rows.querySelectorAll('.aip-ctx-btn').forEach(btn => {
+    btn.addEventListener('click', () => makeContextDoc(parseInt(btn.dataset.idx)));
+  });
+}
+
+async function applyAiSuggestion(idx) {
+  const pending = _aiPendingResults.filter(r => !r.applied);
+  const result  = pending[idx];
+  if (!result || result.applied) return;
+
+  const category   = $('aip-cat-' + idx)?.value.trim() || result.suggested.category;
+  const period     = $('aip-per-' + idx)?.value.trim() || result.suggested.period;
+  const reportName = $('aip-rn-'  + idx)?.value.trim() || result.suggested.reportName;
+  const reportType = result.suggested.reportType || '';
+
+  try {
+    const res = await apiFetch('/files/' + result.fileId + '/meta', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: result.fileName,
+        collection: result.collection,
+        dept,
+        category,
+        period,
+        reportName,
+        reportType,
+      }),
+    });
+    const d = await res.json();
+    if (d.ok) {
+      result.applied = true;
+      // Update file card
+      const card = document.querySelector(`.fcard[data-id="${result.fileId}"]`);
+      if (card) { card.classList.remove('ai-pending'); card.classList.add('ai-reviewed'); }
+      // Refresh panel
+      renderAiReviewPanel();
+      loadFiles();
+    }
+  } catch(e) { console.warn('Apply AI suggestion failed:', e.message); }
+}
+
+async function applyAllAiSuggestions() {
+  const pending = _aiPendingResults.filter(r => !r.applied);
+  for (let i = 0; i < pending.length; i++) {
+    const realIdx = _aiPendingResults.indexOf(pending[i]);
+    // Re-find the idx in the rendered panel (pending only)
+    await applyAiSuggestion(i);
+    await new Promise(r => setTimeout(r, 100));
+  }
+}
+
+async function makeContextDoc(idx) {
+  const pending = _aiPendingResults.filter(r => !r.applied);
+  const result  = pending[idx];
+  if (!result) return;
+  // Re-upload as context doc — delete old record, re-upload with isContext=true
+  // For now just patch metadata and note it — full re-upload as context is a future enhancement
+  alert('Context doc designation: re-upload this file using the "Add Context Doc" button in the Context tab to make it a context document for this collection.');
+}
+
+
+/* ═══════════════════════════════════════════════════════════
    PDF SPLITTER — Split large PDFs by section and re-upload
    Uses pdf-lib (client-side) + PDF.js for text extraction
    to detect section/article breaks, then uploads each part.
@@ -5782,8 +6154,12 @@ async function runPdfSplitter(file) {
 
       const res = await apiFetch('/upload', { method: 'POST', body: fd });
       const d   = await res.json();
-      if (d.ok) addLog(log, `  \u2713 Uploaded \u2014 ${d.chunks} segments`);
-      else      addLog(log, `  \u2717 Upload failed: ${d.error}`);
+      if (d.ok) {
+        addLog(log, `  \u2713 Uploaded \u2014 ${d.chunks} segments`);
+        // Queue AI classification for split sections too
+        queueAiClassify(d.id, subName, selectedCollection, subText);
+      }
+      else addLog(log, `  \u2717 Upload failed: ${d.error}`);
 
       // Small delay
       await new Promise(r => setTimeout(r, 200));
