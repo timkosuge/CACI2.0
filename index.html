@@ -4459,10 +4459,14 @@ async function loadAdminConfig() {
     const res = await apiFetch('/admin/config'); if (!res.ok) return;
     const d = await res.json();
     if (d.ANTHROPIC_API_KEY?.configured) {
-      $('stat-claude').innerHTML = `<div class="spip"></div><span class="srow-text">Configured \u2014 ${d.ANTHROPIC_API_KEY.source}</span>`;
+      $('stat-claude').innerHTML = `<div class="spip"></div><span class="srow-text">Configured — ${d.ANTHROPIC_API_KEY.source}</span>`;
       $('scard-claude').classList.add('ok');
     } else {
       $('stat-claude').innerHTML = '<div class="spip off"></div><span class="srow-text">Not configured</span>';
+    }
+    if (d.XAI_API_KEY?.configured) {
+      const xaiFb = $('xai-fb');
+      if (xaiFb) { xaiFb.className = 'afb ok'; xaiFb.textContent = '✓ xAI key active — ' + d.XAI_API_KEY.source; }
     }
   } catch {}
 }
@@ -5255,45 +5259,35 @@ function stopListening() {
 
 /* ── Voice settings in Config panel ────────────────────── */
 function initVoiceSettings() {
-  // Google TTS key
-  const gttsKey = $('gtts-key');
-  if (gttsKey) gttsKey.value = localStorage.getItem('caci_gtts_key') || '';
-
-  const gttsSave = $('gtts-save');
-  if (gttsSave) gttsSave.addEventListener('click', () => {
-    const key = $('gtts-key')?.value.trim() || '';
-    localStorage.setItem('caci_gtts_key', key);
-    const fb = $('gtts-fb');
-    if (fb) { fb.textContent = key ? '\u2713 Key saved' : 'Key cleared'; fb.className = 'afb ok'; setTimeout(() => { fb.textContent = ''; fb.className = 'afb'; }, 2000); }
-  });
-
-  // Voice select
-  const gttsVoice = $('gtts-voice');
-  if (gttsVoice) {
-    gttsVoice.value = localStorage.getItem('caci_gtts_voice') || 'en-US-Wavenet-F';
-    gttsVoice.addEventListener('change', () => localStorage.setItem('caci_gtts_voice', gttsVoice.value));
+  // Provider select
+  const providerSel = $('tts-provider');
+  if (providerSel) {
+    providerSel.value = localStorage.getItem('caci_tts_provider') || 'grok';
+    providerSel.addEventListener('change', () => localStorage.setItem('caci_tts_provider', providerSel.value));
   }
 
-  // Speed select
-  const gttsSpeed = $('gtts-speed');
-  if (gttsSpeed) {
-    gttsSpeed.value = localStorage.getItem('caci_gtts_speed') || '1.0';
-    gttsSpeed.addEventListener('change', () => localStorage.setItem('caci_gtts_speed', gttsSpeed.value));
+  // Grok voice select
+  const voiceSel = $('tts-grok-voice');
+  if (voiceSel) {
+    voiceSel.value = localStorage.getItem('caci_tts_grok_voice') || 'eve';
+    voiceSel.addEventListener('change', () => localStorage.setItem('caci_tts_grok_voice', voiceSel.value));
   }
 
   // Auto-speak toggle
-  const gttsAuto = $('gtts-auto');
-  if (gttsAuto) {
-    gttsAuto.checked = voiceAutoSpeak;
-    gttsAuto.addEventListener('change', () => {
-      voiceAutoSpeak = gttsAuto.checked;
+  const autoChk = $('gtts-auto');
+  if (autoChk) {
+    autoChk.checked = voiceAutoSpeak;
+    autoChk.addEventListener('change', () => {
+      voiceAutoSpeak = autoChk.checked;
       localStorage.setItem('caci_voice_auto', voiceAutoSpeak);
+      const tog = $('spk-toggle-btn');
+      if (tog) tog.classList.toggle('active', voiceAutoSpeak);
     });
   }
 
   // Test button
-  const gttsTest = $('gtts-test');
-  if (gttsTest) gttsTest.addEventListener('click', () => speakText(gttsTest, 'CACI Intelligence Platform ready. Voice output is working correctly.'));
+  const testBtn = $('gtts-test');
+  if (testBtn) testBtn.addEventListener('click', () => speakText(testBtn, 'CACI Intelligence Platform ready. Voice output is working correctly.'));
 }
 
 
