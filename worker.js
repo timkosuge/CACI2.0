@@ -427,10 +427,26 @@ async function handleChat(request, env) {
       return json({ ok: true, response: data.content?.[0]?.text || '', sources: [], scope: 'discovery', collections: discovery.rawCollections });
     }
 
-    const context = await buildContext({ message, dept, collection, fileId, scope, env });
+    // Auto-switch collection if user is clearly asking about a different one
+    let activeCollection = collection;
+    let activeScope = scope;
+    if (scope === 'collection' && collection) {
+      const reg = await env.CACI_KV.get(`colreg:${dept}`, 'json') || [];
+      const stopWords = new Set(['the','and','for','all','from','with','that','this','are','was','were','has','have','report','reports']);
+      const msgLower = message.toLowerCase();
+      const matchedCol = reg.find(c => {
+        if (c.name === collection) return false;
+        if (msgLower.includes(c.name.toLowerCase())) return true;
+        if (c.category && msgLower.includes(c.category.toLowerCase())) return true;
+        const words = c.name.toLowerCase().split(/[\s&,\/]+/).filter(w => w.length >= 4 && !stopWords.has(w));
+        return words.some(w => msgLower.includes(w));
+      });
+      if (matchedCol) { activeCollection = matchedCol.name; activeScope = 'collection'; }
+    }
+    const context = await buildContext({ message, dept, collection: activeCollection, fileId, scope: activeScope, env });
 
     let contextDocs = '';
-    if (collection) {
+    if (activeCollection) {
       const ctxFiles = await env.CACI_KV.get(`ctx:${dept}:${collection}`, 'json') || [];
       if (ctxFiles.length) {
         const ctxTexts = [];
@@ -660,11 +676,16 @@ async function handleAdminSave(request, env) {
 
 async function handleAdminGet(env) {
   try {
-    const kvKey = await env.CACI_KV.get('config:ANTHROPIC_API_KEY');
+    const kvAnt = await env.CACI_KV.get('config:ANTHROPIC_API_KEY');
+    const kvXai = await env.CACI_KV.get('config:XAI_API_KEY');
     return json({
       ANTHROPIC_API_KEY: {
-        configured: !!(kvKey || env.ANTHROPIC_API_KEY),
-        source: kvKey ? 'admin' : env.ANTHROPIC_API_KEY ? 'secret' : 'none',
+        configured: !!(kvAnt || env.ANTHROPIC_API_KEY),
+        source: kvAnt ? 'admin' : env.ANTHROPIC_API_KEY ? 'secret' : 'none',
+      },
+      XAI_API_KEY: {
+        configured: !!(kvXai || env.XAI_API_KEY),
+        source: kvXai ? 'admin' : env.XAI_API_KEY ? 'secret' : 'none',
       },
     });
   } catch (err) { return json({ error: err.message }, 500); }
