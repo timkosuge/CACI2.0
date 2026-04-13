@@ -41,6 +41,7 @@ export default {
     if (path === '/collections' && method === 'GET')  return handleListCollections(url, env);
     if (path === '/collections/create' && method === 'POST') return handleCreateCollection(request, env);
     if (path.startsWith('/collections/') && method === 'DELETE') return handleDeleteCollection(path.replace('/collections/', ''), url, env);
+    if (path === '/tts'       && method === 'POST')   return handleTTS(request, env);
     if (path === '/chat'      && method === 'POST')   return handleChat(request, env);
     if (path === '/report'    && method === 'POST')   return handleReport(request, env);
     if (path === '/admin/config' && method === 'POST') return handleAdminSave(request, env);
@@ -410,53 +411,24 @@ async function handleChat(request, env) {
     if (!message) return json({ error: 'Message required' }, 400);
 
     const apiKey = (await env.CACI_KV.get('config:ANTHROPIC_API_KEY')) || env.ANTHROPIC_API_KEY;
-    if (!apiKey) return json({ error: 'Anthropic API key not configured. Go to Admin to add it.' }, 400);
+    if (!apiKey) return json({ error: 'Anthropic API key not configured. Go to Config to add it.' }, 400);
 
-    // ── Discovery mode: first message with no collection scoped ──
-    const isFirstMessage = history.length === 0;
-    const isDiscoveryMode = isFirstMessage && scope === 'all' && !collection && !fileId;
-
-    if (isDiscoveryMode) {
+    // Discovery mode
+    if (history.length === 0 && scope === 'all' && !collection && !fileId) {
       const discovery = await buildDiscoveryContext({ dept, env });
-
-      const system = `You are CACI, an internal AI intelligence assistant for Jushi Holdings, a vertically integrated multi-state cannabis operator.
-
-This is the START of a new conversation. Do NOT answer detailed data questions yet.
-
-Your job right now:
-1. Greet the user warmly and briefly (1 sentence).
-2. Ask what topic or data they want to explore today.
-3. Present the available collections as clear options.
-4. Optionally ask if they have a specific time period in mind.
-
-Keep it short — 5 to 8 lines max. Be friendly and direct. Do not use any emoji.
-
-AVAILABLE COLLECTIONS:
-${discovery.collectionList}`;
-
+      const system = `You are CACI, an internal AI intelligence assistant for Jushi Holdings.\n\nGreet the user briefly, ask what they want to explore, and list these available collections:\n${discovery.collectionList}`;
       const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 400,
-          system,
-          messages: [{ role: 'user', content: message }],
-        }),
+        body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 400, system, messages: [{ role: 'user', content: message }] }),
       });
-
-      if (!res.ok) {
-        const err = await res.text();
-        return json({ error: `Claude API error (${res.status}): ${err}` }, 500);
-      }
+      if (!res.ok) { const err = await res.text(); return json({ error: `Claude error: ${err}` }, 500); }
       const data = await res.json();
-      return json({ ok: true, response: data.content?.[0]?.text || 'No response.', sources: [], scope: 'discovery', collections: discovery.rawCollections });
+      return json({ ok: true, response: data.content?.[0]?.text || '', sources: [], scope: 'discovery', collections: discovery.rawCollections });
     }
 
-    // ── Normal mode: scoped to collection or file ─────────────
     const context = await buildContext({ message, dept, collection, fileId, scope, env });
 
-    // Load collection context docs (SOPs, rules, calendars)
     let contextDocs = '';
     if (collection) {
       const ctxFiles = await env.CACI_KV.get(`ctx:${dept}:${collection}`, 'json') || [];
@@ -470,55 +442,38 @@ ${discovery.collectionList}`;
       }
     }
 
-    const scopeLabel = scope === 'file' ? `the document "${context.focusFile}"`
-      : scope === 'collection' ? `the "${collection}" collection`
+    const scopeLabel = scope === 'file' ? `the document ${context.focusFile}`
+      : scope === 'collection' ? `the ${collection} collection`
       : `all ${dept} documents`;
 
-    let system = `You are CACI, an internal AI intelligence assistant for Jushi Holdings, a vertically integrated multi-state cannabis operator. You are analyzing ${scopeLabel} in the ${dept} department.
+    let system = `You are CACI, an internal AI intelligence assistant for Jushi Holdings. You are analyzing ${scopeLabel} in the ${dept} department.
 
-Your capabilities:
-- Answer questions accurately from company documents and data
-- Analyze trends, variances, and patterns across multiple files
-- Compare data across time periods, states, and store locations
-- Generate professional executive-level insights and reports
-- Always cite the specific document name and period when referencing data
-- Never fabricate numbers — if data is not present, say so clearly
+Answer questions accurately from the documents. Cite document names and periods. Never fabricate numbers.`;
 
-When analyzing data, note the metadata context (period, location, category) to give accurate, temporally-aware answers.`;
+    if (context.statsContext) system += `
 
-    if (context.statsContext) {
-      system += `\n\nCOMPUTED DATA SUMMARIES (pre-calculated, use these for precise numbers):\n${context.statsContext}`;
-    }
+DATA SUMMARIES:
+${context.statsContext}`;
+    if (contextDocs) system += `
 
-    if (contextDocs) {
-      system += `\n\nCOLLECTION CONTEXT (SOPs, rules, calendars — read these first and use them to interpret all data):\n${contextDocs}`;
-    }
+COLLECTION CONTEXT:
+${contextDocs}`;
+    if (context.text) system += `
 
-    if (context.text) {
-      system += `\n\nDOCUMENT CONTENT:\n${context.text}\n\nBase your answers on the above. Cite document names and periods when referencing specific data.`;
-    } else {
-      system += `\n\nNo documents found for this scope. Ask the user to upload relevant files first.`;
-    }
+DOCUMENT CONTENT:
+${context.text}
+
+Cite document names when referencing data.`;
+    else system += `
+
+No documents found. Ask the user to upload files first.`;
 
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 3000,
-        system,
-        messages: [
-          ...history.slice(-10).map(h => ({ role: h.role, content: h.content })),
-          { role: 'user', content: message },
-        ],
-      }),
+      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 3000, system, messages: [...history.slice(-10).map(h => ({ role: h.role, content: h.content })), { role: 'user', content: message }] }),
     });
-
-    if (!res.ok) {
-      const err = await res.text();
-      return json({ error: `Claude API error (${res.status}): ${err}` }, 500);
-    }
-
+    if (!res.ok) { const err = await res.text(); return json({ error: `Claude API error (${res.status}): ${err}` }, 500); }
     const data = await res.json();
     return json({ ok: true, response: data.content?.[0]?.text || 'No response.', sources: context.sources, scope });
   } catch (err) { return json({ error: 'Chat error: ' + err.message }, 500); }
@@ -603,10 +558,30 @@ async function buildContext({ message, dept, collection, fileId, scope, env }) {
       const colFiles = await env.CACI_KV.get(`col:${dept}:${collection}`, 'json') || [];
       filesToSearch = (await Promise.all(colFiles.map(f => env.CACI_KV.get(`file:${f.id}`, 'json')))).filter(Boolean);
     } else {
-      const deptIdx   = await env.CACI_KV.get(`index:${dept}`, 'json') || [];
-      const globalIdx = dept !== 'global' ? (await env.CACI_KV.get('index:global', 'json') || []) : [];
-      const allMeta   = [...deptIdx, ...globalIdx].slice(0, 40);
-      filesToSearch   = (await Promise.all(allMeta.map(f => env.CACI_KV.get(`file:${f.id}`, 'json')))).filter(Boolean);
+      // Smart collection detection from keywords
+      const reg = await env.CACI_KV.get(`colreg:${dept}`, 'json') || [];
+      const stopWords = new Set(['the','and','for','all','from','with','that','this','are','was','were','has','have','report','reports']);
+      const msgLower = message.toLowerCase();
+      const matchedCol = reg.find(c => {
+        if (msgLower.includes(c.name.toLowerCase())) return true;
+        if (c.category && msgLower.includes(c.category.toLowerCase())) return true;
+        const words = c.name.toLowerCase().split(/[\s&,\/]+/).filter(w => w.length >= 4 && !stopWords.has(w));
+        return words.some(w => msgLower.includes(w));
+      });
+      if (matchedCol) {
+        const colFiles = await env.CACI_KV.get(`col:${dept}:${matchedCol.name}`, 'json') || [];
+        const colFull = (await Promise.all(colFiles.map(f => env.CACI_KV.get(`file:${f.id}`, 'json')))).filter(Boolean);
+        const deptIdx = await env.CACI_KV.get(`index:${dept}`, 'json') || [];
+        const colIds = new Set(colFiles.map(f => f.id));
+        const otherMeta = deptIdx.filter(f => !colIds.has(f.id)).slice(0, 20);
+        const otherFull = (await Promise.all(otherMeta.map(f => env.CACI_KV.get(`file:${f.id}`, 'json')))).filter(Boolean);
+        filesToSearch = [...colFull, ...otherFull];
+      } else {
+        const deptIdx   = await env.CACI_KV.get(`index:${dept}`, 'json') || [];
+        const globalIdx = dept !== 'global' ? (await env.CACI_KV.get('index:global', 'json') || []) : [];
+        const allMeta   = [...deptIdx, ...globalIdx].slice(0, 40);
+        filesToSearch   = (await Promise.all(allMeta.map(f => env.CACI_KV.get(`file:${f.id}`, 'json')))).filter(Boolean);
+      }
     }
 
     if (!filesToSearch.length) return { text: '', sources: [], statsContext: '', focusFile: null };
@@ -673,7 +648,7 @@ async function handleAdminSave(request, env) {
   try {
     const body = await request.json();
     const saved = [];
-    for (const key of ['ANTHROPIC_API_KEY']) {
+    for (const key of ['ANTHROPIC_API_KEY', 'XAI_API_KEY']) {
       if (body[key] !== undefined) {
         body[key] === '' ? await env.CACI_KV.delete('config:' + key) : await env.CACI_KV.put('config:' + key, body[key]);
         saved.push(key);
@@ -942,3 +917,32 @@ async function handleConnectorFetch(path, request, env) {
     return json({ error: e.message }, 502);
   }
 }
+
+
+// ── TTS (Grok / Cloudflare) ───────────────────────────────────
+async function handleTTS(request, env) {
+  try {
+    const { text, provider = 'grok', voice = 'eve' } = await request.json();
+    if (!text) return json({ error: 'Text required' }, 400);
+    if (provider === 'grok' || provider === 'claude') {
+      const apiKey = (await env.CACI_KV.get('config:XAI_API_KEY')) || env.XAI_API_KEY;
+      if (!apiKey) return json({ error: 'xAI API key not configured.' }, 400);
+      const res = await fetch('https://api.x.ai/v1/audio/speech', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'grok-2-aurora', input: text, voice }),
+      });
+      if (!res.ok) { const err = await res.json().catch(() => ({ error: 'TTS failed' })); return json({ error: err.error || 'TTS failed' }, 500); }
+      const audio = await res.arrayBuffer();
+      return new Response(audio, { headers: { 'Content-Type': 'audio/mpeg', ...CORS } });
+    }
+    if (provider === 'cloudflare') {
+      if (!env.AI) return json({ error: 'Cloudflare AI binding not available' }, 500);
+      const result = await env.AI.run('@cf/deepgram/aura-2-en', { text });
+      return new Response(result, { headers: { 'Content-Type': 'audio/mpeg', ...CORS } });
+    }
+    return json({ error: 'Unknown TTS provider' }, 400);
+  } catch (err) { return json({ error: 'TTS error: ' + err.message }, 500); }
+}
+
+// ── Discovery Context ─────────────────────────────────────────
