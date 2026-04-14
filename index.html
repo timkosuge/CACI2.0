@@ -4947,10 +4947,12 @@ async function extractText(file, log) {
   const e = file.name.split('.').pop().toLowerCase();
   if (e === 'csv') { const raw = await file.text(); return parseCsv(raw); }
   if (['xlsx','xls'].includes(e)) return extractExcel(file, log);
+  // PDF and Word now return {text, stats} directly — pass through
+  if (e === 'pdf')                return extractPdf(file, log);
+  if (['doc','docx'].includes(e)) return extractWord(file, log);
+  // Plain text formats — wrap in {text, stats}
   let text = '';
   if (['txt','md','json'].includes(e)) text = await file.text();
-  else if (e === 'pdf') text = await extractPdf(file, log);
-  else if (['doc','docx'].includes(e)) text = await extractWord(file, log);
   else { try { text = await file.text(); } catch { text = ''; } }
   return { text, stats: {} };
 }
