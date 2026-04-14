@@ -6665,8 +6665,10 @@ function initSplitPdf() {
   input.addEventListener('change', async e => {
     const file = e.target.files[0];
     if (!file || !file.name.toLowerCase().endsWith('.pdf')) return;
+    const meta = input._splitMeta || {};
+    input._splitMeta = null;
     input.value = '';
-    await runPdfSplitter(file);
+    await runPdfSplitter(file, meta);
   });
 
   // Pre-flight modal wiring
@@ -6674,7 +6676,16 @@ function initSplitPdf() {
   $('spm-cancel')?.addEventListener('click', closeSplitMetaModal);
   $('split-meta-modal-bg')?.addEventListener('click', e => { if (e.target === $('split-meta-modal-bg')) closeSplitMetaModal(); });
   $('spm-submit')?.addEventListener('click', () => {
+    // Capture metadata BEFORE closing modal
+    const meta = {
+      category: ($('spm-category')?.value || 'Compliance').trim(),
+      period:   ($('spm-period')?.value   || '').trim(),
+      dept:     ($('spm-dept')?.value      || dept).trim(),
+      chunk:    parseInt($('spm-chunk')?.value || '800', 10) || 800,
+    };
     closeSplitMetaModal();
+    // Store meta for use when file is picked
+    input._splitMeta = meta;
     input.click();
   });
 }
@@ -6705,12 +6716,12 @@ function closeSplitMetaModal() {
   $('split-meta-modal-bg').classList.remove('open');
 }
 
-async function runPdfSplitter(file) {
-  // Read metadata from pre-flight modal
-  const splitCategory = ($('spm-category')?.value || 'Compliance').trim();
-  const splitPeriod   = ($('spm-period')?.value   || '').trim();
-  const splitDept     = ($('spm-dept')?.value      || dept).trim();
-  const splitChunk    = parseInt($('spm-chunk')?.value || '800', 10) || 800;
+async function runPdfSplitter(file, meta = {}) {
+  // Metadata passed directly — modal may already be closed
+  const splitCategory = meta.category || 'Compliance';
+  const splitPeriod   = meta.period   || '';
+  const splitDept     = meta.dept     || dept;
+  const splitChunk    = meta.chunk    || 800;
 
   const prog  = $('uprog');
   const fill  = $('pfill');
