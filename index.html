@@ -6385,6 +6385,14 @@ function queueAiClassify(fileId, fileName, collection, extractedText) {
 
   _aiClassifyQueue.push({ fileId, fileName, collection, text: sample });
   if (!_aiClassifyRunning) processAiClassifyQueue();
+
+  // Trigger compliance processing for PDFs when compliance section is visible
+  if (/\.(pdf|doc|docx)$/i.test(ext)) {
+    const cs = $('um-compliance-section');
+    if (cs && cs.classList.contains('visible')) {
+      runComplianceProcessing(fileName, extractedText, collection);
+    }
+  }
 }
 
 async function processAiClassifyQueue() {
@@ -7030,15 +7038,7 @@ async function loadCompliancePanel(){
   }catch(e){panel.style.display='none';}
 }
 
-// Patch queueAiClassify to also trigger compliance for PDFs
-const _origQAC=queueAiClassify;
-function queueAiClassify(fileId,fileName,collection,extractedText){
-  _origQAC(fileId,fileName,collection,extractedText);
-  if(/\.(pdf|doc|docx)$/i.test(fileName)){
-    const cs=$('um-compliance-section');
-    if(cs&&cs.classList.contains('visible')) runComplianceProcessing(fileName,extractedText,collection);
-  }
-}
+// Compliance processing triggered directly from queueAiClassify below
 
 // initComplianceUI is called directly inside bootApp above
 
