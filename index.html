@@ -939,8 +939,32 @@ body::before {
 }
 
 
-/* ── Scope bar ─────────────────────────────────────────── */
-.scope-bar {
+/* ── Art Deco gold header ornament ─────────────────────── */
+.chat-deco-header {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 72px;
+  z-index: 2;
+  pointer-events: none;
+  overflow: visible;
+}
+.chat-deco-header svg {
+  width: 100%;
+  height: 72px;
+  display: block;
+}
+@keyframes decoShimmer {
+  0%   { stop-color: #fff0a0; }
+  25%  { stop-color: #e8c84a; }
+  50%  { stop-color: #fff8d0; }
+  75%  { stop-color: #c9a832; }
+  100% { stop-color: #fff0a0; }
+}
+@keyframes decoFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.chat-deco-header { animation: decoFadeIn 1.2s ease 0.5s both; }
   display: flex; align-items: center; gap: 6px;
   padding: 0 18px;
   height: 38px;
@@ -3436,6 +3460,126 @@ body::before {
 
   <rect width="1200" height="900" fill="url(#vignette)"/>
 </svg>      </div>
+
+      <!-- Art Deco gold header ornament -->
+      <div class="chat-deco-header" aria-hidden="true">
+        <svg viewBox="0 0 1200 72" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <!-- Main metallic gold gradient -->
+            <linearGradient id="dg-gold" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%"   stop-color="#fff0a0" stop-opacity="0.95"/>
+              <stop offset="30%"  stop-color="#e8c84a" stop-opacity="0.9"/>
+              <stop offset="55%"  stop-color="#c9a832" stop-opacity="0.85"/>
+              <stop offset="80%"  stop-color="#9a7a18" stop-opacity="0.7"/>
+              <stop offset="100%" stop-color="#c9a832" stop-opacity="0.4"/>
+            </linearGradient>
+            <!-- Bright highlight gradient for center elements -->
+            <linearGradient id="dg-bright" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%"   stop-color="#fff8d0" stop-opacity="1"/>
+              <stop offset="40%"  stop-color="#f0d060" stop-opacity="0.95"/>
+              <stop offset="100%" stop-color="#c9a832" stop-opacity="0.8"/>
+            </linearGradient>
+            <!-- Fade out gradient for line ends -->
+            <linearGradient id="dg-fade-r" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%"   stop-color="#e8c84a" stop-opacity="0.9"/>
+              <stop offset="100%" stop-color="#e8c84a" stop-opacity="0"/>
+            </linearGradient>
+            <linearGradient id="dg-fade-l" x1="100%" y1="0%" x2="0%" y2="0%">
+              <stop offset="0%"   stop-color="#e8c84a" stop-opacity="0.9"/>
+              <stop offset="100%" stop-color="#e8c84a" stop-opacity="0"/>
+            </linearGradient>
+            <!-- Shimmer filter -->
+            <filter id="dg-glow" x="-10%" y="-50%" width="120%" height="200%">
+              <feGaussianBlur stdDeviation="1.2" result="blur"/>
+              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+            <filter id="dg-glow-soft" x="-20%" y="-100%" width="140%" height="300%">
+              <feGaussianBlur stdDeviation="2.5" result="blur"/>
+              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+
+          <!-- ═══ PRIMARY HORIZONTAL RULE ═══ -->
+          <!-- Main line — full width, fades at edges -->
+          <line x1="0" y1="14" x2="450" y2="14" stroke="url(#dg-fade-l)" stroke-width="0.6" opacity="0.7"/>
+          <line x1="750" y1="14" x2="1200" y2="14" stroke="url(#dg-fade-r)" stroke-width="0.6" opacity="0.7"/>
+          <!-- Bright center segment -->
+          <line x1="440" y1="14" x2="760" y2="14" stroke="url(#dg-gold)" stroke-width="0.8" filter="url(#dg-glow)" opacity="0.9"/>
+
+          <!-- ═══ CENTER MEDALLION ═══ -->
+          <!-- Outer diamond -->
+          <polygon points="600,2 615,14 600,26 585,14" fill="none" stroke="url(#dg-bright)" stroke-width="0.8" filter="url(#dg-glow-soft)" opacity="0.85"/>
+          <!-- Inner diamond fill -->
+          <polygon points="600,6 611,14 600,22 589,14" fill="url(#dg-gold)" opacity="0.25"/>
+          <!-- Center dot -->
+          <circle cx="600" cy="14" r="2.2" fill="url(#dg-bright)" filter="url(#dg-glow-soft)" opacity="0.95"/>
+          <!-- Side accent dots flanking center diamond -->
+          <circle cx="572" cy="14" r="1.2" fill="#e8c84a" opacity="0.7"/>
+          <circle cx="628" cy="14" r="1.2" fill="#e8c84a" opacity="0.7"/>
+
+          <!-- ═══ LEFT WING ═══ -->
+          <!-- Inner bracket lines -->
+          <line x1="540" y1="8"  x2="540" y2="20" stroke="url(#dg-gold)" stroke-width="0.7" opacity="0.75"/>
+          <line x1="510" y1="10" x2="510" y2="18" stroke="url(#dg-gold)" stroke-width="0.6" opacity="0.6"/>
+          <line x1="480" y1="11" x2="480" y2="17" stroke="url(#dg-gold)" stroke-width="0.5" opacity="0.5"/>
+
+          <!-- Angled chevron pair -->
+          <polyline points="555,7 545,14 555,21" fill="none" stroke="url(#dg-gold)" stroke-width="0.7" stroke-linejoin="miter" opacity="0.8"/>
+          <polyline points="563,9 556,14 563,19" fill="none" stroke="url(#dg-gold)" stroke-width="0.55" opacity="0.6"/>
+
+          <!-- Fan arc left -->
+          <path d="M 490 14 A 52 18 0 0 1 542 14" fill="none" stroke="url(#dg-gold)" stroke-width="0.5" opacity="0.4"/>
+          <path d="M 495 14 A 46 14 0 0 1 541 14" fill="none" stroke="url(#dg-gold)" stroke-width="0.4" opacity="0.3"/>
+
+          <!-- Horizontal tick marks left of center -->
+          <line x1="455" y1="14" x2="472" y2="14" stroke="#e8c84a" stroke-width="1.2" opacity="0.55"/>
+          <line x1="457" y1="11" x2="470" y2="11" stroke="#c9a832" stroke-width="0.5" opacity="0.4"/>
+          <line x1="457" y1="17" x2="470" y2="17" stroke="#c9a832" stroke-width="0.5" opacity="0.4"/>
+
+          <!-- Small diamond accent left -->
+          <polygon points="430,14 437,10 444,14 437,18" fill="none" stroke="#d4a832" stroke-width="0.6" opacity="0.65"/>
+          <polygon points="390,14 395,11 400,14 395,17" fill="none" stroke="#c9a832" stroke-width="0.5" opacity="0.45"/>
+          <polygon points="355,14 359,11.5 363,14 359,16.5" fill="none" stroke="#c9a832" stroke-width="0.4" opacity="0.35"/>
+
+          <!-- ═══ RIGHT WING (mirror of left) ═══ -->
+          <line x1="660" y1="8"  x2="660" y2="20" stroke="url(#dg-gold)" stroke-width="0.7" opacity="0.75"/>
+          <line x1="690" y1="10" x2="690" y2="18" stroke="url(#dg-gold)" stroke-width="0.6" opacity="0.6"/>
+          <line x1="720" y1="11" x2="720" y2="17" stroke="url(#dg-gold)" stroke-width="0.5" opacity="0.5"/>
+
+          <polyline points="645,7 655,14 645,21" fill="none" stroke="url(#dg-gold)" stroke-width="0.7" stroke-linejoin="miter" opacity="0.8"/>
+          <polyline points="637,9 644,14 637,19" fill="none" stroke="url(#dg-gold)" stroke-width="0.55" opacity="0.6"/>
+
+          <path d="M 658 14 A 52 18 0 0 0 710 14" fill="none" stroke="url(#dg-gold)" stroke-width="0.5" opacity="0.4"/>
+          <path d="M 659 14 A 46 14 0 0 0 705 14" fill="none" stroke="url(#dg-gold)" stroke-width="0.4" opacity="0.3"/>
+
+          <line x1="728" y1="14" x2="745" y2="14" stroke="#e8c84a" stroke-width="1.2" opacity="0.55"/>
+          <line x1="730" y1="11" x2="743" y2="11" stroke="#c9a832" stroke-width="0.5" opacity="0.4"/>
+          <line x1="730" y1="17" x2="743" y2="17" stroke="#c9a832" stroke-width="0.5" opacity="0.4"/>
+
+          <polygon points="756,14 763,10 770,14 763,18" fill="none" stroke="#d4a832" stroke-width="0.6" opacity="0.65"/>
+          <polygon points="800,14 805,11 810,14 805,17" fill="none" stroke="#c9a832" stroke-width="0.5" opacity="0.45"/>
+          <polygon points="837,14 841,11.5 845,14 841,16.5" fill="none" stroke="#c9a832" stroke-width="0.4" opacity="0.35"/>
+
+          <!-- ═══ SECOND RULE — subtle echo below ═══ -->
+          <line x1="100" y1="22" x2="520" y2="22" stroke="url(#dg-fade-l)" stroke-width="0.35" opacity="0.35"/>
+          <line x1="680" y1="22" x2="1100" y2="22" stroke="url(#dg-fade-r)" stroke-width="0.35" opacity="0.35"/>
+          <line x1="515" y1="22" x2="685" y2="22" stroke="#c9a832" stroke-width="0.4" opacity="0.4"/>
+
+          <!-- ═══ CORNER ACCENTS — top left / right ═══ -->
+          <!-- Top left corner bracket -->
+          <polyline points="8,28 8,6 30,6" fill="none" stroke="url(#dg-gold)" stroke-width="0.7" opacity="0.5"/>
+          <polyline points="12,24 12,10 26,10" fill="none" stroke="url(#dg-gold)" stroke-width="0.4" opacity="0.35"/>
+          <circle cx="8" cy="6" r="1.5" fill="#e8c84a" opacity="0.55"/>
+          <!-- Top right corner bracket -->
+          <polyline points="1192,28 1192,6 1170,6" fill="none" stroke="url(#dg-gold)" stroke-width="0.7" opacity="0.5"/>
+          <polyline points="1188,24 1188,10 1174,10" fill="none" stroke="url(#dg-gold)" stroke-width="0.4" opacity="0.35"/>
+          <circle cx="1192" cy="6" r="1.5" fill="#e8c84a" opacity="0.55"/>
+
+          <!-- ═══ GLIMMER HIGHLIGHT — single bright pass across center ═══ -->
+          <line x1="500" y1="14" x2="700" y2="14" stroke="#fff8d0" stroke-width="0.4" opacity="0.6" filter="url(#dg-glow-soft)"/>
+        </svg>
+      </div>
+
       <div class="scope-bar" id="scope-bar">
         <span class="scope-label">Context</span>
         <button class="scope-btn active" data-scope="all" id="scope-all">All Files</button>
