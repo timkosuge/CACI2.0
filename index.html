@@ -5332,6 +5332,81 @@ async function openUploadModal(fileList) {
   });
 
   $('upload-modal-bg').classList.add('open');
+
+  // ── Pre-fill: sample first file and ask CACI to classify before user sees the form ──
+  const prefillFile = _umFiles && _umFiles.length === 1 ? _umFiles[0] : null;
+  const prefillExt = prefillFile ? (prefillFile.name.split('.').pop() || '').toLowerCase() : '';
+  if (prefillFile && ['pdf','docx','doc','xlsx','xls','csv'].includes(prefillExt)) {
+    // Show a subtle "thinking..." indicator on the report name field
+    const rn = $('um-report-name');
+    if (rn) { rn.placeholder = 'Caci is reading this file...'; rn.disabled = true; }
+    (async () => {
+      try {
+        const extracted = await extractText(prefillFile, null);
+        const text = extracted.text || extracted || '';
+        if (!text || text.length < 50) { if (rn) { rn.placeholder = 'Report name'; rn.disabled = false; } return; }
+
+        // Build sample — same logic as queueAiClassify
+        let sample = text;
+        if (['xlsx','xls','csv'].includes(prefillExt)) {
+          const parts = text.split('\n\n---\n\n');
+          sample = (parts[0] + '\n\n' + (parts[1] ? parts[1].split('\n').slice(0,25).join('\n') : '')).trim();
+        } else {
+          sample = text.slice(0, 2500);
+        }
+
+        // Fetch existing collection names for suggestion
+        let colNames = '';
+        try {
+          const cr = await apiFetch('/collections?dept=' + dept);
+          const cl = await cr.json();
+          colNames = cl.map(c => c.name).join(', ');
+        } catch(_) {}
+
+        const res = await apiFetch('/ai-classify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileName: prefillFile.name, collection: selectedCollection || '', sample, colNames }),
+        });
+        if (!res.ok) throw new Error('classify failed');
+        const data = await res.json();
+        if (!data.ok || !data.result) throw new Error('no result');
+
+        let suggested;
+        try { suggested = JSON.parse(data.result.replace(/```json|```/g, '').trim()); } catch(_) { throw new Error('parse failed'); }
+        if (suggested.confidence === 'low') throw new Error('low confidence');
+
+        // Pre-fill the form — only if user hasn't already typed anything
+        if (rn && !rn.value && suggested.reportName) {
+          rn.value = suggested.reportName;
+          rn.style.borderColor = 'rgba(184,150,12,0.5)';
+          setTimeout(() => { rn.style.borderColor = ''; }, 2000);
+        }
+        if ($('um-category') && !$('um-category').value && suggested.category) {
+          $('um-category').value = suggested.category;
+        }
+        if ($('um-report-type') && !$('um-report-type').value && suggested.reportType) {
+          $('um-report-type').value = suggested.reportType;
+        }
+        // Suggest collection if different from current
+        if ($('um-collection-pick') && suggested.suggestedCollection && suggested.suggestedCollection !== selectedCollection) {
+          const cp = $('um-collection-pick');
+          const match = Array.from(cp.options).find(o => o.value === suggested.suggestedCollection);
+          if (match) { cp.value = suggested.suggestedCollection; updateColPickMeta(); }
+        }
+        // Period
+        if (suggested.period && $('um-period')) {
+          const per = $('um-period');
+          const match = Array.from(per.options).find(o => o.value === suggested.period);
+          if (match) per.value = suggested.period;
+        }
+      } catch(_) {
+        // Prefill failed silently — user fills in manually
+      } finally {
+        if (rn) { rn.placeholder = 'e.g. Q1 2026 Retail Sales Summary'; rn.disabled = false; }
+      }
+    })();
+  }
 }
 
 function closeUploadModal() {
