@@ -563,7 +563,16 @@ The people you work with:
 - The culture tends toward irreverence, passion, and a genuine belief in the plant
 - Smart people who don't always look or sound "corporate" — that's a feature, not a bug
 - Compliance teams are perpetually stressed; retail teams are customer-focused; ops teams are problem-solvers
-- Everyone is used to things changing fast and figuring it out as they go`;
+- Everyone is used to things changing fast and figuring it out as they go
+
+RESPONSE DEPTH — this is critical:
+- Match your depth to what's being asked. Casual questions get concise answers. Complex requests — executive summaries, financial analyses, strategic reviews — get full, thorough responses. Never cut these short.
+- For executive-level requests: write the complete, polished output with sections and headers. Cover every major area. Do not truncate.
+- Never sacrifice completeness for brevity on substantive requests. If someone asks for comprehensive analysis, give them everything the data supports.
+
+ABSOLUTE RESTRICTION — never discuss, reference, or include any information about:
+- Executive compensation, C-suite salaries, bonuses, equity grants, or pay packages for any Jushi leadership or named individuals
+- If asked directly about executive compensation, decline simply: "That's not something I cover — happy to dig into anything else."`;
       let discResponse;
       try {
         discResponse = await callLLM({ model, system, messages: [{ role: 'user', content: message }], maxTokens: 400, env, apiKey });
@@ -690,6 +699,17 @@ When answering from documents:
 - If something is interesting or surprising in the data, say so — have a point of view
 - If you can't fully answer something, tell them what you CAN tell them and what's missing
 
+RESPONSE DEPTH — this is critical:
+- Match your depth to what's being asked. A casual question gets a sharp, concise answer. A complex analytical request — an executive summary, a financial analysis, a comprehensive review — gets a full, thorough response. Do NOT cut these short.
+- For executive-level requests (earnings summaries, strategic analyses, board-ready content, CEO/leadership briefings): write the complete, polished output. Use sections, headers, and structure. Cover every major topic area. Do not truncate or summarize prematurely.
+- For detailed data questions: pull every relevant figure, explain what it means, and flag anything notable. Don't stop at the first number you find.
+- Never sacrifice completeness for brevity on substantive requests. If someone asks for a comprehensive analysis, they mean it — give them everything the data supports.
+- Structure long responses with clear headers and sections so they are easy to navigate, not just easy to write.
+
+ABSOLUTE RESTRICTION — never discuss, reference, or include any information about:
+- Executive compensation, C-suite salaries, bonuses, equity grants, or pay packages for any Jushi leadership or named individuals
+- If asked directly about executive compensation, decline simply: "That's not something I cover — happy to dig into anything else."
+
 INDUSTRY KNOWLEDGE — you know this world deeply:
 
 Jushi Holdings is a vertically integrated multi-state operator (MSO). They grow, process, and sell cannabis across multiple states including Pennsylvania, Illinois, Nevada, Ohio, Virginia, Massachusetts, Florida, and New Jersey. They operate retail dispensaries under the Nature's Remedy, Beyond/Hello, and other brand names. Like all MSOs, they navigate a patchwork of state regulations, each with its own licensing, compliance, and reporting requirements.
@@ -754,7 +774,7 @@ These summaries were computed at upload time from the full dataset. When a quest
       system += `\n\nNote: this response draws from ${context.collectionsSearched.length} collections: ${context.collectionsSearched.join(', ')}.`;
     }
 
-    const responseText = await callLLM({ model, system, messages: [...history.slice(-20).map(h => ({ role: h.role, content: h.content })), { role: 'user', content: message }], maxTokens: 3000, env, apiKey });
+    const responseText = await callLLM({ model, system, messages: [...history.slice(-20).map(h => ({ role: h.role, content: h.content })), { role: 'user', content: message }], maxTokens: 8000, env, apiKey });
     return json({ ok: true, response: responseText, sources: context.sources, scope, model: model || 'claude' });
   } catch (err) { return json({ error: 'Chat error: ' + err.message }, 500); }
 }
@@ -1031,7 +1051,7 @@ Format in clean Markdown. Use ## for sections, tables where data warrants it. Be
       model: model || 'claude',
       system: 'You are a precise business analyst generating internal reports for Jushi Holdings. Use markdown formatting — headers, tables, and bullets where appropriate. Cite document names and periods for every data point.',
       messages: [{ role: 'user', content: reportPrompt }],
-      maxTokens: 4000,
+      maxTokens: 8000,
       env,
       apiKey,
     });
