@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-//  CACI Worker v6.3 — Compliance Intelligence System
+//  CACI Worker v6.1 — Collection Analysis + AI Auto-Classification
 // ─────────────────────────────────────────────────────────────
 
 const CORS = {
@@ -28,7 +28,7 @@ export default {
 
     if (method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
     if (path === '/auth/login' && method === 'POST') return handleLogin(request, env);
-    if (path === '/health') return json({ ok: true, version: '6.3.0' });
+    if (path === '/health') return json({ ok: true, version: '6.1.0' });
 
     if (!verifyToken(request, env)) return json({ error: 'Unauthorized' }, 401);
 
@@ -72,13 +72,6 @@ export default {
     if (path === '/ai-classify'         && method === 'POST') return handleAiClassify(request, env);
     if (path === '/collection-analyze'  && method === 'POST') return handleCollectionAnalyze(request, env);
     if (path === '/collections/describe'&& method === 'POST') return handleCollectionDescribe(request, env);
-    // ── Compliance Intelligence ───────────────────────────
-    if (path === '/compliance/extract-csv'  && method === 'POST') return handleComplianceExtractCsv(request, env);
-    if (path === '/compliance/synthesize'   && method === 'POST') return handleComplianceSynthesize(request, env);
-    if (path === '/compliance/synthesis'    && method === 'GET')  return handleComplianceSynthesisGet(url, env);
-    if (path === '/compliance/synthesis'    && method === 'DELETE') return handleComplianceSynthesisDelete(request, env);
-    if (path === '/compliance/full-read'    && method === 'POST') return handleComplianceFullRead(request, env);
-
     if (path === '/admin/config' && method === 'POST') return handleAdminSave(request, env);
     if (path === '/admin/config' && method === 'GET')  return handleAdminGet(env);
 
@@ -495,7 +488,7 @@ async function callLLM({ model, system, messages, maxTokens = 2000, env, apiKey 
 // ── Chat ──────────────────────────────────────────────────────
 async function handleChat(request, env) {
   try {
-    const { message, dept, collection, fileId, scope = 'all', model, history = [], complianceMode = false, complianceLens = null, complianceFullDoc = false } = await request.json();
+    const { message, dept, collection, fileId, scope = 'all', model, history = [] } = await request.json();
     if (!message) return json({ error: 'Message required' }, 400);
 
     const apiKey = (await env.CACI_KV.get('config:ANTHROPIC_API_KEY')) || env.ANTHROPIC_API_KEY;
@@ -574,8 +567,8 @@ Be direct and conversational. List them clearly.`;
       return json({ ok: true, response: colRes, sources: [], scope: scope, model: model || 'claude' });
     }
 
-    // ── Structured query plan — drives routing and prompt assembly ────
-    const intent = buildQueryPlan(message);
+    // ── Intent analysis — shapes retrieval strategy ─────────────
+    const intent = analyzeQueryIntent(message);
 
     // ── Collection routing ────────────────────────────────────
     // Auto-switch collection on full name match
@@ -591,33 +584,18 @@ Be direct and conversational. List them clearly.`;
       if (matchedCol) { activeCollection = matchedCol.name; activeScope = 'collection'; }
     }
 
-    // ── Compliance mode — bypasses chunked retrieval ────────────
-    if (complianceMode && activeCollection) {
-      return await handleComplianceChatMode({ message, dept, collection: activeCollection, model, history, lens: complianceLens, fullDoc: complianceFullDoc, env, apiKey, intent });
-    }
-
     // ── Context retrieval — multi-collection for broad queries ─
     let context;
     const useMultiCollection = activeScope === 'all' && !fileId && !activeCollection;
-
-    // Stats-only short-circuit: for pure aggregate queries (e.g. "what was total revenue")
-    // we only need the stats block — no chunk retrieval required.
-    // We still run the full context builder to GET the stats, but we'll discard
-    // the text chunks and tell the model explicitly not to look for row-level data.
-    const forceStatsOnly = intent.statsOnly && !fileId;
-
     if (useMultiCollection) {
+      // Broad scope: search across top-matching collections
       context = await buildContextMultiCollection({ message, dept, env, maxCollections: intent.isComparative ? 4 : 3 });
+      // Fall back to single-path if multi returns nothing
       if (!context.text && !context.statsContext) {
         context = await buildContext({ message, dept, collection: null, fileId: null, scope: 'all', env });
       }
     } else {
       context = await buildContext({ message, dept, collection: activeCollection, fileId, scope: activeScope, env });
-    }
-
-    // Apply stats-only: strip chunks if we have stats and don't need row evidence
-    if (forceStatsOnly && context.statsContext) {
-      context = { ...context, text: '' };
     }
 
     // Note: context builders (buildContextTwoPass / buildContext) already
@@ -685,41 +663,31 @@ The people you work with:
 - Everyone is used to things changing fast and figuring it out as they go`;
 
     // ── Data injection — order matters ────────────────────────
-    // 1. Stats block (always first — authoritative aggregate numbers)
+    // 1. Stats block: pre-computed numeric summaries and category inventories.
+    //    Tell the model exactly what this is and how to use it.
     if (context.statsContext) {
-      if (forceStatsOnly) {
-        // Stats-only mode: be explicit that this IS the answer source
-        system += `\n\nPRE-COMPUTED DATA SUMMARIES — THIS IS YOUR PRIMARY DATA SOURCE FOR THIS QUERY:\n${context.statsContext}\n\nThese totals were computed at upload time from the complete dataset. Answer the question directly from these numbers. Do not say you need more data unless a specific metric is genuinely absent from the summaries above.`;
-      } else {
-        system += `\n\nPRE-COMPUTED DATA SUMMARIES (authoritative — use these numbers directly for aggregate questions like totals, averages, min/max):\n${context.statsContext}\n\nThese summaries were computed at upload time from the full dataset. When a question can be answered from these summaries alone, prefer them over scanning row chunks.`;
-      }
-    } else if (intent.requiresStats) {
-      // Query needed stats but none exist — enforce honest partial-answer response
-      system += `\n\nDATA AVAILABILITY NOTE: This query is asking for aggregate totals or averages, but no pre-computed stats are available for the matched documents. You must be upfront: tell the user what specific data is missing and what you CAN infer from any document content below. Do not fabricate totals.`;
+      system += `\n\nPRE-COMPUTED DATA SUMMARIES (authoritative — use these numbers directly for aggregate questions like totals, averages, min/max):
+${context.statsContext}
+
+These summaries were computed at upload time from the full dataset. When a question can be answered from these summaries alone, prefer them over scanning row chunks.`;
     }
 
     // 2. Context docs (SOPs, policies, reference material)
     if (contextDocs) system += `\n\nCOLLECTION CONTEXT DOCUMENTS (reference material — use for background, definitions, policies):\n${contextDocs}`;
 
-    // 3. Document/row chunks (omitted in stats-only mode)
+    // 3. Document/row chunks — the actual retrievable content
     if (context.text) {
       system += `\n\nDOCUMENT CONTENT:\nFormat note: tabular data appears as self-contained row chunks, each starting with "Columns: ..." followed by numbered rows. Each chunk is a slice of a larger dataset — rows may not be sequential across chunks.\n\n${context.text}\n\nWhen answering: cite the document name and period. For numeric questions, cross-reference the DATA SUMMARIES above with the row chunks below to give precise answers. If the row chunks don't contain enough detail to answer fully, say what you CAN answer from the summaries and note what's missing.`;
-    } else if (!context.statsContext) {
-      system += `\n\nNo documents found matching this query. Let the user know and suggest they upload relevant files or switch to a different collection.`;
+    } else {
+      system += `\n\nNo documents found matching this query. Let the user know and ask them to upload relevant files or switch to a different collection.`;
     }
 
-    // ── Query plan hints appended to system prompt ───────────────
+    // ── Intent hint appended to system prompt ────────────────────
     if (intent.expansionHint) {
-      system += `\n\nQuery routing: ${intent.expansionHint}.`;
-    }
-    if (intent.isComparative) system += ' Compare across time periods where possible. Highlight trends and changes.';
-    if (intent.isCausal)      system += ' Identify likely drivers. Look for correlated changes across metrics.';
-    if (intent.entities?.length) {
-      const entityList = intent.entities.map(e => e.value).join(', ');
-      system += ` Focus on: ${entityList}.`;
-    }
-    if (intent.metrics?.length) {
-      system += ` Key metrics requested: ${intent.metrics.join(', ')}.`;
+      system += `\n\nQuery context: ${intent.expansionHint}. `;
+      if (intent.isComparative) system += 'Compare across time periods where possible. Highlight trends and changes.';
+      if (intent.isCausal) system += 'Identify likely drivers. Look for correlated changes across metrics.';
+      if (intent.isAggregate && context.statsContext) system += 'The DATA SUMMARIES above contain authoritative totals — use them directly.';
     }
     if (useMultiCollection && context.collectionsSearched?.length) {
       system += `\n\nNote: this response draws from ${context.collectionsSearched.length} collections: ${context.collectionsSearched.join(', ')}.`;
@@ -755,98 +723,41 @@ async function buildDiscoveryContext({ dept, env }) {
   }
 }
 
-// ── Structured Query Plan ───────────────────────────────────────────────
-// Produces a typed plan object that drives all retrieval routing decisions.
-// Key addition: statsOnly flag — when true, handleChat bypasses chunk retrieval
-// entirely and answers from pre-computed stats blocks (faster + more accurate
-// for pure "what was total X" queries that don't need row-level evidence).
-function buildQueryPlan(message) {
+// ── Query intent analysis ─────────────────────────────────────
+function analyzeQueryIntent(message) {
   const msg = message.toLowerCase();
-
   const isComparative = [
-    /vs\.?|versus|compare|comparison/,
-    /trend|over time|month.over.month|m\.o\.m/,
-    /year.over.year|y\.o\.y|quarter.over.quarter/,
-    /change|growth|decline|down|up|drop/,
-    /better|worse|improved|increased|decreased/,
-    /histor/,
+    /vs\.?|versus|compare|comparison/,
+    /trend|over time|month.over.month|m\.o\.m/,
+    /year.over.year|y\.o\.y|quarter.over.quarter/,
+    /change|growth|decline|down|up|drop/,
+    /better|worse|improved|increased|decreased/,
+    /histor/,
   ].some(r => r.test(msg));
-
   const isAggregate = [
-    /total|sum|aggregate|overall/,
-    /how much|how many/,
-    /average|avg|mean/,
-    /biggest|largest|highest|lowest|smallest/,
+    /total|sum|aggregate|overall/,
+    /how much|how many/,
+    /average|avg|mean/,
+    /biggest|largest|highest|lowest|smallest/,
   ].some(r => r.test(msg));
-
-  const isCausal = [
-    /why|cause|reason|driving|factor|explain/,
-  ].some(r => r.test(msg));
-
-  // Filtered = query targets a specific sub-entity (state / store / product).
-  // In that case collection totals are only partially useful — row chunks needed.
   const isFiltered = [
     /\bpa\b|\bill\b|\bnv\b|\bva\b|\bnj\b|\boh\b|\bma\b|\bfl\b|\bca\b|\bco\b/,
     /\bpennsylvania\b|\billinois\b|\bnevada\b|\bvirginia\b|\bnew jersey\b|\bohio\b|\bmassachusetts\b|\bflorida\b/,
     /\bflower\b|\bvape\b|\bedible\b|\bconcentrate\b|\bpreroll\b|\bpre-roll\b/,
     /\bstore\b|\blocation\b|\bdispensary\b|\bproduct\b|\bbrand\b/,
   ].some(r => r.test(msg));
-
-  // Entity extraction — what the query is about
-  const entities = [];
-  const stateMap = {
-    pa:'Pennsylvania', il:'Illinois', nv:'Nevada', va:'Virginia',
-    nj:'New Jersey', oh:'Ohio', ma:'Massachusetts', fl:'Florida',
-    ca:'California', co:'Colorado',
-  };
-  for (const [abbr, full] of Object.entries(stateMap)) {
-    if (new RegExp(`\\b${abbr}\\b`, 'i').test(msg)) entities.push({ type: 'state', value: full, abbr });
-  }
-  ['flower','vape','edible','concentrate','preroll','pre-roll','tincture','topical']
-    .forEach(p => { if (msg.includes(p)) entities.push({ type: 'product', value: p }); });
-
-  // Metric extraction — what numbers are being requested
-  const metricPatterns = {
-    revenue:     /revenue|sales|gross/,
-    units:       /units|quantity|qty/,
-    transactions:/transactions?|orders?|visits?/,
-    margin:      /margin|profit|net/,
-    inventory:   /inventory|stock|on.hand/,
-    shrink:      /shrink|loss|variance/,
-    customers:   /customers?|patients?|members?/,
-    average:     /average|avg|mean|per/,
-  };
-  const metrics = Object.entries(metricPatterns)
-    .filter(([, re]) => re.test(msg))
-    .map(([name]) => name);
-
-  // Stats-only routing: bypass chunk retrieval for pure aggregate queries.
-  // Conditions: clearly aggregate + NOT filtered to a sub-entity + NOT causal + NOT comparative.
-  // These are the "what was total revenue" / "what was average basket" queries that
-  // the stats block answers perfectly without any row-chunk scanning.
-  const statsOnly = isAggregate && !isFiltered && !isCausal && !isComparative;
-
+    /why|cause|reason|driving|factor|explain/,
+  ].some(r => r.test(msg));
   let periodExpansion = 1;
   if (isComparative || isCausal) periodExpansion = 3;
   else if (isAggregate && !isFiltered) periodExpansion = 2;
-
-  let expansionHint = '';
-  if (isComparative || isCausal) expansionHint = 'include adjacent time periods for comparison';
-  else if (statsOnly) expansionHint = 'STATS-ONLY MODE: answer directly from DATA SUMMARIES — row chunks are not needed for this query';
-  else if (isAggregate) expansionHint = 'use pre-computed stats block for totals where available';
-
   return {
-    // Legacy flags (backward compat with multi-collection builder)
-    isComparative, isAggregate, isFiltered, isCausal,
-    // New structured fields
-    statsOnly, entities, metrics,
-    periodExpansion, expansionHint,
-    requiresStats: statsOnly,
+    isComparative, isAggregate, isFiltered, isCausal, periodExpansion,
+    expansionHint: isComparative || isCausal
+      ? 'include adjacent time periods for comparison'
+      : isAggregate ? 'use pre-computed stats block for totals' : '',
   };
 }
-
-// Backward-compat alias — multi-collection builder calls analyzeQueryIntent
-function analyzeQueryIntent(message) { return buildQueryPlan(message); }
 
 // ── Multi-collection context builder ─────────────────────────
 async function buildContextMultiCollection({ message, dept, env, maxCollections = 3 }) {
@@ -2188,413 +2099,6 @@ async function handleConnectorFetch(path, request, env) {
     return json({ ok: r.ok, status: r.status, data });
   } catch(e) {
     return json({ error: e.message }, 502);
-  }
-}
-
-
-// ═══════════════════════════════════════════════════════════
-//  COMPLIANCE INTELLIGENCE SYSTEM
-// ═══════════════════════════════════════════════════════════
-
-const COMPLIANCE_LENSES = {
-  employee:   'Dispensary Employee',
-  officer:    'Compliance Officer',
-  gm:         'GM / Operator',
-  transporter:'Transporter',
-  cultivation:'Cultivation & Processing',
-};
-
-const COMPLIANCE_TOPICS = [
-  'Inventory & Shrink', 'METRC & Tracking', 'Patient & Customer Interactions',
-  'Product Handling & Storage', 'Inspections & Audits', 'Licensing & Renewals',
-  'Reporting & Deadlines', 'Penalties & Violations', 'Transfer & Transport',
-  'Security Requirements', 'Employee Requirements', 'Record Keeping',
-];
-
-// ── CSV Extraction ────────────────────────────────────────────
-// Called at upload time for regulation PDFs. Reads full text,
-// returns structured CSV rows, stored as companion file.
-async function handleComplianceExtractCsv(request, env) {
-  try {
-    const { text, fileName, state, dept, collection, model } = await request.json();
-    if (!text || !fileName) return json({ error: 'text and fileName required' }, 400);
-
-    const apiKey = (await env.CACI_KV.get('config:ANTHROPIC_API_KEY')) || env.ANTHROPIC_API_KEY;
-    // Note: apiKey may be empty if user is on Grok/Cloudflare — callLLM handles that
-
-    // Chunk the text for extraction — regulations can be very long
-    // Process in 12k char slices to stay within prompt limits
-    const SLICE = 12000;
-    const slices = [];
-    for (let i = 0; i < text.length; i += SLICE) slices.push(text.slice(i, i + SLICE));
-
-    const allRows = [];
-    let sectionOffset = 0;
-
-    for (let si = 0; si < slices.length; si++) {
-      const slice = slices[si];
-      const prompt = `You are extracting rules from a cannabis regulation document into a structured CSV.
-
-State: ${state || 'Unknown'}
-Document: ${fileName}
-Section ${si + 1} of ${slices.length}:
----
-${slice}
----
-
-Extract EVERY distinct rule, requirement, definition, prohibition, deadline, threshold, penalty, and procedure.
-One row per distinct item. If a section has 5 requirements, make 5 rows.
-
-Return ONLY a JSON array of objects with these exact keys:
-- section: section/subsection number or identifier
-- topic: 3-6 word label (e.g. "Inventory Variance Reporting")
-- rule_type: one of Definition|Requirement|Prohibition|Deadline|Threshold|Procedure|Penalty
-- summary: plain English, 1-3 sentences, no jargon
-- exact_text: verbatim text, max 300 chars
-- keywords: comma-separated search terms including synonyms and abbreviations
-- applies_to: Dispensary|Grower|Processor|Transporter|All or specific license type
-- state: ${state || 'Unknown'}
-- source: ${fileName}
-
-If nothing extractable in this slice, return [].
-Return only the JSON array, no markdown, no explanation.`;
-
-      let raw = '[]';
-      try {
-        raw = await callLLM({
-          model: model || 'claude',
-          system: 'You are a regulatory document parser. Return only valid JSON arrays. No markdown, no explanation.',
-          messages: [{ role: 'user', content: prompt }],
-          maxTokens: 4000,
-          env,
-          apiKey,
-        });
-      } catch(e) { console.error('CSV extract slice error:', e.message); continue; }
-      try {
-        const rows = JSON.parse(raw.replace(/```json|```/g, '').trim());
-        if (Array.isArray(rows)) allRows.push(...rows);
-      } catch(e) { console.warn('Failed to parse slice', si, e.message); }
-
-      // Rate limit between slices
-      if (si < slices.length - 1) await new Promise(r => setTimeout(r, 500));
-    }
-
-    if (!allRows.length) return json({ ok: true, rows: 0, csv: '' });
-
-    // Convert to CSV text
-    const headers = ['section','topic','rule_type','summary','exact_text','keywords','applies_to','state','source'];
-    const csvLines = [headers.join(',')];
-    for (const row of allRows) {
-      const vals = headers.map(h => {
-        const v = String(row[h] || '').replace(/"/g, '""');
-        return v.includes(',') || v.includes('"') || v.includes('\n') ? `"${v}"` : v;
-      });
-      csvLines.push(vals.join(','));
-    }
-    const csv = csvLines.join('\n');
-
-    return json({ ok: true, rows: allRows.length, csv });
-  } catch(err) {
-    return json({ error: 'CSV extraction error: ' + err.message }, 500);
-  }
-}
-
-// ── Lens Synthesis ────────────────────────────────────────────
-// Reads ALL files in a collection in full, generates role-specific synthesis.
-// Stored in KV under compliance:dept:collection:lens
-async function handleComplianceSynthesize(request, env) {
-  try {
-    const { dept, collection, lens, reanalyze = false, model } = await request.json();
-    if (!dept || !collection || !lens) return json({ error: 'dept, collection, lens required' }, 400);
-    if (!COMPLIANCE_LENSES[lens]) return json({ error: 'Unknown lens: ' + lens }, 400);
-
-    const apiKey = (await env.CACI_KV.get('config:ANTHROPIC_API_KEY')) || env.ANTHROPIC_API_KEY;
-    // Note: apiKey may be empty for non-Claude models — callLLM handles routing
-
-    const synthKey = `compliance:${dept}:${collection}:${lens}`;
-    const metaKey  = `compliance:${dept}:${collection}:meta`;
-
-    // Skip if already synthesized and not forced
-    if (!reanalyze) {
-      const existing = await env.CACI_KV.get(synthKey, 'json');
-      if (existing?.synthesis) {
-        return json({ ok: true, cached: true, lens, chars: existing.synthesis.length });
-      }
-    }
-
-    // Load all files in collection
-    const colFiles = await env.CACI_KV.get(`col:${dept}:${collection}`, 'json') || [];
-    if (!colFiles.length) return json({ error: 'No files in collection' }, 400);
-
-    // Build full text from all files (load chunks)
-    let fullText = '';
-    let totalChars = 0;
-    const MAX_CHARS = 80000; // ~60k tokens — safe for Sonnet
-
-    for (const f of colFiles) {
-      if (totalChars >= MAX_CHARS) break;
-      const fileData = await env.CACI_KV.get(`file:${f.id}`, 'json');
-      if (!fileData?.chunks) continue;
-      // Skip companion index CSVs — they're derived, not source
-      if (f.name.endsWith('_INDEX.csv')) continue;
-      const fileText = fileData.chunks.join('\n\n');
-      const remaining = MAX_CHARS - totalChars;
-      const slice = fileText.length > remaining ? fileText.slice(0, remaining) : fileText;
-      fullText += `\n\n=== ${f.name} ===\n${slice}`;
-      totalChars += slice.length;
-    }
-
-    if (!fullText.trim()) return json({ error: 'No readable content in collection' }, 400);
-
-    const lensLabel = COMPLIANCE_LENSES[lens];
-    const prompt = `You are building a comprehensive compliance knowledge base for cannabis dispensary operations.
-
-ROLE LENS: ${lensLabel}
-COLLECTION: ${collection}
-
-Read the following regulation documents in full. Extract and synthesize EVERYTHING that a ${lensLabel} would need to know to do their job in full compliance with state law.
-
-Your synthesis must:
-- Cover EVERY relevant rule, requirement, prohibition, threshold, deadline, and procedure
-- Resolve cross-references — if section 4 references section 2, include the resolved meaning
-- Use plain English — no legal jargon unless the term itself is what matters
-- Be organized by topic, not by document section
-- Include specific numbers, thresholds, timeframes — never vague ("within X days" not "within a reasonable time")
-- Flag anything ambiguous or that requires legal interpretation
-- If in doubt whether something applies to this role — INCLUDE IT
-
-Structure your response with clear topic headers. Be exhaustive — a missed requirement is worse than extra detail.
-
-REGULATION DOCUMENTS:
-${fullText}`;
-
-    let synthesis = '';
-    try {
-      synthesis = await callLLM({
-        model: model || 'claude',
-        system: 'You are a cannabis regulatory compliance expert. Be exhaustive and precise.',
-        messages: [{ role: 'user', content: prompt }],
-        maxTokens: 6000,
-        env,
-        apiKey,
-      });
-    } catch(e) { return json({ error: 'Synthesis error: ' + e.message }, 500); }
-
-    if (!synthesis) return json({ error: 'Empty synthesis returned' }, 500);
-
-    // Store synthesis
-    await env.CACI_KV.put(synthKey, JSON.stringify({
-      lens, lensLabel, collection, dept,
-      synthesis,
-      chars: synthesis.length,
-      sourceFiles: colFiles.filter(f => !f.name.endsWith('_INDEX.csv')).map(f => f.name),
-      createdAt: new Date().toISOString(),
-    }), { expirationTtl: 60 * 60 * 24 * 365 });
-
-    // Update collection meta
-    const meta = await env.CACI_KV.get(metaKey, 'json') || { lenses: {} };
-    meta.lenses[lens] = { label: lensLabel, chars: synthesis.length, createdAt: new Date().toISOString() };
-    meta.lastUpdated = new Date().toISOString();
-    await env.CACI_KV.put(metaKey, JSON.stringify(meta));
-
-    return json({ ok: true, lens, lensLabel, chars: synthesis.length, sourceFiles: colFiles.length });
-  } catch(err) {
-    return json({ error: 'Synthesize error: ' + err.message }, 500);
-  }
-}
-
-// ── Get Synthesis Status ──────────────────────────────────────
-async function handleComplianceSynthesisGet(url, env) {
-  try {
-    const dept       = url.searchParams.get('dept') || 'global';
-    const collection = url.searchParams.get('collection');
-    const lens       = url.searchParams.get('lens');
-    if (!collection) return json({ error: 'collection required' }, 400);
-
-    const metaKey = `compliance:${dept}:${collection}:meta`;
-    const meta    = await env.CACI_KV.get(metaKey, 'json') || { lenses: {} };
-
-    if (lens) {
-      const synthKey = `compliance:${dept}:${collection}:${lens}`;
-      const synth    = await env.CACI_KV.get(synthKey, 'json');
-      return json({ ok: true, lens, exists: !!synth, meta: synth ? { chars: synth.chars, createdAt: synth.createdAt, sourceFiles: synth.sourceFiles } : null });
-    }
-
-    // Return status for all lenses
-    const status = {};
-    for (const l of Object.keys(COMPLIANCE_LENSES)) {
-      const synthKey = `compliance:${dept}:${collection}:${l}`;
-      const synth    = await env.CACI_KV.get(synthKey, 'json');
-      status[l] = { label: COMPLIANCE_LENSES[l], exists: !!synth, chars: synth?.chars || 0, createdAt: synth?.createdAt || null };
-    }
-
-    return json({ ok: true, collection, dept, lenses: status, meta });
-  } catch(err) {
-    return json({ error: err.message }, 500);
-  }
-}
-
-// ── Delete Synthesis ──────────────────────────────────────────
-async function handleComplianceSynthesisDelete(request, env) {
-  try {
-    const { dept, collection, lens } = await request.json();
-    if (!dept || !collection) return json({ error: 'dept and collection required' }, 400);
-
-    if (lens) {
-      await env.CACI_KV.delete(`compliance:${dept}:${collection}:${lens}`);
-    } else {
-      // Delete all lenses for this collection
-      for (const l of Object.keys(COMPLIANCE_LENSES)) {
-        await env.CACI_KV.delete(`compliance:${dept}:${collection}:${l}`);
-      }
-      await env.CACI_KV.delete(`compliance:${dept}:${collection}:meta`);
-    }
-    return json({ ok: true });
-  } catch(err) {
-    return json({ error: err.message }, 500);
-  }
-}
-
-// ── Full Document Read Mode ───────────────────────────────────
-// Loads ALL file text into context — no chunking, no retrieval.
-// Returns the assembled full text for injection into chat.
-async function loadFullDocumentText(dept, collection, env) {
-  const colFiles = await env.CACI_KV.get(`col:${dept}:${collection}`, 'json') || [];
-  let fullText = '';
-  let totalChars = 0;
-  const MAX_CHARS = 90000;
-  const loadedFiles = [];
-
-  for (const f of colFiles) {
-    if (totalChars >= MAX_CHARS) break;
-    if (f.name.endsWith('_INDEX.csv')) continue; // skip derived files
-    const fileData = await env.CACI_KV.get(`file:${f.id}`, 'json');
-    if (!fileData?.chunks) continue;
-    const fileText = fileData.chunks.join('\n\n');
-    const remaining = MAX_CHARS - totalChars;
-    const slice = fileText.length > remaining ? fileText.slice(0, remaining) + '\n[...truncated]' : fileText;
-    fullText += `\n\n=== ${f.name} ===\n${slice}`;
-    totalChars += slice.length;
-    loadedFiles.push(f.name);
-  }
-
-  return { fullText: fullText.trim(), totalChars, loadedFiles };
-}
-
-async function handleComplianceFullRead(request, env) {
-  try {
-    const { dept, collection } = await request.json();
-    const { fullText, totalChars, loadedFiles } = await loadFullDocumentText(dept, collection, env);
-    return json({ ok: true, chars: totalChars, files: loadedFiles, preview: fullText.slice(0, 200) });
-  } catch(err) {
-    return json({ error: err.message }, 500);
-  }
-}
-
-// ── Compliance Chat Mode ──────────────────────────────────────
-// Called from handleChat when complianceMode=true.
-// Priority: synthesis → CSV index chunks → full doc (if requested)
-async function handleComplianceChatMode({ message, dept, collection, model, history, lens, fullDoc, env, apiKey, intent }) {
-  try {
-    // Load CSV index chunks for precise section lookups (always)
-    const colFiles = await env.CACI_KV.get(`col:${dept}:${collection}`, 'json') || [];
-    const indexFiles = colFiles.filter(f => f.name.endsWith('_INDEX.csv'));
-    const keywords = extractKeywords(message);
-    let indexChunks = '';
-
-    for (const f of indexFiles) {
-      const fileData = await env.CACI_KV.get(`file:${f.id}`, 'json');
-      if (!fileData?.chunks) continue;
-      const scored = fileData.chunks
-        .map(c => ({ chunk: c, score: scoreChunk(c, keywords) }))
-        .filter(c => c.score > 0)
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 15)
-        .map(c => c.chunk);
-      if (scored.length) indexChunks += scored.join('\n\n---\n\n');
-    }
-
-    let systemData = '';
-    let sourceMode = '';
-
-    if (fullDoc) {
-      // Full document mode — load everything
-      const { fullText, totalChars, loadedFiles } = await loadFullDocumentText(dept, collection, env);
-      systemData = `FULL REGULATION TEXT (complete — nothing omitted except files over size limit):
-Files loaded: ${loadedFiles.join(', ')}
-Total: ${totalChars.toLocaleString()} characters
-
-${fullText}`;
-      sourceMode = 'full-document';
-    } else if (lens) {
-      // Synthesis mode — load stored synthesis for this lens
-      const synthKey = `compliance:${dept}:${collection}:${lens}`;
-      const synth    = await env.CACI_KV.get(synthKey, 'json');
-
-      if (synth?.synthesis) {
-        systemData = `COMPLIANCE SYNTHESIS — ${synth.lensLabel.toUpperCase()}
-This synthesis was generated by reading the complete regulation documents and extracting everything relevant to a ${synth.lensLabel}. It is exhaustive for this role.
-Generated: ${synth.createdAt} | Source files: ${synth.sourceFiles?.join(', ') || 'unknown'}
-
-${synth.synthesis}`;
-        sourceMode = 'synthesis:' + lens;
-      } else {
-        // No synthesis yet — fall back to full doc
-        const { fullText, loadedFiles } = await loadFullDocumentText(dept, collection, env);
-        systemData = `FULL REGULATION TEXT (synthesis not yet generated — reading full documents):
-Files: ${loadedFiles.join(', ')}
-
-${fullText}`;
-        sourceMode = 'full-document-fallback';
-      }
-    } else {
-      // No lens, no full doc — just use index chunks
-      sourceMode = 'index-only';
-    }
-
-    // Append index chunks as supporting reference
-    if (indexChunks) {
-      systemData += `\n\nSUPPORTING INDEX — specific rules matching this query:\n${indexChunks}`;
-    }
-
-    const lensLabel = lens ? COMPLIANCE_LENSES[lens] : 'compliance professional';
-    const system = `You are Caci — the internal AI intelligence assistant for Jushi Holdings, cannabis division.
-
-You are in COMPLIANCE MODE answering a question for a ${lensLabel}.
-
-CRITICAL COMPLIANCE INSTRUCTIONS:
-- You have been given ${fullDoc ? 'the COMPLETE text of all regulation documents' : lens ? 'a COMPLETE synthesis of regulations for this role' : 'indexed regulation rules'} for the "${collection}" collection
-- Answer with full confidence from this material
-- If the answer is in the provided text, state it clearly and cite the section
-- If something is NOT covered in the provided material, say so explicitly — do not guess
-- For anything with legal or operational consequences, quote the exact requirement
-- Err on the side of inclusion — if something might apply, mention it
-- Never soften a hard regulatory requirement
-
-Your personality: sharp, warm, direct. You work in cannabis, you know compliance is stressful, and you take accuracy seriously.
-
-${systemData || 'No regulation data available for this collection. Ask the user to upload regulation documents.'}`;
-
-    const responseText = await callLLM({
-      model: model || 'claude',
-      system,
-      messages: [...history.slice(-10).map(h => ({ role: h.role, content: h.content })), { role: 'user', content: message }],
-      maxTokens: 4000,
-      env,
-      apiKey,
-    });
-
-    return json({
-      ok: true,
-      response: responseText,
-      sources: indexFiles.map(f => f.name),
-      scope: 'compliance',
-      complianceMode: true,
-      sourceMode,
-      model: model || 'claude',
-    });
-  } catch(err) {
-    return json({ error: 'Compliance chat error: ' + err.message }, 500);
   }
 }
 
