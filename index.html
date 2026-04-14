@@ -5209,12 +5209,17 @@ async function handleFiles(fileList, colName, meta = {}) {
       if (meta.chunkSize) fd.append('chunkSize', String(meta.chunkSize));
       const res = await apiFetch('/upload', { method: 'POST', body: fd });
       const d   = await res.json();
+      console.log('[CACI UPLOAD] response:', d);
       if (d.ok) {
         addLog(log, `\u2713 Stored \u2014 ${d.chunks} segments`);
+        console.log(`[CACI STORAGE] ✅ File stored | id: ${d.id} | chunks: ${d.chunks} | collection: ${colName}`);
         // Queue AI classification (non-blocking, runs after upload completes)
         queueAiClassify(d.id, f.name, colName, text);
       }
-      else      addLog(log, `\u2717 ${d.error}`);
+      else {
+        console.warn('[CACI UPLOAD] ❌ Error:', d.error);
+        addLog(log, `\u2717 ${d.error}`);
+      }
     } catch(e) { addLog(log, '\u2717 ' + e.message); }
   }
 
@@ -5971,25 +5976,32 @@ function updateAiClassifyCostLabel() {
 
 // Called after each successful upload — queues file for AI classification
 function queueAiClassify(fileId, fileName, collection, extractedText) {
-  if (!_aiClassifyEnabled) return;
+  if (!_aiClassifyEnabled) {
+    console.log('[CACI CLASSIFY] ⏭ Skipped — AI classify toggle is OFF');
+    return;
+  }
 
   const ext = (fileName || '').split('.').pop().toLowerCase();
-  // Include tabular formats now that we extract structured text
-  if (!['pdf','docx','doc','xlsx','xls','csv'].includes(ext)) return;
+  if (!['pdf','docx','doc','xlsx','xls','csv'].includes(ext)) {
+    console.log(`[CACI CLASSIFY] ⏭ Skipped — file type ".${ext}" not eligible`);
+    return;
+  }
 
-  // Need meaningful text
-  if (!extractedText || extractedText.length < 100) return;
+  if (!extractedText || extractedText.length < 100) {
+    console.log(`[CACI CLASSIFY] ⏭ Skipped — extracted text too short (${extractedText?.length ?? 0} chars)`);
+    return;
+  }
 
   // For tabular files: use FILE SUMMARY block + first data rows — more informative than raw row dump
   let sample = extractedText;
   if (['xlsx','xls','csv'].includes(ext)) {
-    // Summary block is always first — grab it plus the first rows chunk
     const parts = extractedText.split('\n\n---\n\n');
     const summary = parts[0] || '';
     const firstRows = parts[1] ? parts[1].split('\n').slice(0, 25).join('\n') : '';
     sample = (summary + '\n\n' + firstRows).trim();
   }
 
+  console.log(`[CACI CLASSIFY] 📥 Queued: ${fileName} | id: ${fileId} | sample length: ${sample.length} chars`);
   _aiClassifyQueue.push({ fileId, fileName, collection, text: sample });
   if (!_aiClassifyRunning) processAiClassifyQueue();
 }
@@ -6007,56 +6019,66 @@ async function processAiClassifyQueue() {
 
 async function runAiClassify({ fileId, fileName, collection, text }) {
   try {
+    console.log(`[CACI CLASSIFY] 🚀 Starting classification: ${fileName}`);
+
     // If this is a brand-new collection, wait 2s for KV to register it
     if (_newCollections.has(collection)) {
+      console.log(`[CACI CLASSIFY] ⏳ New collection "${collection}" — waiting 2s for KV registration`);
       await new Promise(r => setTimeout(r, 2000));
     }
 
-    // For tabular files, text is already the pre-built summary+header sample from queueAiClassify.
-    // For PDFs/DOCX, take first 2500 chars — enough for title, dates, headings.
     const sample = text.length <= 2500 ? text : text.slice(0, 2500);
 
-    // Get existing collections for collection suggestion
     const colRes  = await apiFetch('/collections?dept=' + dept);
     const colList = await colRes.json();
     const colNames = colList.map(c => c.name).join(', ');
 
-    // Route through worker to keep API key secure
+    console.log(`[CACI CLASSIFY] 📤 Sending to /ai-classify | sample: ${sample.length} chars | existing collections: ${colNames || '(none)'}`);
+
     const proxyRes = await apiFetch('/ai-classify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fileName, collection, sample, colNames }),
     });
 
-    if (!proxyRes.ok) return;
+    console.log(`[CACI CLASSIFY] 📨 /ai-classify HTTP status: ${proxyRes.status}`);
+    if (!proxyRes.ok) {
+      console.warn('[CACI CLASSIFY] ❌ /ai-classify returned non-OK status');
+      return;
+    }
     const proxyData = await proxyRes.json();
-    if (!proxyData.ok || !proxyData.result) return;
+    console.log('[CACI CLASSIFY] 📦 Raw response:', proxyData);
+
+    if (!proxyData.ok || !proxyData.result) {
+      console.warn('[CACI CLASSIFY] ❌ Response missing ok/result:', proxyData);
+      return;
+    }
 
     let suggested;
     try {
       const clean = proxyData.result.replace(/```json|```/g, '').trim();
       suggested = JSON.parse(clean);
-    } catch { return; }
+      console.log('[CACI CLASSIFY] ✅ Parsed suggestion:', suggested);
+    } catch(e) {
+      console.warn('[CACI CLASSIFY] ❌ Failed to parse JSON from result:', proxyData.result);
+      return;
+    }
 
-    // Skip low confidence results
-    if (suggested.confidence === 'low') return;
+    if (suggested.confidence === 'low') {
+      console.log(`[CACI CLASSIFY] ⏭ Low confidence — discarding suggestion for ${fileName}`);
+      return;
+    }
 
-    // Store result
-    _aiPendingResults.push({
-      fileId, fileName, collection,
-      suggested,
-      applied: false,
-    });
+    _aiPendingResults.push({ fileId, fileName, collection, suggested, applied: false });
+    console.log(`[CACI CLASSIFY] 🎯 Suggestion stored — will appear in review panel`);
 
-    // Mark file card with pending indicator
     const card = document.querySelector(`.fcard[data-id="${fileId}"]`);
     if (card) card.classList.add('ai-pending');
 
-    // Refresh review panel
     renderAiReviewPanel();
 
   } catch(e) {
-    console.warn('AI classify error for', fileName, ':', e.message);
+    console.error('[CACI CLASSIFY] 💥 Uncaught error for', fileName, ':', e.message, e);
   }
 }
 
