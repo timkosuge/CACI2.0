@@ -758,20 +758,50 @@ const _ALL_MONTH_KEYS = Object.keys(_MONTH_TO_NUM);
 // Parse date range from a query string.
 // Handles: "between X 2025 and Y 2026", "from X to Y", "X through Y"
 function parseDateRange(message) {
-  const pat = /(?:between|from)\s+(\w+)\s+(?:of\s+)?(\d{4})\s+(?:and|to|through)\s+(\w+)\s+(?:of\s+)?(\d{4})|(\w+)\s+(?:of\s+)?(\d{4})\s+through\s+(\w+)\s+(?:of\s+)?(\d{4})/i;
-  const m = message.match(pat);
-  if (!m) return { rangeStart: null, rangeEnd: null };
-  const [, m1, y1, m2, y2, m1b, y1b, m2b, y2b] = m;
-  const rm1 = (m1 || m1b || '').toLowerCase();
-  const ry1 = parseInt(y1 || y1b || '0');
-  const rm2 = (m2 || m2b || '').toLowerCase();
-  const ry2 = parseInt(y2 || y2b || '0');
-  if (_MONTH_TO_NUM[rm1] && _MONTH_TO_NUM[rm2]) {
-    return {
-      rangeStart: { m: _MONTH_TO_NUM[rm1], y: ry1 },
-      rangeEnd:   { m: _MONTH_TO_NUM[rm2], y: ry2 },
-    };
+  const msg = message.toLowerCase();
+
+  // ── Pattern 1: explicit range "from/between X YYYY and/to Y YYYY" ──
+  const rangePat = /(?:between|from)\s+(\w+)\s+(?:of\s+)?(\d{4})\s+(?:and|to|through)\s+(\w+)\s+(?:of\s+)?(\d{4})|(\w+)\s+(?:of\s+)?(\d{4})\s+through\s+(\w+)\s+(?:of\s+)?(\d{4})/i;
+  const rm = message.match(rangePat);
+  if (rm) {
+    const [, m1, y1, m2, y2, m1b, y1b, m2b, y2b] = rm;
+    const s1 = (m1 || m1b || '').toLowerCase();
+    const r1 = parseInt(y1 || y1b || '0');
+    const s2 = (m2 || m2b || '').toLowerCase();
+    const r2 = parseInt(y2 || y2b || '0');
+    if (_MONTH_TO_NUM[s1] && _MONTH_TO_NUM[s2]) {
+      return { rangeStart: { m: _MONTH_TO_NUM[s1], y: r1 }, rangeEnd: { m: _MONTH_TO_NUM[s2], y: r2 } };
+    }
   }
+
+  // ── Pattern 2: "Q1 2025" / "Q3 2024" ──
+  const qPat = /\bq([1-4])\s+(20\d{2})\b/i;
+  const qm = msg.match(qPat);
+  if (qm) {
+    const q = parseInt(qm[1]), y = parseInt(qm[2]);
+    const qStart = [0,1,4,7,10][q], qEnd = [0,3,6,9,12][q];
+    return { rangeStart: { m: qStart, y }, rangeEnd: { m: qEnd, y } };
+  }
+
+  // ── Pattern 3: "2024 vs 2025" / "compare 2024 and 2025" ──
+  const vsPat = /\b(20\d{2})\s+(?:vs\.?|versus|compared? to|and)\s+(20\d{2})\b/i;
+  const vsm = message.match(vsPat);
+  if (vsm) {
+    const y1 = parseInt(vsm[1]), y2 = parseInt(vsm[2]);
+    const [yMin, yMax] = y1 < y2 ? [y1, y2] : [y2, y1];
+    return { rangeStart: { m: 1, y: yMin }, rangeEnd: { m: 12, y: yMax } };
+  }
+
+  // ── Pattern 4: single "Month YYYY" — treat as that exact month ──
+  for (const mk of _ALL_MONTH_KEYS) {
+    const mPat = new RegExp('(?<![a-z])' + mk + '(?![a-z])\\s+(20\\d{2})', 'i');
+    const mm = message.match(mPat);
+    if (mm && _MONTH_TO_NUM[mk]) {
+      const y = parseInt(mm[1]);
+      return { rangeStart: { m: _MONTH_TO_NUM[mk], y }, rangeEnd: { m: _MONTH_TO_NUM[mk], y } };
+    }
+  }
+
   return { rangeStart: null, rangeEnd: null };
 }
 
@@ -1023,29 +1053,100 @@ async function buildContext({ message, dept, collection, fileId, scope, env }) {
       const f = await env.CACI_KV.get(`file:${fileId}`, 'json');
       if (f) filesToSearch = [f];
     } else {
-      const reg = await env.CACI_KV.get(`colreg:${dept}`, 'json') || [];
+      // ── Phase 1: score on lightweight index records (no chunks loaded yet) ──
+      const deptIdx   = await env.CACI_KV.get(`index:${dept}`, 'json') || [];
+      const globalIdx = dept !== 'global' ? (await env.CACI_KV.get('index:global', 'json') || []) : [] ;
+      const allMeta   = [...deptIdx, ...globalIdx].filter(f => !f.isContext);
+
+      // Score each index record without loading chunks
+      const { rangeStart: preRange, rangeEnd: preRangeEnd } = parseDateRange(message);
+      const preYears  = new Set((message.match(/20\d\d/g) || []));
+      const msgLower  = message.toLowerCase();
       const stopWords = new Set(['the','and','for','all','from','with','that','this','are','was','were','has','have','report','reports']);
-      const msgLower = message.toLowerCase();
-      const matchedCol = reg.find(c => {
-        if (msgLower.includes(c.name.toLowerCase())) return true;
-        if (c.category && msgLower.includes(c.category.toLowerCase())) return true;
+
+      // Collection relevance scoring: score ALL collections, pick top matches
+      const reg = await env.CACI_KV.get(`colreg:${dept}`, 'json') || [];
+      const colScores = reg.map(c => {
+        let cs = 0;
+        if (msgLower.includes(c.name.toLowerCase())) cs += 20;
+        if (c.category && msgLower.includes(c.category.toLowerCase())) cs += 8;
+        if (c.description && keywords.some(kw => c.description.toLowerCase().includes(kw))) cs += 5;
         const words = c.name.toLowerCase().split(/[\s&,\/]+/).filter(w => w.length >= 4 && !stopWords.has(w));
-        return words.some(w => msgLower.includes(w));
-      });
-      if (matchedCol) {
-        const colFiles = await env.CACI_KV.get(`col:${dept}:${matchedCol.name}`, 'json') || [];
-        const colFull = (await Promise.all(colFiles.map(f => env.CACI_KV.get(`file:${f.id}`, 'json')))).filter(Boolean);
-        const deptIdx = await env.CACI_KV.get(`index:${dept}`, 'json') || [];
-        const colIds = new Set(colFiles.map(f => f.id));
-        const otherMeta = deptIdx.filter(f => !colIds.has(f.id)).slice(0, 20);
-        const otherFull = (await Promise.all(otherMeta.map(f => env.CACI_KV.get(`file:${f.id}`, 'json')))).filter(Boolean);
-        filesToSearch = [...colFull, ...otherFull];
+        cs += words.filter(w => msgLower.includes(w)).length * 3;
+        return { name: c.name, score: cs };
+      }).filter(c => c.score > 0).sort((a,b) => b.score - a.score);
+
+      // Determine which files to consider based on collection matches
+      let candidateMeta;
+      if (colScores.length > 0) {
+        // Pull files from top-scoring collections (up to 2 collections)
+        const topCols = colScores.slice(0, 2).map(c => c.name);
+        const colFileIds = new Set();
+        for (const colName of topCols) {
+          const cf = await env.CACI_KV.get(`col:${dept}:${colName}`, 'json') || [];
+          cf.forEach(f => colFileIds.add(f.id));
+        }
+        const colMeta  = allMeta.filter(f => colFileIds.has(f.id));
+        const otherMeta = allMeta.filter(f => !colFileIds.has(f.id)).slice(0, 15);
+        candidateMeta = [...colMeta, ...otherMeta];
       } else {
-        const deptIdx   = await env.CACI_KV.get(`index:${dept}`, 'json') || [];
-        const globalIdx = dept !== 'global' ? (await env.CACI_KV.get('index:global', 'json') || []) : [];
-        const allMeta   = [...deptIdx, ...globalIdx].slice(0, 40);
-        filesToSearch   = (await Promise.all(allMeta.map(f => env.CACI_KV.get(`file:${f.id}`, 'json')))).filter(Boolean);
+        candidateMeta = allMeta.slice(0, 40);
       }
+
+      // Score each candidate on date + keywords + categoryCols (no chunk load)
+      const scored = candidateMeta.map(f => {
+        const nameLower = (f.name || '').toLowerCase();
+        let score = 0;
+
+        // Date range
+        if (preRange && preRangeEnd) {
+          const { fileMonth, fileYear } = fileMonthYear(nameLower);
+          if (fileMonth && fileYear) {
+            const fv = fileYear * 100 + fileMonth;
+            if (fv >= preRange.y * 100 + preRange.m && fv <= preRangeEnd.y * 100 + preRangeEnd.m) score += 30;
+          }
+        }
+        // Year match
+        const matchedYears = [...preYears].filter(y => nameLower.includes(y));
+        if (matchedYears.length) {
+          const maxYear = Math.max(...matchedYears.map(Number));
+          score += 10 + (maxYear - 2020) * 3;
+        }
+        // Month match
+        for (const mk of _ALL_MONTH_KEYS) {
+          const re = new RegExp('(?<![a-z])' + mk + '(?![a-z])');
+          if (re.test(msgLower) && re.test(nameLower)) { score += 8; break; }
+        }
+        // Keyword in filename
+        keywords.forEach(kw => { if (nameLower.includes(kw)) score += 2; });
+        // categoryCols boost — free signal from index record
+        if (f.stats?.categoryCols) {
+          for (const vals of Object.values(f.stats.categoryCols)) {
+            for (const val of vals) {
+              const vl = val.toLowerCase();
+              if (keywords.some(kw => vl === kw || vl.includes(kw) || kw.includes(vl))) { score += 5; break; }
+            }
+          }
+        }
+        // Recency
+        const age = f.uploadedAt ? Date.now() - new Date(f.uploadedAt).getTime() : 0;
+        score += Math.max(0, 3 - Math.floor(age / (1000 * 60 * 60 * 24 * 30)));
+
+        return { ...f, _preScore: score };
+      }).sort((a,b) => b._preScore - a._preScore);
+
+      // Phase 2: load full records (with chunks) for top candidates only
+      const hasSignal = preYears.size > 0 || (preRange && preRangeEnd) || colScores.length > 0;
+      const loadLimit = hasSignal ? 10 : 15;
+      const topMeta   = scored.slice(0, loadLimit);
+
+      filesToSearch = (await Promise.all(
+        topMeta.map(async f => {
+          const full = await env.CACI_KV.get(`file:${f.id}`, 'json');
+          if (full) full._preScore = f._preScore || 0;
+          return full;
+        })
+      )).filter(Boolean);
     }
 
     if (!filesToSearch.length) return { text: '', sources: [], statsContext: '', focusFile: null };
@@ -1071,36 +1172,10 @@ async function buildContext({ message, dept, collection, fileId, scope, env }) {
       }
     }
 
-    // Date range detection — same logic as buildContextTwoPass
-    const { rangeStart: ctxRangeStart, rangeEnd: ctxRangeEnd } = parseDateRange(message);
-    const yearMatches = message.match(/20\d\d/g) || [];
-    const queryYears = new Set(yearMatches);
-
-    // Score each file by date relevance, then propagate into chunk scores
-    const fileScoreMap = new Map();
-    for (const fileData of filesToSearch) {
-      const nameLower = (fileData.name || '').toLowerCase();
-      let fScore = 0;
-      // Range match
-      if (ctxRangeStart && ctxRangeEnd) {
-        const { fileMonth, fileYear } = fileMonthYear(nameLower);
-        if (fileMonth && fileYear) {
-          const fileVal  = fileYear * 100 + fileMonth;
-          const startVal = ctxRangeStart.y * 100 + ctxRangeStart.m;
-          const endVal   = ctxRangeEnd.y   * 100 + ctxRangeEnd.m;
-          if (fileVal >= startVal && fileVal <= endVal) fScore += 30;
-        }
-      }
-      // Year match with larger multiplier
-      const matchedYears = queryYears.size > 0 ? [...queryYears].filter(y => nameLower.includes(y)) : [];
-      if (matchedYears.length > 0) {
-        const maxYear = Math.max(...matchedYears.map(Number));
-        fScore += 10 + (maxYear - 2020) * 3;
-      }
-      const isXlsx = nameLower.endsWith('.xlsx') || nameLower.endsWith('.xls');
-      if (isXlsx) fScore -= 1;
-      fileScoreMap.set(fileData.name, fScore);
-    }
+    // File scores already computed during pre-scoring phase — reuse them
+    const fileScoreMap = new Map(
+      filesToSearch.map(f => [f.name, f._preScore || 0])
+    );
 
     // Guaranteed: FILE SUMMARY chunk from each file (same pattern as buildContextTwoPass)
     const summaryChunks = [];
@@ -1254,7 +1329,7 @@ Document filename: "${fileName}"
 Current collection: "${collection}"
 Available collections: ${colNames || 'none yet'}
 
-First 2500 characters of document text:
+Document sample (may include FILE SUMMARY with stats for tabular files, or opening text for PDFs/DOCX):
 ---
 ${sample}
 ---
