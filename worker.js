@@ -158,7 +158,11 @@ async function handleUpload(request, env) {
     const uploadedAt = new Date().toISOString();
     // Allow caller to specify chunk size — smaller = more granular retrieval (good for legal/regulatory docs)
     const chunkSize  = parseInt(formData.get('chunkSize') || '1500', 10) || 1500;
-    const cleanText  = text.replace(/\s+/g, ' ').trim();
+    // Preserve newlines for tabular/structured text; collapse whitespace only for prose
+    const isTabular = text.includes('\nRow 1 —') || text.startsWith('FILE SUMMARY') || text.includes('\n\n---\n\n');
+    const cleanText  = isTabular
+      ? text.replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim()
+      : text.replace(/\s+/g, ' ').trim();
     const chunks     = chunkText(cleanText, chunkSize);
 
     if (file && env.CACI_R2) {
@@ -866,6 +870,20 @@ async function buildContextTwoPass({ message, dept, collection, env }) {
       const age = f.uploadedAt ? Date.now() - new Date(f.uploadedAt).getTime() : 0;
       score += Math.max(0, 3 - Math.floor(age / (1000 * 60 * 60 * 24 * 30)));
 
+      // ── 9. categoryCols match — boost if query mentions a known value ──
+      // Uses data already on the index record (no extra KV load)
+      if (f.stats?.categoryCols) {
+        for (const vals of Object.values(f.stats.categoryCols)) {
+          for (const val of vals) {
+            const vLower = val.toLowerCase();
+            if (keywords.some(kw => vLower === kw || vLower.includes(kw) || kw.includes(vLower))) {
+              score += 5;
+              break; // one boost per column
+            }
+          }
+        }
+      }
+
       return { ...f, _score: score };
     });
 
@@ -917,44 +935,63 @@ async function buildContextTwoPass({ message, dept, collection, env }) {
       }
     }
 
-    // Get best chunks — carry file-level _score as boost so range-matched files dominate top slots
-    // When few files in collection, give more chunks per file for deeper coverage
+    // Get best chunks — dynamic allocation: top-scoring files get more chunks
     const keywords2 = extractKeywords(message);
-    const chunksPerFile = fullFiles.length <= 2 ? 12 : fullFiles.length <= 5 ? 6 : 3;
-    const totalChunkLimit = fullFiles.length <= 2 ? 20 : fullFiles.length <= 5 ? 20 : 15;
+    const TOTAL_CHUNK_BUDGET = fullFiles.length <= 2 ? 22 : fullFiles.length <= 5 ? 22 : 18;
+    const MIN_CHUNKS_PER_FILE = 1;  // every selected file gets at least one chunk
+    const MAX_CHUNKS_PER_FILE = fullFiles.length <= 2 ? 14 : fullFiles.length <= 4 ? 8 : 5;
 
-    // Guaranteed slots: FILE SUMMARY chunk (chunk[0]) from each file that has one.
-    // These are always included and don't compete in the scoring race.
+    // Guaranteed slots: FILE SUMMARY chunk from each file
     const guaranteedChunks = [];
     const seenSummaryFiles = new Set();
     for (const fileData of fullFiles) {
-      if (!fileData.chunks || !fileData.chunks.length) continue;
+      if (!fileData.chunks?.length || seenSummaryFiles.has(fileData.name)) continue;
       const first = fileData.chunks[0];
-      if ((first.toLowerCase().startsWith('file summary') || first.toLowerCase().startsWith('sheet:')) && !seenSummaryFiles.has(fileData.name)) {
+      if (first.toLowerCase().startsWith('file summary') || first.toLowerCase().startsWith('sheet:')) {
         guaranteedChunks.push({ chunk: first, score: 999, filename: fileData.name, collection: fileData.collection, meta: fileData.meta || {}, _guaranteed: true });
         seenSummaryFiles.add(fileData.name);
       }
     }
 
+    // Score all non-summary chunks across all files
     const allChunks = [];
     for (const fileData of fullFiles) {
       if (!fileData.chunks) continue;
       const fileBoost = fileData._score || 0;
-      const fileChunks = fileData.chunks.map(chunk => ({
-        chunk,
-        score: scoreChunk(chunk, keywords2) + fileBoost,
-        filename: fileData.name, collection: fileData.collection, meta: fileData.meta || {}
-      })).filter(c => c.score >= 0); // score=-1 means summary chunk — excluded from race
-      fileChunks.sort((a, b) => b.score - a.score);
-      allChunks.push(...fileChunks.slice(0, chunksPerFile));
+      for (const chunk of fileData.chunks) {
+        const s = scoreChunk(chunk, keywords2);
+        if (s >= 0) allChunks.push({ chunk, score: s + fileBoost, filename: fileData.name, collection: fileData.collection, meta: fileData.meta || {} });
+      }
+    }
+    allChunks.sort((a, b) => b.score - a.score);
+
+    // Distribute budget: give each file a minimum, then award remaining slots to top scorers
+    const fileChunkCount = new Map(fullFiles.map(f => [f.name, MIN_CHUNKS_PER_FILE]));
+    let remaining = TOTAL_CHUNK_BUDGET - guaranteedChunks.length - (fullFiles.length * MIN_CHUNKS_PER_FILE);
+    for (const c of allChunks) {
+      if (remaining <= 0) break;
+      const cur = fileChunkCount.get(c.filename) || 0;
+      if (cur < MAX_CHUNKS_PER_FILE) {
+        fileChunkCount.set(c.filename, cur + 1);
+        remaining--;
+      }
     }
 
-    allChunks.sort((a, b) => b.score - a.score);
-    // Merge: guaranteed summaries first, then scored chunks (deduplicate by content)
+    // Select chunks respecting per-file budgets
     const guaranteedTexts = new Set(guaranteedChunks.map(c => c.chunk));
-    const scoredOnly = allChunks.filter(c => !guaranteedTexts.has(c.chunk));
-    const remaining = totalChunkLimit - guaranteedChunks.length;
-    const top = [...guaranteedChunks, ...scoredOnly.slice(0, Math.max(remaining, 0))];
+    const fileSeen = new Map(fullFiles.map(f => [f.name, 0]));
+    const scoredOnly = [];
+    for (const c of allChunks) {
+      if (guaranteedTexts.has(c.chunk)) continue;
+      const seen = fileSeen.get(c.filename) || 0;
+      const budget = fileChunkCount.get(c.filename) || MIN_CHUNKS_PER_FILE;
+      if (seen < budget) {
+        scoredOnly.push(c);
+        fileSeen.set(c.filename, seen + 1);
+      }
+    }
+
+    const top = [...guaranteedChunks, ...scoredOnly];
 
     if (!top.length) return { text: '', sources: [], statsContext: statsLines.join('\n'), focusFile: fullFiles[0]?.name };
 
@@ -1296,12 +1333,54 @@ async function handleAdminGet(env) {
 // ── Helpers ───────────────────────────────────────────────────
 function chunkText(text, size = 1500) {
   if (!text || text.length === 0) return [];
-  const chunks = [];
-  for (let i = 0; i < text.length; i += size - 200) {
-    chunks.push(text.slice(i, i + size));
-    if (i + size >= text.length) break;
+
+  // Detect tabular format — preserve it as-is (already chunked by frontend)
+  // These arrive with "---" separators between row batches
+  if (text.includes('\n---\n') || text.includes('\nRow 1 —') || text.startsWith('FILE SUMMARY')) {
+    const parts = text.split(/\n\n---\n\n/);
+    // Re-merge small parts to avoid tiny chunks; split oversized ones
+    const out = [];
+    let buf = '';
+    for (const part of parts) {
+      if (buf.length + part.length + 4 <= size * 1.2) {
+        buf = buf ? buf + '\n\n---\n\n' + part : part;
+      } else {
+        if (buf) out.push(buf);
+        buf = part;
+      }
+    }
+    if (buf) out.push(buf);
+    return out.length ? out : [text];
   }
-  return chunks;
+
+  // For prose/PDF/DOCX: chunk on paragraph or sentence boundaries
+  // Never slice mid-sentence — look back up to 300 chars for a good break
+  const chunks = [];
+  let start = 0;
+  while (start < text.length) {
+    let end = Math.min(start + size, text.length);
+    if (end < text.length) {
+      // Try to break at paragraph boundary first
+      const paraBreak = text.lastIndexOf('\n\n', end);
+      if (paraBreak > start + size * 0.5) {
+        end = paraBreak;
+      } else {
+        // Fall back to sentence boundary
+        const sentBreak = Math.max(
+          text.lastIndexOf('. ', end),
+          text.lastIndexOf('.\n', end),
+          text.lastIndexOf('? ', end),
+          text.lastIndexOf('! ', end)
+        );
+        if (sentBreak > start + size * 0.5) end = sentBreak + 1;
+      }
+    }
+    chunks.push(text.slice(start, end).trim());
+    // Overlap: back up 150 chars to preserve cross-boundary context
+    start = Math.max(start + 1, end - 150);
+    if (start >= text.length) break;
+  }
+  return chunks.filter(c => c.length > 50);
 }
 
 function extractKeywords(query) {
@@ -1320,24 +1399,67 @@ function escapeRegex(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+// Cannabis/retail domain synonym map — expands queries without adding noise
+// Keys are query terms; values are additional terms to score against
+const DOMAIN_SYNONYMS = {
+  'revenue':    ['sales', 'gross'],
+  'sales':      ['revenue', 'gross'],
+  'profit':     ['margin', 'net', 'revenue'],
+  'margin':     ['profit', 'net'],
+  'inventory':  ['stock', 'units', 'qty', 'quantity', 'on hand'],
+  'shrink':     ['loss', 'shrinkage', 'variance', 'adjustment'],
+  'flower':     ['bud', 'herb', 'cannabis flower'],
+  'vape':       ['vapes', 'vaporizer', 'cartridge', 'cart', 'pod'],
+  'concentrate':['concentrates', 'wax', 'shatter', 'resin', 'rosin', 'badder', 'diamonds'],
+  'edible':     ['edibles', 'gummy', 'gummies', 'chocolate', 'capsule'],
+  'preroll':    ['pre-roll', 'pre roll', 'joint', 'infused'],
+  'compliance': ['regulatory', 'regulation', 'audit', 'metrc'],
+  'return':     ['returns', 'refund', 'credit', 'complaint'],
+  'transfer':   ['transfers', 'manifest', 'transport'],
+  'dispensary': ['store', 'retail', 'location', 'site'],
+  'wholesale':  ['b2b', 'leaftrade', 'bulk'],
+  'patient':    ['customer', 'member', 'consumer'],
+  'adult use':  ['recreational', 'adult-use', 'rec'],
+  'medical':    ['mmj', 'patient', 'caregiver'],
+};
+
+function expandKeywords(keywords) {
+  const expanded = new Set(keywords);
+  for (const kw of keywords) {
+    const syns = DOMAIN_SYNONYMS[kw];
+    if (syns) syns.forEach(s => expanded.add(s));
+    // Also match plurals/stems simply: "vape" matches "vapes" etc.
+    if (kw.endsWith('s')) expanded.add(kw.slice(0, -1));
+    else expanded.add(kw + 's');
+  }
+  return [...expanded];
+}
+
 function scoreChunk(chunk, keywords) {
   const lower = chunk.toLowerCase();
-  // Skip pure summary blocks — they match everything and dilute the race
-  // (Summary chunks are guaranteed-included separately in buildContextTwoPass)
+  // Summary blocks are guaranteed-included separately — exclude from race
   if (lower.startsWith('file summary\n') || lower.startsWith('file summary\r\n')) return -1;
-  let score = 0;
-  for (const kw of keywords) {
-    // Use word-boundary-aware matching with regex escape
+
+  const expanded = expandKeywords(keywords);
+  // Normalize by chunk length so short precise chunks aren't penalized vs long ones
+  const lengthNorm = Math.sqrt(Math.max(lower.length, 100) / 1000);
+
+  let raw = 0;
+  for (const kw of expanded) {
     const re = new RegExp('(?<![a-z0-9])' + escapeRegex(kw) + '(?![a-z0-9])', 'gi');
     const matches = lower.match(re);
     if (matches) {
-      // Column-value pattern gets double weight: "State: PA" is stronger than incidental "pa" match
-      const colValueRe = new RegExp('[a-z_ ]+:\s*' + escapeRegex(kw) + '\\b', 'gi');
+      // Column-value pattern gets 2x weight: "State: PA" >> incidental "pa"
+      const colValueRe = new RegExp('[a-z_ ]+:\s*' + escapeRegex(kw) + '\b', 'gi');
       const colMatches = lower.match(colValueRe);
-      score += matches.length + (colMatches ? colMatches.length : 0);
+      const termScore = matches.length + (colMatches ? colMatches.length : 0);
+      // Synonyms count at 0.6x weight so original keywords still dominate
+      const weight = keywords.includes(kw) ? 1.0 : 0.6;
+      raw += termScore * weight;
     }
   }
-  return score;
+  // Return normalized score — keeps short direct-answer chunks competitive with long ones
+  return raw / lengthNorm;
 }
 
 // ─────────────────────────────────────────────────────────────
