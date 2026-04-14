@@ -888,9 +888,15 @@ async function buildContextTwoPass({ message, dept, collection, env }) {
         const label = `${meta.reportName || f.name} [${meta.period || ''}]`.trim();
         statsLines.push(`\n### ${label}`);
         if (f.stats.rowCount) statsLines.push(`Rows: ${f.stats.rowCount}`);
+        if (f.stats.columns) statsLines.push(`Columns: ${f.stats.columns.join(', ')}`);
         if (f.stats.numeric) {
           for (const [col, s] of Object.entries(f.stats.numeric)) {
-            statsLines.push(`${col}: sum=${s.sum}, avg=${s.avg}, min=${s.min}, max=${s.max}`);
+            statsLines.push(`${col}: sum=${s.sum}, avg=${s.avg}, min=${s.min}, max=${s.max}, count=${s.count}`);
+          }
+        }
+        if (f.stats.categoryCols) {
+          for (const [col, vals] of Object.entries(f.stats.categoryCols)) {
+            statsLines.push(`${col} values: ${vals.map(v => v.includes(',') ? '"' + v + '"' : v).join(', ')}`);
           }
         }
       }
@@ -985,6 +991,11 @@ async function buildContext({ message, dept, collection, fileId, scope, env }) {
         if (f.stats.numeric) {
           for (const [col, s] of Object.entries(f.stats.numeric)) {
             statsLines.push(`${col}: sum=${s.sum}, avg=${s.avg}, min=${s.min}, max=${s.max}, count=${s.count}`);
+          }
+        }
+        if (f.stats.categoryCols) {
+          for (const [col, vals] of Object.entries(f.stats.categoryCols)) {
+            statsLines.push(`${col} values: ${vals.map(v => v.includes(',') ? '"' + v + '"' : v).join(', ')}`);
           }
         }
       }
