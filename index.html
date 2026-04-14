@@ -1173,7 +1173,97 @@ body::before {
   background: linear-gradient(180deg, var(--gold), transparent);
   opacity: 0.3;
 }
-/* ── Message action bar ─────────────────────────────────── */
+/* ── Markdown rendering in AI bubbles ───────────────────── */
+.msg.ai .msg-bubble h2 {
+  font-family: var(--f-display);
+  font-size: 13px; font-weight: 400;
+  letter-spacing: 0.08em;
+  color: var(--gold-metal-2);
+  text-transform: uppercase;
+  margin: 14px 0 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(212,168,50,0.15);
+}
+.msg.ai .msg-bubble h3 {
+  font-family: var(--f-mono);
+  font-size: 10px; font-weight: 500;
+  letter-spacing: 0.1em;
+  color: var(--smoke2);
+  text-transform: uppercase;
+  margin: 10px 0 4px;
+}
+.msg.ai .msg-bubble p { margin: 0 0 8px; }
+.msg.ai .msg-bubble p:last-child { margin-bottom: 0; }
+.msg.ai .msg-bubble ul, .msg.ai .msg-bubble ol {
+  margin: 4px 0 8px;
+  padding-left: 18px;
+}
+.msg.ai .msg-bubble li { margin-bottom: 3px; line-height: 1.6; }
+.msg.ai .msg-bubble strong { color: var(--smoke); font-weight: 500; }
+.msg.ai .msg-bubble em { color: var(--smoke2); font-style: italic; }
+.msg.ai .msg-bubble code {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  background: var(--ink4);
+  border: 1px solid rgba(212,168,50,0.12);
+  border-radius: 3px;
+  padding: 1px 5px;
+  color: var(--gold-lt);
+}
+.msg.ai .msg-bubble pre {
+  background: var(--ink4);
+  border: 1px solid rgba(212,168,50,0.12);
+  border-radius: 4px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  margin: 8px 0;
+  font-family: var(--f-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--smoke2);
+}
+.msg.ai .msg-bubble pre code {
+  background: none; border: none; padding: 0; color: inherit;
+}
+.msg.ai .msg-bubble table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0;
+  font-size: 12px;
+}
+.msg.ai .msg-bubble th {
+  font-family: var(--f-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gold-metal-2);
+  background: rgba(212,168,50,0.06);
+  padding: 6px 10px;
+  border: 1px solid rgba(212,168,50,0.14);
+  text-align: left;
+  font-weight: 500;
+}
+.msg.ai .msg-bubble td {
+  padding: 5px 10px;
+  border: 1px solid rgba(212,168,50,0.08);
+  color: var(--smoke2);
+  vertical-align: top;
+}
+.msg.ai .msg-bubble tr:nth-child(even) td {
+  background: rgba(212,168,50,0.03);
+}
+.msg.ai .msg-bubble hr {
+  border: none;
+  border-top: 1px solid rgba(212,168,50,0.15);
+  margin: 10px 0;
+}
+.msg.ai .msg-bubble blockquote {
+  border-left: 2px solid rgba(212,168,50,0.3);
+  margin: 6px 0;
+  padding: 4px 12px;
+  color: var(--smoke3);
+  font-style: italic;
+}
 .msg-actions {
   display: flex; gap: 6px; align-items: center;
   margin-top: 6px; padding-left: 2px;
@@ -2600,9 +2690,10 @@ body::before {
 .um-file-item {
   font-family: var(--f-mono);
   font-size: 10px; color: var(--smoke2);
-  letter-spacing: 0.05em; padding: 3px 0;
+  letter-spacing: 0.05em; padding: 6px 0;
   border-bottom: 1px solid var(--line);
   display: flex; align-items: center; gap: 8px;
+  flex-wrap: wrap;
 }
 .um-file-item:last-child { border-bottom: none; }
 .um-file-ext {
@@ -2611,6 +2702,29 @@ body::before {
   border-radius: 2px; color: var(--gold); letter-spacing: 0.1em;
   flex-shrink: 0;
 }
+.um-file-name-input {
+  flex: 1; min-width: 0;
+  background: var(--ink4);
+  border: 1px solid rgba(212,168,50,0.14);
+  border-radius: 3px;
+  padding: 4px 8px;
+  color: var(--smoke);
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.um-file-name-input:focus { border-color: var(--gold); }
+.um-file-name-input::placeholder { color: var(--smoke4); }
+.um-file-name-input.prefilling { border-color: rgba(212,168,50,0.3); color: var(--smoke4); }
+.um-file-classify-status {
+  font-size: 8px; letter-spacing: 0.08em;
+  color: var(--smoke4); flex-shrink: 0;
+  width: 100%; padding-left: 2px;
+  margin-top: 2px;
+}
+.um-file-classify-status.done { color: rgba(212,168,50,0.6); }
 .um-row { display: flex; gap: 12px; }
 .um-field { display: flex; flex-direction: column; gap: 6px; flex: 1; }
 .um-label {
@@ -4133,6 +4247,80 @@ function esc(s) {
     .replace(/\n/g,'\x3Cbr>').replace(/\*\*(.*?)\*\*/g,'\x3Cstrong>$1\x3C/strong>');
 }
 
+// Markdown renderer for AI responses — safe subset, no XSS vectors
+function renderMarkdown(raw) {
+  if (!raw) return '';
+  let s = String(raw);
+
+  // Escape HTML first to prevent XSS
+  s = s.replace(/&/g,'&amp;').replace(/\x3C/g,'&lt;').replace(/>/g,'&gt;');
+
+  // Code blocks (``` ... ```) — must come before inline code
+  s = s.replace(/```[\w]*\n?([\s\S]*?)```/g, (_, code) =>
+    `\x3Cpre>\x3Ccode>${code.trim()}\x3C/code>\x3C/pre>`);
+
+  // Tables — | col | col |
+  s = s.replace(/(?:^|\n)((?:\|[^\n]+\|\n?)+)/g, (_, table) => {
+    const rows = table.trim().split('\n').filter(r => r.trim());
+    if (rows.length < 2) return _ ;
+    const isSep = r => /^\|[\s\-:|]+\|$/.test(r.trim());
+    let html = '\x3Ctable>';
+    let inBody = false;
+    rows.forEach((row, i) => {
+      if (isSep(row)) { inBody = true; return; }
+      const cells = row.split('|').slice(1,-1).map(c => c.trim());
+      const tag = (!inBody && i === 0) ? 'th' : 'td';
+      html += `\x3Ctr>${cells.map(c => `\x3C${tag}>${c}\x3C/${tag}>`).join('')}\x3C/tr>`;
+    });
+    html += '\x3C/table>';
+    return '\n' + html + '\n';
+  });
+
+  // Headings
+  s = s.replace(/^### (.+)$/gm, '\x3Ch3>$1\x3C/h3>');
+  s = s.replace(/^## (.+)$/gm,  '\x3Ch2>$1\x3C/h2>');
+
+  // Bold and italic
+  s = s.replace(/\*\*\*(.*?)\*\*\*/g, '\x3Cstrong>\x3Cem>$1\x3C/em>\x3C/strong>');
+  s = s.replace(/\*\*(.*?)\*\*/g,     '\x3Cstrong>$1\x3C/strong>');
+  s = s.replace(/\*(.*?)\*/g,         '\x3Cem>$1\x3C/em>');
+
+  // Inline code
+  s = s.replace(/`([^`]+)`/g, '\x3Ccode>$1\x3C/code>');
+
+  // Horizontal rule
+  s = s.replace(/^---+$/gm, '\x3Chr>');
+
+  // Blockquote
+  s = s.replace(/^&gt; (.+)$/gm, '\x3Cblockquote>$1\x3C/blockquote>');
+
+  // Unordered lists — collect consecutive lines
+  s = s.replace(/((?:^[-*] .+\n?)+)/gm, match => {
+    const items = match.trim().split('\n').map(l => `\x3Cli>${l.replace(/^[-*] /,'')}\x3C/li>`).join('');
+    return `\x3Cul>${items}\x3C/ul>\n`;
+  });
+
+  // Ordered lists
+  s = s.replace(/((?:^\d+\. .+\n?)+)/gm, match => {
+    const items = match.trim().split('\n').map(l => `\x3Cli>${l.replace(/^\d+\. /,'')}\x3C/li>`).join('');
+    return `\x3Col>${items}\x3C/ol>\n`;
+  });
+
+  // Paragraphs — double newlines
+  s = s.replace(/\n\n+/g, '\n\n');
+  const blocks = s.split('\n\n');
+  s = blocks.map(block => {
+    block = block.trim();
+    if (!block) return '';
+    // Don't wrap already-tagged blocks
+    if (/^\x3C(h[23]|ul|ol|table|pre|hr|blockquote)/.test(block)) return block;
+    // Single newlines within a paragraph become <br>
+    return `\x3Cp>${block.replace(/\n/g,'\x3Cbr>')}\x3C/p>`;
+  }).join('\n');
+
+  return s;
+}
+
 async function apiFetch(path, opts = {}) {
   return fetch(API + path, {
     ...opts,
@@ -4812,7 +5000,8 @@ function appendMsg(role, text, sources, scope, model = '') {
   </div>` : '';
   const modelNames = { claude: 'Claude · Anthropic', grok: 'Grok · xAI', cloudflare: 'Cloudflare AI · Llama', ollama: 'Ollama · Local' };
   const modelLabel = (role === 'ai' && model) ? `<div style="font-family:var(--f-mono);font-size:8px;letter-spacing:0.12em;color:rgba(212,168,50,0.40);text-transform:uppercase;margin-top:6px;padding-left:2px">${modelNames[model] || model}</div>` : '';
-  el.innerHTML = `<div class="msg-av">${av}</div><div class="msg-body">${sc}\x3Cdiv class="msg-bubble">${esc(text)}\x3C/div>${src}${modelLabel}${spk}${actions}\x3C/div>`;
+  const bubbleContent = role === 'ai' ? renderMarkdown(text) : esc(text);
+  el.innerHTML = `<div class="msg-av">${av}</div><div class="msg-body">${sc}\x3Cdiv class="msg-bubble">${bubbleContent}\x3C/div>${src}${modelLabel}${spk}${actions}\x3C/div>`;
   if (role === 'ai') {
     const spkBtn = el.querySelector('.spk-btn');
     if (spkBtn) {
@@ -5476,14 +5665,33 @@ async function openUploadModal(fileList) {
   _umFiles      = Array.from(fileList);
   _umDupConfirm = false;
 
-  // File preview
+  // ── File preview — batch mode shows per-file name inputs ──
   const preview = $('um-files-preview');
+  const isBatch = _umFiles.length > 1;
+  const rnField = $('um-report-name-field'); // wrapper div
+  if (rnField) rnField.style.display = isBatch ? 'none' : '';
+
   if (preview) {
-    preview.innerHTML = _umFiles.map(f => {
-      const ext = (f.name.split('.').pop()||'').toUpperCase().slice(0,4);
+    if (isBatch) {
+      // Batch mode — each file gets its own name input
+      preview.innerHTML = _umFiles.map((f, i) => {
+        const ext  = (f.name.split('.').pop()||'').toUpperCase().slice(0,4);
+        const size = f.size > 1048576 ? (f.size/1048576).toFixed(1)+'MB' : Math.round(f.size/1024)+'KB';
+        const baseName = f.name.replace(/\.[^.]+$/, '');
+        return `<div class="um-file-item" data-file-idx="${i}">
+          <span class="um-file-ext">${ext}</span>
+          <input class="um-file-name-input" data-idx="${i}" placeholder="Classifying..." value="${esc(baseName)}" title="${esc(f.name)}"/>
+          <span style="color:var(--smoke4);flex-shrink:0;font-size:9px">${size}</span>
+          <div class="um-file-classify-status" id="um-fcs-${i}"></div>
+        </div>`;
+      }).join('');
+    } else {
+      // Single file — original simple preview
+      const f = _umFiles[0];
+      const ext  = (f.name.split('.').pop()||'').toUpperCase().slice(0,4);
       const size = f.size > 1048576 ? (f.size/1048576).toFixed(1)+'MB' : Math.round(f.size/1024)+'KB';
-      return `<div class="um-file-item"><span class="um-file-ext">${ext}</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.name)}</span><span style="color:var(--smoke4);flex-shrink:0">${size}</span></div>`;
-    }).join('');
+      preview.innerHTML = `<div class="um-file-item"><span class="um-file-ext">${ext}</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.name)}</span><span style="color:var(--smoke4);flex-shrink:0">${size}</span></div>`;
+    }
   }
 
   // Populate dropdowns
@@ -5573,80 +5781,95 @@ async function openUploadModal(fileList) {
 
   $('upload-modal-bg').classList.add('open');
 
-  // ── Pre-fill: sample first file and ask CACI to classify before user sees the form ──
-  const prefillFile = _umFiles && _umFiles.length === 1 ? _umFiles[0] : null;
-  const prefillExt = prefillFile ? (prefillFile.name.split('.').pop() || '').toLowerCase() : '';
-  if (prefillFile && ['pdf','docx','doc','xlsx','xls','csv'].includes(prefillExt)) {
-    // Show a subtle "thinking..." indicator on the report name field
-    const rn = $('um-report-name');
-    if (rn) { rn.placeholder = 'Caci is reading this file...'; rn.disabled = true; }
-    (async () => {
-      try {
-        const extracted = await extractText(prefillFile, null);
-        const text = extracted.text || extracted || '';
-        if (!text || text.length < 50) { if (rn) { rn.placeholder = 'Report name'; rn.disabled = false; } return; }
+  // ── Pre-fill: classify files asynchronously after modal opens ──
+  const classifiableExts = ['pdf','docx','doc','xlsx','xls','csv'];
 
-        // Build sample — same logic as queueAiClassify
-        let sample = text;
-        if (['xlsx','xls','csv'].includes(prefillExt)) {
-          const parts = text.split('\n\n---\n\n');
-          sample = (parts[0] + '\n\n' + (parts[1] ? parts[1].split('\n').slice(0,25).join('\n') : '')).trim();
-        } else {
-          sample = text.slice(0, 2500);
+  // Fetch collection names once for all classify calls
+  let colNames = '';
+  try {
+    const cr = await apiFetch('/collections?dept=' + dept);
+    const cl = await cr.json();
+    colNames = cl.map(c => c.name).join(', ');
+  } catch(_) {}
+
+  async function classifyAndFill(file, idx) {
+    const ext = (file.name.split('.').pop() || '').toLowerCase();
+    if (!classifiableExts.includes(ext)) return;
+    const statusEl = $(`um-fcs-${idx}`);
+    const inputEl  = preview ? preview.querySelector(`.um-file-name-input[data-idx="${idx}"]`) : null;
+    const isSingle = !isBatch;
+    const rnEl     = isSingle ? $('um-report-name') : null;
+
+    if (isSingle && rnEl) { rnEl.placeholder = 'Caci is reading this file...'; rnEl.disabled = true; }
+    if (inputEl) inputEl.classList.add('prefilling');
+    if (statusEl) statusEl.textContent = 'Reading...';
+
+    try {
+      const extracted = await extractText(file, null);
+      const text = extracted.text || extracted || '';
+      if (!text || text.length < 50) throw new Error('no text');
+
+      let sample = text;
+      if (['xlsx','xls','csv'].includes(ext)) {
+        const parts = text.split('\n\n---\n\n');
+        sample = (parts[0] + '\n\n' + (parts[1] ? parts[1].split('\n').slice(0,25).join('\n') : '')).trim();
+      } else {
+        sample = text.slice(0, 2500);
+      }
+
+      const res = await apiFetch('/ai-classify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName: file.name, collection: selectedCollection || '', sample, colNames }),
+      });
+      if (!res.ok) throw new Error('classify failed');
+      const data = await res.json();
+      if (!data.ok || !data.result) throw new Error('no result');
+
+      let suggested;
+      try { suggested = JSON.parse(data.result.replace(/```json|```/g, '').trim()); }
+      catch(_) { throw new Error('parse failed'); }
+      if (suggested.confidence === 'low') throw new Error('low confidence');
+
+      // Fill per-file name input (batch) or report name field (single)
+      if (isBatch && inputEl && suggested.reportName) {
+        inputEl.value = suggested.reportName;
+        inputEl.classList.remove('prefilling');
+        inputEl.style.borderColor = 'rgba(212,168,50,0.4)';
+        setTimeout(() => { inputEl.style.borderColor = ''; }, 1500);
+        if (statusEl) { statusEl.textContent = '✓ ' + (suggested.category || ''); statusEl.classList.add('done'); }
+      }
+      if (isSingle) {
+        if (rnEl && !rnEl.value && suggested.reportName) {
+          rnEl.value = suggested.reportName;
+          rnEl.style.borderColor = 'rgba(212,168,50,0.55)';
+          setTimeout(() => { rnEl.style.borderColor = ''; }, 2000);
         }
-
-        // Fetch existing collection names for suggestion
-        let colNames = '';
-        try {
-          const cr = await apiFetch('/collections?dept=' + dept);
-          const cl = await cr.json();
-          colNames = cl.map(c => c.name).join(', ');
-        } catch(_) {}
-
-        const res = await apiFetch('/ai-classify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fileName: prefillFile.name, collection: selectedCollection || '', sample, colNames }),
-        });
-        if (!res.ok) throw new Error('classify failed');
-        const data = await res.json();
-        if (!data.ok || !data.result) throw new Error('no result');
-
-        let suggested;
-        try { suggested = JSON.parse(data.result.replace(/```json|```/g, '').trim()); } catch(_) { throw new Error('parse failed'); }
-        if (suggested.confidence === 'low') throw new Error('low confidence');
-
-        // Pre-fill the form — only if user hasn't already typed anything
-        if (rn && !rn.value && suggested.reportName) {
-          rn.value = suggested.reportName;
-          rn.style.borderColor = 'rgba(212,168,50,0.55)';
-          setTimeout(() => { rn.style.borderColor = ''; }, 2000);
-        }
-        if ($('um-category') && !$('um-category').value && suggested.category) {
-          $('um-category').value = suggested.category;
-        }
-        if ($('um-report-type') && !$('um-report-type').value && suggested.reportType) {
-          $('um-report-type').value = suggested.reportType;
-        }
-        // Suggest collection if different from current
+        if ($('um-category') && !$('um-category').value && suggested.category) $('um-category').value = suggested.category;
+        if ($('um-report-type') && !$('um-report-type').value && suggested.reportType) $('um-report-type').value = suggested.reportType;
         if ($('um-collection-pick') && suggested.suggestedCollection && suggested.suggestedCollection !== selectedCollection) {
           const cp = $('um-collection-pick');
           const match = Array.from(cp.options).find(o => o.value === suggested.suggestedCollection);
           if (match) { cp.value = suggested.suggestedCollection; updateColPickMeta(); }
         }
-        // Period
         if (suggested.period && $('um-period')) {
           const per = $('um-period');
           const match = Array.from(per.options).find(o => o.value === suggested.period);
           if (match) per.value = suggested.period;
         }
-      } catch(_) {
-        // Prefill failed silently — user fills in manually
-      } finally {
-        if (rn) { rn.placeholder = 'e.g. Q1 2026 Retail Sales Summary'; rn.disabled = false; }
       }
-    })();
+    } catch(_) {
+      if (inputEl) inputEl.classList.remove('prefilling');
+      if (statusEl) statusEl.textContent = '';
+    } finally {
+      if (isSingle && rnEl) { rnEl.placeholder = 'e.g. Q1 2026 Retail Sales Summary'; rnEl.disabled = false; }
+    }
   }
+
+  // Fire classify calls — batch staggers them slightly to avoid rate limits
+  _umFiles.forEach((file, idx) => {
+    setTimeout(() => classifyAndFill(file, idx), isBatch ? idx * 600 : 0);
+  });
 }
 
 function closeUploadModal() {
@@ -5665,29 +5888,27 @@ function initUploadModal() {
   $('um-submit').addEventListener('click', async () => {
     if (!_umFiles || !_umFiles.length) { console.warn('CACI: no files to upload'); return; }
 
-    const reportName  = ($('um-report-name')?.value   || '').trim();
-    const category    = ($('um-category')?.value      || '').trim();
-    const fileDept    = ($('um-dept-select')?.value   || dept).trim();
+    const isBatch    = _umFiles.length > 1;
+    const category   = ($('um-category')?.value    || '').trim();
+    const fileDept   = ($('um-dept-select')?.value || dept).trim();
     const period     = getUmPeriod() || 'Unspecified';
     const reportType = ($('um-report-type')?.value || '').trim();
     const stateChips = $('um-states')?.querySelectorAll('.um-state-chip.selected') || [];
     const states     = Array.from(stateChips).map(s => s.dataset.s).join(',');
     const store      = ($('um-store')?.value || '').trim();
     const chunkSize  = parseInt($('um-chunk-size')?.value || '1500', 10);
+    const reportName = isBatch ? '' : ($('um-report-name')?.value || '').trim();
 
-    if (!reportName) {
+    if (!isBatch && !reportName) {
       $('um-report-name')?.focus();
       $('um-report-name')?.classList.add('um-input-err');
       setTimeout(() => $('um-report-name')?.classList.remove('um-input-err'), 1500);
       return;
     }
-    if (!category) {
-      $('um-category')?.focus();
-      return;
-    }
+    if (!category) { $('um-category')?.focus(); return; }
 
-    // Duplicate check — skip silently if worker unreachable
-    if (!_umDupConfirm) {
+    // Duplicate check — single file only
+    if (!isBatch && !_umDupConfirm) {
       try {
         const res = await apiFetch('/duplicate-check', {
           method: 'POST',
@@ -5709,11 +5930,24 @@ function initUploadModal() {
     }
 
     const pickedCol = ($('um-collection-pick')?.value || '').trim();
-    const colParts  = [category, period !== 'Unspecified' ? period : '', reportName].filter(Boolean);
-    const colName   = pickedCol || colParts.join(' — ') || 'General';
-    const files    = _umFiles.slice();
+    const files = _umFiles.slice();
     closeUploadModal();
-    await handleFiles(files, colName, { reportName, category, period, reportType, states, store, fileDept, chunkSize });
+
+    if (isBatch) {
+      // Read per-file name inputs — fall back to filename if empty
+      const nameInputs = document.querySelectorAll('.um-file-name-input');
+      const fileNames  = Array.from(nameInputs).map(inp => inp.value.trim());
+      const colParts   = [category, period !== 'Unspecified' ? period : ''].filter(Boolean);
+      const colName    = pickedCol || colParts.join(' — ') || 'General';
+      for (let i = 0; i < files.length; i++) {
+        const fname = fileNames[i] || files[i].name.replace(/\.[^.]+$/, '');
+        await handleFiles([files[i]], colName, { reportName: fname, category, period, reportType, states, store, fileDept, chunkSize });
+      }
+    } else {
+      const colParts = [category, period !== 'Unspecified' ? period : '', reportName].filter(Boolean);
+      const colName  = pickedCol || colParts.join(' — ') || 'General';
+      await handleFiles(files, colName, { reportName, category, period, reportType, states, store, fileDept, chunkSize });
+    }
   });
 }
 
@@ -7155,8 +7389,8 @@ async function runPdfSplitter(file) {
         <div class="um-col-pick-meta" id="um-col-pick-meta"></div>
       </div>
 
-      <!-- Report Name -->
-      <div class="um-field">
+      <!-- Report Name — hidden in batch mode -->
+      <div class="um-field" id="um-report-name-field">
         <div class="um-label">Report / Data Name <span class="um-required">*</span></div>
         <input class="um-input" id="um-report-name" placeholder="e.g. Product Satisfaction Survey, Q1 Shrink Report"/>
       </div>
