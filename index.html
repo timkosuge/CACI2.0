@@ -5558,7 +5558,11 @@ async function handleFiles(fileList, colName, meta = {}) {
       const extracted = await extractText(f, log);
       const text  = extracted.text  || extracted || '';
       const stats = extracted.stats || {};
-      if (!text || text.length < 5) { addLog(log, '\u26A0 No text extracted'); continue; }
+      if (!text || text.length < 5) {
+        addLog(log, '\u26A0 No text extracted from ' + f.name + ' — is it a scanned PDF?');
+        console.warn('No text extracted from', f.name, 'extracted object:', extracted);
+        continue;
+      }
       addLog(log, `\u2713 ${text.length.toLocaleString()} chars` + (stats.rowCount ? ' \u2014 ' + stats.rowCount.toLocaleString() + ' rows' : ''));
       const fd = new FormData();
       fd.append('file',       f);
@@ -5583,8 +5587,8 @@ async function handleFiles(fileList, colName, meta = {}) {
         // Queue AI classification (non-blocking, runs after upload completes)
         queueAiClassify(d.id, f.name, colName, text);
       }
-      else      addLog(log, `\u2717 ${d.error}`);
-    } catch(e) { addLog(log, '\u2717 ' + e.message); }
+      else { addLog(log, `\u2717 Upload failed: ${d.error}`); console.error('Upload failed:', d.error, 'file:', f?.name); }
+    } catch(e) { addLog(log, '\u2717 ' + e.message); console.error('Upload exception:', f?.name, e); }
   }
 
   if (fill)  fill.style.width  = '100%';
@@ -6774,7 +6778,19 @@ async function runPdfSplitter(file) {
     });
 
     // Load with pdf-lib for actual splitting
-    if (!window.PDFLib) throw new Error('pdf-lib not loaded. Check your network connection.');
+    if (!window.PDFLib) {
+      addLog(log, '\u26a0 pdf-lib not loaded — attempting fallback load...');
+      try {
+        await new Promise((resolve, reject) => {
+          const s = document.createElement('script');
+          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js';
+          s.onload = resolve; s.onerror = reject;
+          document.head.appendChild(s);
+        });
+        await new Promise(r => setTimeout(r, 500));
+      } catch(e) { console.warn('pdf-lib fallback failed:', e); }
+      if (!window.PDFLib) throw new Error('pdf-lib failed to load — try refreshing the page.');
+    }
     const { PDFDocument } = window.PDFLib;
     const srcDoc = await PDFDocument.load(arrayBuffer);
 
