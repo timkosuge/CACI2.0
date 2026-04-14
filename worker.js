@@ -907,6 +907,20 @@ async function buildContextTwoPass({ message, dept, collection, env }) {
     const keywords2 = extractKeywords(message);
     const chunksPerFile = fullFiles.length <= 2 ? 12 : fullFiles.length <= 5 ? 6 : 3;
     const totalChunkLimit = fullFiles.length <= 2 ? 20 : fullFiles.length <= 5 ? 20 : 15;
+
+    // Guaranteed slots: FILE SUMMARY chunk (chunk[0]) from each file that has one.
+    // These are always included and don't compete in the scoring race.
+    const guaranteedChunks = [];
+    const seenSummaryFiles = new Set();
+    for (const fileData of fullFiles) {
+      if (!fileData.chunks || !fileData.chunks.length) continue;
+      const first = fileData.chunks[0];
+      if ((first.toLowerCase().startsWith('file summary') || first.toLowerCase().startsWith('sheet:')) && !seenSummaryFiles.has(fileData.name)) {
+        guaranteedChunks.push({ chunk: first, score: 999, filename: fileData.name, collection: fileData.collection, meta: fileData.meta || {}, _guaranteed: true });
+        seenSummaryFiles.add(fileData.name);
+      }
+    }
+
     const allChunks = [];
     for (const fileData of fullFiles) {
       if (!fileData.chunks) continue;
@@ -915,13 +929,17 @@ async function buildContextTwoPass({ message, dept, collection, env }) {
         chunk,
         score: scoreChunk(chunk, keywords2) + fileBoost,
         filename: fileData.name, collection: fileData.collection, meta: fileData.meta || {}
-      }));
+      })).filter(c => c.score >= 0); // score=-1 means summary chunk — excluded from race
       fileChunks.sort((a, b) => b.score - a.score);
       allChunks.push(...fileChunks.slice(0, chunksPerFile));
     }
 
     allChunks.sort((a, b) => b.score - a.score);
-    const top = allChunks.slice(0, totalChunkLimit);
+    // Merge: guaranteed summaries first, then scored chunks (deduplicate by content)
+    const guaranteedTexts = new Set(guaranteedChunks.map(c => c.chunk));
+    const scoredOnly = allChunks.filter(c => !guaranteedTexts.has(c.chunk));
+    const remaining = totalChunkLimit - guaranteedChunks.length;
+    const top = [...guaranteedChunks, ...scoredOnly.slice(0, Math.max(remaining, 0))];
 
     if (!top.length) return { text: '', sources: [], statsContext: statsLines.join('\n'), focusFile: fullFiles[0]?.name };
 
@@ -1259,16 +1277,33 @@ function extractKeywords(query) {
     'do','does','did','will','would','could','should','may','might','what','which','who',
     'this','that','these','those','i','me','my','we','our','you','your','he','she','it',
     'they','them','and','but','or','for','at','by','in','of','on','to','as','if','how',
-    'when','where','why','with','about','from','into','can','tell','show','give','get','all']);
+    'when','where','why','with','about','from','into','can','tell','show','give','get','all',
+    'report','reports','data','file','files','show','list','give','find','between','across',
+    'total','totals','number','numbers','amount','amounts','value','values']);
   return query.toLowerCase().replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(w => w.length > 2 && !stop.has(w));
+}
+
+// Escape special regex characters so keywords like "$" or "." don't misbehave
+function escapeRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function scoreChunk(chunk, keywords) {
   const lower = chunk.toLowerCase();
+  // Skip pure summary blocks — they match everything and dilute the race
+  // (Summary chunks are guaranteed-included separately in buildContextTwoPass)
+  if (lower.startsWith('file summary\n') || lower.startsWith('file summary\r\n')) return -1;
   let score = 0;
   for (const kw of keywords) {
-    const count = (lower.match(new RegExp(kw, 'g')) || []).length;
-    score += count;
+    // Use word-boundary-aware matching with regex escape
+    const re = new RegExp('(?<![a-z0-9])' + escapeRegex(kw) + '(?![a-z0-9])', 'gi');
+    const matches = lower.match(re);
+    if (matches) {
+      // Column-value pattern gets double weight: "State: PA" is stronger than incidental "pa" match
+      const colValueRe = new RegExp('[a-z_ ]+:\s*' + escapeRegex(kw) + '\\b', 'gi');
+      const colMatches = lower.match(colValueRe);
+      score += matches.length + (colMatches ? colMatches.length : 0);
+    }
   }
   return score;
 }
