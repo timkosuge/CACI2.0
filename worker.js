@@ -1172,9 +1172,15 @@ async function buildContextTwoPass({ message, dept, collection, env }) {
         const label = `${meta.reportName || f.name} [${meta.period || ''}]`.trim();
         statsLines.push(`\n### ${label}`);
         if (f.stats.rowCount) statsLines.push(`Rows: ${f.stats.rowCount}`);
+        if (f.stats.columns) statsLines.push(`Columns: ${f.stats.columns.join(', ')}`);
         if (f.stats.numeric) {
           for (const [col, s] of Object.entries(f.stats.numeric)) {
-            statsLines.push(`${col}: sum=${s.sum}, avg=${s.avg}, min=${s.min}, max=${s.max}`);
+            statsLines.push(`${col}: sum=${s.sum}, avg=${s.avg}, min=${s.min}, max=${s.max}, count=${s.count}`);
+          }
+        }
+        if (f.stats.categoryCols) {
+          for (const [col, vals] of Object.entries(f.stats.categoryCols)) {
+            statsLines.push(`${col} values: ${vals.map(v => v.includes(',') ? '"' + v + '"' : v).join(', ')}`);
           }
         }
       }
@@ -1182,6 +1188,7 @@ async function buildContextTwoPass({ message, dept, collection, env }) {
 
     // Get best chunks — dynamic allocation: top-scoring files get more chunks
     const keywords2 = extractKeywords(message);
+    const intent2   = analyzeQueryIntent(message);
     const TOTAL_CHUNK_BUDGET = fullFiles.length <= 2 ? 22 : fullFiles.length <= 5 ? 22 : 18;
     const MIN_CHUNKS_PER_FILE = 1;  // every selected file gets at least one chunk
     const MAX_CHUNKS_PER_FILE = fullFiles.length <= 2 ? 14 : fullFiles.length <= 4 ? 8 : 5;
@@ -1241,7 +1248,7 @@ async function buildContextTwoPass({ message, dept, collection, env }) {
     if (!top.length) return { text: '', sources: [], statsContext: statsLines.join('\n'), focusFile: fullFiles[0]?.name };
 
     // Re-rank before final assembly
-    const reranked = rerankChunks(top, keywords2, null);
+    const reranked = rerankChunks(top, keywords2, intent2);
 
     const sources = [...new Set(reranked.map(x => x.filename))];
     const text = reranked.map(x => {
@@ -1265,6 +1272,7 @@ async function buildContext({ message, dept, collection, fileId, scope, env }) {
   }
   try {
     const keywords = extractKeywords(message);
+    const intent   = analyzeQueryIntent(message);
     let filesToSearch = [];
 
     if (scope === 'file' && fileId) {
@@ -1449,7 +1457,7 @@ async function buildContext({ message, dept, collection, fileId, scope, env }) {
     }
 
     // Re-rank before final assembly
-    const rerankedTop = rerankChunks(top, keywords, null);
+    const rerankedTop = rerankChunks(top, keywords, intent);
 
     const sources = [...new Set(rerankedTop.map(x => x.filename))];
     const text = rerankedTop.map(x => {
