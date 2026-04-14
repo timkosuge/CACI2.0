@@ -3760,6 +3760,44 @@ function esc(s) {
     .replace(/\n/g,'\x3Cbr>').replace(/\*\*(.*?)\*\*/g,'\x3Cstrong>$1\x3C/strong>');
 }
 
+// Renders AI markdown responses properly — headers, bullets, bold, code, tables
+function renderMarkdown(s) {
+  if (s == null) return '';
+  let t = String(s);
+  // Escape HTML first (no entity for < >)
+  t = t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  // Fenced code blocks
+  t = t.replace(/```([\s\S]*?)```/g, (_, code) => '<pre><code>' + code.trim() + '</code></pre>');
+  // Inline code
+  t = t.replace(/`([^`]+)`/g, '<code>$1</code>');
+  // Headers h3 h2 h1 (order matters — most specific first)
+  t = t.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  t = t.replace(/^## (.+)$/gm,  '<h2>$1</h2>');
+  t = t.replace(/^# (.+)$/gm,   '<h1>$1</h1>');
+  // Bold and italic
+  t = t.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+  t = t.replace(/\*\*(.+?)\*\*/g,       '<strong>$1</strong>');
+  t = t.replace(/\*(.+?)\*/g,             '<em>$1</em>');
+  // Horizontal rule
+  t = t.replace(/^---+$/gm, '<hr>');
+  // Unordered lists — group consecutive - lines into <ul>
+  t = t.replace(/((?:^[ \t]*[-*+] .+\n?)+)/gm, match => {
+    const items = match.trim().split('\n').map(l => '<li>' + l.replace(/^[ \t]*[-*+] /, '') + '</li>').join('');
+    return '<ul>' + items + '</ul>';
+  });
+  // Ordered lists
+  t = t.replace(/((?:^[ \t]*\d+\. .+\n?)+)/gm, match => {
+    const items = match.trim().split('\n').map(l => '<li>' + l.replace(/^[ \t]*\d+\. /, '') + '</li>').join('');
+    return '<ol>' + items + '</ol>';
+  });
+  // Paragraphs — blank line = paragraph break; single newline = <br>
+  t = t.replace(/\n\n+/g, '</p><p>');
+  t = t.replace(/\n/g, '<br>');
+  // Wrap in paragraph if not already wrapped in a block element
+  if (!/^\s*<(h[1-6]|ul|ol|pre|hr|p)/.test(t)) t = '<p>' + t + '</p>';
+  return t;
+}
+
 async function apiFetch(path, opts = {}) {
   return fetch(API + path, {
     ...opts,
@@ -4314,7 +4352,7 @@ function appendMsg(role, text, sources, scope, model = '') {
   </div>` : '';
   const modelNames = { claude: 'Claude · Anthropic', grok: 'Grok · xAI', cloudflare: 'Cloudflare AI · Llama', ollama: 'Ollama · Local' };
   const modelLabel = (role === 'ai' && model) ? `<div style="font-family:var(--f-mono);font-size:8px;letter-spacing:0.12em;color:rgba(184,150,12,0.35);text-transform:uppercase;margin-top:6px;padding-left:2px">${modelNames[model] || model}</div>` : '';
-  el.innerHTML = `<div class="msg-av">${av}</div><div class="msg-body">${sc}\x3Cdiv class="msg-bubble">${esc(text)}\x3C/div>${src}${modelLabel}${spk}${actions}\x3C/div>`;
+  el.innerHTML = `<div class="msg-av">${av}</div><div class="msg-body">${sc}\x3Cdiv class="msg-bubble">${role === 'ai' ? renderMarkdown(text) : esc(text)}\x3C/div>${src}${modelLabel}${spk}${actions}\x3C/div>`;
   if (role === 'ai') {
     const spkBtn = el.querySelector('.spk-btn');
     if (spkBtn) {
@@ -4569,7 +4607,7 @@ async function extractText(file, log) {
 }
 async function extractPdf(file, log) {
   try {
-    if (!window.pdfjsLib) { addLog(log, '\u26A0 PDF.js not loaded'); return ''; }
+    if (!window.pdfjsLib) { addLog(log, '\u26A0 PDF.js not loaded'); return { text: '', stats: {} }; }
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     const buf = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({data:buf}).promise;
@@ -4579,16 +4617,21 @@ async function extractPdf(file, log) {
       const c = await pg.getTextContent();
       t += c.items.map(x => x.str).join(' ') + '\n';
     }
-    return t.trim();
-  } catch(e) { addLog(log, '\u26A0 PDF: ' + e.message); return ''; }
+    // Build a minimal stats block so the worker has page count metadata
+    const text = t.trim();
+    const stats = { pageCount: pdf.numPages, charCount: text.length };
+    return { text, stats };
+  } catch(e) { addLog(log, '\u26A0 PDF: ' + e.message); return { text: '', stats: {} }; }
 }
 async function extractWord(file, log) {
   try {
-    if (!window.mammoth) { addLog(log, '\u26A0 Mammoth not loaded'); return ''; }
+    if (!window.mammoth) { addLog(log, '\u26A0 Mammoth not loaded'); return { text: '', stats: {} }; }
     const buf = await file.arrayBuffer();
     const r = await mammoth.extractRawText({arrayBuffer:buf});
-    return r.value || '';
-  } catch(e) { addLog(log, '\u26A0 Word: ' + e.message); return ''; }
+    const text = r.value || '';
+    const stats = { charCount: text.length };
+    return { text, stats };
+  } catch(e) { addLog(log, '\u26A0 Word: ' + e.message); return { text: '', stats: {} }; }
 }
 // ── Tabular extraction helpers ────────────────────────────────
 
@@ -5136,7 +5179,10 @@ function initUploadModal() {
     }
 
     const pickedCol = ($('um-collection-pick')?.value || '').trim();
-    const colParts  = [category, period !== 'Unspecified' ? period : '', reportName].filter(Boolean);
+    // Auto-name: category + period only — NOT reportName.
+    // reportName is file-level metadata; baking it into the collection name
+    // creates a new collection for every file instead of grouping them.
+    const colParts  = [category, period !== 'Unspecified' ? period : ''].filter(Boolean);
     const colName   = pickedCol || colParts.join(' — ') || 'General';
     const files    = _umFiles.slice();
     closeUploadModal();
@@ -5198,10 +5244,15 @@ async function handleFiles(fileList, colName, meta = {}) {
   setTimeout(() => { if (prog) prog.classList.remove('on'); if (fill) fill.style.width = '0%'; }, 4000);
   loadCollections(); loadFiles();
 
-  // Re-analyze the collection description after every upload batch —
-  // not just new collections. Description goes stale when files are added to existing ones.
+  // Re-analyze the collection description after upload batch.
+  // Debounced: only runs if the collection hasn't been analyzed in the last 5 min,
+  // preventing N API calls when uploading N files to the same collection.
   if (_aiClassifyEnabled) {
-    setTimeout(() => analyzeCollection(colName), 3000);
+    const lastAnalyzed = _analyzeDebounce.get(colName) || 0;
+    if (Date.now() - lastAnalyzed > 5 * 60 * 1000) {
+      _analyzeDebounce.set(colName, Date.now());
+      setTimeout(() => analyzeCollection(colName), 3000);
+    }
   }
 }
 
@@ -5910,6 +5961,7 @@ let _aiPendingResults   = []; // { fileId, name, collection, suggested: {categor
 let _aiClassifyQueue    = []; // file IDs waiting to be classified
 let _aiClassifyRunning  = false;
 let _newCollections     = new Set(); // track collections just created this session
+let _analyzeDebounce    = new Map(); // colName → timestamp of last analyze call
 
 function initAiClassify() {
   const toggle = $('ai-classify-toggle');
