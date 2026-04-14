@@ -1,5 +1,3 @@
-
-
 <!-- CACI Intelligence Platform v2.0 -->
 <!DOCTYPE html>
 <html lang="en">
@@ -3346,9 +3344,14 @@ body::before {
               </button>
             </div>
             <div class="upload-area">
-              <button class="upload-btn" id="upload-btn">&#8593; Upload &amp; Classify</button>
+              <div style="position:relative;display:inline-block" id="upload-btn-wrap">
+                <button class="upload-btn" id="upload-btn">&#8593; Upload</button>
+                <div id="upload-picker" style="display:none;position:absolute;bottom:calc(100% + 6px);left:0;background:var(--ink2);border:1px solid var(--line2);border-radius:var(--r);min-width:210px;z-index:999;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.4);">
+                  <button id="upick-standard" style="display:block;width:100%;padding:10px 14px;background:transparent;border:none;border-bottom:1px solid var(--line);color:var(--smoke2);font-family:var(--f-mono);font-size:9px;letter-spacing:0.12em;text-transform:uppercase;cursor:pointer;text-align:left;" onmouseover="this.style.background='var(--gold-dim)'" onmouseout="this.style.background='transparent'">&#8593; Standard Upload</button>
+                  <button id="upick-split" style="display:block;width:100%;padding:10px 14px;background:transparent;border:none;color:var(--smoke2);font-family:var(--f-mono);font-size:9px;letter-spacing:0.12em;text-transform:uppercase;cursor:pointer;text-align:left;" onmouseover="this.style.background='var(--gold-dim)'" onmouseout="this.style.background='transparent'">&#9986; Split &amp; Upload PDF</button>
+                </div>
+              </div>
               <button class="upload-btn ctx-upload-btn" id="ctx-upload-btn" style="display:none">&#8593; Add Context Doc</button>
-              <button class="upload-btn" id="split-pdf-btn" style="display:none" title="Split a large PDF into sections and upload each as a separate file">&#9986; Split &amp; Upload PDF</button>
               <input type="file" id="split-pdf-input" accept=".pdf" style="display:none"/>
             </div>
             <input type="file" id="file-input" multiple accept=".pdf,.doc,.docx,.csv,.xlsx,.xls,.txt,.md" style="display:none"/>
@@ -3853,7 +3856,34 @@ function bootApp() {
     }
   }));
 
-  $('upload-btn').addEventListener('click', () => $('file-input').click());
+  $('upload-btn').addEventListener('click', e => {
+    e.stopPropagation();
+    const picker = $('upload-picker');
+    const isOpen = picker.style.display !== 'none';
+    picker.style.display = isOpen ? 'none' : 'block';
+    const splitBtn = $('upick-split');
+    if (splitBtn) {
+      const canSplit = !!selectedCollection;
+      splitBtn.style.opacity = canSplit ? '1' : '0.35';
+      splitBtn.style.cursor  = canSplit ? 'pointer' : 'not-allowed';
+      splitBtn.title = canSplit ? '' : 'Select a collection first';
+    }
+  });
+  document.addEventListener('click', () => {
+    const picker = $('upload-picker');
+    if (picker) picker.style.display = 'none';
+  });
+  $('upick-standard').addEventListener('click', e => {
+    e.stopPropagation();
+    $('upload-picker').style.display = 'none';
+    $('file-input').click();
+  });
+  $('upick-split').addEventListener('click', e => {
+    e.stopPropagation();
+    if (!selectedCollection) return;
+    $('upload-picker').style.display = 'none';
+    openSplitMetaModal();
+  });
   $('file-input').addEventListener('change', e => { if(e.target.files.length) openUploadModal(e.target.files); });
   initUploadModal();
   if (typeof initReports === "function") initReports();
@@ -4483,7 +4513,7 @@ async function loadCollections() {
         // Update upload button label
         const ub = $('upload-btn');
         if (ub) ub.textContent = selectedCollection ? '↑ Add Files to “' + selectedCollection.slice(0,20) + (selectedCollection.length>20?'…':'') + '”' : '↑ Upload & Classify';
-        const sb = $('split-pdf-btn'); if (sb) sb.style.display = selectedCollection ? '' : 'none';
+
       });
     });
     list.querySelectorAll('.col-del').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); deleteCollection(b.dataset.col); }));
