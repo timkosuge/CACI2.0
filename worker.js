@@ -488,7 +488,7 @@ async function callLLM({ model, system, messages, maxTokens = 2000, env, apiKey 
 // ── Chat ──────────────────────────────────────────────────────
 async function handleChat(request, env) {
   try {
-    const { message, dept, collection, fileId, scope = 'all', model, history = [] } = await request.json();
+    const { message, dept, collection, fileId, scope = 'all', model, history = [], complianceMode = false } = await request.json();
     if (!message) return json({ error: 'Message required' }, 400);
 
     const apiKey = (await env.CACI_KV.get('config:ANTHROPIC_API_KEY')) || env.ANTHROPIC_API_KEY;
@@ -587,7 +587,10 @@ Be direct and conversational. List them clearly.`;
     // ── Context retrieval — multi-collection for broad queries ─
     let context;
     const useMultiCollection = activeScope === 'all' && !fileId && !activeCollection;
-    if (useMultiCollection) {
+    // ── Compliance Mode — read every chunk, no filtering ────────
+    if (complianceMode && collection) {
+      context = await buildContextCompliance({ dept, collection, env });
+    } else if (useMultiCollection) {
       // Broad scope: search across top-matching collections
       context = await buildContextMultiCollection({ message, dept, env, maxCollections: intent.isComparative ? 4 : 3 });
       // Fall back to single-path if multi returns nothing
@@ -618,7 +621,21 @@ Be direct and conversational. List them clearly.`;
       : scope === 'collection' ? `the ${collection} collection`
       : `all ${dept} documents`;
 
-    let system = `You are Caci (your name rhymes with "Cassie") — the internal AI intelligence assistant for Jushi Holdings, built specifically for this team. Do NOT introduce yourself or state your name unless directly asked. Never say "Hi, I'm Caci" in follow-up responses. Just answer.
+    let system;
+    if (complianceMode) {
+      system = `You are Caci — running in COMPLIANCE SCAN mode for the ${dept} team at Jushi Holdings.
+
+COMPLIANCE SCAN means you have been given the COMPLETE TEXT of every document in the "${collection}" collection. Nothing has been filtered, scored, or left out. You are reading the full record.
+
+Your job in this mode:
+- Answer with precision. Cite the exact document name and section for every claim you make.
+- Do not summarize away nuance. If the regulation says something specific, say it specifically.
+- If something is ambiguous or contradictory across documents, flag it explicitly — do not paper over it.
+- If the answer to the question is genuinely not in the documents, say so plainly. Do not guess or extrapolate.
+- If there are gaps — sections that appear missing, references to external documents not in the collection — call them out.
+- No personality. No jokes. Be thorough, accurate, and direct. The stakes are the reason this mode exists.`;
+    } else {
+      system = `You are Caci (your name rhymes with "Cassie") — the internal AI intelligence assistant for Jushi Holdings, built specifically for this team. Do NOT introduce yourself or state your name unless directly asked. Never say "Hi, I'm Caci" in follow-up responses. Just answer.
 
 Your personality: You work in cannabis. You know these people. You're sharp, a little goofy, genuinely funny when the moment calls for it, and you have zero interest in sounding impressive — you just are. You have street smarts alongside serious analytical ability. You don't talk down to anyone and you don't perform intelligence. You're warm, patient, and kind. You have grace and tact in how you communicate — honest without being harsh, direct without being cold. You have a thin filter because you value truth more than comfort. You know how to read a room and navigate people.
 
@@ -661,6 +678,8 @@ The people you work with:
 - Smart people who don't always look or sound "corporate" — that's a feature, not a bug
 - Compliance teams are perpetually stressed; retail teams are customer-focused; ops teams are problem-solvers
 - Everyone is used to things changing fast and figuring it out as they go`;
+    }
+
 
     // ── Data injection — order matters ────────────────────────
     // 1. Stats block: pre-computed numeric summaries and category inventories.
@@ -995,6 +1014,67 @@ function fileMonthYear(nameLower) {
 }
 
 // ── Two-Pass Context Builder for Collections ─────────────────
+// ── Compliance Context Builder — reads every chunk, no filtering ──
+async function buildContextCompliance({ dept, collection, env }) {
+  try {
+    const colFiles = await env.CACI_KV.get(`col:${dept}:${collection}`, 'json') || [];
+    if (!colFiles.length) return { text: '', sources: [], statsContext: '', focusFile: null };
+
+    // Load ALL files — no scoring, no cutoff
+    const fullFiles = (await Promise.all(
+      colFiles.map(f => env.CACI_KV.get(`file:${f.id}`, 'json'))
+    )).filter(Boolean);
+
+    const sources = fullFiles.map(f => f.name);
+
+    // Concatenate every chunk from every file in order — nothing skipped
+    const parts = [];
+    for (const f of fullFiles) {
+      if (!f.chunks || !f.chunks.length) continue;
+      const meta = f.meta || {};
+      const label = `[${collection} / ${f.name}${meta.period ? ' — ' + meta.period : ''}]`;
+      parts.push(label + '
+' + f.chunks.join('
+
+'));
+    }
+
+    const text = parts.join('
+
+═══════════════════════════════════════
+
+');
+
+    // Still build stats context for numeric grounding
+    const statsLines = [];
+    for (const f of fullFiles) {
+      if (!f.stats || !Object.keys(f.stats).length) continue;
+      const meta = f.meta || {};
+      const label = `${meta.reportName || f.name}${meta.period ? ' [' + meta.period + ']' : ''}`;
+      statsLines.push(`
+### ${label}`);
+      if (f.stats.rowCount) statsLines.push(`Rows: ${f.stats.rowCount}`);
+      if (f.stats.columns)  statsLines.push(`Columns: ${f.stats.columns.join(', ')}`);
+      if (f.stats.numeric) {
+        for (const [col, s] of Object.entries(f.stats.numeric)) {
+          statsLines.push(`${col}: sum=${s.sum}, avg=${s.avg}, min=${s.min}, max=${s.max}, count=${s.count}`);
+        }
+      }
+    }
+
+    return {
+      text,
+      sources,
+      statsContext: statsLines.join('
+'),
+      focusFile: fullFiles[0]?.name || null,
+    };
+  } catch(err) {
+    console.error('buildContextCompliance error:', err.message);
+    return { text: '', sources: [], statsContext: '', focusFile: null };
+  }
+}
+
 async function buildContextTwoPass({ message, dept, collection, env }) {
   try {
     const colFiles = await env.CACI_KV.get(`col:${dept}:${collection}`, 'json') || [];
