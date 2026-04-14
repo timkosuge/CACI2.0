@@ -3861,13 +3861,6 @@ function bootApp() {
     const picker = $('upload-picker');
     const isOpen = picker.style.display !== 'none';
     picker.style.display = isOpen ? 'none' : 'block';
-    const splitBtn = $('upick-split');
-    if (splitBtn) {
-      const canSplit = !!selectedCollection;
-      splitBtn.style.opacity = canSplit ? '1' : '0.35';
-      splitBtn.style.cursor  = canSplit ? 'pointer' : 'not-allowed';
-      splitBtn.title = canSplit ? '' : 'Select a collection first';
-    }
   });
   document.addEventListener('click', () => {
     const picker = $('upload-picker');
@@ -3880,8 +3873,8 @@ function bootApp() {
   });
   $('upick-split').addEventListener('click', e => {
     e.stopPropagation();
-    if (!selectedCollection) return;
     $('upload-picker').style.display = 'none';
+    if (!selectedCollection) { alert('Select a collection first.'); return; }
     openSplitMetaModal();
   });
   $('file-input').addEventListener('change', e => { if(e.target.files.length) openUploadModal(e.target.files); });
@@ -6261,13 +6254,8 @@ async function makeContextDoc(idx) {
 ═══════════════════════════════════════════════════════════ */
 
 function initSplitPdf() {
-  const btn   = $('split-pdf-btn');
   const input = $('split-pdf-input');
-  if (!btn || !input) return;
-  btn.addEventListener('click', () => {
-    if (!selectedCollection) { alert('Select a collection first.'); return; }
-    openSplitMetaModal();
-  });
+  if (!input) return;
   input.addEventListener('change', async e => {
     const file = e.target.files[0];
     if (!file || !file.name.toLowerCase().endsWith('.pdf')) return;
