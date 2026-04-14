@@ -1084,6 +1084,93 @@ body::before {
   background: linear-gradient(180deg, var(--gold), transparent);
   opacity: 0.3;
 }
+
+/* ── Markdown content inside AI bubbles ─────────────────── */
+.msg.ai .msg-bubble h1,
+.msg.ai .msg-bubble h2,
+.msg.ai .msg-bubble h3 {
+  font-family: var(--f-display);
+  font-weight: 400;
+  color: var(--smoke);
+  letter-spacing: 0.04em;
+  margin: 14px 0 6px;
+  line-height: 1.3;
+}
+.msg.ai .msg-bubble h1 { font-size: 18px; color: var(--gold-lt); }
+.msg.ai .msg-bubble h2 { font-size: 15px; color: var(--smoke); border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+.msg.ai .msg-bubble h3 { font-size: 13px; color: var(--smoke2); text-transform: uppercase; letter-spacing: 0.08em; }
+.msg.ai .msg-bubble p  { margin: 0 0 8px; line-height: 1.7; }
+.msg.ai .msg-bubble p:last-child { margin-bottom: 0; }
+.msg.ai .msg-bubble ul,
+.msg.ai .msg-bubble ol {
+  margin: 6px 0 10px 0;
+  padding-left: 18px;
+  line-height: 1.7;
+}
+.msg.ai .msg-bubble li { margin-bottom: 3px; }
+.msg.ai .msg-bubble li:last-child { margin-bottom: 0; }
+.msg.ai .msg-bubble ul li { list-style-type: none; position: relative; padding-left: 10px; }
+.msg.ai .msg-bubble ul li::before {
+  content: '\25C6';
+  position: absolute; left: -8px;
+  font-size: 5px; top: 6px;
+  color: var(--gold);
+  opacity: 0.7;
+}
+.msg.ai .msg-bubble ol li { list-style-type: decimal; }
+.msg.ai .msg-bubble strong { color: var(--smoke); font-weight: 500; }
+.msg.ai .msg-bubble em { color: var(--smoke2); font-style: italic; }
+.msg.ai .msg-bubble code {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  background: var(--ink4);
+  border: 1px solid var(--line2);
+  border-radius: 3px;
+  padding: 1px 5px;
+  color: var(--gold-lt);
+}
+.msg.ai .msg-bubble pre {
+  background: var(--ink4);
+  border: 1px solid var(--line2);
+  border-radius: 4px;
+  padding: 10px 14px;
+  margin: 8px 0;
+  overflow-x: auto;
+}
+.msg.ai .msg-bubble pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 11px;
+  color: var(--smoke2);
+}
+.msg.ai .msg-bubble hr {
+  border: none;
+  border-top: 1px solid var(--line2);
+  margin: 12px 0;
+}
+.msg.ai .msg-bubble table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin: 8px 0;
+}
+.msg.ai .msg-bubble th {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--gold-lt);
+  border-bottom: 1px solid var(--line2);
+  padding: 4px 8px;
+  text-align: left;
+}
+.msg.ai .msg-bubble td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--line);
+  color: var(--smoke2);
+}
+.msg.ai .msg-bubble tr:last-child td { border-bottom: none; }
 /* ── Message action bar ─────────────────────────────────── */
 .msg-actions {
   display: flex; gap: 6px; align-items: center;
@@ -3789,6 +3876,16 @@ function renderMarkdown(s) {
   t = t.replace(/((?:^[ \t]*\d+\. .+\n?)+)/gm, match => {
     const items = match.trim().split('\n').map(l => '<li>' + l.replace(/^[ \t]*\d+\. /, '') + '</li>').join('');
     return '<ol>' + items + '</ol>';
+  });
+  // Tables — | col | col | rows
+  t = t.replace(/((?:^\|.+\|\n?)+)/gm, match => {
+    const rows = match.trim().split('\n').filter(r => r.trim() && !/^\s*\|[-| :]+\|/.test(r));
+    if (rows.length < 1) return match;
+    const toTd = (row, tag) => row.trim().replace(/^\|/, '').replace(/\|$/, '').split('|')
+      .map(c => `<${tag}>${c.trim()}</${tag}>`).join('');
+    const head = `<tr>${toTd(rows[0], 'th')}</tr>`;
+    const body = rows.slice(1).map(r => `<tr>${toTd(r, 'td')}</tr>`).join('');
+    return `<table><thead>${head}</thead><tbody>${body}</tbody></table>`;
   });
   // Paragraphs — blank line = paragraph break; single newline = <br>
   t = t.replace(/\n\n+/g, '</p><p>');
