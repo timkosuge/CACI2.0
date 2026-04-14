@@ -639,10 +639,25 @@ The people you work with:
 - Compliance teams are perpetually stressed; retail teams are customer-focused; ops teams are problem-solvers
 - Everyone is used to things changing fast and figuring it out as they go`;
 
-    if (context.statsContext) system += `\n\nDATA SUMMARIES:\n${context.statsContext}`;
-    if (contextDocs) system += `\n\nCOLLECTION CONTEXT:\n${contextDocs}`;
-    if (context.text) system += `\n\nDOCUMENT CONTENT:\n${context.text}\n\nCite document names when referencing data.`;
-    else system += `\n\nNo documents found. Ask the user to upload files first.`;
+    // ── Data injection — order matters ────────────────────────
+    // 1. Stats block: pre-computed numeric summaries and category inventories.
+    //    Tell the model exactly what this is and how to use it.
+    if (context.statsContext) {
+      system += `\n\nPRE-COMPUTED DATA SUMMARIES (authoritative — use these numbers directly for aggregate questions like totals, averages, min/max):
+${context.statsContext}
+
+These summaries were computed at upload time from the full dataset. When a question can be answered from these summaries alone, prefer them over scanning row chunks.`;
+    }
+
+    // 2. Context docs (SOPs, policies, reference material)
+    if (contextDocs) system += `\n\nCOLLECTION CONTEXT DOCUMENTS (reference material — use for background, definitions, policies):\n${contextDocs}`;
+
+    // 3. Document/row chunks — the actual retrievable content
+    if (context.text) {
+      system += `\n\nDOCUMENT CONTENT:\nFormat note: tabular data appears as self-contained row chunks, each starting with "Columns: ..." followed by numbered rows. Each chunk is a slice of a larger dataset — rows may not be sequential across chunks.\n\n${context.text}\n\nWhen answering: cite the document name and period. For numeric questions, cross-reference the DATA SUMMARIES above with the row chunks below to give precise answers. If the row chunks don't contain enough detail to answer fully, say what you CAN answer from the summaries and note what's missing.`;
+    } else {
+      system += `\n\nNo documents found matching this query. Let the user know and ask them to upload relevant files or switch to a different collection.`;
+    }
 
     const responseText = await callLLM({ model, system, messages: [...history.slice(-10).map(h => ({ role: h.role, content: h.content })), { role: 'user', content: message }], maxTokens: 3000, env, apiKey });
     return json({ ok: true, response: responseText, sources: context.sources, scope, model: model || 'claude' });
@@ -774,7 +789,7 @@ async function buildContextTwoPass({ message, dept, collection, env }) {
     const colFiles = await env.CACI_KV.get(`col:${dept}:${collection}`, 'json') || [];
     if (!colFiles.length) return { text: '', sources: [], statsContext: '', focusFile: null };
 
-    const manifest = colFiles.map(f => `- ${f.name}${f.meta?.period ? ' [' + f.meta.period + ']' : ''}`).join('\n');
+    const manifest = colFiles.map(f => `- ${f.name}${f.meta?.period ? ' [' + f.meta.period + ']' : ''}${f.stats?.rowCount ? ' (' + f.stats.rowCount + ' rows)' : ''}`).join('\n');
 
     const keywords = extractKeywords(message);
     const yearMatches = message.match(/20\d\d/g) || [];
@@ -1112,14 +1127,14 @@ async function handleCollectionAnalyze(request, env) {
 
 Collection name: "${colName}"
 
-Files in this collection:
+Files in this collection (name, period, row count, columns where available):
 ${manifest}
 
-Based on the file names and their periods/categories, return ONLY valid JSON:
+Based on this information, return ONLY valid JSON with no markdown or preamble:
 {
-  "description": "1-2 sentence plain-English description of what this collection contains and covers (e.g. 'Monthly product return and credit reports tracking customer complaints by state and product type, covering Jan 2024 through Feb 2026.')",
+  "description": "1-2 sentence description covering: what kind of data this is, which states/stores/products if apparent, and the time range covered. Be specific — mention column names or metrics if they reveal what the data tracks. Example: 'Monthly retail sales data by state, store, and product category tracking units sold and revenue, covering March 2024 through February 2026 across PA, IL, NV, and VA locations.'",
   "category": "the primary category: Sales, Inventory, Compliance, Finance, HR, Operations, Marketing, Customer, Product, Legal, Technology, or Other",
-  "summary": "ultra-short 5-8 word summary (e.g. 'Monthly product return data by state')"
+  "summary": "ultra-short 5-8 word summary (e.g. 'Monthly retail sales by state and product')"
 }`;
 
     const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -1127,7 +1142,7 @@ Based on the file names and their periods/categories, return ONLY valid JSON:
       headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 200,
+        max_tokens: 300,
         messages: [{ role: 'user', content: prompt }],
       }),
     });
