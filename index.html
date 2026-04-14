@@ -4261,6 +4261,7 @@ function bootApp() {
   $('model-modal').addEventListener('click', e => { if (e.target === $('model-modal')) $('model-modal').classList.remove('open'); });
   $('ant-save').addEventListener('click', saveKey);
   if ($('xai-save')) $('xai-save').addEventListener('click', saveXaiKey);
+  initComplianceUI();
 }
 
 /* NAV */
@@ -7021,9 +7022,7 @@ function queueAiClassify(fileId,fileName,collection,extractedText){
   }
 }
 
-// Override bootApp to init compliance UI
-const _origBA=bootApp;
-function bootApp(){_origBA();initComplianceUI();}
+// initComplianceUI is called directly inside bootApp above
 
 </script>
 
