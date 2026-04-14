@@ -4259,7 +4259,7 @@ async function sendChat() {
   chatHistory.push({role:'user', content:msg});
   const ty = appendTyping();
   try {
-    const body = {message:msg, dept, model:modelId, scope:chatScope, history:chatHistory.slice(-10)};
+    const body = {message:msg, dept, model:modelId, scope:chatScope, history:chatHistory.slice(-20)};
     if (chatScope === 'collection' && chatCollection) body.collection = chatCollection;
     if (chatScope === 'file' && chatFileId) { body.fileId = chatFileId; body.scope = 'file'; }
 
