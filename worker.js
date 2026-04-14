@@ -488,6 +488,24 @@ async function callLLM({ model, system, messages, maxTokens = 2000, env, apiKey 
   throw new Error('Unknown model: ' + model);
 }
 
+// ── Lightweight LLM call — Haiku for Claude, fallback to selected model ──
+// Used for classify/analyze tasks that don't need a full-power model
+async function callLLMLight({ model, system, messages, maxTokens = 500, env, apiKey }) {
+  // If Anthropic key is available, always use Haiku for lightweight tasks — fast and cheap
+  if (apiKey) {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: maxTokens, messages }),
+    });
+    if (!res.ok) { const e = await res.text(); throw new Error('Claude Haiku error (' + res.status + '): ' + e); }
+    const d = await res.json();
+    return d.content?.[0]?.text || '';
+  }
+  // No Anthropic key — fall back to whatever model is selected
+  return callLLM({ model, system, messages, maxTokens, env, apiKey });
+}
+
 // ── Chat ──────────────────────────────────────────────────────
 async function handleChat(request, env) {
   try {
@@ -983,10 +1001,11 @@ async function buildContextMultiCollection({ message, dept, env, maxCollections 
 // ── Report Generation ─────────────────────────────────────────
 async function handleReport(request, env) {
   try {
-    const { prompt, dept, collection, fileId, scope = 'all', format = 'markdown' } = await request.json();
+    const { prompt, dept, collection, fileId, scope = 'all', format = 'markdown', model } = await request.json();
 
     const apiKey = (await env.CACI_KV.get('config:ANTHROPIC_API_KEY')) || env.ANTHROPIC_API_KEY;
-    if (!apiKey) return json({ error: 'Anthropic API key not configured.' }, 400);
+    const xaiKey = (await env.CACI_KV.get('config:XAI_API_KEY')) || env.XAI_API_KEY;
+    if (!apiKey && !xaiKey && !env.AI) return json({ error: 'No AI provider configured. Add an API key in Config.' }, 400);
 
     const context = await buildContext({ message: prompt, dept, collection, fileId, scope, env });
 
@@ -1008,23 +1027,14 @@ Generate a well-structured internal report. Include only sections that are suppo
 
 Format in clean Markdown. Use ## for sections, tables where data warrants it. Be precise — never round or estimate when exact figures are available. If data is insufficient to complete a section, omit it rather than speculating.`;
 
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 4000,
-        messages: [{ role: 'user', content: reportPrompt }],
-      }),
+    const reportText = await callLLM({
+      model: model || 'claude',
+      system: 'You are a precise business analyst generating internal reports for Jushi Holdings. Use markdown formatting — headers, tables, and bullets where appropriate. Cite document names and periods for every data point.',
+      messages: [{ role: 'user', content: reportPrompt }],
+      maxTokens: 4000,
+      env,
+      apiKey,
     });
-
-    if (!res.ok) {
-      const err = await res.text();
-      return json({ error: `Report generation error (${res.status}): ${err}` }, 500);
-    }
-
-    const data = await res.json();
-    const reportText = data.content?.[0]?.text || '';
     return json({ ok: true, report: reportText, sources: context.sources, format });
   } catch (err) { return json({ error: 'Report error: ' + err.message }, 500); }
 }
@@ -1608,7 +1618,7 @@ async function handleCollectionAnalyze(request, env) {
     if (!colName || !manifest) return json({ error: 'colName and manifest required' }, 400);
 
     const apiKey = (await env.CACI_KV.get('config:ANTHROPIC_API_KEY')) || env.ANTHROPIC_API_KEY;
-    if (!apiKey) return json({ error: 'Anthropic API key not configured' }, 400);
+    if (!apiKey && !env.AI) return json({ error: 'No AI provider configured. Add an API key in Config.' }, 400);
 
     const prompt = `You are analyzing a document collection for a cannabis company (Jushi Holdings).
 
@@ -1624,19 +1634,14 @@ Based on this information, return ONLY valid JSON with no markdown or preamble:
   "summary": "ultra-short 5-8 word summary (e.g. 'Monthly retail sales by state and product')"
 }`;
 
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 300,
-        messages: [{ role: 'user', content: prompt }],
-      }),
+    const result = await callLLMLight({
+      model: 'claude',
+      system: 'You are a precise document analyst. Return only valid JSON, no markdown, no preamble.',
+      messages: [{ role: 'user', content: prompt }],
+      maxTokens: 300,
+      env,
+      apiKey,
     });
-
-    if (!res.ok) { const e = await res.text(); return json({ error: e }, 500); }
-    const data   = await res.json();
-    const result = data.content?.[0]?.text || '';
 
     let parsed;
     try { parsed = JSON.parse(result.replace(/```json|```/g, '').trim()); }
@@ -1679,7 +1684,7 @@ async function handleAiClassify(request, env) {
     if (!fileName || !sample) return json({ error: 'fileName and sample required' }, 400);
 
     const apiKey = (await env.CACI_KV.get('config:ANTHROPIC_API_KEY')) || env.ANTHROPIC_API_KEY;
-    if (!apiKey) return json({ error: 'Anthropic API key not configured' }, 400);
+    if (!apiKey && !env.AI) return json({ error: 'No AI provider configured. Add an API key in Config.' }, 400);
 
     const prompt = `You are classifying a business document for a cannabis company (Jushi Holdings).
 
@@ -1708,23 +1713,14 @@ Rules:
 - period = empty string for regulations, policies, contracts (evergreen docs)
 - confidence = low if you cannot determine category or reportName clearly from the text`;
 
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 350,
-        messages: [{ role: 'user', content: prompt }],
-      }),
+    const result = await callLLMLight({
+      model: 'claude',
+      system: 'You are a precise document classifier. Return only valid JSON, no markdown, no preamble.',
+      messages: [{ role: 'user', content: prompt }],
+      maxTokens: 350,
+      env,
+      apiKey,
     });
-
-    if (!res.ok) {
-      const err = await res.text();
-      return json({ error: `Claude error: ${err}` }, 500);
-    }
-
-    const data = await res.json();
-    const result = data.content?.[0]?.text || '';
     return json({ ok: true, result });
   } catch(err) {
     return json({ error: 'AI classify error: ' + err.message }, 500);
