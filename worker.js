@@ -727,6 +727,150 @@ async function buildDiscoveryContext({ dept, env }) {
   }
 }
 
+// ── Query intent analysis ─────────────────────────────────────
+function analyzeQueryIntent(message) {
+  const msg = message.toLowerCase();
+  const isComparative = [
+    /vs\.?|versus|compare|comparison/,
+    /trend|over time|month.over.month|m\.o\.m/,
+    /year.over.year|y\.o\.y|quarter.over.quarter/,
+    /change|growth|decline|down|up|drop/,
+    /better|worse|improved|increased|decreased/,
+    /histor/,
+  ].some(r => r.test(msg));
+  const isAggregate = [
+    /total|sum|aggregate|overall/,
+    /how much|how many/,
+    /average|avg|mean/,
+    /biggest|largest|highest|lowest|smallest/,
+  ].some(r => r.test(msg));
+  const isFiltered = [
+    /pa|ill|nv|va|nj|oh|ma|fl/,
+    /flower|vape|edible|concentrate|preroll/,
+    /store|location|dispensary/,
+  ].some(r => r.test(msg));
+  const isCausal = [
+    /why|cause|reason|driving|factor|explain/,
+  ].some(r => r.test(msg));
+  let periodExpansion = 1;
+  if (isComparative || isCausal) periodExpansion = 3;
+  else if (isAggregate && !isFiltered) periodExpansion = 2;
+  return {
+    isComparative, isAggregate, isFiltered, isCausal, periodExpansion,
+    expansionHint: isComparative || isCausal
+      ? 'include adjacent time periods for comparison'
+      : isAggregate ? 'use pre-computed stats block for totals' : '',
+  };
+}
+
+// ── Multi-collection context builder ─────────────────────────
+async function buildContextMultiCollection({ message, dept, env, maxCollections = 3 }) {
+  try {
+    const reg = await env.CACI_KV.get(`colreg:${dept}`, 'json') || [];
+    if (!reg.length) return { text: '', sources: [], statsContext: '', focusFile: null };
+
+    const keywords = extractKeywords(message);
+    const intent   = analyzeQueryIntent(message);
+    const msgLower = message.toLowerCase();
+    const queryYears = new Set((message.match(/20\d\d/g) || []));
+
+    const colScores = reg.map(c => {
+      let score = 0;
+      const nameLower = c.name.toLowerCase();
+      if (msgLower.includes(nameLower)) score += 20;
+      if (c.category && msgLower.includes(c.category.toLowerCase())) score += 8;
+      if (c.description) keywords.forEach(kw => { if (c.description.toLowerCase().includes(kw)) score += 3; });
+      if (c.summary)     keywords.forEach(kw => { if (c.summary.toLowerCase().includes(kw)) score += 2; });
+      const stopWords = new Set(['the','and','for','all','from','with','that','this','are','reports']);
+      const nameWords = nameLower.split(/[\s&,\/]+/).filter(w => w.length >= 4 && !stopWords.has(w));
+      score += nameWords.filter(w => msgLower.includes(w)).length * 4;
+      if (c.period) { const pl = c.period.toLowerCase(); if ([...queryYears].some(y => pl.includes(y))) score += 10; }
+      if (intent.isComparative && c.fileCount > 3) score += 5;
+      return { ...c, _colScore: score };
+    })
+    .filter(c => c._colScore > 0)
+    .sort((a, b) => b._colScore - a._colScore)
+    .slice(0, maxCollections);
+
+    if (!colScores.length) return { text: '', sources: [], statsContext: '', focusFile: null };
+
+    const results = await Promise.all(
+      colScores.map(c => buildContextTwoPass({ message, dept, collection: c.name, env }))
+    );
+
+    const allStats = results
+      .map((r, i) => {
+        if (!r.statsContext) return '';
+        const col = colScores[i];
+        const schemaNote = col.category ? ` [${col.category}]` : '';
+        return `### Collection: ${col.name}${schemaNote}
+${r.statsContext}`;
+      })
+      .filter(Boolean)
+      .join('
+
+---
+
+');
+
+    const allChunks = [];
+    for (let i = 0; i < results.length; i++) {
+      const r = results[i];
+      if (!r.text) continue;
+      const boost = (maxCollections - i) * 2;
+      r.text.split('
+
+---
+
+').forEach(chunk => allChunks.push({ chunk, boost, colName: colScores[i].name }));
+    }
+
+    const keywords2 = extractKeywords(message);
+    const ranked = allChunks
+      .map(c => ({ ...c, score: scoreChunk(c.chunk, keywords2) + c.boost }))
+      .filter(c => c.score >= 0)
+      .sort((a, b) => b.score - a.score);
+
+    const seen = new Set();
+    const deduped = ranked.filter(c => {
+      const key = c.chunk.slice(0, 80).replace(/\s+/g, ' ');
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    const top = deduped.slice(0, 22);
+    const text = top.map(c => c.chunk).join('
+
+---
+
+');
+    const sources = [...new Set(top.map(c => {
+      const m = c.chunk.match(/^\[([^\]]+)\]/);
+      return m ? m[1] : c.colName;
+    }))];
+
+    const manifest = colScores.map(c =>
+      `- ${c.name} (score:${c._colScore}, ${c.fileCount || '?'} files${c.summary ? ' — ' + c.summary : ''})`
+    ).join('
+');
+
+    return {
+      text: text + `
+
+COLLECTIONS SEARCHED:
+${manifest}`,
+      sources,
+      statsContext: allStats,
+      focusFile: results[0]?.focusFile || null,
+      collectionsSearched: colScores.map(c => c.name),
+    };
+  } catch(err) {
+    console.error('Multi-collection context error:', err.message);
+    return { text: '', sources: [], statsContext: '', focusFile: null };
+  }
+}
+
 // ── Report Generation ─────────────────────────────────────────
 async function handleReport(request, env) {
   try {
@@ -792,6 +936,10 @@ const _ALL_MONTH_KEYS = Object.keys(_MONTH_TO_NUM);
 // Parse date range from a query string.
 // Handles: "between X 2025 and Y 2026", "from X to Y", "X through Y"
 function parseDateRange(message) {
+  // ── Pattern 0: relative date expressions (highest priority) ─
+  const relative = resolveRelativeDates(message);
+  if (relative) return relative;
+
   const msg = message.toLowerCase();
 
   // ── Pattern 1: explicit range "from/between X YYYY and/to Y YYYY" ──
@@ -977,23 +1125,61 @@ async function buildContextTwoPass({ message, dept, collection, env }) {
       })
     )).filter(Boolean);
 
-    // Build stats context
+    // ── Collection-level aggregate stats (ALL files, not just loaded) ──
+    // colFiles index records carry stats without chunks — use them to compute
+    // true collection totals so the LLM sees the full picture even when only
+    // a subset of files are loaded for chunk retrieval.
+    const collectionAgg = { rowCount: 0, numeric: {}, categoryCols: {}, columns: new Set(), fileCount: colFiles.length };
+    for (const f of colFiles) {
+      if (!f.stats) continue;
+      if (f.stats.rowCount) collectionAgg.rowCount += f.stats.rowCount;
+      if (f.stats.columns)  f.stats.columns.forEach(c => collectionAgg.columns.add(c));
+      if (f.stats.numeric) {
+        for (const [col, s] of Object.entries(f.stats.numeric)) {
+          if (!collectionAgg.numeric[col]) {
+            collectionAgg.numeric[col] = { sum: s.sum, count: s.count, min: s.min, max: s.max };
+          } else {
+            const agg = collectionAgg.numeric[col];
+            agg.sum   = Math.round((agg.sum + s.sum) * 100) / 100;
+            agg.count += s.count;
+            agg.min    = Math.min(agg.min, s.min);
+            agg.max    = Math.max(agg.max, s.max);
+          }
+        }
+      }
+      if (f.stats.categoryCols) {
+        for (const [col, vals] of Object.entries(f.stats.categoryCols)) {
+          if (!collectionAgg.categoryCols[col]) collectionAgg.categoryCols[col] = new Set();
+          vals.forEach(v => collectionAgg.categoryCols[col].add(v));
+        }
+      }
+    }
+
+    // Build stats context — lead with collection-level aggregate, then per-file detail
     const statsLines = [];
+    if (collectionAgg.rowCount > 0) {
+      statsLines.push(`\n### COLLECTION TOTAL (${collectionAgg.fileCount} files, ${collectionAgg.rowCount.toLocaleString()} rows)`);
+      if (collectionAgg.columns.size) statsLines.push(`Columns: ${[...collectionAgg.columns].join(', ')}`);
+      for (const [col, agg] of Object.entries(collectionAgg.numeric)) {
+        const avg = agg.count > 0 ? Math.round(agg.sum / agg.count * 100) / 100 : 0;
+        statsLines.push(`${col}: total=${agg.sum.toLocaleString()}, avg=${avg}, min=${agg.min}, max=${agg.max}, rows=${agg.count}`);
+      }
+      for (const [col, valSet] of Object.entries(collectionAgg.categoryCols)) {
+        const vals = [...valSet];
+        statsLines.push(`${col} values: ${vals.map(v => v.includes(',') ? '"' + v + '"' : v).join(', ')}`);
+      }
+    }
+
+    // Per-file stats for loaded files (provides period-level detail)
     for (const f of fullFiles) {
       if (f.stats && Object.keys(f.stats).length) {
         const meta = f.meta || {};
         const label = `${meta.reportName || f.name} [${meta.period || ''}]`.trim();
         statsLines.push(`\n### ${label}`);
         if (f.stats.rowCount) statsLines.push(`Rows: ${f.stats.rowCount}`);
-        if (f.stats.columns) statsLines.push(`Columns: ${f.stats.columns.join(', ')}`);
         if (f.stats.numeric) {
           for (const [col, s] of Object.entries(f.stats.numeric)) {
-            statsLines.push(`${col}: sum=${s.sum}, avg=${s.avg}, min=${s.min}, max=${s.max}, count=${s.count}`);
-          }
-        }
-        if (f.stats.categoryCols) {
-          for (const [col, vals] of Object.entries(f.stats.categoryCols)) {
-            statsLines.push(`${col} values: ${vals.map(v => v.includes(',') ? '"' + v + '"' : v).join(', ')}`);
+            statsLines.push(`${col}: sum=${s.sum}, avg=${s.avg}, min=${s.min}, max=${s.max}`);
           }
         }
       }
@@ -1445,6 +1631,43 @@ async function handleAdminGet(env) {
   } catch (err) { return json({ error: err.message }, 500); }
 }
 
+// ── Re-ranking pass ───────────────────────────────────────────
+function rerankChunks(chunks, keywords, intent) {
+  if (!chunks.length) return chunks;
+  const expanded = expandKeywords(keywords);
+  const scored = chunks.map((c, idx) => {
+    const lower = c.chunk.toLowerCase();
+    let bonus = 0;
+    // Direct answer signal: number near a keyword
+    for (const kw of expanded) {
+      const re = new RegExp('(?<![a-z0-9])' + escapeRegex(kw) + '[^
+]{0,40}\d+[,.]?\d*', 'i');
+      if (re.test(lower)) bonus += 4;
+    }
+    // Numeric density for aggregate queries
+    if (intent?.isAggregate) {
+      const numCount = (lower.match(/\d+[,.]?\d*/g) || []).length;
+      bonus += Math.min(numCount * 0.3, 3);
+    }
+    // Multi-year presence for comparative queries
+    if (intent?.isComparative) {
+      const years = [...new Set(lower.match(/20\d\d/g) || [])];
+      if (years.length >= 2) bonus += 4;
+    }
+    // FILE SUMMARY always first
+    if (lower.startsWith('file summary')) bonus += 50;
+    // Redundancy penalty
+    const fp = lower.replace(/\s+/g, ' ').slice(0, 100);
+    const isDup = chunks.slice(0, idx).some(prev =>
+      prev.chunk.toLowerCase().replace(/\s+/g, ' ').slice(0, 100) === fp
+    );
+    if (isDup) bonus -= 20;
+    return { ...c, rerankScore: (c.score || 0) + bonus };
+  });
+  scored.sort((a, b) => b.rerankScore - a.rerankScore);
+  return scored;
+}
+
 // ── Helpers ───────────────────────────────────────────────────
 function chunkText(text, size = 1500) {
   if (!text || text.length === 0) return [];
@@ -1498,6 +1721,94 @@ function chunkText(text, size = 1500) {
   return chunks.filter(c => c.length > 50);
 }
 
+// ── Relative date resolver ────────────────────────────────────
+function resolveRelativeDates(message) {
+  const msg   = message.toLowerCase();
+  const today = new Date();
+  const m     = today.getMonth() + 1;
+  const y     = today.getFullYear();
+  const q     = Math.ceil(m / 3);
+
+  if (/last month|previous month/.test(msg)) {
+    const lm = m === 1 ? 12 : m - 1, ly = m === 1 ? y - 1 : y;
+    return { rangeStart: { m: lm, y: ly }, rangeEnd: { m: lm, y: ly } };
+  }
+  if (/this month|month to date|mtd/.test(msg)) {
+    return { rangeStart: { m, y }, rangeEnd: { m, y } };
+  }
+  if (/last quarter|previous quarter/.test(msg)) {
+    const lq = q === 1 ? 4 : q - 1, lqy = q === 1 ? y - 1 : y;
+    const qs = [0,1,4,7,10][lq], qe = [0,3,6,9,12][lq];
+    return { rangeStart: { m: qs, y: lqy }, rangeEnd: { m: qe, y: lqy } };
+  }
+  if (/this quarter|current quarter/.test(msg)) {
+    const qs = [0,1,4,7,10][q], qe = [0,3,6,9,12][q];
+    return { rangeStart: { m: qs, y }, rangeEnd: { m: qe, y } };
+  }
+  if (/last year|prior year/.test(msg)) {
+    return { rangeStart: { m: 1, y: y - 1 }, rangeEnd: { m: 12, y: y - 1 } };
+  }
+  if (/this year|year to date|ytd/.test(msg)) {
+    return { rangeStart: { m: 1, y }, rangeEnd: { m, y } };
+  }
+  const pastN = msg.match(/past\s+(\w+|\d+)\s+months?/);
+  if (pastN) {
+    const wn = {one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,twelve:12};
+    const n = parseInt(pastN[1]) || wn[pastN[1]] || 3;
+    let em = m - 1, ey = y; if (em === 0) { em = 12; ey--; }
+    let sm = em - n + 1, sy = ey; while (sm <= 0) { sm += 12; sy--; }
+    return { rangeStart: { m: sm, y: sy }, rangeEnd: { m: em, y: ey } };
+  }
+  const lastNQ = msg.match(/last\s+(\d+|two|three|four)\s+quarters?/);
+  if (lastNQ) {
+    const wn = {two:2,three:3,four:4};
+    const n = parseInt(lastNQ[1]) || wn[lastNQ[1]] || 2;
+    let eq = q - 1, eqy = y; if (eq === 0) { eq = 4; eqy--; }
+    let sq = eq - n + 1, sqy = eqy; while (sq <= 0) { sq += 4; sqy--; }
+    const qs = [0,1,4,7,10][sq], qe = [0,3,6,9,12][eq];
+    return { rangeStart: { m: qs, y: sqy }, rangeEnd: { m: qe, y: eqy } };
+  }
+  return null;
+}
+
+// ── Derived business metric synonyms ─────────────────────────
+const DERIVED_METRIC_SYNONYMS = {
+  'basket size':          ['revenue','avg','transaction'],
+  'average order':        ['revenue','avg'],
+  'average transaction':  ['revenue','avg'],
+  'aov':                  ['revenue','avg'],
+  'items per basket':     ['units','avg'],
+  'units per transaction':['units','avg'],
+  'sell through':         ['sold','units','inventory'],
+  'sell-through':         ['sold','units','inventory'],
+  'sellthrough':          ['sold','units','inventory'],
+  'margin':               ['revenue','cost','profit','gross'],
+  'profitability':        ['revenue','cost','margin','gross'],
+  'gross profit':         ['revenue','cost','gross'],
+  'conversion':           ['transactions','visits','customers'],
+  'conversion rate':      ['transactions','visits'],
+  'foot traffic':         ['visits','customers','transactions'],
+  'shrinkage':            ['shrink','loss','variance','adjustment'],
+  'variance':             ['shrink','loss','adjustment'],
+  'loss rate':            ['shrink','loss','variance'],
+  'growth rate':          ['revenue','change','increase','decrease'],
+  'run rate':             ['revenue','monthly','annualized'],
+  'compliance rate':      ['violations','audit','passed','failed'],
+  'error rate':           ['errors','corrections','rejected'],
+  'retention':            ['repeat','customers','returning'],
+  'new customers':        ['new','first','customers'],
+  'customer count':       ['customers','patients','transactions'],
+};
+
+function expandWithDerivedMetrics(message, keywords) {
+  const msgLower = message.toLowerCase();
+  const extras = new Set(keywords);
+  for (const [phrase, expansions] of Object.entries(DERIVED_METRIC_SYNONYMS)) {
+    if (msgLower.includes(phrase)) expansions.forEach(e => extras.add(e));
+  }
+  return [...extras];
+}
+
 function extractKeywords(query) {
   const stop = new Set(['a','an','the','is','are','was','were','be','been','have','has','had',
     'do','does','did','will','would','could','should','may','might','what','which','who',
@@ -1506,7 +1817,9 @@ function extractKeywords(query) {
     'when','where','why','with','about','from','into','can','tell','show','give','get','all',
     'report','reports','data','file','files','show','list','give','find','between','across',
     'total','totals','number','numbers','amount','amounts','value','values']);
-  return query.toLowerCase().replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(w => w.length > 2 && !stop.has(w));
+  const base = query.toLowerCase().replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(w => w.length > 2 && !stop.has(w));
+  // Expand with derived business metrics (maps KPIs to actual column terms)
+  return expandWithDerivedMetrics(query, base);
 }
 
 // Escape special regex characters so keywords like "$" or "." don't misbehave
