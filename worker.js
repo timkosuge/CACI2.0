@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-//  CACI Worker v6.1 — Collection Analysis + AI Auto-Classification
+//  CACI Worker v6.2 — Stats-First Routing + Structured Query Plans
 // ─────────────────────────────────────────────────────────────
 
 const CORS = {
@@ -28,7 +28,7 @@ export default {
 
     if (method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
     if (path === '/auth/login' && method === 'POST') return handleLogin(request, env);
-    if (path === '/health') return json({ ok: true, version: '6.1.0' });
+    if (path === '/health') return json({ ok: true, version: '6.2.0' });
 
     if (!verifyToken(request, env)) return json({ error: 'Unauthorized' }, 401);
 
@@ -567,8 +567,8 @@ Be direct and conversational. List them clearly.`;
       return json({ ok: true, response: colRes, sources: [], scope: scope, model: model || 'claude' });
     }
 
-    // ── Intent analysis — shapes retrieval strategy ─────────────
-    const intent = analyzeQueryIntent(message);
+    // ── Structured query plan — drives routing and prompt assembly ────
+    const intent = buildQueryPlan(message);
 
     // ── Collection routing ────────────────────────────────────
     // Auto-switch collection on full name match
@@ -587,15 +587,25 @@ Be direct and conversational. List them clearly.`;
     // ── Context retrieval — multi-collection for broad queries ─
     let context;
     const useMultiCollection = activeScope === 'all' && !fileId && !activeCollection;
+
+    // Stats-only short-circuit: for pure aggregate queries (e.g. "what was total revenue")
+    // we only need the stats block — no chunk retrieval required.
+    // We still run the full context builder to GET the stats, but we'll discard
+    // the text chunks and tell the model explicitly not to look for row-level data.
+    const forceStatsOnly = intent.statsOnly && !fileId;
+
     if (useMultiCollection) {
-      // Broad scope: search across top-matching collections
       context = await buildContextMultiCollection({ message, dept, env, maxCollections: intent.isComparative ? 4 : 3 });
-      // Fall back to single-path if multi returns nothing
       if (!context.text && !context.statsContext) {
         context = await buildContext({ message, dept, collection: null, fileId: null, scope: 'all', env });
       }
     } else {
       context = await buildContext({ message, dept, collection: activeCollection, fileId, scope: activeScope, env });
+    }
+
+    // Apply stats-only: strip chunks if we have stats and don't need row evidence
+    if (forceStatsOnly && context.statsContext) {
+      context = { ...context, text: '' };
     }
 
     // Note: context builders (buildContextTwoPass / buildContext) already
@@ -663,31 +673,41 @@ The people you work with:
 - Everyone is used to things changing fast and figuring it out as they go`;
 
     // ── Data injection — order matters ────────────────────────
-    // 1. Stats block: pre-computed numeric summaries and category inventories.
-    //    Tell the model exactly what this is and how to use it.
+    // 1. Stats block (always first — authoritative aggregate numbers)
     if (context.statsContext) {
-      system += `\n\nPRE-COMPUTED DATA SUMMARIES (authoritative — use these numbers directly for aggregate questions like totals, averages, min/max):
-${context.statsContext}
-
-These summaries were computed at upload time from the full dataset. When a question can be answered from these summaries alone, prefer them over scanning row chunks.`;
+      if (forceStatsOnly) {
+        // Stats-only mode: be explicit that this IS the answer source
+        system += `\n\nPRE-COMPUTED DATA SUMMARIES — THIS IS YOUR PRIMARY DATA SOURCE FOR THIS QUERY:\n${context.statsContext}\n\nThese totals were computed at upload time from the complete dataset. Answer the question directly from these numbers. Do not say you need more data unless a specific metric is genuinely absent from the summaries above.`;
+      } else {
+        system += `\n\nPRE-COMPUTED DATA SUMMARIES (authoritative — use these numbers directly for aggregate questions like totals, averages, min/max):\n${context.statsContext}\n\nThese summaries were computed at upload time from the full dataset. When a question can be answered from these summaries alone, prefer them over scanning row chunks.`;
+      }
+    } else if (intent.requiresStats) {
+      // Query needed stats but none exist — enforce honest partial-answer response
+      system += `\n\nDATA AVAILABILITY NOTE: This query is asking for aggregate totals or averages, but no pre-computed stats are available for the matched documents. You must be upfront: tell the user what specific data is missing and what you CAN infer from any document content below. Do not fabricate totals.`;
     }
 
     // 2. Context docs (SOPs, policies, reference material)
     if (contextDocs) system += `\n\nCOLLECTION CONTEXT DOCUMENTS (reference material — use for background, definitions, policies):\n${contextDocs}`;
 
-    // 3. Document/row chunks — the actual retrievable content
+    // 3. Document/row chunks (omitted in stats-only mode)
     if (context.text) {
       system += `\n\nDOCUMENT CONTENT:\nFormat note: tabular data appears as self-contained row chunks, each starting with "Columns: ..." followed by numbered rows. Each chunk is a slice of a larger dataset — rows may not be sequential across chunks.\n\n${context.text}\n\nWhen answering: cite the document name and period. For numeric questions, cross-reference the DATA SUMMARIES above with the row chunks below to give precise answers. If the row chunks don't contain enough detail to answer fully, say what you CAN answer from the summaries and note what's missing.`;
-    } else {
-      system += `\n\nNo documents found matching this query. Let the user know and ask them to upload relevant files or switch to a different collection.`;
+    } else if (!context.statsContext) {
+      system += `\n\nNo documents found matching this query. Let the user know and suggest they upload relevant files or switch to a different collection.`;
     }
 
-    // ── Intent hint appended to system prompt ────────────────────
+    // ── Query plan hints appended to system prompt ───────────────
     if (intent.expansionHint) {
-      system += `\n\nQuery context: ${intent.expansionHint}. `;
-      if (intent.isComparative) system += 'Compare across time periods where possible. Highlight trends and changes.';
-      if (intent.isCausal) system += 'Identify likely drivers. Look for correlated changes across metrics.';
-      if (intent.isAggregate && context.statsContext) system += 'The DATA SUMMARIES above contain authoritative totals — use them directly.';
+      system += `\n\nQuery routing: ${intent.expansionHint}.`;
+    }
+    if (intent.isComparative) system += ' Compare across time periods where possible. Highlight trends and changes.';
+    if (intent.isCausal)      system += ' Identify likely drivers. Look for correlated changes across metrics.';
+    if (intent.entities?.length) {
+      const entityList = intent.entities.map(e => e.value).join(', ');
+      system += ` Focus on: ${entityList}.`;
+    }
+    if (intent.metrics?.length) {
+      system += ` Key metrics requested: ${intent.metrics.join(', ')}.`;
     }
     if (useMultiCollection && context.collectionsSearched?.length) {
       system += `\n\nNote: this response draws from ${context.collectionsSearched.length} collections: ${context.collectionsSearched.join(', ')}.`;
@@ -723,41 +743,98 @@ async function buildDiscoveryContext({ dept, env }) {
   }
 }
 
-// ── Query intent analysis ─────────────────────────────────────
-function analyzeQueryIntent(message) {
+// ── Structured Query Plan ───────────────────────────────────────────────
+// Produces a typed plan object that drives all retrieval routing decisions.
+// Key addition: statsOnly flag — when true, handleChat bypasses chunk retrieval
+// entirely and answers from pre-computed stats blocks (faster + more accurate
+// for pure "what was total X" queries that don't need row-level evidence).
+function buildQueryPlan(message) {
   const msg = message.toLowerCase();
+
   const isComparative = [
-    /vs\.?|versus|compare|comparison/,
-    /trend|over time|month.over.month|m\.o\.m/,
-    /year.over.year|y\.o\.y|quarter.over.quarter/,
-    /change|growth|decline|down|up|drop/,
-    /better|worse|improved|increased|decreased/,
-    /histor/,
+    /vs\.?|versus|compare|comparison/,
+    /trend|over time|month.over.month|m\.o\.m/,
+    /year.over.year|y\.o\.y|quarter.over.quarter/,
+    /change|growth|decline|down|up|drop/,
+    /better|worse|improved|increased|decreased/,
+    /histor/,
   ].some(r => r.test(msg));
+
   const isAggregate = [
-    /total|sum|aggregate|overall/,
-    /how much|how many/,
-    /average|avg|mean/,
-    /biggest|largest|highest|lowest|smallest/,
+    /total|sum|aggregate|overall/,
+    /how much|how many/,
+    /average|avg|mean/,
+    /biggest|largest|highest|lowest|smallest/,
   ].some(r => r.test(msg));
+
+  const isCausal = [
+    /why|cause|reason|driving|factor|explain/,
+  ].some(r => r.test(msg));
+
+  // Filtered = query targets a specific sub-entity (state / store / product).
+  // In that case collection totals are only partially useful — row chunks needed.
   const isFiltered = [
     /\bpa\b|\bill\b|\bnv\b|\bva\b|\bnj\b|\boh\b|\bma\b|\bfl\b|\bca\b|\bco\b/,
     /\bpennsylvania\b|\billinois\b|\bnevada\b|\bvirginia\b|\bnew jersey\b|\bohio\b|\bmassachusetts\b|\bflorida\b/,
     /\bflower\b|\bvape\b|\bedible\b|\bconcentrate\b|\bpreroll\b|\bpre-roll\b/,
     /\bstore\b|\blocation\b|\bdispensary\b|\bproduct\b|\bbrand\b/,
   ].some(r => r.test(msg));
-    /why|cause|reason|driving|factor|explain/,
-  ].some(r => r.test(msg));
+
+  // Entity extraction — what the query is about
+  const entities = [];
+  const stateMap = {
+    pa:'Pennsylvania', il:'Illinois', nv:'Nevada', va:'Virginia',
+    nj:'New Jersey', oh:'Ohio', ma:'Massachusetts', fl:'Florida',
+    ca:'California', co:'Colorado',
+  };
+  for (const [abbr, full] of Object.entries(stateMap)) {
+    if (new RegExp(`\\b${abbr}\\b`, 'i').test(msg)) entities.push({ type: 'state', value: full, abbr });
+  }
+  ['flower','vape','edible','concentrate','preroll','pre-roll','tincture','topical']
+    .forEach(p => { if (msg.includes(p)) entities.push({ type: 'product', value: p }); });
+
+  // Metric extraction — what numbers are being requested
+  const metricPatterns = {
+    revenue:     /revenue|sales|gross/,
+    units:       /units|quantity|qty/,
+    transactions:/transactions?|orders?|visits?/,
+    margin:      /margin|profit|net/,
+    inventory:   /inventory|stock|on.hand/,
+    shrink:      /shrink|loss|variance/,
+    customers:   /customers?|patients?|members?/,
+    average:     /average|avg|mean|per/,
+  };
+  const metrics = Object.entries(metricPatterns)
+    .filter(([, re]) => re.test(msg))
+    .map(([name]) => name);
+
+  // Stats-only routing: bypass chunk retrieval for pure aggregate queries.
+  // Conditions: clearly aggregate + NOT filtered to a sub-entity + NOT causal + NOT comparative.
+  // These are the "what was total revenue" / "what was average basket" queries that
+  // the stats block answers perfectly without any row-chunk scanning.
+  const statsOnly = isAggregate && !isFiltered && !isCausal && !isComparative;
+
   let periodExpansion = 1;
   if (isComparative || isCausal) periodExpansion = 3;
   else if (isAggregate && !isFiltered) periodExpansion = 2;
+
+  let expansionHint = '';
+  if (isComparative || isCausal) expansionHint = 'include adjacent time periods for comparison';
+  else if (statsOnly) expansionHint = 'STATS-ONLY MODE: answer directly from DATA SUMMARIES — row chunks are not needed for this query';
+  else if (isAggregate) expansionHint = 'use pre-computed stats block for totals where available';
+
   return {
-    isComparative, isAggregate, isFiltered, isCausal, periodExpansion,
-    expansionHint: isComparative || isCausal
-      ? 'include adjacent time periods for comparison'
-      : isAggregate ? 'use pre-computed stats block for totals' : '',
+    // Legacy flags (backward compat with multi-collection builder)
+    isComparative, isAggregate, isFiltered, isCausal,
+    // New structured fields
+    statsOnly, entities, metrics,
+    periodExpansion, expansionHint,
+    requiresStats: statsOnly,
   };
 }
+
+// Backward-compat alias — multi-collection builder calls analyzeQueryIntent
+function analyzeQueryIntent(message) { return buildQueryPlan(message); }
 
 // ── Multi-collection context builder ─────────────────────────
 async function buildContextMultiCollection({ message, dept, env, maxCollections = 3 }) {
