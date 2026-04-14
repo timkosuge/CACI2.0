@@ -1033,17 +1033,10 @@ async function buildContextCompliance({ dept, collection, env }) {
       if (!f.chunks || !f.chunks.length) continue;
       const meta = f.meta || {};
       const label = `[${collection} / ${f.name}${meta.period ? ' — ' + meta.period : ''}]`;
-      parts.push(label + '
-' + f.chunks.join('
-
-'));
+      parts.push(label + '\n' + f.chunks.join('\n\n'));
     }
 
-    const text = parts.join('
-
-═══════════════════════════════════════
-
-');
+    const text = parts.join('\n\n=======================================\n\n');
 
     // Still build stats context for numeric grounding
     const statsLines = [];
