@@ -1044,8 +1044,7 @@ async function buildContextCompliance({ dept, collection, env }) {
       if (!f.stats || !Object.keys(f.stats).length) continue;
       const meta = f.meta || {};
       const label = `${meta.reportName || f.name}${meta.period ? ' [' + meta.period + ']' : ''}`;
-      statsLines.push(`
-### ${label}`);
+      statsLines.push(`\n### ${label}`);
       if (f.stats.rowCount) statsLines.push(`Rows: ${f.stats.rowCount}`);
       if (f.stats.columns)  statsLines.push(`Columns: ${f.stats.columns.join(', ')}`);
       if (f.stats.numeric) {
