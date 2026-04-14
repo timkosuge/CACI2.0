@@ -215,6 +215,8 @@ async function handleUpload(request, env) {
       await env.CACI_KV.put(ctxKey, JSON.stringify(ctxIdx));
     }
 
+    // Invalidate library map cache so next session sees fresh data
+    await env.CACI_KV.delete(`library:map:${dept}`).catch(() => {});
     return json({ ok: true, id, name, collection, chunks: chunks.length, charCount: cleanText.length, isContext });
   } catch (err) {
     return json({ error: 'Upload failed: ' + err.message }, 500);
@@ -325,6 +327,7 @@ async function handleCreateCollection(request, env) {
     if (reg.find(c => c.name === name)) return json({ ok: true, existing: true });
     reg.unshift({ name, dept: deptKey, category: category || '', description: description || '', created: new Date().toISOString(), fileCount: 0 });
     await env.CACI_KV.put(regKey, JSON.stringify(reg));
+    await env.CACI_KV.delete(`library:map:${deptKey}`).catch(() => {});
     return json({ ok: true });
   } catch(e) { return json({ error: e.message }, 500); }
 }
@@ -497,6 +500,8 @@ async function handleChat(request, env) {
     // Discovery mode
     if (history.length === 0 && scope === 'all' && !collection && !fileId) {
       const discovery = await buildDiscoveryContext({ dept, env });
+      const discLibraryMap = await buildLibraryMap({ dept, env });
+      const discLibraryPrompt = libraryMapToPrompt(discLibraryMap);
       const system = `You are Caci (pronounced like "Cassie") — the internal AI intelligence assistant for Jushi Holdings. You were built specifically for this team.
 
 Today's date is ${new Date().toLocaleDateString('en-US', {year:'numeric',month:'long',day:'numeric'})}. The full calendar year 2025 is complete. When discussing 2025 data, treat it as a full historical year.
@@ -509,8 +514,9 @@ You're not just a number cruncher. You can talk about anything — industry tren
 
 Today you're working with the ${dept} team. Here's what you have access to:
 ${discovery.collectionList}
+${discLibraryPrompt ? '\n' + discLibraryPrompt : ''}
 
-Greet them like a colleague — warm, real, not robotic. Ask what they want to dig into. Keep it short.
+You know this library well — it's yours. When you greet the team, show that awareness naturally. If there are interesting things in the library worth mentioning (new documents, gaps, cross-collection relationships), weave one in naturally — don't list everything, just be a librarian who knows her shelves. Greet them like a colleague — warm, real, not robotic. Keep it short.
 
 INDUSTRY KNOWLEDGE — you know this world deeply:
 
@@ -569,6 +575,39 @@ Be direct and conversational. List them clearly.`;
 
     // ── Intent analysis — shapes retrieval strategy ─────────────
     const intent = analyzeQueryIntent(message);
+
+    // ── Library map — inject Caci's understanding of the library ─
+    const libraryMap = await buildLibraryMap({ dept, env });
+    const libraryMapPrompt = libraryMapToPrompt(libraryMap);
+
+    // ── Reason-then-retrieve — Caci thinks before she reaches ────
+    // For non-trivial queries, plan which collections to pull from
+    let retrievalPlan = null;
+    const isSimpleQuery = history.length > 0 && message.length < 60 && !intent.isComparative && !intent.isCausal;
+    if (!isSimpleQuery && libraryMap && libraryMap.collections.length > 1 && !fileId) {
+      try {
+        const planPrompt = `You are Caci, an AI assistant for Jushi Holdings. A user just asked: "${message}"
+
+Here is your library map:
+${libraryMapToPrompt(libraryMap)}
+
+Current scope: ${collection ? '"' + collection + '" collection' : 'all collections'}
+
+In 2-3 sentences max, state: (1) which specific collections are most relevant to answer this question and why, (2) what type of information you expect to find there. Be concrete. If the current scope already covers it, just say so briefly.
+
+Respond in plain text, no headers, no bullets.`;
+
+        const planResponse = await callLLM({
+          model,
+          system: 'You are a precise research assistant. Your job is to identify exactly which document collections contain the information needed to answer a question. Be brief and specific.',
+          messages: [{ role: 'user', content: planPrompt }],
+          maxTokens: 150,
+          env,
+          apiKey,
+        });
+        retrievalPlan = planResponse;
+      } catch(e) { /* non-blocking — proceed without plan */ }
+    }
 
     // ── Collection routing ────────────────────────────────────
     // Auto-switch collection on full name match
@@ -663,6 +702,10 @@ The people you work with:
 - Everyone is used to things changing fast and figuring it out as they go`;
 
     // ── Data injection — order matters ────────────────────────
+    // 0. Library map + retrieval plan — Caci's awareness of the full library
+    if (libraryMapPrompt) system += libraryMapPrompt;
+    if (retrievalPlan) system += `\n\nMY RETRIEVAL PLAN FOR THIS QUERY: ${retrievalPlan}`;
+
     // 1. Stats block: pre-computed numeric summaries and category inventories.
     //    Tell the model exactly what this is and how to use it.
     if (context.statsContext) {
@@ -724,6 +767,92 @@ async function buildDiscoveryContext({ dept, env }) {
 }
 
 // ── Query intent analysis ─────────────────────────────────────
+// ── Library Map — Caci's persistent understanding of the library ──
+async function buildLibraryMap({ dept, env }) {
+  try {
+    const cached = await env.CACI_KV.get(`library:map:${dept}`, 'json');
+    if (cached && cached.builtAt && (Date.now() - cached.builtAt) < 30 * 60 * 1000) return cached;
+
+    const reg = await env.CACI_KV.get(`colreg:${dept}`, 'json') || [];
+    if (!reg.length) return null;
+
+    const collections = await Promise.all(reg.map(async c => {
+      const files    = await env.CACI_KV.get(`col:${dept}:${c.name}`, 'json') || [];
+      const ctxFiles = await env.CACI_KV.get(`ctx:${dept}:${c.name}`, 'json') || [];
+      const years = new Set(); const states = new Set(); const fileTypes = new Set();
+      let totalRows = 0;
+      for (const f of files) {
+        (f.name || '').match(/20\d\d/g)?.forEach(y => years.add(y));
+        const sm = (f.name || '').match(/\b([A-Z]{2})\s*[-]/);
+        if (sm) states.add(sm[1]);
+        const ext = (f.name || '').split('.').pop().toLowerCase();
+        if (ext) fileTypes.add(ext);
+        if (f.stats?.rowCount) totalRows += f.stats.rowCount;
+      }
+      return {
+        name: c.name, category: c.category || '', description: c.description || '',
+        summary: c.summary || '', fileCount: files.length, contextDocCount: ctxFiles.length,
+        years: [...years].sort(), states: [...states].sort(), fileTypes: [...fileTypes],
+        totalRows, hasData: totalRows > 0,
+        files: files.slice(0, 20).map(f => ({ name: f.name, period: f.meta?.period || '', category: f.meta?.category || '' })),
+      };
+    }));
+
+    const relationships = [];
+    for (let i = 0; i < collections.length; i++) {
+      for (let j = i + 1; j < collections.length; j++) {
+        const a = collections[i]; const b = collections[j];
+        const sharedStates = a.states.filter(s => b.states.includes(s));
+        const sharedYears  = a.years.filter(y => b.years.includes(y));
+        const isReg = c => ['legal','compliance','regulation'].some(t => (c.category||'').toLowerCase().includes(t) || c.name.toLowerCase().includes(t));
+        const aReg = isReg(a); const bReg = isReg(b);
+        if (sharedStates.length && aReg !== bReg) {
+          relationships.push(`"${a.name}" (regulations) governs operations covered in "${b.name}" for ${sharedStates.join(', ')}`);
+        } else if (sharedStates.length && sharedYears.length && a.hasData && b.hasData) {
+          relationships.push(`"${a.name}" and "${b.name}" both cover ${sharedStates.join(', ')} for ${sharedYears.join(', ')} — can be compared`);
+        }
+      }
+    }
+
+    const gaps = [];
+    const allStates = [...new Set(collections.flatMap(c => c.states))];
+    const regCollections = collections.filter(c => ['legal','compliance','regulation'].some(t => (c.category||'').toLowerCase().includes(t) || c.name.toLowerCase().includes(t)));
+    for (const state of allStates) {
+      const hasReg = regCollections.some(c => c.states.includes(state) || c.name.toLowerCase().includes(state.toLowerCase()));
+      if (!hasReg && state.length === 2) gaps.push(`${state} — operational data exists but no regulatory documents uploaded`);
+    }
+
+    const map = { dept, builtAt: Date.now(), collectionCount: collections.length, collections, relationships, gaps };
+    await env.CACI_KV.put(`library:map:${dept}`, JSON.stringify(map));
+    return map;
+  } catch(e) { console.error('buildLibraryMap error:', e.message); return null; }
+}
+
+function libraryMapToPrompt(map) {
+  if (!map || !map.collections?.length) return '';
+  const lines = [`\nLIBRARY MAP — your complete understanding of the ${map.dept} department library:`];
+  for (const c of map.collections) {
+    const meta = [
+      c.fileCount + ' file' + (c.fileCount !== 1 ? 's' : ''),
+      c.contextDocCount ? c.contextDocCount + ' context docs' : '',
+      c.category || '',
+      c.years.length ? c.years.join(', ') : '',
+      c.states.length ? 'States: ' + c.states.join(', ') : '',
+      c.hasData ? c.totalRows.toLocaleString() + ' data rows' : '',
+    ].filter(Boolean).join(' · ');
+    lines.push(`\n• "${c.name}" (${meta})`);
+    if (c.description) lines.push(`  ${c.description}`);
+    if (c.files.length) {
+      const sample = c.files.slice(0, 5).map(f => f.name + (f.period ? ' [' + f.period + ']' : '')).join(', ');
+      lines.push(`  Contains: ${sample}${c.files.length > 5 ? ' + ' + (c.files.length - 5) + ' more' : ''}`);
+    }
+  }
+  if (map.relationships.length) { lines.push('\nCROSS-COLLECTION RELATIONSHIPS:'); map.relationships.forEach(r => lines.push('• ' + r)); }
+  if (map.gaps.length) { lines.push('\nNOTED GAPS:'); map.gaps.forEach(g => lines.push('• ' + g)); }
+  lines.push('\nUse this map to route queries to the right collections, surface related documents the user may not have thought to reference, and flag when something is missing from the library.');
+  return lines.join('\n');
+}
+
 function analyzeQueryIntent(message) {
   const msg = message.toLowerCase();
   const isComparative = [
