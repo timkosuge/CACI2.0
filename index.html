@@ -5198,8 +5198,9 @@ async function handleFiles(fileList, colName, meta = {}) {
   setTimeout(() => { if (prog) prog.classList.remove('on'); if (fill) fill.style.width = '0%'; }, 4000);
   loadCollections(); loadFiles();
 
-  // If this was a new collection, run collection analysis after a short delay
-  if (_newCollections.has(colName) && _aiClassifyEnabled) {
+  // Re-analyze the collection description after every upload batch —
+  // not just new collections. Description goes stale when files are added to existing ones.
+  if (_aiClassifyEnabled) {
     setTimeout(() => analyzeCollection(colName), 3000);
   }
 }
@@ -6135,11 +6136,14 @@ async function analyzeCollection(colName) {
     const files    = await filesRes.json();
     if (!files.length) return;
 
-    // Build a manifest of file names + periods
+    // Build a rich manifest: names + periods + column/stats snapshot
     const manifest = files.map(f => {
-      const period = f.meta?.period ? ` [${f.meta.period}]` : '';
-      const cat    = f.meta?.category ? ` (${f.meta.category})` : '';
-      return `- ${f.name}${period}${cat}`;
+      const period  = f.meta?.period    ? ` [${f.meta.period}]`    : '';
+      const cat     = f.meta?.category  ? ` (${f.meta.category})`  : '';
+      const rows    = f.stats?.rowCount ? ` ${f.stats.rowCount} rows` : '';
+      const cols    = f.stats?.columns?.length ? ` | cols: ${f.stats.columns.slice(0,8).join(', ')}${f.stats.columns.length > 8 ? '…' : ''}` : '';
+      const numCols = f.stats?.numeric  ? ` | numeric: ${Object.keys(f.stats.numeric).slice(0,5).join(', ')}` : '';
+      return `- ${f.name}${period}${cat}${rows}${cols}${numCols}`;
     }).join('\n');
 
     // Show subtle "analyzing" indicator on the collection item
