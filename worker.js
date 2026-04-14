@@ -746,7 +746,8 @@ function analyzeQueryIntent(message) {
     /\bflower\b|\bvape\b|\bedible\b|\bconcentrate\b|\bpreroll\b|\bpre-roll\b/,
     /\bstore\b|\blocation\b|\bdispensary\b|\bproduct\b|\bbrand\b/,
   ].some(r => r.test(msg));
-    /why|cause|reason|driving|factor|explain/,
+  const isCausal = [
+    /\bwhy\b|\bcause\b|\breason\b|\bdriving\b|\bfactor\b|\bexplain\b/,
   ].some(r => r.test(msg));
   let periodExpansion = 1;
   if (isComparative || isCausal) periodExpansion = 3;
