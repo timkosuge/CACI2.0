@@ -495,7 +495,7 @@ async function handleChat(request, env) {
       const discovery = await buildDiscoveryContext({ dept, env });
       const system = `You are Caci (pronounced like "Cassie") — the internal AI intelligence assistant for Jushi Holdings. You were built specifically for this team.
 
-Today's date is April 13, 2026. The full calendar year 2025 is complete. When discussing 2025 data, treat it as a full historical year.
+Today's date is ${new Date().toLocaleDateString('en-US', {year:'numeric',month:'long',day:'numeric'})}. The full calendar year 2025 is complete. When discussing 2025 data, treat it as a full historical year.
 
 Your personality: You work in cannabis. You know these people. You're sharp, a little goofy, genuinely funny when the moment calls for it, and you have zero interest in sounding impressive — you just are. You have street smarts alongside serious analytical ability. You don't talk down to anyone and you don't perform intelligence. You're warm, patient, and kind. You have a lot of grace in how you communicate — you're tactful without being fake, honest without being harsh. You have a filter, but it's a thin one, because you value the truth more than comfort. You know how to read a room.
 
@@ -585,7 +585,7 @@ Be direct and conversational. List them clearly.`;
         const ctxTexts = [];
         for (const f of ctxFiles.slice(0, 5)) {
           const full = await env.CACI_KV.get(`file:${f.id}`, 'json');
-          if (full?.chunks) ctxTexts.push(`[Context: ${f.name}]\n${full.chunks.join(' ')}`);
+          if (full?.chunks) ctxTexts.push(`[Context: ${f.name}]\n${full.chunks.join('\n\n')}`);
         }
         if (ctxTexts.length) contextDocs = ctxTexts.join('\n\n');
       }
@@ -699,23 +699,23 @@ async function handleReport(request, env) {
 
     const context = await buildContext({ message: prompt, dept, collection, fileId, scope, env });
 
-    const reportPrompt = `You are generating a professional internal business report for Jushi Holdings executive team.
+    const reportPrompt = `You are generating a professional internal business report for Jushi Holdings.
 
 Report request: ${prompt}
 
-${context.statsContext ? `COMPUTED DATA SUMMARIES:\n${context.statsContext}\n` : ''}
-${context.text ? `SOURCE DOCUMENTS:\n${context.text}\n` : ''}
+${context.statsContext ? `PRE-COMPUTED DATA SUMMARIES (authoritative totals/averages — use directly for aggregate figures):\n${context.statsContext}\n` : ''}
+${context.text ? `SOURCE DOCUMENTS (tabular data appears as row chunks; each chunk starts with "Columns: ..." followed by numbered rows):\n${context.text}\n` : ''}
 
-Generate a comprehensive, well-structured professional report. Include:
-1. Executive Summary (2-3 sentences)
-2. Key Findings (bullet points with specific numbers)
-3. Detailed Analysis (organized by relevant categories)
-4. Period-over-Period Comparison (if multiple periods present)
-5. State/Store Breakdown (if location data present)
-6. Recommendations
-7. Data Sources
+Generate a well-structured internal report. Include only sections that are supported by the data:
+1. Executive Summary (2-3 sentences — lead with the most important finding)
+2. Key Findings (specific numbers, cite source file and period)
+3. Detailed Analysis (by category, state, or store as relevant)
+4. Period-over-Period Comparison (only if multiple time periods are present)
+5. State/Store Breakdown (only if location data is present)
+6. Recommendations (grounded in the data)
+7. Data Sources (list files used)
 
-Format the report in clean Markdown. Use ## for sections, **bold** for key metrics, tables where appropriate. Be precise with numbers. Cite source files.`;
+Format in clean Markdown. Use ## for sections, tables where data warrants it. Be precise — never round or estimate when exact figures are available. If data is insufficient to complete a section, omit it rather than speculating.`;
 
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -1065,28 +1065,45 @@ async function buildContext({ message, dept, collection, fileId, scope, env }) {
       fileScoreMap.set(fileData.name, fScore);
     }
 
+    // Guaranteed: FILE SUMMARY chunk from each file (same pattern as buildContextTwoPass)
+    const summaryChunks = [];
+    const seenSummary = new Set();
+    for (const fileData of filesToSearch) {
+      if (!fileData.chunks?.length || seenSummary.has(fileData.name)) continue;
+      const first = fileData.chunks[0];
+      if (first.toLowerCase().startsWith('file summary') || first.toLowerCase().startsWith('sheet:')) {
+        summaryChunks.push({ chunk: first, score: 999, filename: fileData.name, collection: fileData.collection, meta: fileData.meta || {} });
+        seenSummary.add(fileData.name);
+      }
+    }
+
     const scored = [];
     for (const fileData of filesToSearch) {
       if (!fileData.chunks) continue;
       const fileBoost = fileScoreMap.get(fileData.name) || 0;
       for (const chunk of fileData.chunks) {
         const score = scoreChunk(chunk, keywords) + fileBoost;
-        if (score > 0) scored.push({ chunk, score, filename: fileData.name, collection: fileData.collection, meta: fileData.meta || {} });
+        if (score >= 0) scored.push({ chunk, score, filename: fileData.name, collection: fileData.collection, meta: fileData.meta || {} });
       }
     }
 
     scored.sort((a, b) => b.score - a.score);
+    // Guarantee at least one scored chunk per file for coverage
     const seenFiles = new Set();
-    const guaranteed = [];
+    const perFileGuarantee = [];
     for (const s of scored) {
-      if (!seenFiles.has(s.filename)) { guaranteed.push(s); seenFiles.add(s.filename); }
-      if (guaranteed.length >= filesToSearch.length) break;
+      if (!seenFiles.has(s.filename)) { perFileGuarantee.push(s); seenFiles.add(s.filename); }
+      if (seenFiles.size >= filesToSearch.length) break;
     }
-    const remaining = scored.filter(s => !guaranteed.includes(s));
-    const combined = [...guaranteed, ...remaining];
+    const remaining = scored.filter(s => !perFileGuarantee.includes(s));
+    const combined = [...perFileGuarantee, ...remaining];
+
     // Give more chunks when searching a small number of files (e.g. single file scope)
     const ctxChunkLimit = filesToSearch.length <= 2 ? 20 : filesToSearch.length <= 5 ? 16 : 12;
-    const top = combined.slice(0, ctxChunkLimit);
+    const summaryTexts = new Set(summaryChunks.map(c => c.chunk));
+    const scoredNonSummary = combined.filter(c => !summaryTexts.has(c.chunk));
+    const remainingSlots = Math.max(ctxChunkLimit - summaryChunks.length, 0);
+    const top = [...summaryChunks, ...scoredNonSummary.slice(0, remainingSlots)];
 
     if (!top.length) {
       const fallback = filesToSearch.slice(0, 3).flatMap(f =>
