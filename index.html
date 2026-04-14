@@ -1285,6 +1285,141 @@ body::before {
 }
 .send-btn:disabled { opacity: 0.25; cursor: default; }
 
+/* ── Compliance Mode ─────────────────────────────────────── */
+.compliance-btn {
+  width: 36px; height: 36px;
+  border-radius: var(--r);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--smoke4);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s var(--ease);
+  -webkit-appearance: none;
+  opacity: 0.35;
+}
+.compliance-btn svg { width: 15px; height: 15px; }
+.compliance-btn:hover { opacity: 0.7; color: var(--smoke2); }
+.compliance-btn.eligible { opacity: 0.6; color: #e05c5c; }
+.compliance-btn.eligible:hover { opacity: 1; }
+.compliance-btn.armed {
+  opacity: 1;
+  color: #ff4444;
+  border-color: rgba(255,68,68,0.4);
+  background: rgba(255,68,68,0.08);
+  box-shadow: 0 0 8px rgba(255,68,68,0.2);
+  animation: compliance-pulse 2s ease-in-out infinite;
+}
+@keyframes compliance-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(255,68,68,0.2); }
+  50% { box-shadow: 0 0 16px rgba(255,68,68,0.45); }
+}
+.chat-bar.compliance-armed {
+  border-top-color: rgba(255,68,68,0.5);
+}
+.chat-bar.compliance-armed::before {
+  background: linear-gradient(90deg, transparent, rgba(255,68,68,0.3) 20%, rgba(255,100,100,0.5) 50%, rgba(255,68,68,0.3) 80%, transparent);
+  animation: compliance-bar-pulse 2s ease-in-out infinite;
+}
+@keyframes compliance-bar-pulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+.chat-ta.compliance-armed {
+  border-color: rgba(255,68,68,0.4) !important;
+  box-shadow: 0 0 0 3px rgba(255,68,68,0.1) !important;
+}
+.send-btn.compliance-armed {
+  background: linear-gradient(150deg, rgba(255,68,68,0.25) 0%, rgba(200,30,30,0.15) 100%) !important;
+  border-color: rgba(255,68,68,0.6) !important;
+  color: #ff6666 !important;
+  font-family: var(--f-mono);
+  font-size: 8px !important;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+}
+.send-btn.compliance-armed:hover {
+  background: linear-gradient(150deg, rgba(255,68,68,0.4) 0%, rgba(200,30,30,0.3) 100%) !important;
+  box-shadow: 0 2px 16px rgba(255,68,68,0.35) !important;
+  color: #ff8888 !important;
+}
+.compliance-armed-label {
+  font-family: var(--f-mono);
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255,68,68,0.7);
+  text-align: center;
+  margin-bottom: 6px;
+  animation: compliance-bar-pulse 2s ease-in-out infinite;
+}
+/* Modal */
+.compliance-modal-bg {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 9999;
+  align-items: center; justify-content: center;
+  backdrop-filter: blur(4px);
+}
+.compliance-modal-bg.open { display: flex; }
+.compliance-modal {
+  background: var(--ink2);
+  border: 1px solid rgba(255,68,68,0.3);
+  border-radius: var(--r2);
+  padding: 28px 32px;
+  max-width: 420px; width: 90%;
+  box-shadow: 0 8px 40px rgba(255,68,68,0.15), 0 2px 16px rgba(0,0,0,0.6);
+}
+.compliance-modal-icon {
+  color: #ff4444;
+  margin-bottom: 12px;
+  display: flex; align-items: center; gap: 8px;
+}
+.compliance-modal-icon svg { width: 22px; height: 22px; }
+.compliance-modal-title {
+  font-family: var(--f-display);
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  color: #ff6666;
+  text-transform: uppercase;
+}
+.compliance-modal-body {
+  font-size: 13px;
+  color: var(--smoke2);
+  line-height: 1.65;
+  margin: 14px 0 22px;
+}
+.compliance-modal-body strong { color: var(--smoke); }
+.compliance-modal-btns { display: flex; gap: 10px; justify-content: flex-end; }
+.compliance-modal-cancel {
+  padding: 9px 18px;
+  background: transparent;
+  border: 1px solid var(--line2);
+  border-radius: var(--r);
+  color: var(--smoke3);
+  font-family: var(--f-mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.compliance-modal-cancel:hover { border-color: var(--smoke3); color: var(--smoke2); }
+.compliance-modal-confirm {
+  padding: 9px 18px;
+  background: rgba(255,68,68,0.12);
+  border: 1px solid rgba(255,68,68,0.4);
+  border-radius: var(--r);
+  color: #ff6666;
+  font-family: var(--f-mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.compliance-modal-confirm:hover { background: rgba(255,68,68,0.22); color: #ff8888; }
+
 
 /* ── Discovery Greeting ────────────────────────────────── */
 /* Name sits just above the input bar — injected into bar zone */
@@ -3301,6 +3436,9 @@ body::before {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 010 7.07"/><path d="M19.07 4.93a10 10 0 010 14.14"/></svg>
             </button>
             <textarea class="chat-ta" id="chat-ta" rows="1" placeholder="Ask anything..."></textarea>
+            <button class="compliance-btn" id="compliance-btn" title="Compliance Scan">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7L12 2z"/></svg>
+            </button>
             <button class="send-btn" id="send-btn">&#8593;</button>
           </div>
           <div class="voice-status" id="voice-status"></div>
@@ -3836,6 +3974,93 @@ function bootApp() {
   if (window.innerWidth < 768) $('tb-model-chip').style.display = 'flex';
 
   $('send-btn').addEventListener('click', sendChat);
+  // ── Compliance Mode ──────────────────────────────────────────
+  let _complianceMode = false;
+
+  function isComplianceCollection(colName) {
+    if (!colName) return false;
+    // Check _caciCollections metadata first
+    if (window._caciCollections) {
+      const col = window._caciCollections.find(c => c.name === colName);
+      if (col) {
+        const cat = (col.category || '').toLowerCase();
+        const desc = (col.description || '').toLowerCase();
+        const name = (col.name || '').toLowerCase();
+        const complianceTerms = ['legal','compliance','regulation','policy','regulatory'];
+        if (complianceTerms.some(t => cat.includes(t) || desc.includes(t) || name.includes(t))) return true;
+      }
+    }
+    // Fallback: check collection name directly
+    const nameLower = colName.toLowerCase();
+    return ['legal','compliance','regulation','regulatory','policy','statute','ordinance','rule'].some(t => nameLower.includes(t));
+  }
+
+  function updateComplianceBtn() {
+    const btn = $('compliance-btn');
+    if (!btn) return;
+    const eligible = chatScope === 'collection' && isComplianceCollection(chatCollection);
+    btn.classList.toggle('eligible', eligible && !_complianceMode);
+    btn.classList.toggle('armed', _complianceMode);
+    btn.style.pointerEvents = eligible || _complianceMode ? '' : 'none';
+    btn.title = _complianceMode ? 'Compliance Scan ARMED — fires on next query' : eligible ? 'Compliance Scan' : 'Only available for compliance/regulation collections';
+  }
+
+  function armCompliance() {
+    _complianceMode = true;
+    $('compliance-btn').classList.remove('eligible');
+    $('compliance-btn').classList.add('armed');
+    $('chat-bar').classList.add('compliance-armed');
+    $('chat-ta').classList.add('compliance-armed');
+    const sendBtn = $('send-btn');
+    sendBtn.classList.add('compliance-armed');
+    sendBtn.innerHTML = 'SCAN';
+    // Insert armed label
+    if (!$('compliance-armed-label')) {
+      const label = document.createElement('div');
+      label.id = 'compliance-armed-label';
+      label.className = 'compliance-armed-label';
+      label.textContent = '⚠ Compliance Scan Armed — reads every document';
+      $('chat-bar').querySelector('.chat-bar-inner').insertBefore(label, $('chat-bar').querySelector('.chat-row'));
+    }
+  }
+
+  function disarmCompliance() {
+    _complianceMode = false;
+    $('compliance-btn').classList.remove('armed');
+    $('chat-bar').classList.remove('compliance-armed');
+    $('chat-ta').classList.remove('compliance-armed');
+    const sendBtn = $('send-btn');
+    sendBtn.classList.remove('compliance-armed');
+    sendBtn.innerHTML = '&#8593;';
+    const label = $('compliance-armed-label');
+    if (label) label.remove();
+    updateComplianceBtn();
+  }
+
+  $('compliance-btn').addEventListener('click', () => {
+    if (_complianceMode) { disarmCompliance(); return; }
+    if (chatScope !== 'collection' || !isComplianceCollection(chatCollection)) return;
+    $('compliance-modal-bg').classList.add('open');
+  });
+  $('compliance-modal-cancel').addEventListener('click', () => $('compliance-modal-bg').classList.remove('open'));
+  $('compliance-modal-confirm').addEventListener('click', () => {
+    $('compliance-modal-bg').classList.remove('open');
+    armCompliance();
+  });
+  $('compliance-modal-bg').addEventListener('click', e => {
+    if (e.target === $('compliance-modal-bg')) $('compliance-modal-bg').classList.remove('open');
+  });
+
+  // Re-evaluate button state whenever scope changes
+  const _origSetScope = typeof setScope === 'function' ? setScope : null;
+  // Hook into scope changes via MutationObserver on scope buttons
+  document.querySelectorAll('.scope-btn').forEach(b => b.addEventListener('click', () => setTimeout(updateComplianceBtn, 50)));
+  // Initial state
+  updateComplianceBtn();
+
+  // Expose for sendChat to read
+  window._getComplianceMode = () => _complianceMode;
+  window._disarmCompliance  = disarmCompliance;
   $('chat-ta').addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
   });
@@ -4137,6 +4362,8 @@ function syncModel() {
 function setScope(scope, col, fileId, fileName) {
   chatScope = scope;
   if (col !== undefined) chatCollection = col;
+  // Update compliance button eligibility whenever scope changes
+  if (typeof updateComplianceBtn === 'function') setTimeout(updateComplianceBtn, 10);
   if (fileId !== undefined) chatFileId = fileId;
   if (fileName !== undefined) chatFileName = fileName;
 
@@ -4288,6 +4515,11 @@ async function sendChat() {
     const body = {message:msg, dept, model:modelId, scope:chatScope, history:chatHistory.slice(-20)};
     if (chatScope === 'collection' && chatCollection) body.collection = chatCollection;
     if (chatScope === 'file' && chatFileId) { body.fileId = chatFileId; body.scope = 'file'; }
+    // Compliance mode — fires once then disarms
+    if (window._getComplianceMode && window._getComplianceMode()) {
+      body.complianceMode = true;
+      window._disarmCompliance();
+    }
 
     // Auto-detect collection from user message if we are still in discovery (no collection locked)
     if (chatScope === 'all' && !chatCollection && window._caciCollections && window._caciCollections.length) {
@@ -5297,8 +5529,19 @@ async function createCollection() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, dept: deptVal, category, description: desc }),
     });
-    await res.json();
-  } catch(_) {}
+    const d = await res.json();
+    if (!res.ok || d.error) {
+      console.warn('[CACI] createCollection failed:', d.error || res.status);
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Create Collection'; }
+      alert('Failed to create collection: ' + (d.error || 'server error'));
+      return;
+    }
+  } catch(e) {
+    console.warn('[CACI] createCollection error:', e.message);
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Create Collection'; }
+    alert('Failed to create collection: ' + e.message);
+    return;
+  }
 
   closeNewColModal();
   selectedCollection = name;
@@ -5337,14 +5580,6 @@ async function createCollection() {
 
   // Re-fetch in background to confirm server state (no await — don't block UI)
   loadCollections();
-
-  // Switch straight to Context tab
-  _activeFilesTab = 'ctx';
-  document.querySelectorAll('.ftab').forEach(b => b.classList.toggle('active', b.dataset.ft === 'ctx'));
-  if ($('files-tab-docs')) $('files-tab-docs').style.display = 'none';
-  if ($('files-tab-ctx'))  $('files-tab-ctx').style.display  = '';
-  if ($('upload-btn'))     $('upload-btn').style.display     = 'none';
-  if ($('ctx-upload-btn')) $('ctx-upload-btn').style.display = '';
 
   if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Create Collection'; }
 }
@@ -6769,6 +7004,25 @@ async function runPdfSplitter(file) {
         <button class="um-cancel" id="spm-cancel">Cancel</button>
         <button class="um-submit" id="spm-submit">Choose PDF &amp; Split</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- COMPLIANCE SCAN MODAL -->
+<div class="compliance-modal-bg" id="compliance-modal-bg">
+  <div class="compliance-modal">
+    <div class="compliance-modal-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7L12 2z"/></svg>
+      <span class="compliance-modal-title">Compliance Scan</span>
+    </div>
+    <div class="compliance-modal-body">
+      Hey — just so you know, this is not a normal query. <strong>Compliance Scan reads every single document in this collection</strong>, top to bottom, no skipping. Nothing gets filtered out.<br><br>
+      It's going to be slower, it's going to use more tokens, and it's built for situations where missing something actually matters. If you're just looking something up, regular mode is fine.<br><br>
+      <strong>This only fires once.</strong> After your query runs, it goes back to normal automatically.
+    </div>
+    <div class="compliance-modal-btns">
+      <button class="compliance-modal-cancel" id="compliance-modal-cancel">Never mind</button>
+      <button class="compliance-modal-confirm" id="compliance-modal-confirm">Arm it</button>
     </div>
   </div>
 </div>
