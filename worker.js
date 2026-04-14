@@ -567,7 +567,11 @@ Be direct and conversational. List them clearly.`;
       return json({ ok: true, response: colRes, sources: [], scope: scope, model: model || 'claude' });
     }
 
-    // Auto-switch collection — only on full collection name match
+    // ── Intent analysis — shapes retrieval strategy ─────────────
+    const intent = analyzeQueryIntent(message);
+
+    // ── Collection routing ────────────────────────────────────
+    // Auto-switch collection on full name match
     let activeCollection = collection;
     let activeScope = scope;
     if (scope === 'collection' && collection) {
@@ -575,12 +579,31 @@ Be direct and conversational. List them clearly.`;
       const msgLower = message.toLowerCase();
       const matchedCol = reg.find(c => {
         if (c.name === collection) return false;
-        if (msgLower.includes(c.name.toLowerCase())) return true;
-        return false;
+        return msgLower.includes(c.name.toLowerCase());
       });
       if (matchedCol) { activeCollection = matchedCol.name; activeScope = 'collection'; }
     }
-    const context = await buildContext({ message, dept, collection: activeCollection, fileId, scope: activeScope, env });
+
+    // ── Context retrieval — multi-collection for broad queries ─
+    let context;
+    const useMultiCollection = activeScope === 'all' && !fileId && !activeCollection;
+    if (useMultiCollection) {
+      // Broad scope: search across top-matching collections
+      context = await buildContextMultiCollection({ message, dept, env, maxCollections: intent.isComparative ? 4 : 3 });
+      // Fall back to single-path if multi returns nothing
+      if (!context.text && !context.statsContext) {
+        context = await buildContext({ message, dept, collection: null, fileId: null, scope: 'all', env });
+      }
+    } else {
+      context = await buildContext({ message, dept, collection: activeCollection, fileId, scope: activeScope, env });
+    }
+
+    // ── Re-ranking pass ───────────────────────────────────────
+    if (context.text) {
+      const rawChunks = context.text.split('\n\n---\n\n').map(chunk => ({ chunk, score: 0 }));
+      const reranked  = rerankChunks(rawChunks, extractKeywords(message), intent);
+      context.text    = reranked.map(c => c.chunk).join('\n\n---\n\n');
+    }
 
     let contextDocs = '';
     if (activeCollection) {
@@ -663,7 +686,18 @@ These summaries were computed at upload time from the full dataset. When a quest
       system += `\n\nNo documents found matching this query. Let the user know and ask them to upload relevant files or switch to a different collection.`;
     }
 
-    const responseText = await callLLM({ model, system, messages: [...history.slice(-10).map(h => ({ role: h.role, content: h.content })), { role: 'user', content: message }], maxTokens: 3000, env, apiKey });
+    // ── Intent hint appended to system prompt ────────────────────
+    if (intent.expansionHint) {
+      system += `\n\nQuery context: ${intent.expansionHint}. `;
+      if (intent.isComparative) system += 'Compare across time periods where possible. Highlight trends and changes.';
+      if (intent.isCausal) system += 'Identify likely drivers. Look for correlated changes across metrics.';
+      if (intent.isAggregate && context.statsContext) system += 'The DATA SUMMARIES above contain authoritative totals — use them directly.';
+    }
+    if (useMultiCollection && context.collectionsSearched?.length) {
+      system += `\n\nNote: this response draws from ${context.collectionsSearched.length} collections: ${context.collectionsSearched.join(', ')}.`;
+    }
+
+    const responseText = await callLLM({ model, system, messages: [...history.slice(-20).map(h => ({ role: h.role, content: h.content })), { role: 'user', content: message }], maxTokens: 3000, env, apiKey });
     return json({ ok: true, response: responseText, sources: context.sources, scope, model: model || 'claude' });
   } catch (err) { return json({ error: 'Chat error: ' + err.message }, 500); }
 }
@@ -1025,8 +1059,11 @@ async function buildContextTwoPass({ message, dept, collection, env }) {
 
     if (!top.length) return { text: '', sources: [], statsContext: statsLines.join('\n'), focusFile: fullFiles[0]?.name };
 
-    const sources = [...new Set(top.map(x => x.filename))];
-    const text = top.map(x => {
+    // Re-rank before final assembly
+    const reranked = rerankChunks(top, keywords2, null);
+
+    const sources = [...new Set(reranked.map(x => x.filename))];
+    const text = reranked.map(x => {
       const period = x.meta?.period ? ` [${x.meta.period}]` : '';
       return `[${x.collection}${period} / ${x.filename}]\n${x.chunk}`;
     }).join('\n\n---\n\n');
@@ -1230,8 +1267,11 @@ async function buildContext({ message, dept, collection, fileId, scope, env }) {
       return { text, sources, statsContext: statsLines.join('\n'), focusFile: filesToSearch[0]?.name };
     }
 
-    const sources = [...new Set(top.map(x => x.filename))];
-    const text = top.map(x => {
+    // Re-rank before final assembly
+    const rerankedTop = rerankChunks(top, keywords, null);
+
+    const sources = [...new Set(rerankedTop.map(x => x.filename))];
+    const text = rerankedTop.map(x => {
       const period = x.meta?.period ? ` [${x.meta.period}]` : '';
       return `[${x.collection}${period} / ${x.filename}]\n${x.chunk}`;
     }).join('\n\n---\n\n');
