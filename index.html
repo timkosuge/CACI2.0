@@ -1084,6 +1084,317 @@ body::before {
   background: linear-gradient(180deg, var(--gold), transparent);
   opacity: 0.3;
 }
+
+/* ── Markdown content inside AI bubbles ─────────────────── */
+.msg.ai .msg-bubble h1,
+.msg.ai .msg-bubble h2,
+.msg.ai .msg-bubble h3 {
+  font-family: var(--f-display);
+  font-weight: 400;
+  color: var(--smoke);
+  letter-spacing: 0.04em;
+  margin: 14px 0 6px;
+  line-height: 1.3;
+}
+.msg.ai .msg-bubble h1 { font-size: 18px; color: var(--gold-lt); }
+.msg.ai .msg-bubble h2 { font-size: 15px; color: var(--smoke); border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+.msg.ai .msg-bubble h3 { font-size: 13px; color: var(--smoke2); text-transform: uppercase; letter-spacing: 0.08em; }
+.msg.ai .msg-bubble p  { margin: 0 0 8px; line-height: 1.7; }
+.msg.ai .msg-bubble p:last-child { margin-bottom: 0; }
+.msg.ai .msg-bubble ul,
+.msg.ai .msg-bubble ol {
+  margin: 6px 0 10px 0;
+  padding-left: 18px;
+  line-height: 1.7;
+}
+.msg.ai .msg-bubble li { margin-bottom: 3px; }
+.msg.ai .msg-bubble li:last-child { margin-bottom: 0; }
+.msg.ai .msg-bubble ul li { list-style-type: none; position: relative; padding-left: 10px; }
+.msg.ai .msg-bubble ul li::before {
+  content: '\25C6';
+  position: absolute; left: -8px;
+  font-size: 5px; top: 6px;
+  color: var(--gold);
+  opacity: 0.7;
+}
+.msg.ai .msg-bubble ol li { list-style-type: decimal; }
+.msg.ai .msg-bubble strong { color: var(--smoke); font-weight: 500; }
+.msg.ai .msg-bubble em { color: var(--smoke2); font-style: italic; }
+.msg.ai .msg-bubble code {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  background: var(--ink4);
+  border: 1px solid var(--line2);
+  border-radius: 3px;
+  padding: 1px 5px;
+  color: var(--gold-lt);
+}
+.msg.ai .msg-bubble pre {
+  background: var(--ink4);
+  border: 1px solid var(--line2);
+  border-radius: 4px;
+  padding: 10px 14px;
+  margin: 8px 0;
+  overflow-x: auto;
+}
+.msg.ai .msg-bubble pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 11px;
+  color: var(--smoke2);
+}
+.msg.ai .msg-bubble hr {
+  border: none;
+  border-top: 1px solid var(--line2);
+  margin: 12px 0;
+}
+.msg.ai .msg-bubble table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin: 8px 0;
+}
+.msg.ai .msg-bubble th {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--gold-lt);
+  border-bottom: 1px solid var(--line2);
+  padding: 4px 8px;
+  text-align: left;
+}
+.msg.ai .msg-bubble td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--line);
+  color: var(--smoke2);
+}
+.msg.ai .msg-bubble tr:last-child td { border-bottom: none; }
+
+/* ── Compliance Mode UI ─────────────────────────────────── */
+.compliance-bar {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: linear-gradient(90deg, rgba(180,50,50,0.08), rgba(180,50,50,0.04));
+  border-top: 1px solid rgba(180,50,50,0.2);
+  flex-wrap: wrap;
+}
+.compliance-bar.visible { display: flex; }
+.cb-label {
+  font-family: var(--f-mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(220,100,100,0.8);
+  flex-shrink: 0;
+}
+.cb-lens-btn {
+  padding: 3px 9px;
+  border-radius: 3px;
+  border: 1px solid rgba(180,50,50,0.25);
+  background: none;
+  color: var(--smoke4);
+  font-family: var(--f-mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.cb-lens-btn:hover { border-color: rgba(220,100,100,0.5); color: rgba(220,150,150,0.9); }
+.cb-lens-btn.active {
+  background: rgba(180,50,50,0.15);
+  border-color: rgba(220,100,100,0.5);
+  color: rgba(255,180,180,0.95);
+}
+.cb-full-btn {
+  padding: 3px 9px;
+  border-radius: 3px;
+  border: 1px solid rgba(180,50,50,0.3);
+  background: rgba(180,50,50,0.1);
+  color: rgba(255,160,160,0.8);
+  font-family: var(--f-mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: all 0.15s;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.cb-full-btn:hover { background: rgba(180,50,50,0.2); color: rgba(255,180,180,1); }
+.cb-full-btn.active { background: rgba(180,50,50,0.25); border-color: rgba(255,100,100,0.6); }
+.cb-status {
+  font-family: var(--f-mono);
+  font-size: 9px;
+  color: rgba(180,50,50,0.5);
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+}
+/* Compliance toggle in scope bar */
+.compliance-toggle-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.compliance-toggle-label {
+  font-family: var(--f-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--smoke4);
+  cursor: pointer;
+  transition: color 0.15s;
+  user-select: none;
+}
+.compliance-toggle-label.active { color: rgba(220,100,100,0.8); }
+.ctoggle {
+  width: 28px; height: 15px;
+  border-radius: 8px;
+  border: 1px solid var(--line2);
+  background: var(--ink3);
+  cursor: pointer;
+  position: relative;
+  transition: background 0.2s, border-color 0.2s;
+  flex-shrink: 0;
+}
+.ctoggle.on {
+  background: rgba(160,40,40,0.4);
+  border-color: rgba(220,100,100,0.4);
+}
+.ctoggle::after {
+  content: '';
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: var(--smoke4);
+  transition: transform 0.2s, background 0.2s;
+}
+.ctoggle.on::after { transform: translateX(13px); background: rgba(255,140,140,0.9); }
+/* Compliance section in Files panel */
+.compliance-section {
+  margin: 16px 0;
+  border: 1px solid rgba(180,50,50,0.2);
+  border-radius: var(--r2);
+  overflow: hidden;
+}
+.compliance-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: rgba(180,50,50,0.06);
+  border-bottom: 1px solid rgba(180,50,50,0.15);
+}
+.cs-title {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(220,100,100,0.8);
+}
+.cs-reanalyze {
+  padding: 3px 9px;
+  border-radius: 3px;
+  border: 1px solid rgba(180,50,50,0.3);
+  background: none;
+  color: rgba(220,100,100,0.7);
+  font-family: var(--f-mono);
+  font-size: 9px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.cs-reanalyze:hover { background: rgba(180,50,50,0.1); }
+.compliance-lenses {
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cl-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.cl-name {
+  font-family: var(--f-body);
+  font-size: 12px;
+  color: var(--smoke2);
+  flex: 1;
+}
+.cl-status {
+  font-family: var(--f-mono);
+  font-size: 9px;
+  color: var(--smoke4);
+  letter-spacing: 0.06em;
+}
+.cl-status.ready { color: rgba(60,180,100,0.8); }
+.cl-run {
+  padding: 3px 9px;
+  border-radius: 3px;
+  border: 1px solid var(--line2);
+  background: none;
+  color: var(--smoke4);
+  font-family: var(--f-mono);
+  font-size: 9px;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.cl-run:hover { border-color: rgba(220,100,100,0.4); color: rgba(220,100,100,0.8); }
+.cl-run:disabled { opacity: 0.4; cursor: default; }
+/* Upload modal compliance section */
+.um-compliance-section {
+  display: none;
+  border: 1px solid rgba(180,50,50,0.2);
+  border-radius: var(--r);
+  overflow: hidden;
+  margin-top: 4px;
+}
+.um-compliance-section.visible { display: block; }
+.um-compliance-header {
+  padding: 8px 12px;
+  background: rgba(180,50,50,0.06);
+  font-family: var(--f-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(220,100,100,0.7);
+  border-bottom: 1px solid rgba(180,50,50,0.15);
+}
+.um-compliance-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.um-lens-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.um-lens-chip {
+  padding: 4px 10px;
+  border-radius: 3px;
+  border: 1px solid rgba(180,50,50,0.25);
+  background: none;
+  color: var(--smoke4);
+  font-family: var(--f-mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.um-lens-chip.selected {
+  background: rgba(180,50,50,0.15);
+  border-color: rgba(220,100,100,0.5);
+  color: rgba(255,180,180,0.9);
+}
+.um-compliance-note {
+  font-family: var(--f-mono);
+  font-size: 9px;
+  color: var(--smoke4);
+  line-height: 1.6;
+  letter-spacing: 0.04em;
+}
+
 /* ── Message action bar ─────────────────────────────────── */
 .msg-actions {
   display: flex; gap: 6px; align-items: center;
@@ -3275,6 +3586,21 @@ body::before {
         <button class="scope-btn" data-scope="collection" id="scope-col" style="display:none">Collection</button>
         <span class="scope-chevron" id="sep-file" style="display:none">&#8250;</span>
         <button class="scope-btn" data-scope="file" id="scope-file" style="display:none">File</button>
+        <div class="compliance-toggle-wrap" id="compliance-toggle-wrap" style="display:none">
+          <span class="compliance-toggle-label" id="compliance-toggle-label">Compliance</span>
+          <div class="ctoggle" id="compliance-ctoggle"></div>
+        </div>
+      </div>
+      <!-- Compliance mode bar — shown when toggle is on -->
+      <div class="compliance-bar" id="compliance-bar">
+        <span class="cb-label">Lens</span>
+        <button class="cb-lens-btn" data-lens="employee">Dispensary Employee</button>
+        <button class="cb-lens-btn" data-lens="officer">Compliance Officer</button>
+        <button class="cb-lens-btn" data-lens="gm">GM / Operator</button>
+        <button class="cb-lens-btn" data-lens="transporter">Transporter</button>
+        <button class="cb-lens-btn" data-lens="cultivation">Cultivation</button>
+        <span class="cb-status" id="cb-status"></span>
+        <button class="cb-full-btn" id="cb-full-btn" title="Load full document text — maximum accuracy, slower">Full Doc</button>
       </div>
       <div class="chat-messages" id="chat-msgs">
         <div class="chat-empty" id="chat-empty" style="display:none">
@@ -3760,6 +4086,54 @@ function esc(s) {
     .replace(/\n/g,'\x3Cbr>').replace(/\*\*(.*?)\*\*/g,'\x3Cstrong>$1\x3C/strong>');
 }
 
+// Renders AI markdown responses properly — headers, bullets, bold, code, tables
+function renderMarkdown(s) {
+  if (s == null) return '';
+  let t = String(s);
+  // Escape HTML first (no entity for < >)
+  t = t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  // Fenced code blocks
+  t = t.replace(/```([\s\S]*?)```/g, (_, code) => '<pre><code>' + code.trim() + '</code></pre>');
+  // Inline code
+  t = t.replace(/`([^`]+)`/g, '<code>$1</code>');
+  // Headers h3 h2 h1 (order matters — most specific first)
+  t = t.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  t = t.replace(/^## (.+)$/gm,  '<h2>$1</h2>');
+  t = t.replace(/^# (.+)$/gm,   '<h1>$1</h1>');
+  // Bold and italic
+  t = t.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+  t = t.replace(/\*\*(.+?)\*\*/g,       '<strong>$1</strong>');
+  t = t.replace(/\*(.+?)\*/g,             '<em>$1</em>');
+  // Horizontal rule
+  t = t.replace(/^---+$/gm, '<hr>');
+  // Unordered lists — group consecutive - lines into <ul>
+  t = t.replace(/((?:^[ \t]*[-*+] .+\n?)+)/gm, match => {
+    const items = match.trim().split('\n').map(l => '<li>' + l.replace(/^[ \t]*[-*+] /, '') + '</li>').join('');
+    return '<ul>' + items + '</ul>';
+  });
+  // Ordered lists
+  t = t.replace(/((?:^[ \t]*\d+\. .+\n?)+)/gm, match => {
+    const items = match.trim().split('\n').map(l => '<li>' + l.replace(/^[ \t]*\d+\. /, '') + '</li>').join('');
+    return '<ol>' + items + '</ol>';
+  });
+  // Tables — | col | col | rows
+  t = t.replace(/((?:^\|.+\|\n?)+)/gm, match => {
+    const rows = match.trim().split('\n').filter(r => r.trim() && !/^\s*\|[-| :]+\|/.test(r));
+    if (rows.length < 1) return match;
+    const toTd = (row, tag) => row.trim().replace(/^\|/, '').replace(/\|$/, '').split('|')
+      .map(c => `<${tag}>${c.trim()}</${tag}>`).join('');
+    const head = `<tr>${toTd(rows[0], 'th')}</tr>`;
+    const body = rows.slice(1).map(r => `<tr>${toTd(r, 'td')}</tr>`).join('');
+    return `<table><thead>${head}</thead><tbody>${body}</tbody></table>`;
+  });
+  // Paragraphs — blank line = paragraph break; single newline = <br>
+  t = t.replace(/\n\n+/g, '</p><p>');
+  t = t.replace(/\n/g, '<br>');
+  // Wrap in paragraph if not already wrapped in a block element
+  if (!/^\s*<(h[1-6]|ul|ol|pre|hr|p)/.test(t)) t = '<p>' + t + '</p>';
+  return t;
+}
+
 async function apiFetch(path, opts = {}) {
   return fetch(API + path, {
     ...opts,
@@ -3887,6 +4261,7 @@ function bootApp() {
   $('model-modal').addEventListener('click', e => { if (e.target === $('model-modal')) $('model-modal').classList.remove('open'); });
   $('ant-save').addEventListener('click', saveKey);
   if ($('xai-save')) $('xai-save').addEventListener('click', saveXaiKey);
+  initComplianceUI();
 }
 
 /* NAV */
@@ -4136,6 +4511,13 @@ function setScope(scope, col, fileId, fileName) {
   if (scope === 'all') {
     const ta = $('chat-ta');
     if (ta) ta.placeholder = 'Ask anything\u2026';
+    const ctw = $('compliance-toggle-wrap');
+    if (ctw) ctw.style.display = 'none';
+    setComplianceMode(false);
+  } else if (scope === 'collection') {
+    const ctw2 = $('compliance-toggle-wrap');
+    if (ctw2) ctw2.style.display = 'flex';
+    syncComplianceStatus(col);
   }
 }
 
@@ -4260,6 +4642,11 @@ async function sendChat() {
   const ty = appendTyping();
   try {
     const body = {message:msg, dept, model:modelId, scope:chatScope, history:chatHistory.slice(-20)};
+    if (_complianceMode && chatScope === 'collection') {
+      body.complianceMode = true;
+      body.complianceLens = _complianceLens;
+      body.complianceFullDoc = _complianceFullDoc;
+    }
     if (chatScope === 'collection' && chatCollection) body.collection = chatCollection;
     if (chatScope === 'file' && chatFileId) { body.fileId = chatFileId; body.scope = 'file'; }
 
@@ -4314,7 +4701,7 @@ function appendMsg(role, text, sources, scope, model = '') {
   </div>` : '';
   const modelNames = { claude: 'Claude · Anthropic', grok: 'Grok · xAI', cloudflare: 'Cloudflare AI · Llama', ollama: 'Ollama · Local' };
   const modelLabel = (role === 'ai' && model) ? `<div style="font-family:var(--f-mono);font-size:8px;letter-spacing:0.12em;color:rgba(184,150,12,0.35);text-transform:uppercase;margin-top:6px;padding-left:2px">${modelNames[model] || model}</div>` : '';
-  el.innerHTML = `<div class="msg-av">${av}</div><div class="msg-body">${sc}\x3Cdiv class="msg-bubble">${esc(text)}\x3C/div>${src}${modelLabel}${spk}${actions}\x3C/div>`;
+  el.innerHTML = `<div class="msg-av">${av}</div><div class="msg-body">${sc}\x3Cdiv class="msg-bubble">${role === 'ai' ? renderMarkdown(text) : esc(text)}\x3C/div>${src}${modelLabel}${spk}${actions}\x3C/div>`;
   if (role === 'ai') {
     const spkBtn = el.querySelector('.spk-btn');
     if (spkBtn) {
@@ -4560,16 +4947,18 @@ async function extractText(file, log) {
   const e = file.name.split('.').pop().toLowerCase();
   if (e === 'csv') { const raw = await file.text(); return parseCsv(raw); }
   if (['xlsx','xls'].includes(e)) return extractExcel(file, log);
+  // PDF and Word now return {text, stats} directly — pass through
+  if (e === 'pdf')                return extractPdf(file, log);
+  if (['doc','docx'].includes(e)) return extractWord(file, log);
+  // Plain text formats — wrap in {text, stats}
   let text = '';
   if (['txt','md','json'].includes(e)) text = await file.text();
-  else if (e === 'pdf') text = await extractPdf(file, log);
-  else if (['doc','docx'].includes(e)) text = await extractWord(file, log);
   else { try { text = await file.text(); } catch { text = ''; } }
   return { text, stats: {} };
 }
 async function extractPdf(file, log) {
   try {
-    if (!window.pdfjsLib) { addLog(log, '\u26A0 PDF.js not loaded'); return ''; }
+    if (!window.pdfjsLib) { addLog(log, '\u26A0 PDF.js not loaded'); return { text: '', stats: {} }; }
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     const buf = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({data:buf}).promise;
@@ -4579,16 +4968,21 @@ async function extractPdf(file, log) {
       const c = await pg.getTextContent();
       t += c.items.map(x => x.str).join(' ') + '\n';
     }
-    return t.trim();
-  } catch(e) { addLog(log, '\u26A0 PDF: ' + e.message); return ''; }
+    // Build a minimal stats block so the worker has page count metadata
+    const text = t.trim();
+    const stats = { pageCount: pdf.numPages, charCount: text.length };
+    return { text, stats };
+  } catch(e) { addLog(log, '\u26A0 PDF: ' + e.message); return { text: '', stats: {} }; }
 }
 async function extractWord(file, log) {
   try {
-    if (!window.mammoth) { addLog(log, '\u26A0 Mammoth not loaded'); return ''; }
+    if (!window.mammoth) { addLog(log, '\u26A0 Mammoth not loaded'); return { text: '', stats: {} }; }
     const buf = await file.arrayBuffer();
     const r = await mammoth.extractRawText({arrayBuffer:buf});
-    return r.value || '';
-  } catch(e) { addLog(log, '\u26A0 Word: ' + e.message); return ''; }
+    const text = r.value || '';
+    const stats = { charCount: text.length };
+    return { text, stats };
+  } catch(e) { addLog(log, '\u26A0 Word: ' + e.message); return { text: '', stats: {} }; }
 }
 // ── Tabular extraction helpers ────────────────────────────────
 
@@ -5136,7 +5530,10 @@ function initUploadModal() {
     }
 
     const pickedCol = ($('um-collection-pick')?.value || '').trim();
-    const colParts  = [category, period !== 'Unspecified' ? period : '', reportName].filter(Boolean);
+    // Auto-name: category + period only — NOT reportName.
+    // reportName is file-level metadata; baking it into the collection name
+    // creates a new collection for every file instead of grouping them.
+    const colParts  = [category, period !== 'Unspecified' ? period : ''].filter(Boolean);
     const colName   = pickedCol || colParts.join(' — ') || 'General';
     const files    = _umFiles.slice();
     closeUploadModal();
@@ -5163,7 +5560,11 @@ async function handleFiles(fileList, colName, meta = {}) {
       const extracted = await extractText(f, log);
       const text  = extracted.text  || extracted || '';
       const stats = extracted.stats || {};
-      if (!text || text.length < 5) { addLog(log, '\u26A0 No text extracted'); continue; }
+      if (!text || text.length < 5) {
+        addLog(log, '\u26A0 No text extracted from ' + f.name + ' — is it a scanned PDF?');
+        console.warn('No text extracted from', f.name, 'extracted object:', extracted);
+        continue;
+      }
       addLog(log, `\u2713 ${text.length.toLocaleString()} chars` + (stats.rowCount ? ' \u2014 ' + stats.rowCount.toLocaleString() + ' rows' : ''));
       const fd = new FormData();
       fd.append('file',       f);
@@ -5188,8 +5589,8 @@ async function handleFiles(fileList, colName, meta = {}) {
         // Queue AI classification (non-blocking, runs after upload completes)
         queueAiClassify(d.id, f.name, colName, text);
       }
-      else      addLog(log, `\u2717 ${d.error}`);
-    } catch(e) { addLog(log, '\u2717 ' + e.message); }
+      else { addLog(log, `\u2717 Upload failed: ${d.error}`); console.error('Upload failed:', d.error, 'file:', f?.name); }
+    } catch(e) { addLog(log, '\u2717 ' + e.message); console.error('Upload exception:', f?.name, e); }
   }
 
   if (fill)  fill.style.width  = '100%';
@@ -5198,10 +5599,15 @@ async function handleFiles(fileList, colName, meta = {}) {
   setTimeout(() => { if (prog) prog.classList.remove('on'); if (fill) fill.style.width = '0%'; }, 4000);
   loadCollections(); loadFiles();
 
-  // Re-analyze the collection description after every upload batch —
-  // not just new collections. Description goes stale when files are added to existing ones.
+  // Re-analyze the collection description after upload batch.
+  // Debounced: only runs if the collection hasn't been analyzed in the last 5 min,
+  // preventing N API calls when uploading N files to the same collection.
   if (_aiClassifyEnabled) {
-    setTimeout(() => analyzeCollection(colName), 3000);
+    const lastAnalyzed = _analyzeDebounce.get(colName) || 0;
+    if (Date.now() - lastAnalyzed > 5 * 60 * 1000) {
+      _analyzeDebounce.set(colName, Date.now());
+      setTimeout(() => analyzeCollection(colName), 3000);
+    }
   }
 }
 
@@ -5910,6 +6316,19 @@ let _aiPendingResults   = []; // { fileId, name, collection, suggested: {categor
 let _aiClassifyQueue    = []; // file IDs waiting to be classified
 let _aiClassifyRunning  = false;
 let _newCollections     = new Set(); // track collections just created this session
+let _analyzeDebounce    = new Map(); // colName → timestamp of last analyze call
+
+// ── Compliance Intelligence state ─────────────────────────
+let _complianceMode    = false;
+let _complianceLens    = null;
+let _complianceFullDoc = false;
+const COMPLIANCE_LENSES = {
+  employee:    'Dispensary Employee',
+  officer:     'Compliance Officer',
+  gm:          'GM / Operator',
+  transporter: 'Transporter',
+  cultivation: 'Cultivation & Processing',
+};
 
 function initAiClassify() {
   const toggle = $('ai-classify-toggle');
@@ -5966,6 +6385,14 @@ function queueAiClassify(fileId, fileName, collection, extractedText) {
 
   _aiClassifyQueue.push({ fileId, fileName, collection, text: sample });
   if (!_aiClassifyRunning) processAiClassifyQueue();
+
+  // Trigger compliance processing for PDFs when compliance section is visible
+  if (/\.(pdf|doc|docx)$/i.test(ext)) {
+    const cs = $('um-compliance-section');
+    if (cs && cs.classList.contains('visible')) {
+      runComplianceProcessing(fileName, extractedText, collection);
+    }
+  }
 }
 
 async function processAiClassifyQueue() {
@@ -6238,8 +6665,10 @@ function initSplitPdf() {
   input.addEventListener('change', async e => {
     const file = e.target.files[0];
     if (!file || !file.name.toLowerCase().endsWith('.pdf')) return;
+    const meta = input._splitMeta || {};
+    input._splitMeta = null;
     input.value = '';
-    await runPdfSplitter(file);
+    await runPdfSplitter(file, meta);
   });
 
   // Pre-flight modal wiring
@@ -6247,7 +6676,16 @@ function initSplitPdf() {
   $('spm-cancel')?.addEventListener('click', closeSplitMetaModal);
   $('split-meta-modal-bg')?.addEventListener('click', e => { if (e.target === $('split-meta-modal-bg')) closeSplitMetaModal(); });
   $('spm-submit')?.addEventListener('click', () => {
+    // Capture metadata BEFORE closing modal
+    const meta = {
+      category: ($('spm-category')?.value || 'Compliance').trim(),
+      period:   ($('spm-period')?.value   || '').trim(),
+      dept:     ($('spm-dept')?.value      || dept).trim(),
+      chunk:    parseInt($('spm-chunk')?.value || '800', 10) || 800,
+    };
     closeSplitMetaModal();
+    // Store meta for use when file is picked
+    input._splitMeta = meta;
     input.click();
   });
 }
@@ -6278,12 +6716,12 @@ function closeSplitMetaModal() {
   $('split-meta-modal-bg').classList.remove('open');
 }
 
-async function runPdfSplitter(file) {
-  // Read metadata from pre-flight modal
-  const splitCategory = ($('spm-category')?.value || 'Compliance').trim();
-  const splitPeriod   = ($('spm-period')?.value   || '').trim();
-  const splitDept     = ($('spm-dept')?.value      || dept).trim();
-  const splitChunk    = parseInt($('spm-chunk')?.value || '800', 10) || 800;
+async function runPdfSplitter(file, meta = {}) {
+  // Metadata passed directly — modal may already be closed
+  const splitCategory = meta.category || 'Compliance';
+  const splitPeriod   = meta.period   || '';
+  const splitDept     = meta.dept     || dept;
+  const splitChunk    = meta.chunk    || 800;
 
   const prog  = $('uprog');
   const fill  = $('pfill');
@@ -6361,7 +6799,19 @@ async function runPdfSplitter(file) {
     });
 
     // Load with pdf-lib for actual splitting
-    if (!window.PDFLib) throw new Error('pdf-lib not loaded. Check your network connection.');
+    if (!window.PDFLib) {
+      addLog(log, '\u26a0 pdf-lib not loaded — attempting fallback load...');
+      try {
+        await new Promise((resolve, reject) => {
+          const s = document.createElement('script');
+          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js';
+          s.onload = resolve; s.onerror = reject;
+          document.head.appendChild(s);
+        });
+        await new Promise(r => setTimeout(r, 500));
+      } catch(e) { console.warn('pdf-lib fallback failed:', e); }
+      if (!window.PDFLib) throw new Error('pdf-lib failed to load — try refreshing the page.');
+    }
     const { PDFDocument } = window.PDFLib;
     const srcDoc = await PDFDocument.load(arrayBuffer);
 
@@ -6439,6 +6889,169 @@ async function runPdfSplitter(file) {
     setTimeout(() => { if (prog) prog.classList.remove('on'); }, 3000);
   }
 }
+
+
+// ═══════════════════════════════════════════════════════════
+//  COMPLIANCE INTELLIGENCE — CLIENT SIDE
+// ═══════════════════════════════════════════════════════════
+
+function initComplianceUI() {
+  const toggle = $('compliance-ctoggle'), label = $('compliance-toggle-label');
+  if (toggle) toggle.addEventListener('click', () => setComplianceMode(!_complianceMode));
+  if (label)  label.addEventListener('click',  () => setComplianceMode(!_complianceMode));
+  const bar = $('compliance-bar');
+  if (bar) bar.querySelectorAll('.cb-lens-btn').forEach(btn => btn.addEventListener('click', () => {
+    _complianceLens = (_complianceLens === btn.dataset.lens) ? null : btn.dataset.lens;
+    bar.querySelectorAll('.cb-lens-btn').forEach(b => b.classList.toggle('active', b.dataset.lens === _complianceLens));
+    updateComplianceBarStatus();
+  }));
+  const fullBtn = $('cb-full-btn');
+  if (fullBtn) fullBtn.addEventListener('click', () => {
+    _complianceFullDoc = !_complianceFullDoc;
+    fullBtn.classList.toggle('active', _complianceFullDoc);
+    updateComplianceBarStatus();
+  });
+  const fi = $('file-input');
+  if (fi) fi.addEventListener('change', e => {
+    const hasPdf = Array.from(e.target.files||[]).some(f => /\.(pdf|doc|docx)$/i.test(f.name));
+    const cs = $('um-compliance-section');
+    if (cs) cs.classList.toggle('visible', hasPdf);
+    if (hasPdf) { const ck=$('um-chunk-size'); if(ck&&ck.value==='1500') ck.value='800'; }
+  });
+  const chips = $('um-lens-chips');
+  if (chips) chips.querySelectorAll('.um-lens-chip').forEach(c => c.addEventListener('click', () => c.classList.toggle('selected')));
+}
+
+function setComplianceMode(on) {
+  _complianceMode = on;
+  const toggle=$('compliance-ctoggle'), label=$('compliance-toggle-label'), bar=$('compliance-bar');
+  if (toggle) toggle.classList.toggle('on', on);
+  if (label)  label.classList.toggle('active', on);
+  if (bar)    bar.classList.toggle('visible', on);
+  if (!on) {
+    _complianceLens=null; _complianceFullDoc=false;
+    if (bar) bar.querySelectorAll('.cb-lens-btn').forEach(b=>b.classList.remove('active'));
+    const fb=$('cb-full-btn'); if(fb) fb.classList.remove('active');
+  }
+  updateComplianceBarStatus();
+}
+
+function updateComplianceBarStatus() {
+  const st=$('cb-status'); if(!st) return;
+  if(!_complianceMode){st.textContent='';return;}
+  const parts=[];
+  if(_complianceLens) parts.push(COMPLIANCE_LENSES[_complianceLens]);
+  if(_complianceFullDoc) parts.push('Full Doc');
+  if(!parts.length) parts.push('Select a lens');
+  st.textContent=parts.join(' \u00b7 ');
+}
+
+async function syncComplianceStatus(collection) {
+  if(!collection) return;
+  try {
+    const res=await apiFetch('/compliance/synthesis?dept='+dept+'&collection='+encodeURIComponent(collection));
+    if(!res.ok) return;
+    const data=await res.json();
+    const bar=$('compliance-bar'); if(!bar) return;
+    bar.querySelectorAll('.cb-lens-btn').forEach(btn => {
+      const l=data.lenses?.[btn.dataset.lens];
+      btn.title=l?.exists?'Ready \u2014 '+Math.round(l.chars/1000)+'k chars':'Not yet synthesized';
+      btn.style.borderColor=l?.exists?'rgba(60,180,100,0.3)':'';
+    });
+  } catch(e){}
+}
+
+async function runComplianceProcessing(fileName, text, collection) {
+  const chips=$('um-lens-chips'); if(!chips) return;
+  const lenses=Array.from(chips.querySelectorAll('.um-lens-chip.selected')).map(c=>c.dataset.lens);
+  if(!lenses.length) return;
+  const state=inferStateFromName(fileName,collection);
+  try {
+    addLog($('plog'),'\u25c8 Extracting compliance index\u2026');
+    const res=await apiFetch('/compliance/extract-csv',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({text,fileName,state,dept,collection,model:modelId}),
+    });
+    if(res.ok){
+      const data=await res.json();
+      if(data.csv&&data.rows>0){
+        const csvName=fileName.replace(/\.[^.]+$/,'')+' _INDEX.csv';
+        const csvFile=new File([new Blob([data.csv],{type:'text/csv'})],csvName,{type:'text/csv'});
+        const ex=await extractText(csvFile,null);
+        const fd=new FormData();
+        fd.append('file',csvFile);fd.append('text',ex.text||'');fd.append('stats',JSON.stringify(ex.stats||{}));
+        fd.append('name',csvName);fd.append('dept',dept);fd.append('collection',collection);
+        fd.append('type','text/csv');fd.append('category','Compliance');
+        fd.append('reportName',fileName.replace(/\.[^.]+$/,'')+' \u2014 Compliance Index');
+        await apiFetch('/upload',{method:'POST',body:fd});
+        addLog($('plog'),'\u2713 Index: '+data.rows+' rules');
+      }
+    }
+  } catch(e){addLog($('plog'),'\u26a0 Index error: '+e.message);}
+  for(const lens of lenses){
+    addLog($('plog'),'\u25c8 Queuing '+COMPLIANCE_LENSES[lens]+'...');
+    apiFetch('/compliance/synthesize',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({dept,collection,lens,model:modelId}),
+    }).then(async r=>{
+      const d=await r.json().catch(()=>({}));
+      if(d.ok) addLog($('plog'),'\u2713 '+COMPLIANCE_LENSES[lens]+' ready ('+Math.round((d.chars||0)/1000)+'k)');
+    }).catch(()=>{});
+  }
+}
+
+function inferStateFromName(f,c){
+  const t=(f+' '+c).toLowerCase();
+  const m={'pennsylvania':'Pennsylvania','illinois':'Illinois','nevada':'Nevada','virginia':'Virginia',
+    'ohio':'Ohio','massachusetts':'Massachusetts','florida':'Florida','new jersey':'New Jersey',
+    'colorado':'Colorado','california':'California'};
+  for(const[k,v] of Object.entries(m)){if(t.includes(k))return v;}
+  return '';
+}
+
+async function loadCompliancePanel(){
+  const panel=$('compliance-panel'); if(!panel) return;
+  if(!selectedCollection){panel.style.display='none';return;}
+  try{
+    const res=await apiFetch('/compliance/synthesis?dept='+dept+'&collection='+encodeURIComponent(selectedCollection));
+    if(!res.ok){panel.style.display='none';return;}
+    const data=await res.json();
+    panel.style.display='';
+    const rows=Object.entries(data.lenses||{}).map(([key,l])=>
+      '<div class="cl-row"><div class="cl-name">'+l.label+'</div>'+
+      '<div class="cl-status '+(l.exists?'ready':'')+'">'+
+      (l.exists?'\u2713 Ready \u00b7 '+Math.round(l.chars/1000)+'k':'Not generated')+'</div>'+
+      '<button class="cl-run" data-lens="'+key+'">'+(l.exists?'Re-run':'Generate')+'</button></div>'
+    ).join('');
+    panel.innerHTML='<div class="compliance-section"><div class="compliance-section-header">'+
+      '<span class="cs-title">\u25c8 Compliance Intelligence</span>'+
+      '<button class="cs-reanalyze" id="cs-reanalyze-all">Re-run All</button></div>'+
+      '<div class="compliance-lenses">'+rows+'</div></div>';
+    panel.querySelectorAll('.cl-run').forEach(btn=>btn.addEventListener('click',async()=>{
+      btn.disabled=true;btn.textContent='Running\u2026';
+      const r=await apiFetch('/compliance/synthesize',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({dept,collection:selectedCollection,lens:btn.dataset.lens,reanalyze:true,model:modelId})});
+      const d=await r.json().catch(()=>({}));
+      btn.textContent=d.ok?'Done':'Error';btn.disabled=false;
+      if(d.ok) loadCompliancePanel();
+    }));
+    const rra=$('cs-reanalyze-all');
+    if(rra) rra.addEventListener('click',async()=>{
+      rra.disabled=true;rra.textContent='Running\u2026';
+      await apiFetch('/compliance/synthesis',{method:'DELETE',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({dept,collection:selectedCollection})});
+      for(const lens of Object.keys(COMPLIANCE_LENSES)){
+        await apiFetch('/compliance/synthesize',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({dept,collection:selectedCollection,lens,reanalyze:true,model:modelId})});
+      }
+      rra.textContent='Done';loadCompliancePanel();
+    });
+  }catch(e){panel.style.display='none';}
+}
+
+// Compliance processing triggered directly from queueAiClassify below
+
+// initComplianceUI is called directly inside bootApp above
 
 </script>
 
@@ -6663,6 +7276,27 @@ async function runPdfSplitter(file) {
         </select>
         <div style="font-family:var(--f-mono);font-size:9px;color:var(--smoke4);margin-top:4px;letter-spacing:0.04em">
           Smaller = more precise retrieval for dense documents. Use Fine or Ultra-fine for regulations and legal text.
+        </div>
+      </div>
+
+      <!-- Compliance Intelligence — shown for PDF uploads -->
+      <div class="um-compliance-section" id="um-compliance-section">
+        <div class="um-compliance-header">&#9670; Compliance Intelligence</div>
+        <div class="um-compliance-body">
+          <div class="um-compliance-note">
+            Select which roles this regulation applies to. CACI will automatically extract a structured rule index and generate role-specific syntheses for compliance mode chat.
+          </div>
+          <div class="um-label" style="margin-bottom:4px">Role Lenses</div>
+          <div class="um-lens-chips" id="um-lens-chips">
+            <button type="button" class="um-lens-chip" data-lens="employee">Dispensary Employee</button>
+            <button type="button" class="um-lens-chip" data-lens="officer">Compliance Officer</button>
+            <button type="button" class="um-lens-chip" data-lens="gm">GM / Operator</button>
+            <button type="button" class="um-lens-chip" data-lens="transporter">Transporter</button>
+            <button type="button" class="um-lens-chip" data-lens="cultivation">Cultivation & Processing</button>
+          </div>
+          <div class="um-compliance-note" style="color:rgba(220,100,100,0.5)">
+            &#9888; CSV index and syntheses run in background after upload. May take 1-3 minutes per document.
+          </div>
         </div>
       </div>
 
