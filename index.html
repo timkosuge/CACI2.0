@@ -107,23 +107,54 @@ body::before {
   padding: 24px;
   /* Deep navy base */
   background-color: #060911;
-  /* Subtle overhead warm light — like a single pendant lamp above center */
+  /* Candlelight — warm amber source, subtle flicker */
   background-image:
-    radial-gradient(ellipse 70% 38% at 50% 0%, rgba(200,170,90,0.06) 0%, transparent 100%),
-    radial-gradient(ellipse 40% 28% at 50% -4%, rgba(220,185,110,0.055) 0%, transparent 80%),
-    radial-gradient(ellipse 100% 60% at 50% 0%, rgba(15,20,38,0.6) 0%, transparent 100%);
+    linear-gradient(180deg,
+      rgba(200,120,20,0.08) 0%,
+      rgba(200,120,20,0.14) 3%,
+      rgba(180,100,15,0.08) 12%,
+      rgba(155,80,10,0.04) 26%,
+      rgba(120,60,8,0.016) 40%,
+      transparent 60%
+    ),
+    radial-gradient(ellipse 100% 32% at 50% -8%, rgba(210,130,25,0.07) 0%, transparent 100%),
+    radial-gradient(ellipse 45% 18% at 49% -6%, rgba(230,150,30,0.064) 0%, transparent 100%);
   /* Suede noise overlay via pseudo-element — see ::before */
 }
 #login-screen::before {
   content: '';
   position: absolute; inset: 0;
   z-index: 0;
-  opacity: 0.05;
-  /* Fine-grain suede — high frequency = crisp, not blurry */
+  opacity: 0.025;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='2' stitchTiles='stitch' result='noise'/%3E%3CfeColorMatrix type='matrix' values='0.5 0.35 0 0 0.14 0.4 0.28 0 0 0.09 0.25 0.15 0 0 0.04 0 0 0 1 0' in='noise'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
   background-repeat: repeat;
   background-size: 160px 160px;
   pointer-events: none;
+}
+/* Candle flicker overlay */
+#login-screen::after {
+  content: '';
+  position: absolute; inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(180deg,
+      rgba(200,110,15,0.08) 0%,
+      rgba(170,85,10,0.04) 15%,
+      transparent 45%
+    ),
+    radial-gradient(ellipse 60% 22% at 50% 0%, rgba(220,135,20,0.055) 0%, transparent 100%);
+  animation: candleFlicker 4s ease-in-out infinite;
+}
+@keyframes candleFlicker {
+  0%   { opacity: 1;    }
+  15%  { opacity: 0.82; }
+  30%  { opacity: 0.95; }
+  45%  { opacity: 0.87; }
+  60%  { opacity: 1.0;  }
+  75%  { opacity: 0.84; }
+  88%  { opacity: 0.92; }
+  100% { opacity: 1;    }
 }
 #login-screen > * { position: relative; z-index: 1; }
 .login-wrap {
