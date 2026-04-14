@@ -803,26 +803,17 @@ async function buildContextMultiCollection({ message, dept, env, maxCollections 
         if (!r.statsContext) return '';
         const col = colScores[i];
         const schemaNote = col.category ? ` [${col.category}]` : '';
-        return `### Collection: ${col.name}${schemaNote}
-${r.statsContext}`;
+        return `### Collection: ${col.name}${schemaNote}\n${r.statsContext}`;
       })
       .filter(Boolean)
-      .join('
-
----
-
-');
+      .join('\n\n---\n\n');
 
     const allChunks = [];
     for (let i = 0; i < results.length; i++) {
       const r = results[i];
       if (!r.text) continue;
       const boost = (maxCollections - i) * 2;
-      r.text.split('
-
----
-
-').forEach(chunk => allChunks.push({ chunk, boost, colName: colScores[i].name }));
+      r.text.split('\n\n---\n\n').forEach(chunk => allChunks.push({ chunk, boost, colName: colScores[i].name }));
     }
 
     const keywords2 = extractKeywords(message);
@@ -840,11 +831,7 @@ ${r.statsContext}`;
     });
 
     const top = deduped.slice(0, 22);
-    const text = top.map(c => c.chunk).join('
-
----
-
-');
+    const text = top.map(c => c.chunk).join('\n\n---\n\n');
     const sources = [...new Set(top.map(c => {
       const m = c.chunk.match(/^\[([^\]]+)\]/);
       return m ? m[1] : c.colName;
@@ -852,14 +839,10 @@ ${r.statsContext}`;
 
     const manifest = colScores.map(c =>
       `- ${c.name} (score:${c._colScore}, ${c.fileCount || '?'} files${c.summary ? ' — ' + c.summary : ''})`
-    ).join('
-');
+    ).join('\n');
 
     return {
-      text: text + `
-
-COLLECTIONS SEARCHED:
-${manifest}`,
+      text: text + '\n\nCOLLECTIONS SEARCHED:\n' + manifest,
       sources,
       statsContext: allStats,
       focusFile: results[0]?.focusFile || null,
@@ -1640,8 +1623,7 @@ function rerankChunks(chunks, keywords, intent) {
     let bonus = 0;
     // Direct answer signal: number near a keyword
     for (const kw of expanded) {
-      const re = new RegExp('(?<![a-z0-9])' + escapeRegex(kw) + '[^
-]{0,40}\d+[,.]?\d*', 'i');
+      const re = new RegExp('(?<![a-z0-9])' + escapeRegex(kw) + '[^\\n]{0,40}\\d+[,.]?\\d*', 'i');
       if (re.test(lower)) bonus += 4;
     }
     // Numeric density for aggregate queries
