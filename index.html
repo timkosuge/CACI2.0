@@ -4558,12 +4558,14 @@ function addLog(el, t) { if(el){ el.innerHTML += t + '<br>'; el.scrollTop = 9999
 /* TEXT EXTRACTION */
 async function extractText(file, log) {
   const e = file.name.split('.').pop().toLowerCase();
-  if (['txt','md','json'].includes(e)) return file.text();
-  if (e === 'csv') return parseCsv(await file.text());
-  if (e === 'pdf') return extractPdf(file, log);
-  if (['doc','docx'].includes(e)) return extractWord(file, log);
+  if (e === 'csv') { const raw = await file.text(); return parseCsv(raw); }
   if (['xlsx','xls'].includes(e)) return extractExcel(file, log);
-  try { return await file.text(); } catch { return ''; }
+  let text = '';
+  if (['txt','md','json'].includes(e)) text = await file.text();
+  else if (e === 'pdf') text = await extractPdf(file, log);
+  else if (['doc','docx'].includes(e)) text = await extractWord(file, log);
+  else { try { text = await file.text(); } catch { text = ''; } }
+  return { text, stats: {} };
 }
 async function extractPdf(file, log) {
   try {
@@ -4588,29 +4590,172 @@ async function extractWord(file, log) {
     return r.value || '';
   } catch(e) { addLog(log, '\u26A0 Word: ' + e.message); return ''; }
 }
+// ── Tabular extraction helpers ────────────────────────────────
+
+// Robust CSV parser — handles quoted fields and embedded commas
+function parseCsvLine(line) {
+  const fields = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQ && line[i+1] === '"') { cur += '"'; i++; }
+      else inQ = !inQ;
+    } else if (ch === ',' && !inQ) {
+      fields.push(cur.trim()); cur = '';
+    } else {
+      cur += ch;
+    }
+  }
+  fields.push(cur.trim());
+  return fields;
+}
+
+// Compute per-column numeric stats from an array of row objects
+function computeTabularStats(rows, headers) {
+  const numeric = {};
+  const categoryCols = {}; // track unique values for low-cardinality cols
+  for (const h of headers) {
+    const vals = rows.map(r => r[h]).filter(v => v !== '' && v !== null && v !== undefined);
+    const nums = vals.map(v => parseFloat(String(v).replace(/[$,%]/g, ''))).filter(n => !isNaN(n));
+    if (nums.length > 0 && nums.length / vals.length >= 0.7) {
+      const sum = nums.reduce((a,b) => a+b, 0);
+      numeric[h] = {
+        sum:   Math.round(sum * 100) / 100,
+        avg:   Math.round(sum / nums.length * 100) / 100,
+        min:   Math.min(...nums),
+        max:   Math.max(...nums),
+        count: nums.length,
+      };
+    } else {
+      // Low-cardinality text cols: capture unique values (useful for category cols like State, Product)
+      const unique = [...new Set(vals.map(v => String(v).trim()).filter(Boolean))];
+      if (unique.length > 0 && unique.length <= 30) categoryCols[h] = unique;
+    }
+  }
+  return { rowCount: rows.length, columns: headers, numeric, categoryCols };
+}
+
+// Convert rows array into structured text chunks — one chunk per ROW_BATCH rows,
+// each chunk starts with the header line so it's self-contained for retrieval
+function rowsToChunkedText(headers, rows, sheetLabel, rowBatch) {
+  if (!rows.length) return '';
+  const headerLine = 'Columns: ' + headers.join(' | ');
+  const chunks = [];
+  for (let i = 0; i < rows.length; i += rowBatch) {
+    const slice = rows.slice(i, i + rowBatch);
+    const rowLines = slice.map((r, idx) => {
+      const cells = headers.map(h => {
+        const v = r[h];
+        return (v !== undefined && v !== '') ? h + ': ' + v : null;
+      }).filter(Boolean);
+      return 'Row ' + (i + idx + 1) + ' — ' + cells.join(' | ');
+    });
+    chunks.push(sheetLabel + '\n' + headerLine + '\n' + rowLines.join('\n'));
+  }
+  return chunks.join('\n\n---\n\n');
+}
+
 async function extractExcel(file, log) {
   try {
-    if (!window.XLSX) { addLog(log, '\u26A0 SheetJS not loaded'); return ''; }
+    if (!window.XLSX) { addLog(log, '\u26A0 SheetJS not loaded'); return { text: '', stats: {} }; }
     const buf = await file.arrayBuffer();
-    const wb = XLSX.read(buf, {type:'array'});
-    let t = '';
+    const wb  = XLSX.read(buf, { type: 'array', cellDates: true });
+
+    let allText  = '';
+    let combined = { rowCount: 0, columns: [], numeric: {}, categoryCols: {} };
+
     for (const sn of wb.SheetNames) {
-      const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], {defval:''});
-      t += `Sheet: ${sn}\n`;
-      t += rows.map(r => Object.entries(r).map(([k,v]) => `${k}: ${v}`).join(' | ')).join('\n') + '\n\n';
+      const sheet = wb.Sheets[sn];
+      const rows  = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false });
+      if (!rows.length) continue;
+
+      const headers = Object.keys(rows[0]);
+      addLog(log, '\u2192 Sheet "' + sn + '" \u2014 ' + rows.length + ' rows, ' + headers.length + ' cols');
+
+      const sheetLabel = wb.SheetNames.length > 1 ? 'Sheet: ' + sn : '';
+
+      // Adaptive row batch: fewer rows per chunk for wide sheets so chunks stay under ~2000 chars
+      const rowBatch = headers.length > 20 ? 20 : headers.length > 10 ? 35 : 50;
+      const sheetText = rowsToChunkedText(headers, rows, sheetLabel, rowBatch);
+      allText += (allText ? '\n\n' : '') + sheetText;
+
+      // Merge stats across sheets
+      const sheetStats = computeTabularStats(rows, headers);
+      combined.rowCount  += sheetStats.rowCount;
+      combined.columns    = [...new Set([...combined.columns, ...sheetStats.columns])];
+      for (const [k, v] of Object.entries(sheetStats.numeric)) {
+        if (!combined.numeric[k]) {
+          combined.numeric[k] = { ...v };
+        } else {
+          combined.numeric[k].sum   = Math.round((combined.numeric[k].sum + v.sum) * 100) / 100;
+          combined.numeric[k].count += v.count;
+          combined.numeric[k].avg   = Math.round(combined.numeric[k].sum / combined.numeric[k].count * 100) / 100;
+          combined.numeric[k].min   = Math.min(combined.numeric[k].min, v.min);
+          combined.numeric[k].max   = Math.max(combined.numeric[k].max, v.max);
+        }
+      }
+      Object.assign(combined.categoryCols, sheetStats.categoryCols);
     }
-    return t.trim();
-  } catch(e) { addLog(log, '\u26A0 Excel: ' + e.message); return ''; }
+
+    // Prepend a stats summary block so the first chunk always has the overview
+    if (combined.rowCount > 0) {
+      const numLines = Object.entries(combined.numeric)
+        .map(([col, s]) => col + ': sum=' + s.sum + ', avg=' + s.avg + ', min=' + s.min + ', max=' + s.max + ', count=' + s.count)
+        .join('\n');
+      const catLines = Object.entries(combined.categoryCols)
+        .map(([col, vals]) => col + ' values: ' + vals.map(v => v.includes(',') ? '"' + v + '"' : v).join(', '))
+        .join('\n');
+      const summary = [
+        'FILE SUMMARY',
+        'Rows: ' + combined.rowCount,
+        'Columns: ' + combined.columns.join(', '),
+        numLines ? 'Numeric stats:\n' + numLines : '',
+        catLines ? 'Categories:\n'    + catLines : '',
+      ].filter(Boolean).join('\n');
+      allText = summary + '\n\n---\n\n' + allText;
+    }
+
+    return { text: allText.trim(), stats: combined };
+  } catch(e) {
+    addLog(log, '\u26A0 Excel: ' + e.message);
+    return { text: '', stats: {} };
+  }
 }
+
 function parseCsv(raw) {
   const lines = raw.split('\n').filter(l => l.trim());
-  if (!lines.length) return raw;
-  const headers = lines[0].split(',').map(h => h.replace(/"/g,'').trim());
+  if (!lines.length) return { text: raw, stats: {} };
+
+  const headers = parseCsvLine(lines[0]).map(h => h.replace(/^"|"$/g, '').trim());
+  if (!headers.length) return { text: raw, stats: {} };
+
   const rows = lines.slice(1).map(line => {
-    const vals = line.split(',').map(v => v.replace(/"/g,'').trim());
-    return headers.map((h,i) => `${h}: ${vals[i]||''}`).join(' | ');
-  });
-  return `Headers: ${headers.join(', ')}\n\n${rows.join('\n')}`;
+    const vals = parseCsvLine(line);
+    const obj = {};
+    headers.forEach((h, i) => { obj[h] = (vals[i] || '').replace(/^"|"$/g, '').trim(); });
+    return obj;
+  }).filter(r => Object.values(r).some(v => v !== ''));
+
+  const stats   = computeTabularStats(rows, headers);
+  const rowBatch = headers.length > 20 ? 20 : headers.length > 10 ? 35 : 50;
+  const chunkedText = rowsToChunkedText(headers, rows, '', rowBatch);
+
+  const numLines = Object.entries(stats.numeric)
+    .map(([col, s]) => col + ': sum=' + s.sum + ', avg=' + s.avg + ', min=' + s.min + ', max=' + s.max + ', count=' + s.count)
+    .join('\n');
+  const catLines = Object.entries(stats.categoryCols)
+    .map(([col, vals]) => col + ' values: ' + vals.map(v => v.includes(',') ? '"' + v + '"' : v).join(', '))
+    .join('\n');
+  const summary = [
+    'FILE SUMMARY',
+    'Rows: ' + stats.rowCount,
+    'Columns: ' + headers.join(', '),
+    numLines ? 'Numeric stats:\n' + numLines : '',
+    catLines ? 'Categories:\n'    + catLines : '',
+  ].filter(Boolean).join('\n');
+
+  return { text: (summary + '\n\n---\n\n' + chunkedText).trim(), stats };
 }
 
 /* ADMIN */
@@ -5015,12 +5160,15 @@ async function handleFiles(fileList, colName, meta = {}) {
     if (label) label.textContent = `[${i+1}/${files.length}] ${f.name}`;
     addLog(log, `\u2192 ${f.name}`);
     try {
-      const text = await extractText(f, log);
+      const extracted = await extractText(f, log);
+      const text  = extracted.text  || extracted || '';
+      const stats = extracted.stats || {};
       if (!text || text.length < 5) { addLog(log, '\u26A0 No text extracted'); continue; }
-      addLog(log, `\u2713 ${text.length.toLocaleString()} chars`);
+      addLog(log, `\u2713 ${text.length.toLocaleString()} chars` + (stats.rowCount ? ' \u2014 ' + stats.rowCount.toLocaleString() + ' rows' : ''));
       const fd = new FormData();
       fd.append('file',       f);
       fd.append('text',       text);
+      fd.append('stats',      JSON.stringify(stats));
       fd.append('name',       f.name);
       fd.append('dept',       dept);
       fd.append('collection', colName);
@@ -5203,9 +5351,11 @@ function initContextTab() {
       ctxBtn.disabled = true; ctxBtn.textContent = 'Uploading\u2026';
       for (const f of files) {
         try {
-          const text = await extractText(f, null);
+          const extracted = await extractText(f, null);
+          const text  = extracted.text  || extracted || '';
+          const stats = extracted.stats || {};
           const fd = new FormData();
-          fd.append('file', f); fd.append('text', text || ''); fd.append('name', f.name);
+          fd.append('file', f); fd.append('text', text); fd.append('stats', JSON.stringify(stats)); fd.append('name', f.name);
           fd.append('dept', dept); fd.append('collection', selectedCollection);
           fd.append('type', f.type || f.name.split('.').pop());
           fd.append('isContext', 'true');
@@ -5796,14 +5946,24 @@ function updateAiClassifyCostLabel() {
 function queueAiClassify(fileId, fileName, collection, extractedText) {
   if (!_aiClassifyEnabled) return;
 
-  // Only classify PDF and DOCX — skip xlsx/csv/txt
   const ext = (fileName || '').split('.').pop().toLowerCase();
-  if (!['pdf','docx','doc'].includes(ext)) return;
+  // Include tabular formats now that we extract structured text
+  if (!['pdf','docx','doc','xlsx','xls','csv'].includes(ext)) return;
 
   // Need meaningful text
-  if (!extractedText || extractedText.length < 300) return;
+  if (!extractedText || extractedText.length < 100) return;
 
-  _aiClassifyQueue.push({ fileId, fileName, collection, text: extractedText });
+  // For tabular files: use FILE SUMMARY block + first data rows — more informative than raw row dump
+  let sample = extractedText;
+  if (['xlsx','xls','csv'].includes(ext)) {
+    // Summary block is always first — grab it plus the first rows chunk
+    const parts = extractedText.split('\n\n---\n\n');
+    const summary = parts[0] || '';
+    const firstRows = parts[1] ? parts[1].split('\n').slice(0, 25).join('\n') : '';
+    sample = (summary + '\n\n' + firstRows).trim();
+  }
+
+  _aiClassifyQueue.push({ fileId, fileName, collection, text: sample });
   if (!_aiClassifyRunning) processAiClassifyQueue();
 }
 
@@ -5825,8 +5985,9 @@ async function runAiClassify({ fileId, fileName, collection, text }) {
       await new Promise(r => setTimeout(r, 2000));
     }
 
-    // Use first 2500 chars — enough for title, dates, headings
-    const sample = text.slice(0, 2500);
+    // For tabular files, text is already the pre-built summary+header sample from queueAiClassify.
+    // For PDFs/DOCX, take first 2500 chars — enough for title, dates, headings.
+    const sample = text.length <= 2500 ? text : text.slice(0, 2500);
 
     // Get existing collections for collection suggestion
     const colRes  = await apiFetch('/collections?dept=' + dept);
