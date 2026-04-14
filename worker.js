@@ -598,12 +598,8 @@ Be direct and conversational. List them clearly.`;
       context = await buildContext({ message, dept, collection: activeCollection, fileId, scope: activeScope, env });
     }
 
-    // ── Re-ranking pass ───────────────────────────────────────
-    if (context.text) {
-      const rawChunks = context.text.split('\n\n---\n\n').map(chunk => ({ chunk, score: 0 }));
-      const reranked  = rerankChunks(rawChunks, extractKeywords(message), intent);
-      context.text    = reranked.map(c => c.chunk).join('\n\n---\n\n');
-    }
+    // Note: context builders (buildContextTwoPass / buildContext) already
+    // apply rerankChunks internally. No second pass needed here.
 
     let contextDocs = '';
     if (activeCollection) {
@@ -745,11 +741,11 @@ function analyzeQueryIntent(message) {
     /biggest|largest|highest|lowest|smallest/,
   ].some(r => r.test(msg));
   const isFiltered = [
-    /pa|ill|nv|va|nj|oh|ma|fl/,
-    /flower|vape|edible|concentrate|preroll/,
-    /store|location|dispensary/,
+    /\bpa\b|\bill\b|\bnv\b|\bva\b|\bnj\b|\boh\b|\bma\b|\bfl\b|\bca\b|\bco\b/,
+    /\bpennsylvania\b|\billinois\b|\bnevada\b|\bvirginia\b|\bnew jersey\b|\bohio\b|\bmassachusetts\b|\bflorida\b/,
+    /\bflower\b|\bvape\b|\bedible\b|\bconcentrate\b|\bpreroll\b|\bpre-roll\b/,
+    /\bstore\b|\blocation\b|\bdispensary\b|\bproduct\b|\bbrand\b/,
   ].some(r => r.test(msg));
-  const isCausal = [
     /why|cause|reason|driving|factor|explain/,
   ].some(r => r.test(msg));
   let periodExpansion = 1;
@@ -957,13 +953,28 @@ function parseDateRange(message) {
     return { rangeStart: { m: 1, y: yMin }, rangeEnd: { m: 12, y: yMax } };
   }
 
-  // ── Pattern 4: single "Month YYYY" — treat as that exact month ──
+  // ── Pattern 4: "Month YYYY" — exact month ──────────────────
   for (const mk of _ALL_MONTH_KEYS) {
     const mPat = new RegExp('(?<![a-z])' + mk + '(?![a-z])\\s+(20\\d{2})', 'i');
     const mm = message.match(mPat);
     if (mm && _MONTH_TO_NUM[mk]) {
       const y = parseInt(mm[1]);
       return { rangeStart: { m: _MONTH_TO_NUM[mk], y }, rangeEnd: { m: _MONTH_TO_NUM[mk], y } };
+    }
+  }
+
+  // ── Pattern 5: month name only, no year — infer most recent ──
+  // "show me March data" → most recent March (try current year, then prior)
+  const today5 = new Date();
+  const curMonth5 = today5.getMonth() + 1;
+  const curYear5  = today5.getFullYear();
+  for (const mk of _ALL_MONTH_KEYS.filter((v, i, a) => a.indexOf(v) === i)) {
+    const re5 = new RegExp('(?<![a-z])' + mk + '(?![a-z])', 'i');
+    if (re5.test(message)) {
+      const targetM = _MONTH_TO_NUM[mk];
+      // If that month has passed this year, use this year; otherwise use last year
+      const inferYear = targetM <= curMonth5 ? curYear5 : curYear5 - 1;
+      return { rangeStart: { m: targetM, y: inferYear }, rangeEnd: { m: targetM, y: inferYear } };
     }
   }
 
@@ -1791,6 +1802,9 @@ function expandWithDerivedMetrics(message, keywords) {
   return [...extras];
 }
 
+// Known 2-char cannabis state abbreviations — preserved despite length filter
+const STATE_ABBREVS = new Set(['pa','il','nv','va','nj','oh','ma','fl','ca','co','mi','az','mo','md','mn','ok','or','wa','ny']);
+
 function extractKeywords(query) {
   const stop = new Set(['a','an','the','is','are','was','were','be','been','have','has','had',
     'do','does','did','will','would','could','should','may','might','what','which','who',
@@ -1799,7 +1813,17 @@ function extractKeywords(query) {
     'when','where','why','with','about','from','into','can','tell','show','give','get','all',
     'report','reports','data','file','files','show','list','give','find','between','across',
     'total','totals','number','numbers','amount','amounts','value','values']);
-  const base = query.toLowerCase().replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(w => w.length > 2 && !stop.has(w));
+  // Split preserving case for state abbrev detection, then lowercase
+  const tokens = query.replace(/[^a-zA-Z0-9\s]/g,' ').split(/\s+/);
+  const base = tokens
+    .map(t => t.toLowerCase())
+    .filter(w => {
+      if (w.length === 0) return false;
+      if (stop.has(w)) return false;
+      // Keep 2-char state abbreviations; drop other 1-2 char tokens
+      if (w.length <= 2) return STATE_ABBREVS.has(w);
+      return true;
+    });
   // Expand with derived business metrics (maps KPIs to actual column terms)
   return expandWithDerivedMetrics(query, base);
 }
@@ -1812,6 +1836,12 @@ function escapeRegex(s) {
 // Cannabis/retail domain synonym map — expands queries without adding noise
 // Keys are query terms; values are additional terms to score against
 const DOMAIN_SYNONYMS = {
+  // State abbreviations → full names (for chunk content matching)
+  'pa': ['pennsylvania'], 'il': ['illinois'], 'nv': ['nevada'],
+  'va': ['virginia'],     'nj': ['new jersey'], 'oh': ['ohio'],
+  'ma': ['massachusetts'], 'fl': ['florida'],  'ca': ['california'],
+  'co': ['colorado'],
+  // Revenue/sales
   'revenue':    ['sales', 'gross'],
   'sales':      ['revenue', 'gross'],
   'profit':     ['margin', 'net', 'revenue'],
