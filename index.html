@@ -889,12 +889,10 @@ body::before {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  /* Crisp shadow — minimal blur for sharp text */
-  filter: drop-shadow(0 1px 0 rgba(0,0,0,0.95)) drop-shadow(0 0 6px rgba(212,168,50,0.12));
+  filter: none;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   transform: translateZ(0);
-  will-change: transform;
 }
 .sb-tagline {
   font-family: var(--f-ui);
