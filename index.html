@@ -1006,6 +1006,78 @@ body::before {
   position: relative; z-index: 1;
 }
 .scope-bar::-webkit-scrollbar { display: none; }
+/* ── Collection quick-picker dropdown ───────────────────── */
+.col-picker-wrap { position: relative; flex-shrink: 0; }
+.col-picker-btn {
+  padding: 3px 10px 3px 12px;
+  border-radius: 3px;
+  border: 1px solid rgba(212,168,50,0.3);
+  background: rgba(212,168,50,0.07);
+  color: var(--gold-metal-2);
+  font-family: var(--f-mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.15s;
+  -webkit-appearance: none;
+}
+.col-picker-btn:hover { background: rgba(212,168,50,0.13); border-color: rgba(212,168,50,0.5); }
+.col-picker-btn svg { width: 8px; height: 8px; opacity: 0.7; flex-shrink: 0; }
+.col-picker-dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 220px;
+  max-width: 320px;
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--ink2);
+  border: 1px solid var(--line2);
+  border-radius: var(--r);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  z-index: 200;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ink5) transparent;
+}
+.col-picker-dropdown.open { display: block; }
+.col-picker-item {
+  padding: 8px 14px;
+  font-family: var(--f-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--smoke3);
+  cursor: pointer;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  transition: background 0.1s;
+}
+.col-picker-item:last-child { border-bottom: none; }
+.col-picker-item:hover { background: var(--gold-dim); color: var(--smoke); }
+.col-picker-item.active { color: var(--gold-lt); background: rgba(212,168,50,0.08); }
+.col-picker-item.active::before { content: '◈'; margin-right: 6px; color: var(--gold); font-size: 8px; }
+.col-picker-count { font-size: 8px; color: var(--smoke4); flex-shrink: 0; }
+.col-picker-all {
+  padding: 8px 14px;
+  font-family: var(--f-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--smoke4);
+  cursor: pointer;
+  border-bottom: 1px solid var(--line2);
+  transition: background 0.1s;
+}
+.col-picker-all:hover { background: var(--ink3); color: var(--smoke3); }
 .scope-label {
   font-family: var(--f-mono);
   font-size: 8px;
@@ -3766,6 +3838,14 @@ body::before {
         <button class="scope-btn" data-scope="collection" id="scope-col" style="display:none">Collection</button>
         <span class="scope-chevron" id="sep-file" style="display:none">&#8250;</span>
         <button class="scope-btn" data-scope="file" id="scope-file" style="display:none">File</button>
+        <!-- Collection quick-picker — always accessible from chat -->
+        <div class="col-picker-wrap" id="col-picker-wrap" style="margin-left:auto;flex-shrink:0">
+          <button class="col-picker-btn" id="col-picker-btn" title="Switch collection">
+            <span id="col-picker-label">Switch Collection</span>
+            <svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1,1 5,5 9,1"/></svg>
+          </button>
+          <div class="col-picker-dropdown" id="col-picker-dropdown"></div>
+        </div>
       </div>
       <div class="chat-messages" id="chat-msgs">
         <div class="chat-empty" id="chat-empty" style="display:none">
@@ -4540,6 +4620,7 @@ function bootApp() {
   initVoiceSettings();
   initSplitPdf();
   initAiClassify();
+  initColPicker();
 
   // ── Recurring gold glimmer sweep — fires every 60s ──────────
   function triggerAppGlimmer() {
@@ -4607,7 +4688,11 @@ function switchPanel(id) {
   if (id === 'responses') loadResponses();
   if (id === 'files') { loadCollections(); loadFiles(); loadContextDocs(); }
   if (id === 'admin') { loadAdminConfig(); loadIntegrationStatuses(); loadConnectorStatuses(); }
-  if (id === 'chat') { initChatGreeting(); loadCollections(); }
+  if (id === 'chat') {
+    initChatGreeting();
+    // Always refresh pills when entering chat — loadCollections populates scope bar
+    loadCollections();
+  }
 }
 
 /* DEPT */
@@ -4840,6 +4925,7 @@ function renderScopeCollections(cols) {
   pills.innerHTML = '';
   if (!cols || !cols.length) {
     if (divider) divider.style.display = 'none';
+    renderColPicker([]);
     return;
   }
   if (divider) divider.style.display = 'inline';
@@ -4850,12 +4936,15 @@ function renderScopeCollections(cols) {
     btn.textContent = c.name;
     btn.title = c.name + (c.fileCount ? ' (' + c.fileCount + ' files)' : '');
     btn.addEventListener('click', () => {
+      $('send-btn').disabled = false;
       if (chatCollection === c.name && chatScope === 'collection') {
-        // Toggle off — go back to all
         chatCollection = null;
         setScope('all');
         pills.querySelectorAll('.scope-btn').forEach(b => b.classList.remove('active'));
         $('scope-all').classList.add('active');
+        $('chat-ta').placeholder = 'Ask anything\u2026';
+        const lbl = $('col-picker-label');
+        if (lbl) lbl.textContent = 'Switch Collection';
       } else {
         chatCollection = c.name;
         setScope('collection', c.name);
@@ -4863,10 +4952,101 @@ function renderScopeCollections(cols) {
         btn.classList.add('active');
         $('scope-all').classList.remove('active');
         $('chat-ta').placeholder = 'Ask about ' + c.name + '\u2026';
-        $('chat-ta').focus();
+        const lbl = $('col-picker-label');
+        if (lbl) lbl.textContent = c.name.length > 22 ? c.name.slice(0, 22) + '\u2026' : c.name;
       }
+      btn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+      $('chat-ta').focus();
     });
     pills.appendChild(btn);
+  });
+  // Keep the dropdown picker in sync
+  renderColPicker(cols);
+}
+
+/* COLLECTION QUICK-PICKER */
+function renderColPicker(cols) {
+  const dd = $('col-picker-dropdown');
+  const label = $('col-picker-label');
+  if (!dd) return;
+
+  dd.innerHTML = '';
+
+  // "All Files" option at top
+  const allItem = document.createElement('div');
+  allItem.className = 'col-picker-all';
+  allItem.textContent = 'All Files';
+  allItem.addEventListener('click', () => {
+    chatCollection = null;
+    setScope('all');
+    $('scope-all').classList.add('active');
+    $('chat-ta').placeholder = 'Ask anything\u2026';
+    $('chat-ta').focus();
+    $('send-btn').disabled = false;
+    if (label) label.textContent = 'Switch Collection';
+    closeColPicker();
+  });
+  dd.appendChild(allItem);
+
+  if (!cols || !cols.length) {
+    const empty = document.createElement('div');
+    empty.className = 'col-picker-item';
+    empty.style.color = 'var(--smoke4)';
+    empty.textContent = 'No collections yet';
+    dd.appendChild(empty);
+    return;
+  }
+
+  cols.forEach(c => {
+    const item = document.createElement('div');
+    item.className = 'col-picker-item' + (chatCollection === c.name && chatScope === 'collection' ? ' active' : '');
+    item.innerHTML = '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(c.name) + '</span>'
+      + (c.fileCount ? '<span class="col-picker-count">' + c.fileCount + ' file' + (c.fileCount !== 1 ? 's' : '') + '</span>' : '');
+    item.addEventListener('click', () => {
+      chatCollection = c.name;
+      setScope('collection', c.name);
+      // Sync pills active state
+      const pills = $('scope-col-pills');
+      if (pills) {
+        pills.querySelectorAll('.scope-btn').forEach(b => b.classList.toggle('active', b.textContent === c.name));
+      }
+      $('scope-all').classList.remove('active');
+      $('chat-ta').placeholder = 'Ask about ' + c.name + '\u2026';
+      $('chat-ta').focus();
+      $('send-btn').disabled = false;
+      if (label) label.textContent = c.name.length > 22 ? c.name.slice(0, 22) + '\u2026' : c.name;
+      closeColPicker();
+    });
+    dd.appendChild(item);
+  });
+}
+
+function openColPicker() {
+  const dd = $('col-picker-dropdown');
+  if (dd) dd.classList.add('open');
+}
+
+function closeColPicker() {
+  const dd = $('col-picker-dropdown');
+  if (dd) dd.classList.remove('open');
+}
+
+function initColPicker() {
+  const btn = $('col-picker-btn');
+  if (!btn) return;
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    const dd = $('col-picker-dropdown');
+    if (dd && dd.classList.contains('open')) {
+      closeColPicker();
+    } else {
+      openColPicker();
+    }
+  });
+  // Close on outside click
+  document.addEventListener('click', e => {
+    const wrap = $('col-picker-wrap');
+    if (wrap && !wrap.contains(e.target)) closeColPicker();
   });
 }
 
@@ -4957,14 +5137,7 @@ async function sendChat() {
     // Auto-detect collection from user message if we are still in discovery (no collection locked)
     if (chatScope === 'all' && !chatCollection && window._caciCollections && window._caciCollections.length) {
       const msgLower = msg.toLowerCase();
-      // Match full name, category, OR any significant word from the collection name (3+ chars, not stop words)
-      const stopWords = new Set(['the','and','for','all','from','with','that','this','are','was','were','has','have']);
-      // Only match on full collection name — not partial words
-      // Prevents state names like "Ohio" from switching to "Ohio Regulations"
-      const match = window._caciCollections.find(c => {
-        if (msgLower.includes(c.name.toLowerCase())) return true;
-        return false;
-      });
+      const match = window._caciCollections.find(c => msgLower.includes(c.name.toLowerCase()));
       if (match) {
         setScope('collection', match.name);
         body.scope = 'collection';
@@ -4979,11 +5152,10 @@ async function sendChat() {
     else {
       appendMsg('ai', d.response, d.sources, d.scope, d.model);
       chatHistory.push({role:'assistant', content:d.response});
-      // If discovery returned collections, cache them
       if (d.collections) window._caciCollections = d.collections;
     }
   } catch(e) { ty.remove(); appendMsg('ai', '\u26A0  ' + e.message); }
-  $('send-btn').disabled = false;
+  finally { $('send-btn').disabled = false; }
 }
 
 function appendMsg(role, text, sources, scope, model = '') {
