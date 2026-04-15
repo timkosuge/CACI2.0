@@ -2102,7 +2102,51 @@ body::before {
 }
 .fb-send-btn:hover { border-color: var(--gold); color: var(--gold-lt); background: var(--gold-dim); }
 
-/* ── Intelligence Tuning admin section ───────────────────── */
+/* ── Retrieval Intelligence admin section ────────────────── */
+.weight-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.weight-row {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 10px 12px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--line2); border-radius: 3px;
+  transition: border-color 0.15s;
+}
+.weight-row:hover { border-color: var(--line); }
+.weight-row.modified { border-color: rgba(212,168,50,0.35); }
+.weight-label {
+  font-family: var(--f-mono); font-size: 9px; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--smoke3);
+}
+.weight-desc {
+  font-family: var(--f-ui); font-size: 9px; color: var(--smoke4);
+  line-height: 1.4; margin-bottom: 2px;
+}
+.weight-input-row { display: flex; align-items: center; gap: 8px; }
+.weight-input {
+  width: 64px; flex-shrink: 0;
+  background: rgba(0,0,0,0.3); border: 1px solid var(--line2);
+  border-radius: 2px; padding: 3px 7px;
+  font-family: var(--f-mono); font-size: 11px; color: var(--gold-lt);
+  text-align: right; outline: none;
+  transition: border-color 0.15s;
+}
+.weight-input:focus { border-color: var(--gold); }
+.weight-default { font-family: var(--f-mono); font-size: 9px; color: var(--smoke4); }
+.weight-default span { color: var(--smoke3); }
+.weight-group-label {
+  font-family: var(--f-mono); font-size: 9px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: rgba(212,168,50,0.5);
+  margin: 12px 0 6px; grid-column: 1 / -1;
+}
+.weight-actions { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
+.weight-status { font-family: var(--f-mono); font-size: 9px; color: var(--smoke4); letter-spacing: 0.06em; }
+.weight-status.ok { color: rgba(100,220,130,0.8); }
+.weight-status.modified { color: rgba(220,170,60,0.8); }
 .tune-card {
   background: rgba(255,255,255,0.02); border: 1px solid var(--line2);
   border-radius: 4px; padding: 14px 16px; margin-bottom: 10px;
@@ -4918,42 +4962,59 @@ body::before {
       <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
     <!-- Bright point-of-light: tight core bloom + wide soft halo -->
-    <filter id="goldGlow" x="-400%" y="-400%" width="900%" height="900%">
-      <feGaussianBlur stdDeviation="1" result="tightBlur"/>
+    <filter id="goldGlow" x="-500%" y="-500%" width="1100%" height="1100%">
+      <!-- Tight hot core -->
+      <feGaussianBlur stdDeviation="1.5" result="tightBlur"/>
       <feColorMatrix in="tightBlur" type="matrix"
-        values="1.5 0.6 0   0 0.20
-                0.9 1.1 0   0 0.08
-                0.1 0.1 0.3 0 0.01
-                0   0   0   3.0 0" result="coreGlow"/>
-      <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="wideBlur"/>
-      <feColorMatrix in="wideBlur" type="matrix"
-        values="1.1 0.3 0   0 0.03
-                0.5 0.6 0   0 0.01
+        values="1.6 0.7 0   0 0.30
+                1.0 1.2 0   0 0.12
+                0.1 0.1 0.1 0 0.01
+                0   0   0   4.0 0" result="coreGlow"/>
+      <!-- Mid glow ring -->
+      <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="midBlur"/>
+      <feColorMatrix in="midBlur" type="matrix"
+        values="1.3 0.5 0   0 0.08
+                0.7 0.9 0   0 0.03
                 0   0   0.1 0 0
-                0   0   0   0.7 0" result="haloGlow"/>
+                0   0   0   1.8 0" result="midGlow"/>
+      <!-- Wide ambient halo -->
+      <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="wideBlur"/>
+      <feColorMatrix in="wideBlur" type="matrix"
+        values="1.1 0.4 0   0 0.04
+                0.6 0.7 0   0 0.01
+                0   0   0.1 0 0
+                0   0   0   0.9 0" result="haloGlow"/>
       <feMerge>
         <feMergeNode in="haloGlow"/>
+        <feMergeNode in="midGlow"/>
         <feMergeNode in="coreGlow"/>
         <feMergeNode in="coreGlow"/>
         <feMergeNode in="SourceGraphic"/>
       </feMerge>
     </filter>
     <!-- Smaller point-of-light for thinner paths -->
-    <filter id="goldGlow2" x="-400%" y="-400%" width="900%" height="900%">
-      <feGaussianBlur stdDeviation="0.8" result="tightBlur"/>
+    <filter id="goldGlow2" x="-500%" y="-500%" width="1100%" height="1100%">
+      <feGaussianBlur stdDeviation="1.2" result="tightBlur"/>
       <feColorMatrix in="tightBlur" type="matrix"
-        values="1.5 0.5 0   0 0.15
-                0.8 1.0 0   0 0.06
-                0.1 0.1 0.2 0 0
-                0   0   0   2.8 0" result="coreGlow"/>
-      <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="wideBlur"/>
-      <feColorMatrix in="wideBlur" type="matrix"
-        values="1.1 0.3 0   0 0.02
-                0.5 0.6 0   0 0
+        values="1.5 0.6 0   0 0.25
+                0.9 1.1 0   0 0.10
+                0.1 0.1 0.1 0 0
+                0   0   0   3.5 0" result="coreGlow"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="midBlur"/>
+      <feColorMatrix in="midBlur" type="matrix"
+        values="1.3 0.4 0   0 0.06
+                0.7 0.8 0   0 0.02
                 0   0   0.1 0 0
-                0   0   0   0.6 0" result="haloGlow"/>
+                0   0   0   1.5 0" result="midGlow"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="7" result="wideBlur"/>
+      <feColorMatrix in="wideBlur" type="matrix"
+        values="1.1 0.3 0   0 0.03
+                0.5 0.6 0   0 0.01
+                0   0   0.1 0 0
+                0   0   0   0.8 0" result="haloGlow"/>
       <feMerge>
         <feMergeNode in="haloGlow"/>
+        <feMergeNode in="midGlow"/>
         <feMergeNode in="coreGlow"/>
         <feMergeNode in="SourceGraphic"/>
       </feMerge>
@@ -5107,85 +5168,85 @@ body::before {
 
   <!-- ═══ OUTER BORDER ═══ -->
   <path class="pulse a1t" d="M 0,28 L 1440,28"          stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
-  <path class="pulse a1h" d="M 0,28 L 1440,28"          stroke="#ffffff" stroke-width="1.2" filter="url(#goldGlow)"/>
+  <path class="pulse a1h" d="M 0,28 L 1440,28"          stroke="#fff8e7" stroke-width="2" filter="url(#goldGlow)"/>
   <path class="pulse a2t" d="M 0,872 L 1440,872"         stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
-  <path class="pulse a2h" d="M 1440,872 L 0,872"         stroke="#ffffff" stroke-width="1.2" filter="url(#goldGlow)"/>
+  <path class="pulse a2h" d="M 1440,872 L 0,872"         stroke="#fff8e7" stroke-width="2" filter="url(#goldGlow)"/>
 
   <!-- ═══ INNER OCTAGON FRAME — matches the central diamond shape ═══ -->
   <!-- CW: top-center → top-right corner → right → bottom-right → bottom → bottom-left → left → top-left → top-center -->
   <path class="pulse b1t" d="M 720,55 L 1100,55 L 1385,170 L 1385,730 L 1100,845 L 720,845 L 340,730 L 340,170 Z"
         stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
   <path class="pulse b1h" d="M 720,55 L 1100,55 L 1385,170 L 1385,730 L 1100,845 L 720,845 L 340,730 L 340,170 Z"
-        stroke="#ffffff" stroke-width="1.2" filter="url(#goldGlow)"/>
+        stroke="#fff8e7" stroke-width="2" filter="url(#goldGlow)"/>
   <path class="pulse b2t" d="M 720,55 L 1100,55 L 1385,170 L 1385,730 L 1100,845 L 720,845 L 340,730 L 340,170 Z"
         stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
   <path class="pulse b2h" d="M 720,55 L 1100,55 L 1385,170 L 1385,730 L 1100,845 L 720,845 L 340,730 L 340,170 Z"
-        stroke="#ffffff" stroke-width="1.2" filter="url(#goldGlow)"/>
+        stroke="#fff8e7" stroke-width="2" filter="url(#goldGlow)"/>
 
   <!-- ═══ VERTICAL SPINES — center top/bottom pointing inward ═══ -->
   <path class="pulse c1t" d="M 720,0 L 720,450"          stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
-  <path class="pulse c1h" d="M 720,0 L 720,450"          stroke="#ffffff" stroke-width="1.2" filter="url(#goldGlow)"/>
+  <path class="pulse c1h" d="M 720,0 L 720,450"          stroke="#fff8e7" stroke-width="2" filter="url(#goldGlow)"/>
   <path class="pulse c2t" d="M 720,900 L 720,450"         stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
-  <path class="pulse c2h" d="M 720,900 L 720,450"         stroke="#ffffff" stroke-width="1.2" filter="url(#goldGlow)"/>
+  <path class="pulse c2h" d="M 720,900 L 720,450"         stroke="#fff8e7" stroke-width="2" filter="url(#goldGlow)"/>
 
   <!-- ═══ L-TRACES — corner clusters routing inward ═══ -->
   <!-- Top-left: from outer-left down then right into frame -->
   <path class="pulse d1t" d="M 0,170 L 200,170 L 200,280 L 340,280 L 340,400 L 460,400 L 460,280 L 580,280 L 580,170 L 720,170"
         stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
   <path class="pulse d1h" d="M 0,170 L 200,170 L 200,280 L 340,280 L 340,400 L 460,400 L 460,280 L 580,280 L 580,170 L 720,170"
-        stroke="#ffffff" stroke-width="1" filter="url(#goldGlow2)"/>
+        stroke="#fff8e7" stroke-width="1.6" filter="url(#goldGlow2)"/>
   <!-- Top-right: from outer-right down then left into frame -->
   <path class="pulse d2t" d="M 1440,170 L 1240,170 L 1240,280 L 1100,280 L 1100,400 L 980,400 L 980,280 L 860,280 L 860,170 L 720,170"
         stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
   <path class="pulse d2h" d="M 1440,170 L 1240,170 L 1240,280 L 1100,280 L 1100,400 L 980,400 L 980,280 L 860,280 L 860,170 L 720,170"
-        stroke="#ffffff" stroke-width="1" filter="url(#goldGlow2)"/>
+        stroke="#fff8e7" stroke-width="1.6" filter="url(#goldGlow2)"/>
   <!-- Bottom-left -->
   <path class="pulse d3t" d="M 0,730 L 200,730 L 200,620 L 340,620 L 340,500 L 460,500 L 460,620 L 580,620 L 580,730 L 720,730"
         stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
   <path class="pulse d3h" d="M 0,730 L 200,730 L 200,620 L 340,620 L 340,500 L 460,500 L 460,620 L 580,620 L 580,730 L 720,730"
-        stroke="#ffffff" stroke-width="1" filter="url(#goldGlow2)"/>
+        stroke="#fff8e7" stroke-width="1.6" filter="url(#goldGlow2)"/>
   <!-- Bottom-right -->
   <path class="pulse d4t" d="M 1440,730 L 1240,730 L 1240,620 L 1100,620 L 1100,500 L 980,500 L 980,620 L 860,620 L 860,730 L 720,730"
         stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
   <path class="pulse d4h" d="M 1440,730 L 1240,730 L 1240,620 L 1100,620 L 1100,500 L 980,500 L 980,620 L 860,620 L 860,730 L 720,730"
-        stroke="#ffffff" stroke-width="1" filter="url(#goldGlow2)"/>
+        stroke="#fff8e7" stroke-width="1.6" filter="url(#goldGlow2)"/>
 
   <!-- ═══ DENSE CIRCUIT RUNS — left side horizontal stacks ═══ -->
   <path class="pulse e1t" d="M 0,340 L 340,340"  stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
-  <path class="pulse e1h" d="M 0,340 L 340,340"  stroke="#ffffff" stroke-width="1" filter="url(#goldGlow2)"/>
+  <path class="pulse e1h" d="M 0,340 L 340,340"  stroke="#fff8e7" stroke-width="1.6" filter="url(#goldGlow2)"/>
   <path class="pulse e2t" d="M 0,380 L 340,380"  stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
-  <path class="pulse e2h" d="M 340,380 L 0,380"  stroke="#ffffff" stroke-width="1" filter="url(#goldGlow2)"/>
+  <path class="pulse e2h" d="M 340,380 L 0,380"  stroke="#fff8e7" stroke-width="1.6" filter="url(#goldGlow2)"/>
   <path class="pulse e3t" d="M 0,420 L 340,420"  stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
-  <path class="pulse e3h" d="M 0,420 L 340,420"  stroke="#ffffff" stroke-width="1" filter="url(#goldGlow2)"/>
+  <path class="pulse e3h" d="M 0,420 L 340,420"  stroke="#fff8e7" stroke-width="1.6" filter="url(#goldGlow2)"/>
   <!-- Right side — mirror, reversed direction -->
   <path class="pulse e4t" d="M 1440,340 L 1100,340" stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
-  <path class="pulse e4h" d="M 1440,340 L 1100,340" stroke="#ffffff" stroke-width="1" filter="url(#goldGlow2)"/>
+  <path class="pulse e4h" d="M 1440,340 L 1100,340" stroke="#fff8e7" stroke-width="1.6" filter="url(#goldGlow2)"/>
   <path class="pulse e5t" d="M 1440,380 L 1100,380" stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
-  <path class="pulse e5h" d="M 1100,380 L 1440,380" stroke="#ffffff" stroke-width="1" filter="url(#goldGlow2)"/>
+  <path class="pulse e5h" d="M 1100,380 L 1440,380" stroke="#fff8e7" stroke-width="1.6" filter="url(#goldGlow2)"/>
   <path class="pulse e6t" d="M 1440,420 L 1100,420" stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
-  <path class="pulse e6h" d="M 1440,420 L 1100,420" stroke="#ffffff" stroke-width="1" filter="url(#goldGlow2)"/>
+  <path class="pulse e6h" d="M 1440,420 L 1100,420" stroke="#fff8e7" stroke-width="1.6" filter="url(#goldGlow2)"/>
 
   <!-- ═══ CORNER ORNAMENTS — small square cluster traces ═══ -->
   <!-- Top-left ornament -->
   <path class="pulse f1t" d="M 60,60 L 200,60 L 200,100 L 260,100 L 260,60 L 340,60 L 340,170 L 260,170 L 260,130 L 200,130 L 200,170"
         stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
   <path class="pulse f1h" d="M 60,60 L 200,60 L 200,100 L 260,100 L 260,60 L 340,60 L 340,170 L 260,170 L 260,130 L 200,130 L 200,170"
-        stroke="#ffffff" stroke-width="1" filter="url(#goldGlow2)"/>
+        stroke="#fff8e7" stroke-width="1.6" filter="url(#goldGlow2)"/>
   <!-- Top-right ornament -->
   <path class="pulse f2t" d="M 1380,60 L 1240,60 L 1240,100 L 1180,100 L 1180,60 L 1100,60 L 1100,170 L 1180,170 L 1180,130 L 1240,130 L 1240,170"
         stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
   <path class="pulse f2h" d="M 1380,60 L 1240,60 L 1240,100 L 1180,100 L 1180,60 L 1100,60 L 1100,170 L 1180,170 L 1180,130 L 1240,130 L 1240,170"
-        stroke="#ffffff" stroke-width="1" filter="url(#goldGlow2)"/>
+        stroke="#fff8e7" stroke-width="1.6" filter="url(#goldGlow2)"/>
   <!-- Bottom-left ornament -->
   <path class="pulse f3t" d="M 60,840 L 200,840 L 200,800 L 260,800 L 260,840 L 340,840 L 340,730 L 260,730 L 260,770 L 200,770 L 200,730"
         stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
   <path class="pulse f3h" d="M 60,840 L 200,840 L 200,800 L 260,800 L 260,840 L 340,840 L 340,730 L 260,730 L 260,770 L 200,770 L 200,730"
-        stroke="#ffffff" stroke-width="1" filter="url(#goldGlow2)"/>
+        stroke="#fff8e7" stroke-width="1.6" filter="url(#goldGlow2)"/>
   <!-- Bottom-right ornament -->
   <path class="pulse f4t" d="M 1380,840 L 1240,840 L 1240,800 L 1180,800 L 1180,840 L 1100,840 L 1100,730 L 1180,730 L 1180,770 L 1240,770 L 1240,730"
         stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
   <path class="pulse f4h" d="M 1380,840 L 1240,840 L 1240,800 L 1180,800 L 1180,840 L 1100,840 L 1100,730 L 1180,730 L 1180,770 L 1240,770 L 1240,730"
-        stroke="#ffffff" stroke-width="1" filter="url(#goldGlow2)"/>
+        stroke="#fff8e7" stroke-width="1.6" filter="url(#goldGlow2)"/>
 
   <rect width="1440" height="900" fill="url(#vignette)"/>
 </svg>      </div>
@@ -5396,6 +5457,19 @@ body::before {
               </label>
               <button class="asave" id="gtts-test" style="flex-shrink:0">Test Voice</button>
             </div>
+          </div>
+        </div>
+
+        <!-- RETRIEVAL INTELLIGENCE -->
+        <div class="asec">
+          <div class="asec-head"><div class="asec-title">Retrieval Intelligence</div><div class="asec-line"></div></div>
+          <div class="asec-sub-title" style="margin:-8px 0 14px">
+            Controls how CACI scores and ranks documents when answering questions.
+            Higher values give that signal more influence on which files and chunks get retrieved.
+            Changes apply immediately — no redeploy needed.
+          </div>
+          <div id="weights-wrap">
+            <div class="tune-empty">Loading...</div>
           </div>
         </div>
 
@@ -6162,7 +6236,7 @@ function switchPanel(id) {
   $('tb-module').textContent = MODS.find(m => m.id === id)?.label || '';
   if (id === 'responses') loadResponses();
   if (id === 'files') { loadCollections(); loadFiles(); loadContextDocs(); }
-  if (id === 'admin') { loadAdminConfig(); loadIntegrationStatuses(); loadConnectorStatuses(); loadIntelligenceTuning(); }
+  if (id === 'admin') { loadAdminConfig(); loadIntegrationStatuses(); loadConnectorStatuses(); loadIntelligenceTuning(); loadRetrievalWeights(); }
   if (id === 'chat') {
     initChatGreeting();
     // Always refresh pills when entering chat — loadCollections populates scope bar
@@ -6756,6 +6830,152 @@ function appendMsg(role, text, sources, scope, model = '', responseId = '') {
   // Reliable scroll: use scrollIntoView on a sentinel element
   el.scrollIntoView({block:'end', behavior:'smooth'});
   if (role === 'ai' && voiceAutoSpeak) speakText(null, text);
+}
+
+// ── Retrieval Weights UI ──────────────────────────────────────
+const WEIGHT_META = {
+  // File selection weights
+  keywordFilenameBonus:   { label: 'Keyword in Filename',    desc: 'Score boost per keyword match in a file\'s name', group: 'file' },
+  categoryColBonus:       { label: 'Category Column Match',  desc: 'Boost when query matches a known data column value', group: 'file' },
+  yearMatchBase:          { label: 'Year Match Base',        desc: 'Base score when file\'s year matches query year', group: 'date' },
+  yearRecencyMultiplier:  { label: 'Year Recency Multiplier',desc: 'Extra points per year closer to present (2026=+12, 2025=+10...)', group: 'date' },
+  monthMatchBonus:        { label: 'Month Match',            desc: 'Boost when file\'s month matches query month', group: 'date' },
+  quarterMatchBonus:      { label: 'Quarter Match',          desc: 'Boost when file\'s quarter matches query quarter', group: 'date' },
+  rangeMatchBonus:        { label: 'Date Range Match',       desc: 'Boost when file falls within an explicit date range', group: 'date' },
+  annualBonus:            { label: 'Annual / Full Year',     desc: 'Boost for annual summary files on annual queries', group: 'date' },
+  recencyMaxBonus:        { label: 'Recency Bonus (max)',    desc: 'Max bonus for recently uploaded files (fades over 3 months)', group: 'date' },
+  xlsxPenalty:            { label: 'Excel Penalty',          desc: 'Small penalty for .xlsx vs .pdf (negative = penalize)', group: 'file' },
+  // Chunk reranking weights
+  rerankDirectAnswerBonus:{ label: 'Direct Answer Signal',   desc: 'Chunk reranker: boost when a number appears near a keyword', group: 'chunk' },
+  rerankNumericBonus:     { label: 'Numeric Density',        desc: 'Chunk reranker: reward for numeric-dense chunks on aggregate queries', group: 'chunk' },
+  rerankComparativeBonus: { label: 'Multi-Year Presence',    desc: 'Chunk reranker: boost chunks containing multiple years', group: 'chunk' },
+  fileSummaryBonus:       { label: 'Summary Chunk Priority', desc: 'Guaranteed-first boost for FILE SUMMARY and DOCUMENT SUMMARY chunks', group: 'chunk' },
+};
+
+const WEIGHT_GROUPS = {
+  file:  { label: 'File Selection — Keyword & Content Signals', color: 'rgba(100,200,255,0.5)' },
+  date:  { label: 'File Selection — Date & Time Signals',       color: 'rgba(220,170,60,0.5)' },
+  chunk: { label: 'Chunk Reranking — Inside Document Signals',  color: 'rgba(180,130,220,0.5)' },
+};
+
+let _currentWeights = null;
+let _defaultWeights = null;
+
+async function loadRetrievalWeights() {
+  const wrap = document.getElementById('weights-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = '<div class="tune-empty">Loading...</div>';
+  try {
+    const res  = await apiFetch(`/admin/weights?dept=${encodeURIComponent(dept)}`);
+    const data = await res.json();
+    if (!data.ok) { wrap.innerHTML = `<div class="tune-empty">Error: ${data.error}</div>`; return; }
+
+    _currentWeights = { ...data.weights };
+    _defaultWeights = data.defaults;
+
+    renderWeightsUI(wrap, data.weights, data.defaults, data.isCustom, data.lastUpdated);
+  } catch(e) {
+    wrap.innerHTML = `<div class="tune-empty">Failed to load weights: ${e.message}</div>`;
+  }
+}
+
+function renderWeightsUI(wrap, weights, defaults, isCustom, lastUpdated) {
+  const groups = { file: [], date: [], chunk: [] };
+  for (const [key, meta] of Object.entries(WEIGHT_META)) {
+    groups[meta.group].push(key);
+  }
+
+  let html = '';
+
+  // Status bar
+  if (isCustom && lastUpdated) {
+    html += `<div style="font-family:var(--f-mono);font-size:9px;color:rgba(212,168,50,0.6);letter-spacing:.06em;margin-bottom:12px">
+      Custom weights active &nbsp;&middot;&nbsp; Last updated ${new Date(lastUpdated).toLocaleDateString()}
+    </div>`;
+  }
+
+  html += '<div class="weight-grid" id="weight-grid">';
+
+  for (const [groupKey, keys] of Object.entries(groups)) {
+    const gMeta = WEIGHT_GROUPS[groupKey];
+    html += `<div class="weight-group-label" style="color:${gMeta.color}">${gMeta.label}</div>`;
+    for (const key of keys) {
+      const meta = WEIGHT_META[key];
+      const val  = weights[key] ?? defaults[key];
+      const def  = defaults[key];
+      const isModified = val !== def;
+      html += `<div class="weight-row${isModified ? ' modified' : ''}" id="wr-${key}">
+        <div class="weight-label">${meta.label}</div>
+        <div class="weight-desc">${meta.desc}</div>
+        <div class="weight-input-row">
+          <input class="weight-input" type="number" id="wi-${key}" value="${val}" step="${Math.abs(def) < 2 ? '0.1' : '1'}" data-key="${key}" data-default="${def}"/>
+          <div class="weight-default">default: <span>${def}</span></div>
+        </div>
+      </div>`;
+    }
+  }
+
+  html += '</div>';
+
+  html += `<div class="weight-actions">
+    <button class="lbtn" id="weights-save-btn">Save Changes</button>
+    <button class="lbtn" style="color:var(--smoke4);border-color:var(--line2)" id="weights-reset-btn">Reset to Defaults</button>
+    <div class="weight-status" id="weights-status">${isCustom ? '● Custom' : '● Using defaults'}</div>
+  </div>`;
+
+  wrap.innerHTML = html;
+
+  // Wire up input change highlighting
+  wrap.querySelectorAll('.weight-input').forEach(input => {
+    input.addEventListener('input', function() {
+      const row = document.getElementById(`wr-${this.dataset.key}`);
+      const changed = parseFloat(this.value) !== parseFloat(this.dataset.default);
+      row.classList.toggle('modified', changed);
+    });
+  });
+
+  // Save
+  document.getElementById('weights-save-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('weights-save-btn');
+    const status = document.getElementById('weights-status');
+    const updated = {};
+    let hasChange = false;
+    wrap.querySelectorAll('.weight-input').forEach(input => {
+      const val = parseFloat(input.value);
+      updated[input.dataset.key] = isFinite(val) ? val : parseFloat(input.dataset.default);
+      if (val !== parseFloat(input.dataset.default)) hasChange = true;
+    });
+    if (!hasChange) { status.textContent = '— No changes to save'; return; }
+    btn.disabled = true; btn.textContent = 'Saving...';
+    try {
+      const res  = await apiFetch('/admin/weights', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ dept, weights: updated }) });
+      const data = await res.json();
+      if (data.ok) {
+        _currentWeights = updated;
+        status.className = 'weight-status ok';
+        status.textContent = '● Saved — active immediately';
+        // Update data-default visual markers to show new saved values aren't "modified"
+        wrap.querySelectorAll('.weight-input').forEach(i => i.dataset.default = updated[i.dataset.key]);
+        wrap.querySelectorAll('.weight-row').forEach(r => r.classList.remove('modified'));
+      } else {
+        status.textContent = 'Error: ' + data.error;
+      }
+    } catch(e) { status.textContent = 'Save failed: ' + e.message; }
+    btn.disabled = false; btn.textContent = 'Save Changes';
+  });
+
+  // Reset
+  document.getElementById('weights-reset-btn').addEventListener('click', async () => {
+    if (!confirm('Reset all weights to defaults for this department?')) return;
+    const btn = document.getElementById('weights-reset-btn');
+    btn.disabled = true; btn.textContent = 'Resetting...';
+    try {
+      const res  = await apiFetch('/admin/weights/reset', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ dept }) });
+      const data = await res.json();
+      if (data.ok) await loadRetrievalWeights();
+    } catch(e) { console.error(e); }
+    btn.disabled = false; btn.textContent = 'Reset to Defaults';
+  });
 }
 
 async function submitFeedback(responseId, signal, comment, query, sources) {
