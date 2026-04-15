@@ -1,4 +1,4 @@
-\<!-- CACI Intelligence Platform v2.0 -->
+<!-- CACI Intelligence Platform v2.0 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5405,7 +5405,7 @@ body::before {
     </div>
 
     <!-- ADMIN -->
-    <div class="panel" data-panel="intelligence">
+    <div class="panel" data-panel="aisettings">
       <div class="admin-wrap">
 
         <!-- AI CONFIGURATION -->
@@ -5766,8 +5766,8 @@ const MODS = [
   {id:'chat',         label:'Intelligence',  icon:'\u25C8'},
   {id:'files',        label:'Documents',     icon:'\u2261'},
   {id:'responses',    label:'Responses',     icon:'\u2193'},
-  {id:'intelligence', label:'AI Engine',     icon:'\u2736'},
   {id:'admin',        label:'Configurations',icon:'\u2699'},
+  {id:'aisettings',   label:'AI Settings',   icon:'\u2736'},
 ];
 
 let token   = sessionStorage.getItem('caci_token') || '';
@@ -6243,7 +6243,7 @@ function switchPanel(id) {
   $('tb-module').textContent = MODS.find(m => m.id === id)?.label || '';
   if (id === 'responses') loadResponses();
   if (id === 'files') { loadCollections(); loadFiles(); loadContextDocs(); }
-  if (id === 'intelligence') { loadAdminConfig(); loadRetrievalWeights(); loadIntelligenceTuning(); }
+  if (id === 'aisettings') { loadAdminConfig(); loadRetrievalWeights(); loadIntelligenceTuning(); }
   if (id === 'admin') { loadAdminConfig(); loadIntegrationStatuses(); loadConnectorStatuses(); }
   if (id === 'chat') {
     initChatGreeting();
