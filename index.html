@@ -413,13 +413,13 @@ body::before {
   width: 100%;
   padding: 14px 20px;
   background: rgba(4,7,16,0.85);
-  border: none;
+  border: none !important;
   border-radius: 3px;
   color: rgba(245,227,152,0.75);
   font-family: var(--f-mono);
   font-size: 15px;
   font-weight: 300;
-  outline: none;
+  outline: none !important;
   transition: box-shadow 0.3s var(--ease), color 0.3s;
   -webkit-appearance: none;
   letter-spacing: 0.22em;
@@ -434,13 +434,23 @@ body::before {
     inset 0 3px 8px rgba(0,0,0,0.70),
     inset 0 1px 3px rgba(0,0,0,0.55);
 }
-/* Kill browser autofill white background */
+/* Kill browser autofill white background — must also re-declare our full shadow stack here
+   because -webkit-box-shadow in autofill rules replaces ALL box-shadow */
 .linput:-webkit-autofill,
 .linput:-webkit-autofill:hover,
 .linput:-webkit-autofill:focus {
-  -webkit-box-shadow: 0 0 0 100px rgba(8,12,24,1) inset;
+  -webkit-box-shadow:
+    0 0 0 100px rgba(4,7,16,1) inset,
+    inset 0 2px 0 rgba(180,130,20,0.28),
+    inset 2px 0 0 rgba(180,130,20,0.14),
+    inset -2px 0 0 rgba(180,130,20,0.14),
+    inset 0 -1px 0 rgba(180,130,20,0.10),
+    inset 0 3px 8px rgba(0,0,0,0.70),
+    inset 0 1px 3px rgba(0,0,0,0.55);
   -webkit-text-fill-color: rgba(245,227,152,0.75);
   caret-color: rgba(212,168,50,0.8);
+  border: none !important;
+  outline: none !important;
 }
 .linput::placeholder {
   color: rgba(212,168,50,0.18);
