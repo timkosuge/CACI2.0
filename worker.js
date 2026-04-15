@@ -68,6 +68,11 @@ export default {
       return json({ found: true, id: kvId, name: val.name, chunkCount: val.chunks?.length || 0, firstChunk: val.chunks?.[0]?.slice(0, 200) });
     }
     if (path === '/chat'      && method === 'POST')   return handleChat(request, env);
+    if (path === '/feedback'  && method === 'POST')   return handleFeedback(request, env);
+    if (path === '/feedback/analyze' && method === 'POST') return handleAnalyzeFeedback(request, env);
+    if (path === '/feedback/approve' && method === 'POST') return handleApproveTuning(request, env);
+    if (path === '/feedback/pending' && method === 'GET')  return handleGetPendingTuning(env);
+    if (path === '/feedback/log'     && method === 'GET')  return handleGetFeedbackLog(url, env);
     if (path === '/report'    && method === 'POST')   return handleReport(request, env);
     if (path === '/ai-classify'         && method === 'POST') return handleAiClassify(request, env);
     if (path === '/collection-analyze'  && method === 'POST') return handleCollectionAnalyze(request, env);
@@ -587,7 +592,8 @@ ABSOLUTE RESTRICTION — never discuss, reference, or include any information ab
           discResponse = `Hey! I'm Caci. Here's what I have access to:\n\n${discovery.collectionList}\n\nWhat would you like to dig into?`;
         }
       }
-      return json({ ok: true, response: discResponse, sources: [], scope: 'discovery', collections: discovery.rawCollections, model: model || 'claude' });
+      const discRespId = `${dept}:${Date.now()}:${Math.random().toString(36).slice(2,8)}`;
+      return json({ ok: true, response: discResponse, sources: [], scope: 'discovery', collections: discovery.rawCollections, model: model || 'claude', responseId: discRespId });
     }
 
     // If user is asking about collections, always answer from registry
@@ -601,7 +607,8 @@ ${discovery.collectionList}
 
 Be direct and conversational. List them clearly.`;
       const colRes = await callLLM({ model, system: colSystem, messages: [{ role: 'user', content: message }], maxTokens: 400, env, apiKey });
-      return json({ ok: true, response: colRes, sources: [], scope: scope, model: model || 'claude' });
+      const colRespId = `${dept}:${Date.now()}:${Math.random().toString(36).slice(2,8)}`;
+      return json({ ok: true, response: colRes, sources: [], scope: scope, model: model || 'claude', responseId: colRespId });
     }
 
     // If user is asking about Caci herself — personality, feelings, identity, opinions —
@@ -621,7 +628,8 @@ Your personality: You work in cannabis. You know these people. You're sharp, a l
 
 Answer this question about yourself directly and authentically. Do not mention documents, data, or your library. Just be yourself.`;
       const personalRes = await callLLM({ model, system: personalSystem, messages: [...history.slice(-6).map(h => ({ role: h.role, content: h.content })), { role: 'user', content: message }], maxTokens: 600, env, apiKey });
-      return json({ ok: true, response: personalRes, sources: [], scope: scope, model: model || 'claude' });
+      const personalRespId = `${dept}:${Date.now()}:${Math.random().toString(36).slice(2,8)}`;
+      return json({ ok: true, response: personalRes, sources: [], scope: scope, model: model || 'claude', responseId: personalRespId });
     }
 
     // ── Intent analysis — shapes retrieval strategy ─────────────
@@ -1217,6 +1225,7 @@ async function buildContextTwoPass({ message, dept, collection, env }) {
     }));
 
     // Score each file
+    const W = await getScoringWeights(dept, env);
     const scoredFiles = colFiles.map(f => {
       const nameLower = (f.name || '').toLowerCase();
       let score = 0;
@@ -1228,7 +1237,7 @@ async function buildContextTwoPass({ message, dept, collection, env }) {
           const fileVal  = fileYear * 100 + fileMonth;
           const startVal = rangeStart.y * 100 + rangeStart.m;
           const endVal   = rangeEnd.y   * 100 + rangeEnd.m;
-          if (fileVal >= startVal && fileVal <= endVal) score += 30;
+          if (fileVal >= startVal && fileVal <= endVal) score += W.rangeMatchBonus;
         }
       }
 
@@ -1236,54 +1245,52 @@ async function buildContextTwoPass({ message, dept, collection, env }) {
       const matchedYears = queryYears.size > 0 ? [...queryYears].filter(y => nameLower.includes(y)) : [];
       if (matchedYears.length > 0) {
         const maxYear = Math.max(...matchedYears.map(Number));
-        score += 10 + (maxYear - 2020) * 3; // 2026=+28, 2025=+25, 2024=+22
+        score += W.yearMatchBase + (maxYear - 2020) * W.yearRecencyMultiplier;
       }
 
       // ── 3. Month match — only add if NOT already in a range ──
-      // Prevents e.g. "February 2025" from matching "february" in a 2025–2026 range query
-      if (queryMonths.size > 0 && score < 30) {
+      if (queryMonths.size > 0 && score < W.rangeMatchBonus) {
         const hasMonthMatch = [...queryMonths].some(m => {
           const abbr = _MONTH_ABBREV[m] || m;
           return nameLower.includes(m) || nameLower.includes(abbr);
         });
-        if (hasMonthMatch) score += 8;
+        if (hasMonthMatch) score += W.monthMatchBonus;
       }
 
       // ── 4. Annual / full-year boost ───────────────────────
       const isAnnual = nameLower.includes('annual') || nameLower.includes('full year')
         || nameLower.includes('ye ') || nameLower.includes('10-k') || nameLower.includes('10k');
       if (isAnnual && (queryYears.size > 0 || message.toLowerCase().includes('annual') || message.toLowerCase().includes('full year'))) {
-        score += 8;
+        score += W.annualBonus;
       }
 
       // ── 5. Quarter match ──────────────────────────────────
       const fileQ = nameLower.match(/q[1-4]|first quarter|second quarter|third quarter|fourth quarter/)?.[0];
       if (fileQ && queryQuarters.size > 0) {
         const qMap = { 'q1':'q1','q2':'q2','q3':'q3','q4':'q4','first quarter':'q1','second quarter':'q2','third quarter':'q3','fourth quarter':'q4' };
-        if ([...queryQuarters].some(q => qMap[q] === fileQ)) score += 8;
+        if ([...queryQuarters].some(q => qMap[q] === fileQ)) score += W.quarterMatchBonus;
       }
 
       // ── 6. Keyword match in filename ──────────────────────
       for (const kw of keywords) {
-        if (nameLower.includes(kw)) score += 2;
+        if (nameLower.includes(kw)) score += W.keywordFilenameBonus;
       }
 
       // ── 7. PDF preferred over xlsx ────────────────────────
-      if (nameLower.endsWith('.xlsx') || nameLower.endsWith('.xls')) score -= 1;
+      if (nameLower.endsWith('.xlsx') || nameLower.endsWith('.xls')) score += W.xlsxPenalty;
 
       // ── 8. Recency boost (up to +3) ───────────────────────
       const age = f.uploadedAt ? Date.now() - new Date(f.uploadedAt).getTime() : 0;
-      score += Math.max(0, 3 - Math.floor(age / (1000 * 60 * 60 * 24 * 30)));
+      score += Math.max(0, W.recencyMaxBonus - Math.floor(age / (1000 * 60 * 60 * 24 * 30)));
 
       // ── 9. categoryCols match — boost if query mentions a known value ──
-      // Uses data already on the index record (no extra KV load)
       if (f.stats?.categoryCols) {
         for (const vals of Object.values(f.stats.categoryCols)) {
           for (const val of vals) {
             const vLower = val.toLowerCase();
             if (keywords.some(kw => vLower === kw || vLower.includes(kw) || kw.includes(vLower))) {
-              score += 5;
-              break; // one boost per column
+              score += W.categoryColBonus;
+              break;
             }
           }
         }
@@ -1818,30 +1825,250 @@ async function handleAdminGet(env) {
   } catch (err) { return json({ error: err.message }, 500); }
 }
 
+// ── Feedback & Self-Improvement ───────────────────────────────
+
+async function handleFeedback(request, env) {
+  try {
+    const { responseId, signal, comment, query, dept, sources, retrievalScope } = await request.json();
+    if (!responseId || !signal || !dept) return json({ error: 'Missing required fields' }, 400);
+    if (!['sharp', 'missed', 'incomplete'].includes(signal)) return json({ error: 'Invalid signal' }, 400);
+
+    const entry = {
+      responseId, signal, comment: comment || '', query: query || '',
+      dept, sources: sources || [], retrievalScope: retrievalScope || 'all',
+      timestamp: new Date().toISOString(),
+    };
+
+    // Store individual feedback entry
+    await env.CACI_KV.put(`feedback:${dept}:${responseId}`, JSON.stringify(entry));
+
+    // Update rolling summary counter for this dept
+    const summaryKey = `feedback:summary:${dept}`;
+    const summary = await env.CACI_KV.get(summaryKey, 'json') || { sharp: 0, missed: 0, incomplete: 0, total: 0, lastUpdated: null };
+    summary[signal] = (summary[signal] || 0) + 1;
+    summary.total = (summary.total || 0) + 1;
+    summary.lastUpdated = entry.timestamp;
+    await env.CACI_KV.put(summaryKey, JSON.stringify(summary));
+
+    return json({ ok: true });
+  } catch (err) { return json({ error: err.message }, 500); }
+}
+
+async function handleGetFeedbackLog(url, env) {
+  try {
+    const dept = url.searchParams.get('dept') || 'default';
+    const limit = Math.min(parseInt(url.searchParams.get('limit') || '50'), 200);
+
+    const summary = await env.CACI_KV.get(`feedback:summary:${dept}`, 'json') || { sharp: 0, missed: 0, incomplete: 0, total: 0 };
+
+    // List recent feedback keys for this dept
+    const listResult = await env.CACI_KV.list({ prefix: `feedback:${dept}:` });
+    const keys = (listResult.keys || []).slice(-limit);
+
+    const entries = await Promise.all(
+      keys.map(k => env.CACI_KV.get(k.name, 'json').catch(() => null))
+    );
+    const valid = entries.filter(Boolean).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    return json({ ok: true, summary, entries: valid });
+  } catch (err) { return json({ error: err.message }, 500); }
+}
+
+async function handleAnalyzeFeedback(request, env) {
+  try {
+    const { dept } = await request.json();
+    if (!dept) return json({ error: 'dept required' }, 400);
+
+    const apiKey = (await env.CACI_KV.get('config:ANTHROPIC_API_KEY')) || env.ANTHROPIC_API_KEY;
+    if (!apiKey) return json({ error: 'Anthropic API key not configured' }, 400);
+
+    // Gather recent negative feedback (missed + incomplete)
+    const listResult = await env.CACI_KV.list({ prefix: `feedback:${dept}:` });
+    const keys = listResult.keys || [];
+
+    const entries = (await Promise.all(
+      keys.map(k => env.CACI_KV.get(k.name, 'json').catch(() => null))
+    )).filter(Boolean);
+
+    const negatives = entries.filter(e => e.signal === 'missed' || e.signal === 'incomplete');
+    const positives = entries.filter(e => e.signal === 'sharp');
+
+    if (negatives.length < 3) {
+      return json({ ok: true, message: 'Not enough feedback yet (need at least 3 negative signals to analyze)', suggestions: [] });
+    }
+
+    // Get current weights
+    const currentWeights = await env.CACI_KV.get(`config:scoring-weights:${dept}`, 'json') || getDefaultWeights();
+    const summary = await env.CACI_KV.get(`feedback:summary:${dept}`, 'json') || {};
+
+    // Ask Claude to analyze and suggest weight adjustments
+    const analysisPrompt = `You are analyzing feedback on a RAG (retrieval-augmented generation) system called CACI used by a cannabis company. Your job is to suggest scoring weight adjustments based on user feedback patterns.
+
+CURRENT SCORING WEIGHTS:
+${JSON.stringify(currentWeights, null, 2)}
+
+FEEDBACK SUMMARY for department "${dept}":
+- Sharp (good): ${positives.length}
+- Missed (wrong retrieval): ${negatives.filter(e=>e.signal==='missed').length}  
+- Incomplete (right direction, not enough depth): ${negatives.filter(e=>e.signal==='incomplete').length}
+- Total: ${entries.length}
+
+RECENT NEGATIVE FEEDBACK SAMPLES (query + signal + comment):
+${negatives.slice(-15).map(e => `[${e.signal.toUpperCase()}] Query: "${e.query}" | Sources returned: ${(e.sources||[]).join(', ')||'none'} | Comment: "${e.comment||'none'}"`).join('\n')}
+
+RECENT POSITIVE FEEDBACK SAMPLES:
+${positives.slice(-8).map(e => `[SHARP] Query: "${e.query}" | Sources: ${(e.sources||[]).join(', ')||'none'}`).join('\n')}
+
+Based on this feedback, suggest 1-4 specific weight adjustments. For each suggestion:
+1. Name the weight to change (must be one of: yearMatchBase, yearRecencyMultiplier, monthMatchBonus, rangeMatchBonus, quarterMatchBonus, keywordFilenameBonus, recencyMaxBonus, categoryColBonus, fileSummaryBonus, rerankDirectAnswerBonus, rerankNumericBonus, rerankComparativeBonus, xlsxPenalty)
+2. Current value (from the weights above)
+3. Suggested new value
+4. One-sentence reason grounded in the feedback patterns
+
+Respond ONLY as a JSON array of objects with keys: weightName, currentValue, suggestedValue, reason. No preamble, no markdown.`;
+
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 800,
+        messages: [{ role: 'user', content: analysisPrompt }],
+      }),
+    });
+
+    const data = await resp.json();
+    const raw = data.content?.[0]?.text || '[]';
+
+    let suggestions = [];
+    try {
+      const cleaned = raw.replace(/```json|```/g, '').trim();
+      suggestions = JSON.parse(cleaned);
+    } catch { suggestions = []; }
+
+    // Store pending suggestions for admin review
+    const pending = {
+      dept, generatedAt: new Date().toISOString(),
+      feedbackSnapshot: { sharp: positives.length, missed: negatives.filter(e=>e.signal==='missed').length, incomplete: negatives.filter(e=>e.signal==='incomplete').length },
+      suggestions,
+      status: 'pending',
+    };
+    await env.CACI_KV.put(`config:tune-pending:${dept}`, JSON.stringify(pending));
+
+    return json({ ok: true, suggestions, feedbackSnapshot: pending.feedbackSnapshot });
+  } catch (err) { return json({ error: err.message }, 500); }
+}
+
+async function handleGetPendingTuning(env) {
+  try {
+    const listResult = await env.CACI_KV.list({ prefix: 'config:tune-pending:' });
+    const pending = (await Promise.all(
+      (listResult.keys || []).map(k => env.CACI_KV.get(k.name, 'json').catch(() => null))
+    )).filter(p => p && p.status === 'pending');
+    return json({ ok: true, pending });
+  } catch (err) { return json({ error: err.message }, 500); }
+}
+
+async function handleApproveTuning(request, env) {
+  try {
+    const { dept, approvedIndices, action } = await request.json();
+    // action: 'approve' | 'reject_all'
+    if (!dept) return json({ error: 'dept required' }, 400);
+
+    const pendingKey = `config:tune-pending:${dept}`;
+    const pending = await env.CACI_KV.get(pendingKey, 'json');
+    if (!pending) return json({ error: 'No pending suggestions found' }, 404);
+
+    if (action === 'reject_all') {
+      pending.status = 'rejected';
+      pending.rejectedAt = new Date().toISOString();
+      await env.CACI_KV.put(pendingKey, JSON.stringify(pending));
+      return json({ ok: true, message: 'All suggestions rejected' });
+    }
+
+    // Apply only approved indices
+    const toApply = (approvedIndices || []).map(i => pending.suggestions[i]).filter(Boolean);
+    if (!toApply.length) return json({ error: 'No valid indices provided' }, 400);
+
+    const weights = await env.CACI_KV.get(`config:scoring-weights:${dept}`, 'json') || getDefaultWeights();
+    const changes = [];
+    for (const s of toApply) {
+      if (weights.hasOwnProperty(s.weightName)) {
+        const old = weights[s.weightName];
+        weights[s.weightName] = s.suggestedValue;
+        changes.push({ weightName: s.weightName, from: old, to: s.suggestedValue, reason: s.reason });
+      }
+    }
+
+    weights._lastUpdated = new Date().toISOString();
+    weights._appliedCount = (weights._appliedCount || 0) + changes.length;
+    await env.CACI_KV.put(`config:scoring-weights:${dept}`, JSON.stringify(weights));
+
+    // Archive the tune log
+    const logKey = `config:tune-log:${dept}`;
+    const log = await env.CACI_KV.get(logKey, 'json') || [];
+    log.unshift({ appliedAt: new Date().toISOString(), changes, feedbackSnapshot: pending.feedbackSnapshot });
+    if (log.length > 50) log.splice(50);
+    await env.CACI_KV.put(logKey, JSON.stringify(log));
+
+    pending.status = 'applied';
+    pending.appliedAt = new Date().toISOString();
+    pending.appliedChanges = changes;
+    await env.CACI_KV.put(pendingKey, JSON.stringify(pending));
+
+    return json({ ok: true, changes });
+  } catch (err) { return json({ error: err.message }, 500); }
+}
+
+function getDefaultWeights() {
+  return {
+    yearMatchBase: 10,
+    yearRecencyMultiplier: 3,
+    monthMatchBonus: 8,
+    rangeMatchBonus: 30,
+    quarterMatchBonus: 8,
+    annualBonus: 8,
+    keywordFilenameBonus: 2,
+    recencyMaxBonus: 3,
+    categoryColBonus: 5,
+    fileSummaryBonus: 50,
+    rerankDirectAnswerBonus: 4,
+    rerankNumericBonus: 0.3,
+    rerankComparativeBonus: 4,
+    xlsxPenalty: -1,
+  };
+}
+
+async function getScoringWeights(dept, env) {
+  const stored = await env.CACI_KV.get(`config:scoring-weights:${dept}`, 'json').catch(() => null);
+  return stored ? { ...getDefaultWeights(), ...stored } : getDefaultWeights();
+}
+
 // ── Re-ranking pass ───────────────────────────────────────────
-function rerankChunks(chunks, keywords, intent) {
+function rerankChunks(chunks, keywords, intent, W = null) {
   if (!chunks.length) return chunks;
+  const w = W || getDefaultWeights();
   const expanded = expandKeywords(keywords);
   const scored = chunks.map((c, idx) => {
     const lower = c.chunk.toLowerCase();
     let bonus = 0;
     // Direct answer signal: number near a keyword
     for (const kw of expanded) {
-      const re = new RegExp('(?<![a-z0-9])' + escapeRegex(kw) + '[^\\n]{0,40}\\d+[,.]?\\d*', 'i');
-      if (re.test(lower)) bonus += 4;
+      const re = new RegExp('(?<![a-z0-9])' + escapeRegex(kw) + '[^\n]{0,40}\d+[,.]?\d*', 'i');
+      if (re.test(lower)) bonus += w.rerankDirectAnswerBonus;
     }
     // Numeric density for aggregate queries
     if (intent?.isAggregate) {
-      const numCount = (lower.match(/\d+[,.]?\d*/g) || []).length;
-      bonus += Math.min(numCount * 0.3, 3);
+      const numCount = (lower.match(/\b\d+[,.]?\d*\b/g) || []).length;
+      bonus += Math.min(numCount * w.rerankNumericBonus, 3);
     }
     // Multi-year presence for comparative queries
     if (intent?.isComparative) {
       const years = [...new Set(lower.match(/20\d\d/g) || [])];
-      if (years.length >= 2) bonus += 4;
+      if (years.length >= 2) bonus += w.rerankComparativeBonus;
     }
     // FILE SUMMARY always first
-    if (lower.startsWith('file summary')) bonus += 50;
+    if (lower.startsWith('file summary')) bonus += w.fileSummaryBonus;
     // Redundancy penalty
     const fp = lower.replace(/\s+/g, ' ').slice(0, 100);
     const isDup = chunks.slice(0, idx).some(prev =>
