@@ -581,7 +581,7 @@ Today you're working with the ${dept} team. Here's what you have access to:
 ${discovery.collectionList}
 ${discLibraryPrompt ? '\n' + discLibraryPrompt : ''}
 
-You know this library well — it's yours. When you greet the team, show that awareness naturally. If there are documents explicitly listed above worth mentioning, weave one in naturally — but ONLY reference documents that are actually listed in the library above. If the library is empty or sparse, do not invent or imply documents exist. Greet them like a colleague — warm, real, not robotic. Keep it short.
+You know this library well — it's yours. When you greet the team, show that awareness naturally. If there are documents explicitly listed above worth mentioning, weave one in naturally — but ONLY reference documents that are actually listed in the library above. If the library is empty or sparse, do not invent or imply documents exist. Greet them like a colleague — warm, real, not robotic. HARD LIMIT: 2 sentences maximum. No lists, no bullet points, no paragraph breaks.
 
 INDUSTRY KNOWLEDGE — you know this world deeply:
 
@@ -622,10 +622,10 @@ ABSOLUTE RESTRICTION — never discuss, reference, or include any information ab
 - If asked directly about executive compensation, decline simply: "That's not something I cover — happy to dig into anything else."`;
       let discResponse;
       try {
-        discResponse = await callLLM({ model, system, messages: [{ role: 'user', content: message }], maxTokens: 700, env, apiKey });
+        discResponse = await callLLM({ model, system, messages: [{ role: 'user', content: message }], maxTokens: 120, env, apiKey });
       } catch(e) {
         try {
-          discResponse = await callLLM({ model: 'grok', system, messages: [{ role: 'user', content: message }], maxTokens: 700, env, apiKey });
+          discResponse = await callLLM({ model: 'grok', system, messages: [{ role: 'user', content: message }], maxTokens: 120, env, apiKey });
         } catch(e2) {
           discResponse = `Hey! I'm Caci. Here's what I have access to:\n\n${discovery.collectionList}\n\nWhat would you like to dig into?`;
         }
