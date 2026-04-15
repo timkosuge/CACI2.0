@@ -4962,58 +4962,62 @@ body::before {
       <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
     <!-- Bright point-of-light: tight core bloom + wide soft halo -->
-    <filter id="goldGlow" x="-500%" y="-500%" width="1100%" height="1100%">
-      <!-- Tight amber core — R heavy, G medium, B suppressed -->
-      <feGaussianBlur stdDeviation="1.2" result="tightBlur"/>
+    <filter id="goldGlow" x="-800%" y="-800%" width="1700%" height="1700%">
+      <!-- Hot amber core — punchy and tight -->
+      <feGaussianBlur stdDeviation="1.5" result="tightBlur"/>
       <feColorMatrix in="tightBlur" type="matrix"
-        values="2.2 0.4 0   0 0.10
+        values="3.0 0.6 0   0 0.18
+                1.2 0.8 0   0 0.06
+                0   0   0   0 0
+                0   0   0   3.5 0" result="coreGlow"/>
+      <!-- Mid warm bloom -->
+      <feGaussianBlur in="SourceGraphic" stdDeviation="7" result="midBlur"/>
+      <feColorMatrix in="midBlur" type="matrix"
+        values="2.5 0.5 0   0 0.10
                 0.8 0.6 0   0 0.02
                 0   0   0   0 0
-                0   0   0   2.2 0" result="coreGlow"/>
-      <!-- Mid warm ring -->
-      <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="midBlur"/>
-      <feColorMatrix in="midBlur" type="matrix"
-        values="1.8 0.3 0   0 0.06
-                0.5 0.4 0   0 0.01
-                0   0   0   0 0
-                0   0   0   1.2 0" result="midGlow"/>
-      <!-- Wide amber halo -->
-      <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="wideBlur"/>
+                0   0   0   2.0 0" result="midGlow"/>
+      <!-- Wide atmospheric halo -->
+      <feGaussianBlur in="SourceGraphic" stdDeviation="18" result="wideBlur"/>
       <feColorMatrix in="wideBlur" type="matrix"
-        values="1.4 0.2 0   0 0.03
-                0.4 0.3 0   0 0
+        values="2.0 0.4 0   0 0.06
+                0.7 0.5 0   0 0.01
                 0   0   0   0 0
-                0   0   0   0.7 0" result="haloGlow"/>
+                0   0   0   1.2 0" result="haloGlow"/>
       <feMerge>
         <feMergeNode in="haloGlow"/>
+        <feMergeNode in="haloGlow"/>
         <feMergeNode in="midGlow"/>
+        <feMergeNode in="coreGlow"/>
         <feMergeNode in="coreGlow"/>
         <feMergeNode in="SourceGraphic"/>
       </feMerge>
     </filter>
     <!-- Smaller amber ember for thinner paths -->
-    <filter id="goldGlow2" x="-500%" y="-500%" width="1100%" height="1100%">
-      <feGaussianBlur stdDeviation="0.9" result="tightBlur"/>
+    <filter id="goldGlow2" x="-800%" y="-800%" width="1700%" height="1700%">
+      <feGaussianBlur stdDeviation="1.2" result="tightBlur"/>
       <feColorMatrix in="tightBlur" type="matrix"
-        values="2.2 0.4 0   0 0.08
-                0.8 0.5 0   0 0.01
+        values="3.0 0.5 0   0 0.15
+                1.1 0.7 0   0 0.04
                 0   0   0   0 0
-                0   0   0   2.0 0" result="coreGlow"/>
-      <feGaussianBlur in="SourceGraphic" stdDeviation="3.5" result="midBlur"/>
+                0   0   0   3.2 0" result="coreGlow"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="midBlur"/>
       <feColorMatrix in="midBlur" type="matrix"
-        values="1.8 0.3 0   0 0.04
-                0.5 0.4 0   0 0
+        values="2.4 0.4 0   0 0.08
+                0.7 0.5 0   0 0.01
                 0   0   0   0 0
-                0   0   0   1.0 0" result="midGlow"/>
-      <feGaussianBlur in="SourceGraphic" stdDeviation="7" result="wideBlur"/>
+                0   0   0   1.8 0" result="midGlow"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="13" result="wideBlur"/>
       <feColorMatrix in="wideBlur" type="matrix"
-        values="1.4 0.2 0   0 0.02
-                0.4 0.3 0   0 0
+        values="1.8 0.3 0   0 0.04
+                0.6 0.4 0   0 0.01
                 0   0   0   0 0
-                0   0   0   0.6 0" result="haloGlow"/>
+                0   0   0   1.0 0" result="haloGlow"/>
       <feMerge>
         <feMergeNode in="haloGlow"/>
+        <feMergeNode in="haloGlow"/>
         <feMergeNode in="midGlow"/>
+        <feMergeNode in="coreGlow"/>
         <feMergeNode in="coreGlow"/>
         <feMergeNode in="SourceGraphic"/>
       </feMerge>
