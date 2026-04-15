@@ -1,4 +1,4 @@
-<!-- CACI Intelligence Platform v2.0 -->
+\<!-- CACI Intelligence Platform v2.0 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4963,55 +4963,54 @@ body::before {
     </filter>
     <!-- Bright point-of-light: tight core bloom + wide soft halo -->
     <filter id="goldGlow" x="-500%" y="-500%" width="1100%" height="1100%">
-      <!-- Tight hot core -->
-      <feGaussianBlur stdDeviation="1.5" result="tightBlur"/>
+      <!-- Tight amber core — R heavy, G medium, B suppressed -->
+      <feGaussianBlur stdDeviation="1.2" result="tightBlur"/>
       <feColorMatrix in="tightBlur" type="matrix"
-        values="1.6 0.7 0   0 0.30
-                1.0 1.2 0   0 0.12
-                0.1 0.1 0.1 0 0.01
-                0   0   0   4.0 0" result="coreGlow"/>
-      <!-- Mid glow ring -->
-      <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="midBlur"/>
+        values="2.2 0.4 0   0 0.10
+                0.8 0.6 0   0 0.02
+                0   0   0   0 0
+                0   0   0   2.2 0" result="coreGlow"/>
+      <!-- Mid warm ring -->
+      <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="midBlur"/>
       <feColorMatrix in="midBlur" type="matrix"
-        values="1.3 0.5 0   0 0.08
-                0.7 0.9 0   0 0.03
-                0   0   0.1 0 0
-                0   0   0   1.8 0" result="midGlow"/>
-      <!-- Wide ambient halo -->
+        values="1.8 0.3 0   0 0.06
+                0.5 0.4 0   0 0.01
+                0   0   0   0 0
+                0   0   0   1.2 0" result="midGlow"/>
+      <!-- Wide amber halo -->
       <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="wideBlur"/>
       <feColorMatrix in="wideBlur" type="matrix"
-        values="1.1 0.4 0   0 0.04
-                0.6 0.7 0   0 0.01
-                0   0   0.1 0 0
-                0   0   0   0.9 0" result="haloGlow"/>
+        values="1.4 0.2 0   0 0.03
+                0.4 0.3 0   0 0
+                0   0   0   0 0
+                0   0   0   0.7 0" result="haloGlow"/>
       <feMerge>
         <feMergeNode in="haloGlow"/>
         <feMergeNode in="midGlow"/>
         <feMergeNode in="coreGlow"/>
-        <feMergeNode in="coreGlow"/>
         <feMergeNode in="SourceGraphic"/>
       </feMerge>
     </filter>
-    <!-- Smaller point-of-light for thinner paths -->
+    <!-- Smaller amber ember for thinner paths -->
     <filter id="goldGlow2" x="-500%" y="-500%" width="1100%" height="1100%">
-      <feGaussianBlur stdDeviation="1.2" result="tightBlur"/>
+      <feGaussianBlur stdDeviation="0.9" result="tightBlur"/>
       <feColorMatrix in="tightBlur" type="matrix"
-        values="1.5 0.6 0   0 0.25
-                0.9 1.1 0   0 0.10
-                0.1 0.1 0.1 0 0
-                0   0   0   3.5 0" result="coreGlow"/>
-      <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="midBlur"/>
+        values="2.2 0.4 0   0 0.08
+                0.8 0.5 0   0 0.01
+                0   0   0   0 0
+                0   0   0   2.0 0" result="coreGlow"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="3.5" result="midBlur"/>
       <feColorMatrix in="midBlur" type="matrix"
-        values="1.3 0.4 0   0 0.06
-                0.7 0.8 0   0 0.02
-                0   0   0.1 0 0
-                0   0   0   1.5 0" result="midGlow"/>
+        values="1.8 0.3 0   0 0.04
+                0.5 0.4 0   0 0
+                0   0   0   0 0
+                0   0   0   1.0 0" result="midGlow"/>
       <feGaussianBlur in="SourceGraphic" stdDeviation="7" result="wideBlur"/>
       <feColorMatrix in="wideBlur" type="matrix"
-        values="1.1 0.3 0   0 0.03
-                0.5 0.6 0   0 0.01
-                0   0   0.1 0 0
-                0   0   0   0.8 0" result="haloGlow"/>
+        values="1.4 0.2 0   0 0.02
+                0.4 0.3 0   0 0
+                0   0   0   0 0
+                0   0   0   0.6 0" result="haloGlow"/>
       <feMerge>
         <feMergeNode in="haloGlow"/>
         <feMergeNode in="midGlow"/>
@@ -5168,85 +5167,85 @@ body::before {
 
   <!-- ═══ OUTER BORDER ═══ -->
   <path class="pulse a1t" d="M 0,28 L 1440,28"          stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
-  <path class="pulse a1h" d="M 0,28 L 1440,28"          stroke="#fff8e7" stroke-width="2" filter="url(#goldGlow)"/>
+  <path class="pulse a1h" d="M 0,28 L 1440,28"          stroke="#e8a020" stroke-width="1.5" filter="url(#goldGlow)"/>
   <path class="pulse a2t" d="M 0,872 L 1440,872"         stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
-  <path class="pulse a2h" d="M 1440,872 L 0,872"         stroke="#fff8e7" stroke-width="2" filter="url(#goldGlow)"/>
+  <path class="pulse a2h" d="M 1440,872 L 0,872"         stroke="#e8a020" stroke-width="1.5" filter="url(#goldGlow)"/>
 
   <!-- ═══ INNER OCTAGON FRAME — matches the central diamond shape ═══ -->
   <!-- CW: top-center → top-right corner → right → bottom-right → bottom → bottom-left → left → top-left → top-center -->
   <path class="pulse b1t" d="M 720,55 L 1100,55 L 1385,170 L 1385,730 L 1100,845 L 720,845 L 340,730 L 340,170 Z"
         stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
   <path class="pulse b1h" d="M 720,55 L 1100,55 L 1385,170 L 1385,730 L 1100,845 L 720,845 L 340,730 L 340,170 Z"
-        stroke="#fff8e7" stroke-width="2" filter="url(#goldGlow)"/>
+        stroke="#e8a020" stroke-width="1.5" filter="url(#goldGlow)"/>
   <path class="pulse b2t" d="M 720,55 L 1100,55 L 1385,170 L 1385,730 L 1100,845 L 720,845 L 340,730 L 340,170 Z"
         stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
   <path class="pulse b2h" d="M 720,55 L 1100,55 L 1385,170 L 1385,730 L 1100,845 L 720,845 L 340,730 L 340,170 Z"
-        stroke="#fff8e7" stroke-width="2" filter="url(#goldGlow)"/>
+        stroke="#e8a020" stroke-width="1.5" filter="url(#goldGlow)"/>
 
   <!-- ═══ VERTICAL SPINES — center top/bottom pointing inward ═══ -->
   <path class="pulse c1t" d="M 720,0 L 720,450"          stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
-  <path class="pulse c1h" d="M 720,0 L 720,450"          stroke="#fff8e7" stroke-width="2" filter="url(#goldGlow)"/>
+  <path class="pulse c1h" d="M 720,0 L 720,450"          stroke="#e8a020" stroke-width="1.5" filter="url(#goldGlow)"/>
   <path class="pulse c2t" d="M 720,900 L 720,450"         stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
-  <path class="pulse c2h" d="M 720,900 L 720,450"         stroke="#fff8e7" stroke-width="2" filter="url(#goldGlow)"/>
+  <path class="pulse c2h" d="M 720,900 L 720,450"         stroke="#e8a020" stroke-width="1.5" filter="url(#goldGlow)"/>
 
   <!-- ═══ L-TRACES — corner clusters routing inward ═══ -->
   <!-- Top-left: from outer-left down then right into frame -->
   <path class="pulse d1t" d="M 0,170 L 200,170 L 200,280 L 340,280 L 340,400 L 460,400 L 460,280 L 580,280 L 580,170 L 720,170"
         stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
   <path class="pulse d1h" d="M 0,170 L 200,170 L 200,280 L 340,280 L 340,400 L 460,400 L 460,280 L 580,280 L 580,170 L 720,170"
-        stroke="#fff8e7" stroke-width="1.6" filter="url(#goldGlow2)"/>
+        stroke="#e8a020" stroke-width="1.2" filter="url(#goldGlow2)"/>
   <!-- Top-right: from outer-right down then left into frame -->
   <path class="pulse d2t" d="M 1440,170 L 1240,170 L 1240,280 L 1100,280 L 1100,400 L 980,400 L 980,280 L 860,280 L 860,170 L 720,170"
         stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
   <path class="pulse d2h" d="M 1440,170 L 1240,170 L 1240,280 L 1100,280 L 1100,400 L 980,400 L 980,280 L 860,280 L 860,170 L 720,170"
-        stroke="#fff8e7" stroke-width="1.6" filter="url(#goldGlow2)"/>
+        stroke="#e8a020" stroke-width="1.2" filter="url(#goldGlow2)"/>
   <!-- Bottom-left -->
   <path class="pulse d3t" d="M 0,730 L 200,730 L 200,620 L 340,620 L 340,500 L 460,500 L 460,620 L 580,620 L 580,730 L 720,730"
         stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
   <path class="pulse d3h" d="M 0,730 L 200,730 L 200,620 L 340,620 L 340,500 L 460,500 L 460,620 L 580,620 L 580,730 L 720,730"
-        stroke="#fff8e7" stroke-width="1.6" filter="url(#goldGlow2)"/>
+        stroke="#e8a020" stroke-width="1.2" filter="url(#goldGlow2)"/>
   <!-- Bottom-right -->
   <path class="pulse d4t" d="M 1440,730 L 1240,730 L 1240,620 L 1100,620 L 1100,500 L 980,500 L 980,620 L 860,620 L 860,730 L 720,730"
         stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
   <path class="pulse d4h" d="M 1440,730 L 1240,730 L 1240,620 L 1100,620 L 1100,500 L 980,500 L 980,620 L 860,620 L 860,730 L 720,730"
-        stroke="#fff8e7" stroke-width="1.6" filter="url(#goldGlow2)"/>
+        stroke="#e8a020" stroke-width="1.2" filter="url(#goldGlow2)"/>
 
   <!-- ═══ DENSE CIRCUIT RUNS — left side horizontal stacks ═══ -->
   <path class="pulse e1t" d="M 0,340 L 340,340"  stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
-  <path class="pulse e1h" d="M 0,340 L 340,340"  stroke="#fff8e7" stroke-width="1.6" filter="url(#goldGlow2)"/>
+  <path class="pulse e1h" d="M 0,340 L 340,340"  stroke="#e8a020" stroke-width="1.2" filter="url(#goldGlow2)"/>
   <path class="pulse e2t" d="M 0,380 L 340,380"  stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
-  <path class="pulse e2h" d="M 340,380 L 0,380"  stroke="#fff8e7" stroke-width="1.6" filter="url(#goldGlow2)"/>
+  <path class="pulse e2h" d="M 340,380 L 0,380"  stroke="#e8a020" stroke-width="1.2" filter="url(#goldGlow2)"/>
   <path class="pulse e3t" d="M 0,420 L 340,420"  stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
-  <path class="pulse e3h" d="M 0,420 L 340,420"  stroke="#fff8e7" stroke-width="1.6" filter="url(#goldGlow2)"/>
+  <path class="pulse e3h" d="M 0,420 L 340,420"  stroke="#e8a020" stroke-width="1.2" filter="url(#goldGlow2)"/>
   <!-- Right side — mirror, reversed direction -->
   <path class="pulse e4t" d="M 1440,340 L 1100,340" stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
-  <path class="pulse e4h" d="M 1440,340 L 1100,340" stroke="#fff8e7" stroke-width="1.6" filter="url(#goldGlow2)"/>
+  <path class="pulse e4h" d="M 1440,340 L 1100,340" stroke="#e8a020" stroke-width="1.2" filter="url(#goldGlow2)"/>
   <path class="pulse e5t" d="M 1440,380 L 1100,380" stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
-  <path class="pulse e5h" d="M 1100,380 L 1440,380" stroke="#fff8e7" stroke-width="1.6" filter="url(#goldGlow2)"/>
+  <path class="pulse e5h" d="M 1100,380 L 1440,380" stroke="#e8a020" stroke-width="1.2" filter="url(#goldGlow2)"/>
   <path class="pulse e6t" d="M 1440,420 L 1100,420" stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
-  <path class="pulse e6h" d="M 1440,420 L 1100,420" stroke="#fff8e7" stroke-width="1.6" filter="url(#goldGlow2)"/>
+  <path class="pulse e6h" d="M 1440,420 L 1100,420" stroke="#e8a020" stroke-width="1.2" filter="url(#goldGlow2)"/>
 
   <!-- ═══ CORNER ORNAMENTS — small square cluster traces ═══ -->
   <!-- Top-left ornament -->
   <path class="pulse f1t" d="M 60,60 L 200,60 L 200,100 L 260,100 L 260,60 L 340,60 L 340,170 L 260,170 L 260,130 L 200,130 L 200,170"
         stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
   <path class="pulse f1h" d="M 60,60 L 200,60 L 200,100 L 260,100 L 260,60 L 340,60 L 340,170 L 260,170 L 260,130 L 200,130 L 200,170"
-        stroke="#fff8e7" stroke-width="1.6" filter="url(#goldGlow2)"/>
+        stroke="#e8a020" stroke-width="1.2" filter="url(#goldGlow2)"/>
   <!-- Top-right ornament -->
   <path class="pulse f2t" d="M 1380,60 L 1240,60 L 1240,100 L 1180,100 L 1180,60 L 1100,60 L 1100,170 L 1180,170 L 1180,130 L 1240,130 L 1240,170"
         stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
   <path class="pulse f2h" d="M 1380,60 L 1240,60 L 1240,100 L 1180,100 L 1180,60 L 1100,60 L 1100,170 L 1180,170 L 1180,130 L 1240,130 L 1240,170"
-        stroke="#fff8e7" stroke-width="1.6" filter="url(#goldGlow2)"/>
+        stroke="#e8a020" stroke-width="1.2" filter="url(#goldGlow2)"/>
   <!-- Bottom-left ornament -->
   <path class="pulse f3t" d="M 60,840 L 200,840 L 200,800 L 260,800 L 260,840 L 340,840 L 340,730 L 260,730 L 260,770 L 200,770 L 200,730"
         stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
   <path class="pulse f3h" d="M 60,840 L 200,840 L 200,800 L 260,800 L 260,840 L 340,840 L 340,730 L 260,730 L 260,770 L 200,770 L 200,730"
-        stroke="#fff8e7" stroke-width="1.6" filter="url(#goldGlow2)"/>
+        stroke="#e8a020" stroke-width="1.2" filter="url(#goldGlow2)"/>
   <!-- Bottom-right ornament -->
   <path class="pulse f4t" d="M 1380,840 L 1240,840 L 1240,800 L 1180,800 L 1180,840 L 1100,840 L 1100,730 L 1180,730 L 1180,770 L 1240,770 L 1240,730"
         stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
   <path class="pulse f4h" d="M 1380,840 L 1240,840 L 1240,800 L 1180,800 L 1180,840 L 1100,840 L 1100,730 L 1180,730 L 1180,770 L 1240,770 L 1240,730"
-        stroke="#fff8e7" stroke-width="1.6" filter="url(#goldGlow2)"/>
+        stroke="#e8a020" stroke-width="1.2" filter="url(#goldGlow2)"/>
 
   <rect width="1440" height="900" fill="url(#vignette)"/>
 </svg>      </div>
@@ -5406,17 +5405,10 @@ body::before {
     </div>
 
     <!-- ADMIN -->
-    <div class="panel" data-panel="admin">
+    <div class="panel" data-panel="intelligence">
       <div class="admin-wrap">
-        <div class="asec">
-          <div class="asec-head"><div class="asec-title">System Status</div><div class="asec-line"></div></div>
-          <div class="sgrid">
-            <div class="scard" id="scard-api"><div class="scard-label">Worker API</div><div class="scard-val">CF Workers</div><div class="srow" id="stat-api"><div class="spip warn"></div><span class="srow-text">Checking...</span></div></div>
-            <div class="scard" id="scard-claude"><div class="scard-label">AI Engine</div><div class="scard-val" id="stat-model-val">Claude</div><div class="srow" id="stat-claude"><div class="spip warn"></div><span class="srow-text">Checking key...</span></div></div>
-            <div class="scard ok"><div class="scard-label">File Storage</div><div class="scard-val">KV + R2</div><div class="srow"><div class="spip"></div><span class="srow-text">Active</span></div></div>
-            <div class="scard ok"><div class="scard-label">Extraction</div><div class="scard-val">Client-Side</div><div class="srow"><div class="spip"></div><span class="srow-text">PDF &middot; Word &middot; Excel</span></div></div>
-          </div>
-        </div>
+
+        <!-- AI CONFIGURATION -->
         <div class="asec">
           <div class="asec-head"><div class="asec-title">AI Configuration</div><div class="asec-line"></div></div>
           <div class="acard">
@@ -5473,6 +5465,33 @@ body::before {
           </div>
         </div>
 
+        <!-- INTELLIGENCE TUNING -->
+        <div class="asec">
+          <div class="asec-head"><div class="asec-title">Intelligence Tuning</div><div class="asec-line"></div></div>
+          <div class="asec-sub-title" style="margin:-8px 0 14px">
+            CACI learns from your feedback — Sharp, Missed, and Incomplete signals on every response.
+            Once enough signals accumulate, run an analysis to generate scoring weight suggestions.
+            You review and approve each change before it takes effect.
+          </div>
+          <div id="tune-wrap">
+            <div class="tune-empty">Loading...</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="panel" data-panel="admin">
+      <div class="admin-wrap">
+        <div class="asec">
+          <div class="asec-head"><div class="asec-title">System Status</div><div class="asec-line"></div></div>
+          <div class="sgrid">
+            <div class="scard" id="scard-api"><div class="scard-label">Worker API</div><div class="scard-val">CF Workers</div><div class="srow" id="stat-api"><div class="spip warn"></div><span class="srow-text">Checking...</span></div></div>
+            <div class="scard" id="scard-claude"><div class="scard-label">AI Engine</div><div class="scard-val" id="stat-model-val">Claude</div><div class="srow" id="stat-claude"><div class="spip warn"></div><span class="srow-text">Checking key...</span></div></div>
+            <div class="scard ok"><div class="scard-label">File Storage</div><div class="scard-val">KV + R2</div><div class="srow"><div class="spip"></div><span class="srow-text">Active</span></div></div>
+            <div class="scard ok"><div class="scard-label">Extraction</div><div class="scard-val">Client-Side</div><div class="srow"><div class="spip"></div><span class="srow-text">PDF &middot; Word &middot; Excel</span></div></div>
+          </div>
+        </div>
         <!-- INTEGRATIONS — Microsoft 365 -->
         <div class="asec">
           <div class="asec-head"><div class="asec-title">Microsoft 365 Integrations</div><div class="asec-line"></div></div>
@@ -5563,19 +5582,6 @@ body::before {
               <div class="int-actions"><input class="ainput int-input" type="password" placeholder="API Token" id="ci-mjfw-token" autocomplete="off"/><input class="ainput int-input" type="text" placeholder="Facility License #" id="ci-mjfw-license" autocomplete="off"/><input class="ainput int-input" type="text" placeholder="API Base URL" id="ci-mjfw-url" value="https://api.mjfreeway.com/v1"/><button class="asave int-btn" onclick="saveConnector('mjfreeway')">Save &amp; Verify</button></div>
               <div class="int-fb" id="cfb-mjfreeway"></div>
             </div>
-          </div>
-        </div>
-
-        <!-- INTELLIGENCE TUNING -->
-        <div class="asec">
-          <div class="asec-head"><div class="asec-title">Intelligence Tuning</div><div class="asec-line"></div></div>
-          <div class="asec-sub-title" style="margin:-8px 0 14px">
-            CACI learns from your feedback — Sharp, Missed, and Incomplete signals on every response.
-            Once enough signals accumulate, run an analysis to generate scoring weight suggestions.
-            You review and approve each change before it takes effect.
-          </div>
-          <div id="tune-wrap">
-            <div class="tune-empty">Loading...</div>
           </div>
         </div>
 
@@ -5757,10 +5763,11 @@ const MODELS = [
 ];
 
 const MODS = [
-  {id:'chat',      label:'Intelligence', icon:'\u25C8'},
-  {id:'files',     label:'Documents',    icon:'\u2261'},
-  {id:'responses', label:'Responses',    icon:'\u2193'},
-  {id:'admin',     label:'Configurations', icon:'\u2699'},
+  {id:'chat',         label:'Intelligence',  icon:'\u25C8'},
+  {id:'files',        label:'Documents',     icon:'\u2261'},
+  {id:'responses',    label:'Responses',     icon:'\u2193'},
+  {id:'intelligence', label:'AI Engine',     icon:'\u2736'},
+  {id:'admin',        label:'Configurations',icon:'\u2699'},
 ];
 
 let token   = sessionStorage.getItem('caci_token') || '';
@@ -6236,7 +6243,8 @@ function switchPanel(id) {
   $('tb-module').textContent = MODS.find(m => m.id === id)?.label || '';
   if (id === 'responses') loadResponses();
   if (id === 'files') { loadCollections(); loadFiles(); loadContextDocs(); }
-  if (id === 'admin') { loadAdminConfig(); loadIntegrationStatuses(); loadConnectorStatuses(); loadIntelligenceTuning(); loadRetrievalWeights(); }
+  if (id === 'intelligence') { loadAdminConfig(); loadRetrievalWeights(); loadIntelligenceTuning(); }
+  if (id === 'admin') { loadAdminConfig(); loadIntegrationStatuses(); loadConnectorStatuses(); }
   if (id === 'chat') {
     initChatGreeting();
     // Always refresh pills when entering chat — loadCollections populates scope bar
