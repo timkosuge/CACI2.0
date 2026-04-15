@@ -575,10 +575,10 @@ ABSOLUTE RESTRICTION — never discuss, reference, or include any information ab
 - If asked directly about executive compensation, decline simply: "That's not something I cover — happy to dig into anything else."`;
       let discResponse;
       try {
-        discResponse = await callLLM({ model, system, messages: [{ role: 'user', content: message }], maxTokens: 400, env, apiKey });
+        discResponse = await callLLM({ model, system, messages: [{ role: 'user', content: message }], maxTokens: 700, env, apiKey });
       } catch(e) {
         try {
-          discResponse = await callLLM({ model: 'grok', system, messages: [{ role: 'user', content: message }], maxTokens: 400, env, apiKey });
+          discResponse = await callLLM({ model: 'grok', system, messages: [{ role: 'user', content: message }], maxTokens: 700, env, apiKey });
         } catch(e2) {
           discResponse = `Hey! I'm Caci. Here's what I have access to:\n\n${discovery.collectionList}\n\nWhat would you like to dig into?`;
         }
@@ -603,6 +603,19 @@ Be direct and conversational. List them clearly.`;
     // ── Intent analysis — shapes retrieval strategy ─────────────
     const intent = analyzeQueryIntent(message);
 
+    // ── Retrieval message — blend recent history with current message ──
+    // Follow-up questions like "what about Virginia?" carry no context alone.
+    // Prepend the last 1-2 user turns so file scoring and keyword extraction
+    // understand the full thread. Only used for retrieval, not for the LLM response.
+    const recentUserTurns = history
+      .filter(h => h.role === 'user')
+      .slice(-2)
+      .map(h => h.content)
+      .join(' ');
+    const retrievalMessage = recentUserTurns
+      ? `${recentUserTurns} ${message}`.trim()
+      : message;
+
     // ── Library map — inject Caci's understanding of the library ─
     const libraryMap = await buildLibraryMap({ dept, env });
     const libraryMapPrompt = libraryMapToPrompt(libraryMap);
@@ -613,7 +626,7 @@ Be direct and conversational. List them clearly.`;
     const isSimpleQuery = history.length > 0 && message.length < 60 && !intent.isComparative && !intent.isCausal;
     if (!isSimpleQuery && libraryMap && libraryMap.collections.length > 1 && !fileId) {
       try {
-        const planPrompt = `You are Caci, an AI assistant for Jushi Holdings. A user just asked: "${message}"
+        const planPrompt = `You are Caci, an AI assistant for Jushi Holdings. A user just asked: "${retrievalMessage}"
 
 Here is your library map:
 ${libraryMapToPrompt(libraryMap)}
@@ -655,13 +668,13 @@ Respond in plain text, no headers, no bullets.`;
     const useMultiCollection = activeScope === 'all' && !fileId && !activeCollection;
     if (useMultiCollection) {
       // Broad scope: search across top-matching collections
-      context = await buildContextMultiCollection({ message, dept, env, maxCollections: intent.isComparative ? 4 : 3 });
+      context = await buildContextMultiCollection({ message: retrievalMessage, dept, env, maxCollections: intent.isComparative ? 6 : 5 });
       // Fall back to single-path if multi returns nothing
       if (!context.text && !context.statsContext) {
-        context = await buildContext({ message, dept, collection: null, fileId: null, scope: 'all', env });
+        context = await buildContext({ message: retrievalMessage, dept, collection: null, fileId: null, scope: 'all', env });
       }
     } else {
-      context = await buildContext({ message, dept, collection: activeCollection, fileId, scope: activeScope, env });
+      context = await buildContext({ message: retrievalMessage, dept, collection: activeCollection, fileId, scope: activeScope, env });
     }
 
     // Note: context builders (buildContextTwoPass / buildContext) already
@@ -1348,9 +1361,9 @@ async function buildContextTwoPass({ message, dept, collection, env }) {
     // Get best chunks — dynamic allocation: top-scoring files get more chunks
     const keywords2 = extractKeywords(message);
     const intent2   = analyzeQueryIntent(message);
-    const TOTAL_CHUNK_BUDGET = fullFiles.length <= 2 ? 22 : fullFiles.length <= 5 ? 22 : 18;
+    const TOTAL_CHUNK_BUDGET = fullFiles.length <= 2 ? 32 : fullFiles.length <= 5 ? 30 : 26;
     const MIN_CHUNKS_PER_FILE = 1;  // every selected file gets at least one chunk
-    const MAX_CHUNKS_PER_FILE = fullFiles.length <= 2 ? 14 : fullFiles.length <= 4 ? 8 : 5;
+    const MAX_CHUNKS_PER_FILE = fullFiles.length <= 2 ? 20 : fullFiles.length <= 4 ? 12 : 7;
 
     // Guaranteed slots: FILE SUMMARY chunk from each file
     const guaranteedChunks = [];
