@@ -4917,30 +4917,44 @@ body::before {
       <feGaussianBlur stdDeviation="2" result="blur"/>
       <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
-    <!-- Gold-tinted glow: blurs then matrix-tints amber before merging -->
-    <filter id="goldGlow" x="-100%" y="-100%" width="300%" height="300%">
-      <feGaussianBlur stdDeviation="4" result="blur"/>
-      <feColorMatrix in="blur" type="matrix"
-        values="1.2 0.4 0   0 0.05
-                0.6 0.8 0   0 0.02
+    <!-- Bright point-of-light: tight core bloom + wide soft halo -->
+    <filter id="goldGlow" x="-400%" y="-400%" width="900%" height="900%">
+      <feGaussianBlur stdDeviation="1" result="tightBlur"/>
+      <feColorMatrix in="tightBlur" type="matrix"
+        values="1.5 0.6 0   0 0.20
+                0.9 1.1 0   0 0.08
+                0.1 0.1 0.3 0 0.01
+                0   0   0   3.0 0" result="coreGlow"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="wideBlur"/>
+      <feColorMatrix in="wideBlur" type="matrix"
+        values="1.1 0.3 0   0 0.03
+                0.5 0.6 0   0 0.01
                 0   0   0.1 0 0
-                0   0   0   1 0" result="goldBlur"/>
+                0   0   0   0.7 0" result="haloGlow"/>
       <feMerge>
-        <feMergeNode in="goldBlur"/>
-        <feMergeNode in="goldBlur"/>
+        <feMergeNode in="haloGlow"/>
+        <feMergeNode in="coreGlow"/>
+        <feMergeNode in="coreGlow"/>
         <feMergeNode in="SourceGraphic"/>
       </feMerge>
     </filter>
-    <!-- Smaller gold glow for thinner paths -->
-    <filter id="goldGlow2" x="-80%" y="-80%" width="260%" height="260%">
-      <feGaussianBlur stdDeviation="2.5" result="blur"/>
-      <feColorMatrix in="blur" type="matrix"
-        values="1.2 0.4 0   0 0.04
-                0.6 0.8 0   0 0.01
+    <!-- Smaller point-of-light for thinner paths -->
+    <filter id="goldGlow2" x="-400%" y="-400%" width="900%" height="900%">
+      <feGaussianBlur stdDeviation="0.8" result="tightBlur"/>
+      <feColorMatrix in="tightBlur" type="matrix"
+        values="1.5 0.5 0   0 0.15
+                0.8 1.0 0   0 0.06
+                0.1 0.1 0.2 0 0
+                0   0   0   2.8 0" result="coreGlow"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="wideBlur"/>
+      <feColorMatrix in="wideBlur" type="matrix"
+        values="1.1 0.3 0   0 0.02
+                0.5 0.6 0   0 0
                 0   0   0.1 0 0
-                0   0   0   1 0" result="goldBlur"/>
+                0   0   0   0.6 0" result="haloGlow"/>
       <feMerge>
-        <feMergeNode in="goldBlur"/>
+        <feMergeNode in="haloGlow"/>
+        <feMergeNode in="coreGlow"/>
         <feMergeNode in="SourceGraphic"/>
       </feMerge>
     </filter>
@@ -5093,85 +5107,85 @@ body::before {
 
   <!-- ═══ OUTER BORDER ═══ -->
   <path class="pulse a1t" d="M 0,28 L 1440,28"          stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
-  <path class="pulse a1h" d="M 0,28 L 1440,28"          stroke="#ffc832" stroke-width="2.5" filter="url(#goldGlow)"/>
+  <path class="pulse a1h" d="M 0,28 L 1440,28"          stroke="#ffffff" stroke-width="1.2" filter="url(#goldGlow)"/>
   <path class="pulse a2t" d="M 0,872 L 1440,872"         stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
-  <path class="pulse a2h" d="M 1440,872 L 0,872"         stroke="#ffc832" stroke-width="2.5" filter="url(#goldGlow)"/>
+  <path class="pulse a2h" d="M 1440,872 L 0,872"         stroke="#ffffff" stroke-width="1.2" filter="url(#goldGlow)"/>
 
   <!-- ═══ INNER OCTAGON FRAME — matches the central diamond shape ═══ -->
   <!-- CW: top-center → top-right corner → right → bottom-right → bottom → bottom-left → left → top-left → top-center -->
   <path class="pulse b1t" d="M 720,55 L 1100,55 L 1385,170 L 1385,730 L 1100,845 L 720,845 L 340,730 L 340,170 Z"
         stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
   <path class="pulse b1h" d="M 720,55 L 1100,55 L 1385,170 L 1385,730 L 1100,845 L 720,845 L 340,730 L 340,170 Z"
-        stroke="#ffc832" stroke-width="2.5" filter="url(#goldGlow)"/>
+        stroke="#ffffff" stroke-width="1.2" filter="url(#goldGlow)"/>
   <path class="pulse b2t" d="M 720,55 L 1100,55 L 1385,170 L 1385,730 L 1100,845 L 720,845 L 340,730 L 340,170 Z"
         stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
   <path class="pulse b2h" d="M 720,55 L 1100,55 L 1385,170 L 1385,730 L 1100,845 L 720,845 L 340,730 L 340,170 Z"
-        stroke="#ffc832" stroke-width="2.5" filter="url(#goldGlow)"/>
+        stroke="#ffffff" stroke-width="1.2" filter="url(#goldGlow)"/>
 
   <!-- ═══ VERTICAL SPINES — center top/bottom pointing inward ═══ -->
   <path class="pulse c1t" d="M 720,0 L 720,450"          stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
-  <path class="pulse c1h" d="M 720,0 L 720,450"          stroke="#ffce50" stroke-width="2.5" filter="url(#goldGlow)"/>
+  <path class="pulse c1h" d="M 720,0 L 720,450"          stroke="#ffffff" stroke-width="1.2" filter="url(#goldGlow)"/>
   <path class="pulse c2t" d="M 720,900 L 720,450"         stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
-  <path class="pulse c2h" d="M 720,900 L 720,450"         stroke="#ffce50" stroke-width="2.5" filter="url(#goldGlow)"/>
+  <path class="pulse c2h" d="M 720,900 L 720,450"         stroke="#ffffff" stroke-width="1.2" filter="url(#goldGlow)"/>
 
   <!-- ═══ L-TRACES — corner clusters routing inward ═══ -->
   <!-- Top-left: from outer-left down then right into frame -->
   <path class="pulse d1t" d="M 0,170 L 200,170 L 200,280 L 340,280 L 340,400 L 460,400 L 460,280 L 580,280 L 580,170 L 720,170"
         stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
   <path class="pulse d1h" d="M 0,170 L 200,170 L 200,280 L 340,280 L 340,400 L 460,400 L 460,280 L 580,280 L 580,170 L 720,170"
-        stroke="#ffc832" stroke-width="2" filter="url(#goldGlow2)"/>
+        stroke="#ffffff" stroke-width="1" filter="url(#goldGlow2)"/>
   <!-- Top-right: from outer-right down then left into frame -->
   <path class="pulse d2t" d="M 1440,170 L 1240,170 L 1240,280 L 1100,280 L 1100,400 L 980,400 L 980,280 L 860,280 L 860,170 L 720,170"
         stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
   <path class="pulse d2h" d="M 1440,170 L 1240,170 L 1240,280 L 1100,280 L 1100,400 L 980,400 L 980,280 L 860,280 L 860,170 L 720,170"
-        stroke="#ffc832" stroke-width="2" filter="url(#goldGlow2)"/>
+        stroke="#ffffff" stroke-width="1" filter="url(#goldGlow2)"/>
   <!-- Bottom-left -->
   <path class="pulse d3t" d="M 0,730 L 200,730 L 200,620 L 340,620 L 340,500 L 460,500 L 460,620 L 580,620 L 580,730 L 720,730"
         stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
   <path class="pulse d3h" d="M 0,730 L 200,730 L 200,620 L 340,620 L 340,500 L 460,500 L 460,620 L 580,620 L 580,730 L 720,730"
-        stroke="#ffc832" stroke-width="2" filter="url(#goldGlow2)"/>
+        stroke="#ffffff" stroke-width="1" filter="url(#goldGlow2)"/>
   <!-- Bottom-right -->
   <path class="pulse d4t" d="M 1440,730 L 1240,730 L 1240,620 L 1100,620 L 1100,500 L 980,500 L 980,620 L 860,620 L 860,730 L 720,730"
         stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
   <path class="pulse d4h" d="M 1440,730 L 1240,730 L 1240,620 L 1100,620 L 1100,500 L 980,500 L 980,620 L 860,620 L 860,730 L 720,730"
-        stroke="#ffc832" stroke-width="2" filter="url(#goldGlow2)"/>
+        stroke="#ffffff" stroke-width="1" filter="url(#goldGlow2)"/>
 
   <!-- ═══ DENSE CIRCUIT RUNS — left side horizontal stacks ═══ -->
   <path class="pulse e1t" d="M 0,340 L 340,340"  stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
-  <path class="pulse e1h" d="M 0,340 L 340,340"  stroke="#ffce50" stroke-width="2" filter="url(#goldGlow2)"/>
+  <path class="pulse e1h" d="M 0,340 L 340,340"  stroke="#ffffff" stroke-width="1" filter="url(#goldGlow2)"/>
   <path class="pulse e2t" d="M 0,380 L 340,380"  stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
-  <path class="pulse e2h" d="M 340,380 L 0,380"  stroke="#ffce50" stroke-width="2" filter="url(#goldGlow2)"/>
+  <path class="pulse e2h" d="M 340,380 L 0,380"  stroke="#ffffff" stroke-width="1" filter="url(#goldGlow2)"/>
   <path class="pulse e3t" d="M 0,420 L 340,420"  stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
-  <path class="pulse e3h" d="M 0,420 L 340,420"  stroke="#ffce50" stroke-width="2" filter="url(#goldGlow2)"/>
+  <path class="pulse e3h" d="M 0,420 L 340,420"  stroke="#ffffff" stroke-width="1" filter="url(#goldGlow2)"/>
   <!-- Right side — mirror, reversed direction -->
   <path class="pulse e4t" d="M 1440,340 L 1100,340" stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
-  <path class="pulse e4h" d="M 1440,340 L 1100,340" stroke="#ffce50" stroke-width="2" filter="url(#goldGlow2)"/>
+  <path class="pulse e4h" d="M 1440,340 L 1100,340" stroke="#ffffff" stroke-width="1" filter="url(#goldGlow2)"/>
   <path class="pulse e5t" d="M 1440,380 L 1100,380" stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
-  <path class="pulse e5h" d="M 1100,380 L 1440,380" stroke="#ffce50" stroke-width="2" filter="url(#goldGlow2)"/>
+  <path class="pulse e5h" d="M 1100,380 L 1440,380" stroke="#ffffff" stroke-width="1" filter="url(#goldGlow2)"/>
   <path class="pulse e6t" d="M 1440,420 L 1100,420" stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
-  <path class="pulse e6h" d="M 1440,420 L 1100,420" stroke="#ffce50" stroke-width="2" filter="url(#goldGlow2)"/>
+  <path class="pulse e6h" d="M 1440,420 L 1100,420" stroke="#ffffff" stroke-width="1" filter="url(#goldGlow2)"/>
 
   <!-- ═══ CORNER ORNAMENTS — small square cluster traces ═══ -->
   <!-- Top-left ornament -->
   <path class="pulse f1t" d="M 60,60 L 200,60 L 200,100 L 260,100 L 260,60 L 340,60 L 340,170 L 260,170 L 260,130 L 200,130 L 200,170"
         stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
   <path class="pulse f1h" d="M 60,60 L 200,60 L 200,100 L 260,100 L 260,60 L 340,60 L 340,170 L 260,170 L 260,130 L 200,130 L 200,170"
-        stroke="#fffae8" stroke-width="1.8" filter="url(#goldGlow2)"/>
+        stroke="#ffffff" stroke-width="1" filter="url(#goldGlow2)"/>
   <!-- Top-right ornament -->
   <path class="pulse f2t" d="M 1380,60 L 1240,60 L 1240,100 L 1180,100 L 1180,60 L 1100,60 L 1100,170 L 1180,170 L 1180,130 L 1240,130 L 1240,170"
         stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
   <path class="pulse f2h" d="M 1380,60 L 1240,60 L 1240,100 L 1180,100 L 1180,60 L 1100,60 L 1100,170 L 1180,170 L 1180,130 L 1240,130 L 1240,170"
-        stroke="#fffae8" stroke-width="1.8" filter="url(#goldGlow2)"/>
+        stroke="#ffffff" stroke-width="1" filter="url(#goldGlow2)"/>
   <!-- Bottom-left ornament -->
   <path class="pulse f3t" d="M 60,840 L 200,840 L 200,800 L 260,800 L 260,840 L 340,840 L 340,730 L 260,730 L 260,770 L 200,770 L 200,730"
         stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
   <path class="pulse f3h" d="M 60,840 L 200,840 L 200,800 L 260,800 L 260,840 L 340,840 L 340,730 L 260,730 L 260,770 L 200,770 L 200,730"
-        stroke="#fffae8" stroke-width="1.8" filter="url(#goldGlow2)"/>
+        stroke="#ffffff" stroke-width="1" filter="url(#goldGlow2)"/>
   <!-- Bottom-right ornament -->
   <path class="pulse f4t" d="M 1380,840 L 1240,840 L 1240,800 L 1180,800 L 1180,840 L 1100,840 L 1100,730 L 1180,730 L 1180,770 L 1240,770 L 1240,730"
         stroke="#c9a832" stroke-width="1.8" filter="url(#tailGlow)"/>
   <path class="pulse f4h" d="M 1380,840 L 1240,840 L 1240,800 L 1180,800 L 1180,840 L 1100,840 L 1100,730 L 1180,730 L 1180,770 L 1240,770 L 1240,730"
-        stroke="#fffae8" stroke-width="1.8" filter="url(#goldGlow2)"/>
+        stroke="#ffffff" stroke-width="1" filter="url(#goldGlow2)"/>
 
   <rect width="1440" height="900" fill="url(#vignette)"/>
 </svg>      </div>
