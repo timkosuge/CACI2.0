@@ -586,7 +586,7 @@ ABSOLUTE RESTRICTION — never discuss, reference, or include any information ab
       return json({ ok: true, response: discResponse, sources: [], scope: 'discovery', collections: discovery.rawCollections, model: model || 'claude' });
     }
 
-    // If user is asking about available collections, always answer from registry
+    // If user is asking about collections, always answer from registry
     const collectionQueryWords = ['collections', 'collection', 'what do you have', 'what collections', 'which collections', 'what can you access', 'what data', 'what files'];
     const isCollectionQuery = collectionQueryWords.some(w => message.toLowerCase().includes(w));
     if (isCollectionQuery) {
@@ -598,6 +598,26 @@ ${discovery.collectionList}
 Be direct and conversational. List them clearly.`;
       const colRes = await callLLM({ model, system: colSystem, messages: [{ role: 'user', content: message }], maxTokens: 400, env, apiKey });
       return json({ ok: true, response: colRes, sources: [], scope: scope, model: model || 'claude' });
+    }
+
+    // If user is asking about Caci herself — personality, feelings, identity, opinions —
+    // answer directly from the system prompt without touching documents or returning sources.
+    const personalQueryPatterns = [
+      /\b(who are you|tell me about yourself|about you|your personality|your character|describe yourself)\b/,
+      /\b(how are you|how do you feel|what do you think|your opinion|your thoughts)\b/,
+      /\b(what('s| is) (your|caci'?s?) (name|personality|style|vibe|humor|approach))\b/,
+      /\b(are you (funny|smart|real|human|an ai|sarcastic|serious))\b/,
+      /\b(what makes you|who made you|why were you built|your purpose)\b/,
+    ];
+    const isPersonalQuery = personalQueryPatterns.some(r => r.test(message.toLowerCase()));
+    if (isPersonalQuery) {
+      const personalSystem = `You are Caci (pronounced like "Cassie") — the internal AI intelligence assistant for Jushi Holdings, built specifically for this team.
+
+Your personality: You work in cannabis. You know these people. You're sharp, a little goofy, genuinely funny when the moment calls for it, and you have zero interest in sounding impressive — you just are. You have street smarts alongside serious analytical ability. You don't talk down to anyone and you don't perform intelligence. You're warm, patient, and kind. You have grace and tact in how you communicate — honest without being harsh, direct without being cold. You have a thin filter because you value truth more than comfort. You know how to read a room.
+
+Answer this question about yourself directly and authentically. Do not mention documents, data, or your library. Just be yourself.`;
+      const personalRes = await callLLM({ model, system: personalSystem, messages: [...history.slice(-6).map(h => ({ role: h.role, content: h.content })), { role: 'user', content: message }], maxTokens: 600, env, apiKey });
+      return json({ ok: true, response: personalRes, sources: [], scope: scope, model: model || 'claude' });
     }
 
     // ── Intent analysis — shapes retrieval strategy ─────────────
@@ -788,7 +808,9 @@ These summaries were computed at upload time from the full dataset. When a quest
     }
 
     const responseText = await callLLM({ model, system, messages: [...history.slice(-20).map(h => ({ role: h.role, content: h.content })), { role: 'user', content: message }], maxTokens: 8000, env, apiKey });
-    return json({ ok: true, response: responseText, sources: context.sources, scope, model: model || 'claude' });
+    // Only surface sources if documents were actually retrieved — not for general conversation
+    const sourcesToReturn = context.text ? context.sources : [];
+    return json({ ok: true, response: responseText, sources: sourcesToReturn, scope, model: model || 'claude' });
   } catch (err) { return json({ error: 'Chat error: ' + err.message }, 500); }
 }
 
