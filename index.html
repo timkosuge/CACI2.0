@@ -2071,6 +2071,77 @@ body::before {
 .msg-action-btn svg { width: 11px; height: 11px; flex-shrink: 0; }
 .msg-action-btn.saved { border-color: var(--green-lt); color: var(--green-lt); }
 
+/* ── Feedback signal buttons ─────────────────────────────── */
+.fb-divider { width: 1px; height: 12px; background: var(--line2); margin: 0 2px; flex-shrink: 0; }
+.msg-action-btn.fb-sharp:hover  { border-color: rgba(100,220,130,0.7); color: rgba(100,220,130,0.9); background: rgba(100,220,130,0.06); }
+.msg-action-btn.fb-missed:hover { border-color: rgba(220,90,90,0.7);  color: rgba(220,90,90,0.9);  background: rgba(220,90,90,0.06); }
+.msg-action-btn.fb-incomplete:hover { border-color: rgba(220,170,60,0.7); color: rgba(220,170,60,0.9); background: rgba(220,170,60,0.06); }
+.msg-action-btn.fb-sharp.fb-selected  { border-color: rgba(100,220,130,0.8); color: rgba(100,220,130,1); background: rgba(100,220,130,0.1); }
+.msg-action-btn.fb-missed.fb-selected { border-color: rgba(220,90,90,0.8);  color: rgba(220,90,90,1);  background: rgba(220,90,90,0.1); }
+.msg-action-btn.fb-incomplete.fb-selected { border-color: rgba(220,170,60,0.8); color: rgba(220,170,60,1); background: rgba(220,170,60,0.1); }
+.fb-comment-wrap {
+  display: none; margin-top: 6px;
+  animation: fbSlideIn 0.18s ease;
+}
+.fb-comment-wrap.open { display: flex; gap: 6px; align-items: center; }
+@keyframes fbSlideIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+.fb-comment-input {
+  flex: 1; background: rgba(255,255,255,0.03); border: 1px solid var(--line2);
+  border-radius: 3px; padding: 4px 8px;
+  font-family: var(--f-mono); font-size: 9px; letter-spacing: 0.06em;
+  color: var(--smoke3); outline: none; min-width: 0;
+  transition: border-color 0.15s;
+}
+.fb-comment-input:focus { border-color: var(--gold); color: var(--smoke); }
+.fb-comment-input::placeholder { color: rgba(255,255,255,0.18); }
+.fb-send-btn {
+  padding: 3px 9px; border-radius: 3px; border: 1px solid var(--line2);
+  background: none; color: var(--smoke4); cursor: pointer;
+  font-family: var(--f-mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase;
+  transition: all 0.15s; flex-shrink: 0;
+}
+.fb-send-btn:hover { border-color: var(--gold); color: var(--gold-lt); background: var(--gold-dim); }
+
+/* ── Intelligence Tuning admin section ───────────────────── */
+.tune-card {
+  background: rgba(255,255,255,0.02); border: 1px solid var(--line2);
+  border-radius: 4px; padding: 14px 16px; margin-bottom: 10px;
+}
+.tune-card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.tune-dept-badge {
+  font-family: var(--f-mono); font-size: 9px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--gold); border: 1px solid rgba(212,168,50,0.3);
+  padding: 2px 7px; border-radius: 2px;
+}
+.tune-snapshot { font-family: var(--f-mono); font-size: 9px; color: var(--smoke4); letter-spacing: 0.06em; }
+.tune-snapshot b { color: var(--smoke3); }
+.tune-suggestion {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 8px 10px; margin-bottom: 6px;
+  background: rgba(255,255,255,0.015); border: 1px solid var(--line2); border-radius: 3px;
+}
+.tune-suggestion input[type=checkbox] { accent-color: var(--gold); margin-top: 2px; flex-shrink: 0; }
+.tune-sug-body { flex: 1; min-width: 0; }
+.tune-sug-weight { font-family: var(--f-mono); font-size: 10px; color: var(--gold-lt); letter-spacing: 0.08em; }
+.tune-sug-delta { font-family: var(--f-mono); font-size: 9px; color: var(--smoke4); margin: 2px 0; }
+.tune-sug-delta span.arrow { color: var(--gold); margin: 0 4px; }
+.tune-sug-reason { font-family: var(--f-ui); font-size: 10px; color: var(--smoke3); line-height: 1.5; }
+.tune-actions { display: flex; gap: 8px; margin-top: 12px; }
+.tune-empty { font-family: var(--f-mono); font-size: 10px; color: var(--smoke4); letter-spacing: 0.06em; padding: 10px 0; }
+.tune-analyze-btn { margin-bottom: 14px; }
+.fb-log-row {
+  display: flex; gap: 10px; align-items: baseline;
+  padding: 5px 0; border-bottom: 1px solid var(--line2);
+  font-family: var(--f-mono); font-size: 9px; color: var(--smoke4); letter-spacing: 0.05em;
+}
+.fb-log-row:last-child { border-bottom: none; }
+.fb-sig-sharp    { color: rgba(100,220,130,0.9); }
+.fb-sig-missed   { color: rgba(220,90,90,0.9); }
+.fb-sig-incomplete { color: rgba(220,170,60,0.9); }
+.fb-log-query { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--smoke3); }
+.fb-summary-bar { display: flex; gap: 16px; margin-bottom: 14px; flex-wrap: wrap; }
+.fb-sum-item { font-family: var(--f-mono); font-size: 10px; letter-spacing: 0.08em; }
+
 /* ── Responses panel ────────────────────────────────────── */
 .resp-wrap { height: 100%; display: flex; flex-direction: column; overflow: hidden; }
 .resp-top {
@@ -5386,6 +5457,19 @@ body::before {
           </div>
         </div>
 
+        <!-- INTELLIGENCE TUNING -->
+        <div class="asec">
+          <div class="asec-head"><div class="asec-title">Intelligence Tuning</div><div class="asec-line"></div></div>
+          <div class="asec-sub-title" style="margin:-8px 0 14px">
+            CACI learns from your feedback — Sharp, Missed, and Incomplete signals on every response.
+            Once enough signals accumulate, run an analysis to generate scoring weight suggestions.
+            You review and approve each change before it takes effect.
+          </div>
+          <div id="tune-wrap">
+            <div class="tune-empty">Loading...</div>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -6043,7 +6127,7 @@ function switchPanel(id) {
   $('tb-module').textContent = MODS.find(m => m.id === id)?.label || '';
   if (id === 'responses') loadResponses();
   if (id === 'files') { loadCollections(); loadFiles(); loadContextDocs(); }
-  if (id === 'admin') { loadAdminConfig(); loadIntegrationStatuses(); loadConnectorStatuses(); }
+  if (id === 'admin') { loadAdminConfig(); loadIntegrationStatuses(); loadConnectorStatuses(); loadIntelligenceTuning(); }
   if (id === 'chat') {
     initChatGreeting();
     // Always refresh pills when entering chat — loadCollections populates scope bar
@@ -6506,7 +6590,7 @@ async function sendChat() {
     ty.remove();
     if (d.error) appendMsg('ai', '\u26A0  ' + d.error);
     else {
-      appendMsg('ai', d.response, d.sources, d.scope, d.model);
+      appendMsg('ai', d.response, d.sources, d.scope, d.model, d.responseId || '');
       chatHistory.push({role:'assistant', content:d.response});
       if (d.collections) window._caciCollections = d.collections;
     }
@@ -6514,13 +6598,27 @@ async function sendChat() {
   finally { $('send-btn').disabled = false; }
 }
 
-function appendMsg(role, text, sources, scope, model = '') {
+function appendMsg(role, text, sources, scope, model = '', responseId = '') {
   const el = document.createElement('div');
   el.className = 'msg ' + role;
   const av = role === 'user' ? 'YOU' : 'CACI';
   const src = sources && sources.length ? `<div class="msg-sources">Sources &mdash; <b>${sources.join(' \u00b7 ')}</b></div>` : '';
   const sc = scope && scope !== 'all' ? `<div class="msg-scope">Scope: ${scope === 'file' ? chatFileName : scope === 'collection' ? chatCollection : 'all'}</div>` : '';
   const spk = role === 'ai' ? `<button class="spk-btn" title="Read aloud" data-spk="1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 010 7.07"/><path d="M19.07 4.93a10 10 0 010 14.14"/></svg></button>` : '';
+  const fbButtons = (role === 'ai' && responseId) ? `
+    <div class="fb-divider"></div>
+    <button class="msg-action-btn fb-sharp" data-fb="sharp" title="Sharp — retrieved the right things">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+      Sharp
+    </button>
+    <button class="msg-action-btn fb-missed" data-fb="missed" title="Missed — wrong sources or off-topic">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      Missed
+    </button>
+    <button class="msg-action-btn fb-incomplete" data-fb="incomplete" title="Incomplete — right direction, needed more depth">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      Incomplete
+    </button>` : '';
   const actions = role === 'ai' ? `<div class="msg-actions">
     <button class="msg-action-btn dl-btn" title="Download as .md file">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -6530,6 +6628,11 @@ function appendMsg(role, text, sources, scope, model = '') {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
       Save
     </button>
+    ${fbButtons}
+  </div>
+  <div class="fb-comment-wrap" id="fb-wrap-${responseId}">
+    <input class="fb-comment-input" id="fb-input-${responseId}" placeholder="What was off? (optional)" maxlength="200"/>
+    <button class="fb-send-btn" id="fb-send-${responseId}">Send</button>
   </div>` : '';
   const modelNames = { claude: 'Claude · Anthropic', grok: 'Grok · xAI', cloudflare: 'Cloudflare AI · Llama', ollama: 'Ollama · Local' };
   const modelLabel = (role === 'ai' && model) ? `<div style="font-family:var(--f-mono);font-size:8px;letter-spacing:0.12em;color:rgba(212,168,50,0.40);text-transform:uppercase;margin-top:6px;padding-left:2px">${modelNames[model] || model}</div>` : '';
@@ -6558,11 +6661,230 @@ function appendMsg(role, text, sources, scope, model = '') {
         this.disabled = true;
       });
     }
+
+    // ── Feedback signal buttons ───────────────────────────
+    if (responseId) {
+      let selectedSignal = null;
+      const fbBtns = el.querySelectorAll('[data-fb]');
+      const fbWrap = el.querySelector(`#fb-wrap-${responseId}`);
+      const fbInput = el.querySelector(`#fb-input-${responseId}`);
+      const fbSend = el.querySelector(`#fb-send-${responseId}`);
+
+      // Get the query that prompted this response
+      const queryMsgs = $('chat-msgs').querySelectorAll('.msg.user .msg-bubble');
+      const lastQuery = queryMsgs.length ? queryMsgs[queryMsgs.length - 1].textContent.trim() : '';
+      const currentSources = (sources || []);
+
+      fbBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+          const sig = this.dataset.fb;
+          if (selectedSignal === sig) {
+            // Deselect — toggle off
+            selectedSignal = null;
+            fbBtns.forEach(b => b.classList.remove('fb-selected'));
+            if (fbWrap) fbWrap.classList.remove('open');
+            return;
+          }
+          selectedSignal = sig;
+          fbBtns.forEach(b => b.classList.remove('fb-selected'));
+          this.classList.add('fb-selected');
+
+          if (sig === 'sharp') {
+            // Submit immediately for sharp — no comment needed
+            submitFeedback(responseId, 'sharp', '', lastQuery, currentSources);
+            if (fbWrap) fbWrap.classList.remove('open');
+          } else {
+            // Open comment box for missed / incomplete
+            if (fbWrap) fbWrap.classList.add('open');
+            if (fbInput) fbInput.focus();
+          }
+        });
+      });
+
+      if (fbSend) {
+        fbSend.addEventListener('click', () => {
+          if (!selectedSignal || selectedSignal === 'sharp') return;
+          const comment = fbInput ? fbInput.value.trim() : '';
+          submitFeedback(responseId, selectedSignal, comment, lastQuery, currentSources);
+          if (fbWrap) fbWrap.classList.remove('open');
+          if (fbSend) { fbSend.textContent = 'Sent'; fbSend.disabled = true; }
+        });
+        if (fbInput) {
+          fbInput.addEventListener('keydown', e => {
+            if (e.key === 'Enter') fbSend.click();
+          });
+        }
+      }
+    }
   }
   $('chat-msgs').appendChild(el);
   // Reliable scroll: use scrollIntoView on a sentinel element
   el.scrollIntoView({block:'end', behavior:'smooth'});
   if (role === 'ai' && voiceAutoSpeak) speakText(null, text);
+}
+
+async function submitFeedback(responseId, signal, comment, query, sources) {
+  try {
+    await apiFetch('/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ responseId, signal, comment, query, dept, sources, retrievalScope: chatScope }),
+    });
+  } catch (e) { console.warn('Feedback submit failed:', e); }
+}
+
+// ── Intelligence Tuning ───────────────────────────────────────
+async function loadIntelligenceTuning() {
+  const wrap = $('tune-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = `<div class="tune-empty">Loading...</div>`;
+
+  try {
+    // Load feedback summary
+    const fbRes = await apiFetch(`/feedback/log?dept=${encodeURIComponent(dept)}&limit=20`);
+    const fbData = await fbRes.json();
+
+    // Load pending suggestions
+    const pendRes = await apiFetch('/feedback/pending');
+    const pendData = await pendRes.json();
+    const pending = (pendData.pending || []).filter(p => p.dept === dept);
+
+    let html = '';
+
+    // Summary bar
+    const s = fbData.summary || {};
+    const total = s.total || 0;
+    if (total > 0) {
+      html += `<div class="fb-summary-bar">
+        <div class="fb-sum-item"><span class="fb-sig-sharp">◆ Sharp</span> &nbsp;${s.sharp || 0}</div>
+        <div class="fb-sum-item"><span class="fb-sig-missed">◆ Missed</span> &nbsp;${s.missed || 0}</div>
+        <div class="fb-sum-item"><span class="fb-sig-incomplete">◆ Incomplete</span> &nbsp;${s.incomplete || 0}</div>
+        <div class="fb-sum-item" style="color:var(--smoke4)">Total &nbsp;${total}</div>
+      </div>`;
+    } else {
+      html += `<div class="tune-empty" style="margin-bottom:14px">No feedback collected yet — signal buttons appear on every CACI response.</div>`;
+    }
+
+    // Analyze button
+    const needMore = (s.missed || 0) + (s.incomplete || 0) < 3;
+    html += `<button class="lbtn tune-analyze-btn" id="tune-analyze-btn" ${needMore ? 'disabled title="Need at least 3 missed/incomplete signals"' : ''}>
+      Run Analysis &rarr; Generate Suggestions
+    </button>`;
+    if (needMore) html += `<div style="font-family:var(--f-mono);font-size:9px;color:var(--smoke4);letter-spacing:.06em;margin-bottom:12px">Collect at least 3 missed or incomplete signals to enable analysis</div>`;
+
+    // Pending suggestions
+    if (pending.length > 0) {
+      for (const p of pending) {
+        const snap = p.feedbackSnapshot || {};
+        html += `<div class="tune-card" id="tune-card-${p.dept}">
+          <div class="tune-card-head">
+            <div class="tune-dept-badge">${p.dept}</div>
+            <div class="tune-snapshot">
+              Generated ${new Date(p.generatedAt).toLocaleDateString()} &nbsp;&middot;&nbsp;
+              Based on <b>${(snap.sharp||0)+(snap.missed||0)+(snap.incomplete||0)}</b> signals
+              (<b class="fb-sig-sharp">${snap.sharp||0} sharp</b> &middot;
+              <b class="fb-sig-missed">${snap.missed||0} missed</b> &middot;
+              <b class="fb-sig-incomplete">${snap.incomplete||0} incomplete</b>)
+            </div>
+          </div>`;
+
+        if (!p.suggestions || p.suggestions.length === 0) {
+          html += `<div class="tune-empty">No specific weight changes suggested — patterns were inconclusive.</div>`;
+        } else {
+          p.suggestions.forEach((sug, i) => {
+            html += `<div class="tune-suggestion">
+              <input type="checkbox" class="tune-chk" data-idx="${i}" id="tune-chk-${p.dept}-${i}" checked/>
+              <div class="tune-sug-body">
+                <div class="tune-sug-weight">${sug.weightName}</div>
+                <div class="tune-sug-delta">${sug.currentValue}<span class="arrow">&rarr;</span>${sug.suggestedValue}</div>
+                <div class="tune-sug-reason">${sug.reason}</div>
+              </div>
+            </div>`;
+          });
+        }
+
+        html += `<div class="tune-actions">
+          <button class="lbtn" onclick="approveTuning('${p.dept}')">Apply Selected</button>
+          <button class="lbtn" style="color:var(--red-lt);border-color:var(--red-lt)" onclick="rejectTuning('${p.dept}')">Reject All</button>
+        </div></div>`;
+      }
+    } else if (total > 0 && !needMore) {
+      html += `<div class="tune-empty">No pending suggestions. Run analysis to generate new ones.</div>`;
+    }
+
+    // Recent feedback log
+    if (fbData.entries && fbData.entries.length > 0) {
+      html += `<div class="asec-head" style="margin-top:18px"><div class="asec-title" style="font-size:10px">Recent Signals</div><div class="asec-line"></div></div>`;
+      html += `<div style="margin-top:8px">`;
+      fbData.entries.slice(0, 15).forEach(e => {
+        const sigClass = `fb-sig-${e.signal}`;
+        const ts = new Date(e.timestamp).toLocaleDateString();
+        html += `<div class="fb-log-row">
+          <span class="${sigClass}" style="min-width:68px;flex-shrink:0">${e.signal.toUpperCase()}</span>
+          <span class="fb-log-query">${e.query ? e.query.slice(0, 80) : '—'}</span>
+          <span style="flex-shrink:0">${ts}</span>
+        </div>`;
+      });
+      html += `</div>`;
+    }
+
+    wrap.innerHTML = html;
+
+    // Wire up analyze button
+    const analyzeBtn = $('tune-analyze-btn');
+    if (analyzeBtn && !needMore) {
+      analyzeBtn.addEventListener('click', async () => {
+        analyzeBtn.disabled = true;
+        analyzeBtn.textContent = 'Analyzing...';
+        try {
+          const res = await apiFetch('/feedback/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dept }),
+          });
+          const data = await res.json();
+          if (data.error) { analyzeBtn.textContent = 'Error: ' + data.error; return; }
+          await loadIntelligenceTuning(); // Refresh
+        } catch (e) {
+          analyzeBtn.textContent = 'Failed — try again';
+          analyzeBtn.disabled = false;
+        }
+      });
+    }
+
+  } catch (e) {
+    wrap.innerHTML = `<div class="tune-empty">Error loading tuning data: ${e.message}</div>`;
+  }
+}
+
+async function approveTuning(deptKey) {
+  const card = document.getElementById(`tune-card-${deptKey}`);
+  if (!card) return;
+  const checked = [...card.querySelectorAll('.tune-chk:checked')].map(c => parseInt(c.dataset.idx));
+  if (!checked.length) { alert('Select at least one suggestion to apply.'); return; }
+
+  try {
+    const res = await apiFetch('/feedback/approve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dept: deptKey, approvedIndices: checked, action: 'approve' }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      await loadIntelligenceTuning();
+    }
+  } catch (e) { console.error('Approve failed:', e); }
+}
+
+async function rejectTuning(deptKey) {
+  try {
+    await apiFetch('/feedback/approve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dept: deptKey, action: 'reject_all' }),
+    });
+    await loadIntelligenceTuning();
+  } catch (e) { console.error('Reject failed:', e); }
 }
 
 function downloadResponse(text) {
