@@ -223,6 +223,7 @@ body::before {
 .login-mark {
   margin-bottom: 44px;
   text-align: center;
+  display: none;
 }
 .login-wordmark {
   font-family: var(--f-display);
@@ -492,24 +493,12 @@ body::before {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 44px 34px 40px;
+  padding: 42px 34px 38px;
   gap: 0;
-}
-.lcard-crest {
-  margin-bottom: 22px;
-  animation: crestPulse 3.5s ease-in-out infinite;
-}
-@keyframes crestPulse {
-  0%, 100% { filter: drop-shadow(0 0 6px rgba(212,168,50,0.25)); }
-  50%       { filter: drop-shadow(0 0 14px rgba(212,168,50,0.50)); }
-}
-.lcard-crest-svg {
-  width: 52px; height: 60px;
-  display: block;
 }
 .lcard-front-wordmark {
   font-family: var(--f-display);
-  font-size: 42px;
+  font-size: 52px;
   font-weight: 300;
   letter-spacing: 0.30em;
   background: linear-gradient(160deg,
@@ -524,25 +513,59 @@ body::before {
     drop-shadow(0 1px 0px rgba(0,0,0,1))
     drop-shadow(0 2px 3px rgba(0,0,0,0.75))
     drop-shadow(0 0 14px rgba(212,168,50,0.22));
-  margin-bottom: 18px;
+  margin-bottom: 10px;
+}
+.lcard-front-sub {
+  font-family: var(--f-mono);
+  font-size: 9px;
+  letter-spacing: 0.24em;
+  color: rgba(255,255,255,0.20);
+  text-transform: uppercase;
+  margin-bottom: 28px;
+  -webkit-font-smoothing: antialiased;
 }
 .lcard-front-rule {
-  width: 60%;
+  width: 100%;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(212,168,50,0.55) 50%, transparent);
-  margin-bottom: 16px;
+  background: linear-gradient(90deg, transparent, rgba(212,168,50,0.30) 30%, rgba(212,168,50,0.30) 70%, transparent);
+  margin-bottom: 22px;
 }
-.lcard-front-prompt {
-  font-family: var(--f-mono);
-  font-size: 8px;
-  letter-spacing: 0.30em;
-  color: rgba(212,168,50,0.35);
-  text-transform: uppercase;
-  animation: promptBlink 2.4s ease-in-out infinite;
+/* The turn toggle — a horizontal line bisected by a rotatable diamond */
+.lcard-turn {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  width: 56px;
+  cursor: pointer;
+  position: relative;
 }
-@keyframes promptBlink {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.25; }
+.lcard-turn-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(212,168,50,0.45));
+  transition: background 0.4s ease;
+}
+.lcard-turn-line:last-child {
+  background: linear-gradient(90deg, rgba(212,168,50,0.45), transparent);
+}
+.lcard-turn-diamond {
+  width: 7px; height: 7px;
+  border: 1px solid rgba(212,168,50,0.70);
+  transform: rotate(45deg);
+  flex-shrink: 0;
+  transition: transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.3s, box-shadow 0.3s;
+  box-shadow: 0 0 0 rgba(212,168,50,0);
+}
+.lcard-turn:hover .lcard-turn-diamond {
+  transform: rotate(225deg);
+  border-color: rgba(245,227,152,0.95);
+  box-shadow: 0 0 8px rgba(212,168,50,0.50);
+}
+.lcard-turn:hover .lcard-turn-line {
+  background: linear-gradient(90deg, transparent, rgba(212,168,50,0.70));
+}
+.lcard-turn:hover .lcard-turn-line:last-child {
+  background: linear-gradient(90deg, rgba(212,168,50,0.70), transparent);
 }
 
 /* Keep back face height in sync with front during animation */
@@ -3718,20 +3741,14 @@ body::before {
           <div class="corner tl"></div><div class="corner tr"></div>
           <div class="corner bl"></div><div class="corner br"></div>
           <div class="lcard-front-inner">
-            <div class="lcard-crest">
-              <svg class="lcard-crest-svg" viewBox="0 0 60 70" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <polygon points="30,4 56,18 56,52 30,66 4,52 4,18" stroke="rgba(212,168,50,0.55)" stroke-width="1" fill="none"/>
-                <polygon points="30,10 50,21 50,49 30,60 10,49 10,21" stroke="rgba(212,168,50,0.25)" stroke-width="0.5" fill="none"/>
-                <line x1="30" y1="4" x2="30" y2="66" stroke="rgba(212,168,50,0.15)" stroke-width="0.5"/>
-                <line x1="4" y1="18" x2="56" y2="52" stroke="rgba(212,168,50,0.15)" stroke-width="0.5"/>
-                <line x1="56" y1="18" x2="4" y2="52" stroke="rgba(212,168,50,0.15)" stroke-width="0.5"/>
-                <circle cx="30" cy="35" r="6" stroke="rgba(212,168,50,0.50)" stroke-width="0.75" fill="none"/>
-                <circle cx="30" cy="35" r="2" fill="rgba(212,168,50,0.60)"/>
-              </svg>
-            </div>
             <div class="lcard-front-wordmark">CACI</div>
+            <div class="lcard-front-sub">Intelligence Platform &nbsp;&middot;&nbsp; Jushi Holdings</div>
             <div class="lcard-front-rule"></div>
-            <div class="lcard-front-prompt">PRESS ANY KEY TO ACCESS</div>
+            <div class="lcard-turn" id="lcard-turn" title="Enter">
+              <div class="lcard-turn-line"></div>
+              <div class="lcard-turn-diamond"></div>
+              <div class="lcard-turn-line"></div>
+            </div>
           </div>
         </div>
 
@@ -3740,8 +3757,7 @@ body::before {
           <div class="corner tl"></div><div class="corner tr"></div>
           <div class="corner bl"></div><div class="corner br"></div>
           <div class="lfield-wrap">
-            <div class="lfield-rule"><div class="lfield-rule-diamond"></div></div>
-            <div class="lfield-label">Credentials</div>
+            <div class="lfield-label" style="margin-top:4px;">Credentials</div>
             <input class="linput" type="text" id="login-pw" placeholder="&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-real="" readonly>
             <div class="linput-glow"></div>
           </div>
@@ -4567,6 +4583,8 @@ function setupLogin() {
   });
   // Click/tap on the front face also flips
   if (scene) scene.addEventListener('click', () => { if (!flipped) doFlip(); });
+  const turnBtn = document.getElementById('lcard-turn');
+  if (turnBtn) turnBtn.addEventListener('click', (e) => { e.stopPropagation(); if (!flipped) doFlip(); });
 
   /* Fake password masking — type="text" so Chrome never triggers autofill styling */
   const pwEl = $('login-pw');
