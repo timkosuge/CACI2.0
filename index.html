@@ -412,7 +412,7 @@ body::before {
 .linput {
   width: 100%;
   padding: 14px 20px;
-  background: rgba(4,7,16,0.85);
+  background: rgba(4,7,16,0.85) !important;
   border: none !important;
   border-radius: 3px;
   color: rgba(245,227,152,0.75);
@@ -422,6 +422,8 @@ body::before {
   outline: none !important;
   transition: box-shadow 0.3s var(--ease), color 0.3s;
   -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
   letter-spacing: 0.22em;
   text-align: center;
   caret-color: rgba(212,168,50,0.8);
@@ -432,7 +434,18 @@ body::before {
     inset -2px 0 0 rgba(180,130,20,0.14),
     inset 0 -1px 0 rgba(180,130,20,0.10),
     inset 0 3px 8px rgba(0,0,0,0.70),
-    inset 0 1px 3px rgba(0,0,0,0.55);
+    inset 0 1px 3px rgba(0,0,0,0.55) !important;
+}
+/* Nuclear autofill kill — override Chrome's white/yellow flash */
+.linput:-webkit-autofill,
+.linput:-webkit-autofill:hover,
+.linput:-webkit-autofill:focus,
+.linput:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 100px rgba(4,7,16,1) inset !important;
+  -webkit-text-fill-color: rgba(245,227,152,0.75) !important;
+  background-color: rgba(4,7,16,1) !important;
+  color: rgba(245,227,152,0.75) !important;
+}
 }
 /* ── 3D flip card scene ─────────────────────────────────── */
 .login-card-scene {
@@ -3723,7 +3736,7 @@ body::before {
           <div class="lfield-wrap">
             <div class="lfield-rule"><div class="lfield-rule-diamond"></div></div>
             <div class="lfield-label">Credentials</div>
-            <input class="linput" type="text" id="login-pw" placeholder="&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-real="">
+            <input class="linput" type="text" id="login-pw" placeholder="&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-real="" readonly>
             <div class="linput-glow"></div>
           </div>
           <button class="lbtn" id="login-btn">Authenticate</button>
@@ -4529,8 +4542,13 @@ function setupLogin() {
     if (flipped) return;
     flipped = true;
     flipper.classList.add('flipped');
-    // Focus the input after flip completes
-    setTimeout(() => { $('login-pw') && $('login-pw').focus(); }, 750);
+    setTimeout(() => {
+      const pw = $('login-pw');
+      if (pw) {
+        pw.removeAttribute('readonly');
+        pw.focus();
+      }
+    }, 750);
   }
 
   // Any keypress on the page flips the card
