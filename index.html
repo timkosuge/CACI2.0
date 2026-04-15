@@ -1928,7 +1928,7 @@ body::before {
 
 /* ── Compliance Mode ─────────────────────────────────────── */
 .compliance-btn {
-  width: 36px; height: 36px;
+  width: 32px; height: 32px;
   border-radius: var(--r);
   border: 1px solid rgba(212,168,50,0.20);
   border-top-color: rgba(245,227,152,0.28);
@@ -4088,6 +4088,33 @@ body::before {
       <div class="status-pip warn" id="api-pip"></div>
       <span class="tb-status-text" id="api-text">Connecting</span>
     </div>
+
+    <!-- Compliance scan -->
+    <button class="compliance-btn" id="compliance-btn" title="Compliance Scan">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="shieldGold" x1="30%" y1="0%" x2="70%" y2="100%">
+            <stop offset="0%" stop-color="#fff8d0"/>
+            <stop offset="25%" stop-color="#e8c84a"/>
+            <stop offset="50%" stop-color="#c9a832"/>
+            <stop offset="75%" stop-color="#a07820"/>
+            <stop offset="100%" stop-color="#d4a832"/>
+          </linearGradient>
+          <linearGradient id="shieldRed" x1="30%" y1="0%" x2="70%" y2="100%">
+            <stop offset="0%" stop-color="#ff8080"/>
+            <stop offset="50%" stop-color="#ff4444"/>
+            <stop offset="100%" stop-color="#cc2222"/>
+          </linearGradient>
+        </defs>
+        <path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7L12 2z"
+          fill="url(#shieldGold)"
+          stroke="rgba(100,70,10,0.6)"
+          stroke-width="0.5"
+          filter="drop-shadow(0 1px 2px rgba(0,0,0,0.8))"/>
+        <path d="M12 4.5L5 8.8v3.8c0 3.8 2.8 7.35 7 8.5 4.2-1.15 7-4.7 7-8.5V8.8L12 4.5z"
+          fill="rgba(0,0,0,0.20)"/>
+      </svg>
+    </button>
   </header>
 
   <!-- Content -->
@@ -4262,31 +4289,6 @@ body::before {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 010 7.07"/><path d="M19.07 4.93a10 10 0 010 14.14"/></svg>
             </button>
             <textarea class="chat-ta" id="chat-ta" rows="1" placeholder="Ask anything..."></textarea>
-            <button class="compliance-btn" id="compliance-btn" title="Compliance Scan">
-              <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <defs>
-                  <linearGradient id="shieldGold" x1="30%" y1="0%" x2="70%" y2="100%">
-                    <stop offset="0%" stop-color="#fff8d0"/>
-                    <stop offset="25%" stop-color="#e8c84a"/>
-                    <stop offset="50%" stop-color="#c9a832"/>
-                    <stop offset="75%" stop-color="#a07820"/>
-                    <stop offset="100%" stop-color="#d4a832"/>
-                  </linearGradient>
-                  <linearGradient id="shieldRed" x1="30%" y1="0%" x2="70%" y2="100%">
-                    <stop offset="0%" stop-color="#ff8080"/>
-                    <stop offset="50%" stop-color="#ff4444"/>
-                    <stop offset="100%" stop-color="#cc2222"/>
-                  </linearGradient>
-                </defs>
-                <path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7L12 2z"
-                  fill="url(#shieldGold)"
-                  stroke="rgba(100,70,10,0.6)"
-                  stroke-width="0.5"
-                  filter="drop-shadow(0 1px 2px rgba(0,0,0,0.8))"/>
-                <path d="M12 4.5L5 8.8v3.8c0 3.8 2.8 7.35 7 8.5 4.2-1.15 7-4.7 7-8.5V8.8L12 4.5z"
-                  fill="rgba(0,0,0,0.20)"/>
-              </svg>
-            </button>
             <button class="send-btn" id="send-btn">&#8593;</button>
           </div>
           <div class="voice-status" id="voice-status"></div>
