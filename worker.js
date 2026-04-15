@@ -170,6 +170,40 @@ async function handleUpload(request, env) {
       : text.replace(/\s+/g, ' ').trim();
     const chunks     = chunkText(cleanText, chunkSize);
 
+    // ── Parent summary for prose docs ──────────────────────────
+    // For non-tabular documents (compliance memos, SOPs, legal docs, PDFs),
+    // generate a concise parent summary stored as the first chunk.
+    // This lets retrieval find the doc via summary even when specific keywords
+    // only appear deep in child chunks.
+    let parentSummary = null;
+    if (!isTabular && cleanText.length > 800 && chunks.length > 1) {
+      try {
+        const localApiKey = (await env.CACI_KV.get('config:ANTHROPIC_API_KEY').catch(() => null)) || env.ANTHROPIC_API_KEY;
+        if (localApiKey) {
+          const summaryResp = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-api-key': localApiKey, 'anthropic-version': '2023-06-01' },
+            body: JSON.stringify({
+              model: 'claude-haiku-4-5-20251001',
+              max_tokens: 300,
+              messages: [{
+                role: 'user',
+                content: `Summarize this document in 3-5 sentences for a cannabis company's internal knowledge base. Focus on: what type of document it is, what time period or jurisdiction it covers, the main topics or requirements it addresses, and any key figures or thresholds mentioned. Be specific and factual.\n\nDocument name: ${name}\n\nContent:\n${cleanText.slice(0, 3000)}`,
+              }],
+            }),
+          });
+          const summaryData = await summaryResp.json();
+          const summaryText = summaryData.content?.[0]?.text?.trim();
+          if (summaryText) {
+            parentSummary = `DOCUMENT SUMMARY [${name}${period ? ' · ' + period : ''}${states ? ' · ' + states : ''}]\n${summaryText}`;
+          }
+        }
+      } catch { /* non-blocking — proceed without summary */ }
+    }
+
+    // Prepend parent summary as guaranteed first chunk for prose docs
+    const finalChunks = parentSummary ? [parentSummary, ...chunks] : chunks;
+
     if (file && env.CACI_R2) {
       const buffer = await file.arrayBuffer();
       await env.CACI_R2.put(`${dept}/${collection}/${id}/${name}`, buffer, {
@@ -181,15 +215,16 @@ async function handleUpload(request, env) {
     const fileRecord = {
       id, name, dept, collection, uploadedAt,
       charCount: cleanText.length,
-      chunks: chunks.length,
+      chunks: finalChunks.length,
       chunkSize,
       meta,
       stats,
+      hasParentSummary: !!parentSummary,
     };
 
     await env.CACI_KV.put(
       `file:${id}`,
-      JSON.stringify({ ...fileRecord, chunks }),
+      JSON.stringify({ ...fileRecord, chunks: finalChunks }),
       { expirationTtl: 60 * 60 * 24 * 365 }
     );
 
@@ -222,7 +257,7 @@ async function handleUpload(request, env) {
 
     // Invalidate library map cache so next session sees fresh data
     await env.CACI_KV.delete(`library:map:${dept}`).catch(() => {});
-    return json({ ok: true, id, name, collection, chunks: chunks.length, charCount: cleanText.length, isContext });
+    return json({ ok: true, id, name, collection, chunks: finalChunks.length, charCount: cleanText.length, isContext, hasParentSummary: !!parentSummary });
   } catch (err) {
     return json({ error: 'Upload failed: ' + err.message }, 500);
   }
@@ -635,6 +670,48 @@ Answer this question about yourself directly and authentically. Do not mention d
     // ── Intent analysis — shapes retrieval strategy ─────────────
     const intent = analyzeQueryIntent(message);
 
+    // ── Query rewriting — expand ambiguous queries before retrieval ──
+    // Runs a fast Haiku pass to generate 2-3 retrieval variants.
+    // Only fires for non-trivial queries where expansion adds value.
+    // Simple follow-ups, greetings, and short messages skip this entirely.
+    let rewrittenQueries = null;
+    const isSimpleMessage = message.length < 40 || /^(yes|no|ok|sure|thanks|what|show|list|get|tell|more|continue|why|how)\b/i.test(message.trim());
+    const needsRewrite = !isSimpleMessage && (intent.isComparative || intent.isCausal || intent.isAggregate || message.includes('last') || message.includes('recent') || message.includes('quarter') || message.includes('best') || message.includes('worst') || message.includes('why') || message.length > 80);
+    if (needsRewrite) {
+      try {
+        const rewritePrompt = `You are a search query optimizer for a cannabis company's internal knowledge base. A user asked: "${message}"
+
+Today's date: ${new Date().toLocaleDateString('en-US', {year:'numeric',month:'long',day:'numeric'})}
+Department: ${dept}
+
+Generate 2-3 alternative search queries that would retrieve relevant documents. Each variant should:
+- Use different terminology (e.g. "shrink" → "inventory loss", "variance", "shrinkage")  
+- Make implicit time periods explicit (e.g. "last quarter" → "Q1 2026", "January February March 2026")
+- Expand abbreviations and add domain synonyms
+- Keep each query under 15 words
+
+Respond ONLY as a JSON array of strings. Example: ["query one", "query two", "query three"]
+No preamble, no explanation.`;
+
+        const rewriteResp = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+          body: JSON.stringify({
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: 150,
+            messages: [{ role: 'user', content: rewritePrompt }],
+          }),
+        });
+        const rewriteData = await rewriteResp.json();
+        const raw = rewriteData.content?.[0]?.text?.trim() || '[]';
+        const cleaned = raw.replace(/```json|```/g, '').trim();
+        const variants = JSON.parse(cleaned);
+        if (Array.isArray(variants) && variants.length > 0) {
+          rewrittenQueries = variants.filter(v => typeof v === 'string' && v.length > 3);
+        }
+      } catch { /* non-blocking */ }
+    }
+
     // ── Retrieval message — blend recent history with current message ──
     // Follow-up questions like "what about Virginia?" carry no context alone.
     // Prepend the last 1-2 user turns so file scoring and keyword extraction
@@ -644,9 +721,14 @@ Answer this question about yourself directly and authentically. Do not mention d
       .slice(-2)
       .map(h => h.content)
       .join(' ');
-    const retrievalMessage = recentUserTurns
-      ? `${recentUserTurns} ${message}`.trim()
-      : message;
+
+    // Blend original message + history context + rewritten variants into one
+    // retrieval string. Deduplication happens naturally via keyword extraction.
+    const variantBlend = rewrittenQueries ? rewrittenQueries.join(' ') : '';
+    const retrievalMessage = [recentUserTurns, message, variantBlend]
+      .filter(Boolean)
+      .join(' ')
+      .trim();
 
     // ── Library map — inject Caci's understanding of the library ─
     const libraryMap = await buildLibraryMap({ dept, env });
@@ -788,6 +870,7 @@ The people you work with:
     // 0. Library map + retrieval plan — Caci's awareness of the full library
     if (libraryMapPrompt) system += libraryMapPrompt;
     if (retrievalPlan) system += `\n\nMY RETRIEVAL PLAN FOR THIS QUERY: ${retrievalPlan}`;
+    if (rewrittenQueries?.length) system += `\n\nQUERY VARIANTS USED FOR RETRIEVAL: ${rewrittenQueries.join(' | ')} — these synonyms and expansions were used to find relevant documents. You don't need to mention this to the user.`;
 
     // 1. Stats block: pre-computed numeric summaries and category inventories.
     //    Tell the model exactly what this is and how to use it.
@@ -2067,8 +2150,8 @@ function rerankChunks(chunks, keywords, intent, W = null) {
       const years = [...new Set(lower.match(/20\d\d/g) || [])];
       if (years.length >= 2) bonus += w.rerankComparativeBonus;
     }
-    // FILE SUMMARY always first
-    if (lower.startsWith('file summary')) bonus += w.fileSummaryBonus;
+    // FILE SUMMARY and DOCUMENT SUMMARY always first
+    if (lower.startsWith('file summary') || lower.startsWith('document summary')) bonus += w.fileSummaryBonus;
     // Redundancy penalty
     const fp = lower.replace(/\s+/g, ' ').slice(0, 100);
     const isDup = chunks.slice(0, idx).some(prev =>
