@@ -6623,6 +6623,23 @@ function initTambour() {
   });
 }
 
+/* ── Easter egg — triple-click CACI plate → Jushi ────────── */
+(function() {
+  const plate = document.querySelector('.sb-plaque');
+  if (!plate) return;
+  let clicks = 0, timer = null;
+  plate.addEventListener('click', () => {
+    clicks++;
+    clearTimeout(timer);
+    timer = setTimeout(() => { clicks = 0; }, 500);
+    if (clicks >= 3) {
+      clicks = 0;
+      clearTimeout(timer);
+      window.open('https://jushico.com/', '_blank', 'noopener,noreferrer');
+    }
+  });
+})();
+
 /* ═══════════════════════════════════════════════════════════
    UPLOAD MODAL
 ═══════════════════════════════════════════════════════════ */
