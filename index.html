@@ -868,31 +868,31 @@ body::before {
 }
 .sb-wordmark {
   font-family: var(--f-display);
-  font-size: 34px;
-  font-weight: 300;
+  font-size: 36px;
+  font-weight: 400;
   letter-spacing: 0.28em;
   line-height: 1;
   text-align: center;
   position: relative;
   z-index: 1;
   background: linear-gradient(160deg,
-    #fffae8 0%,
-    #fff0a0 10%,
-    var(--gold-metal-2) 28%,
-    #8a6418 46%,
-    #6b4e10 52%,
+    #ffffff 0%,
+    #fff8d0 8%,
+    #f5e398 20%,
+    var(--gold-metal-2) 35%,
+    #8a6418 50%,
     var(--gold-metal-3) 62%,
-    #f5e398 78%,
-    #fffae8 90%,
-    var(--gold-metal-2) 100%
+    #f5e398 76%,
+    #fffae8 88%,
+    #ffffff 100%
   );
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  filter:
-    drop-shadow(0 1px 0px rgba(0,0,0,1))
-    drop-shadow(0 2px 3px rgba(0,0,0,0.80))
-    drop-shadow(0 0 12px rgba(212,168,50,0.20));
+  /* Single crisp shadow — no blur stacking */
+  filter: drop-shadow(0 1px 0 rgba(0,0,0,0.95)) drop-shadow(0 0 10px rgba(212,168,50,0.18));
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
 }
 .sb-tagline {
   font-family: var(--f-ui);
@@ -912,12 +912,12 @@ body::before {
   flex-direction: column;
   align-items: center;
   width: 100%;
-  padding: 14px 14px 13px;
+  padding: 16px 14px 14px;
   border-radius: 6px;
   /* Layered metallic border — bright top, dim sides, dark bottom */
-  border: 1px solid rgba(212,168,50,0.35);
-  border-top-color: rgba(245,227,152,0.65);
-  border-bottom-color: rgba(0,0,0,0.80);
+  border: 1px solid rgba(212,168,50,0.45);
+  border-top-color: rgba(245,227,152,0.80);
+  border-bottom-color: rgba(0,0,0,0.85);
   /* Deep dark base with subtle warm center */
   background:
     radial-gradient(ellipse 80% 60% at 50% 30%, rgba(30,22,8,0.60) 0%, transparent 70%),
