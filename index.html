@@ -7992,6 +7992,17 @@ const UM_PERIODS = (()=>{
 })();
 const UM_STATES = ['CA','IL','MA','NJ','NV','OH','PA','VA'];
 
+const UM_STORE_MAP = {
+  CA: ['Santa Barbara'],
+  IL: ['Bloomington','Goose Lake Rd','Mississippi Ave','Normal','Peoria'],
+  MA: ['Millbury','Tyngsborough'],
+  NJ: ['Little Ferry'],
+  NV: ['Incline','Sahara','Twain'],
+  OH: ['Cincinnati','Mansfield','Oxford','Parma','Springdale','Toledo','Warren'],
+  PA: ['Ardmore','Bethlehem','Bristol','Center City','Dickson City','Easton','Irwin','Johnstown','Linwood','Mt. Pocono','Northern Liberties','Pittsburgh','Pottsville','Reading','Scranton','Stroudsburg','University City','West Chester'],
+  VA: ['Alexandria','Arlington','Fairfax','Manassas','Sterling','Woodbridge']
+};
+
 let _umFiles      = null;
 let _umDupConfirm = false;
 
@@ -8089,6 +8100,21 @@ async function openUploadModal(fileList) {
       const sel = statesEl.querySelectorAll('.um-state-chip.selected');
       const wrap = $('um-store-wrap');
       if (wrap) wrap.classList.toggle('visible', sel.length === 1);
+      // Populate store dropdown for the selected state
+      const storeEl = $('um-store');
+      if (storeEl) {
+        storeEl.innerHTML = '<option value="">All stores in state</option>';
+        if (sel.length === 1) {
+          const stateCode = sel[0].dataset.s;
+          const stores = UM_STORE_MAP[stateCode] || [];
+          stores.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s;
+            opt.textContent = s;
+            storeEl.appendChild(opt);
+          });
+        }
+      }
     });
   }
 
