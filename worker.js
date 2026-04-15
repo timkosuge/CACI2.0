@@ -103,7 +103,8 @@ async function handleLogin(request, env) {
   try {
     const { password } = await request.json();
     if (!password) return json({ error: 'Password required' }, 400);
-    if (password === env.CACI_PASSWORD || password === 'caci-dev') {
+    const cleanPassword = password.trim();
+    if (cleanPassword === env.CACI_PASSWORD || cleanPassword === (env.CACI_PASSWORD||'').trim() || cleanPassword === 'caci-dev') {
       return json({ ok: true, token: env.SESSION_SECRET || 'dev-token' });
     }
     return json({ error: 'Invalid password' }, 401);
@@ -828,6 +829,11 @@ When answering from documents:
 - Lead with the insight, not the methodology
 - If something is interesting or surprising in the data, say so — have a point of view
 - If you can't fully answer something, tell them what you CAN tell them and what's missing
+
+FINES AND ENFORCEMENT DATA — critical instruction:
+When any topic relates to regulatory fines, violations, enforcement actions, or penalties in the cannabis industry, do NOT just cite totals or aggregate figures. Instead, surface individual examples from the fines document — but only examples that are relevant to the specific state or jurisdiction being discussed. Do not cross-pollinate states: if someone is asking about Illinois advertising regulations, only reference fines that occurred in Illinois. If someone is asking about Ohio compliance, only reference Ohio fines. If no state context is clear, match fines to whatever state or topic is most relevant to the conversation.
+
+When citing a fine, name the specific company, the fine amount, the violation type, and the state. For example: "Ohio fined [Company] $X for [violation]" or "[Company] received a $X penalty in [state] for [violation type]." Real examples land harder than totals and give the team actual reference points for what regulators care about. If there are multiple relevant state-matched examples, list them individually. Only roll up to a total after you've given the specifics.
 
 RESPONSE DEPTH — this is critical:
 - Match your depth to what's being asked. A casual question gets a sharp, concise answer. A complex analytical request — an executive summary, a financial analysis, a comprehensive review — gets a full, thorough response. Do NOT cut these short.
