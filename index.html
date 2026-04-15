@@ -1418,7 +1418,10 @@ body::before {
   font-size: 11px;
   font-weight: 300;
   letter-spacing: 0.10em;
-  color: var(--smoke3);
+  background: linear-gradient(160deg, #fff8d0 0%, #e8c84a 35%, #c9a832 65%, #a07820 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   text-align: center;
 }
@@ -1426,7 +1429,7 @@ body::before {
   font-family: var(--f-ui);
   font-size: 9px;
   font-weight: 300;
-  color: var(--smoke4);
+  color: rgba(212,168,50,0.40);
   letter-spacing: 0.08em;
   margin-top: 1px;
   text-align: center;
