@@ -79,6 +79,9 @@ export default {
     if (path === '/collections/describe'&& method === 'POST') return handleCollectionDescribe(request, env);
     if (path === '/admin/config' && method === 'POST') return handleAdminSave(request, env);
     if (path === '/admin/config' && method === 'GET')  return handleAdminGet(env);
+    if (path === '/admin/weights' && method === 'GET')  return handleGetWeights(request, env);
+    if (path === '/admin/weights' && method === 'POST') return handleSaveWeights(request, env);
+    if (path === '/admin/weights/reset' && method === 'POST') return handleResetWeights(request, env);
 
     // ── Integrations (Microsoft 365 / QuickBase) ──────────
     if (path.startsWith('/integrations/') && method === 'POST')   return handleIntegrationSave(path, request, env);
@@ -1908,6 +1911,45 @@ async function handleAdminGet(env) {
   } catch (err) { return json({ error: err.message }, 500); }
 }
 
+// ── Retrieval Weight Admin ────────────────────────────────────
+async function handleGetWeights(request, env) {
+  try {
+    const url  = new URL(request.url);
+    const dept = url.searchParams.get('dept') || 'default';
+    const stored = await env.CACI_KV.get(`config:scoring-weights:${dept}`, 'json').catch(() => null);
+    const defaults = getDefaultWeights();
+    const weights  = stored ? { ...defaults, ...stored } : defaults;
+    return json({ ok: true, weights, defaults, dept, isCustom: !!stored, lastUpdated: stored?._lastUpdated || null });
+  } catch (err) { return json({ error: err.message }, 500); }
+}
+
+async function handleSaveWeights(request, env) {
+  try {
+    const { dept, weights } = await request.json();
+    if (!dept || !weights) return json({ error: 'dept and weights required' }, 400);
+    const defaults = getDefaultWeights();
+    const sanitized = {};
+    for (const key of Object.keys(defaults)) {
+      if (typeof weights[key] === 'number' && isFinite(weights[key])) {
+        sanitized[key] = weights[key];
+      }
+    }
+    sanitized._lastUpdated = new Date().toISOString();
+    sanitized._appliedCount = weights._appliedCount || 0;
+    await env.CACI_KV.put(`config:scoring-weights:${dept}`, JSON.stringify(sanitized));
+    return json({ ok: true, weights: sanitized });
+  } catch (err) { return json({ error: err.message }, 500); }
+}
+
+async function handleResetWeights(request, env) {
+  try {
+    const { dept } = await request.json();
+    if (!dept) return json({ error: 'dept required' }, 400);
+    await env.CACI_KV.delete(`config:scoring-weights:${dept}`);
+    return json({ ok: true, weights: getDefaultWeights() });
+  } catch (err) { return json({ error: err.message }, 500); }
+}
+
 // ── Feedback & Self-Improvement ───────────────────────────────
 
 async function handleFeedback(request, env) {
@@ -2105,15 +2147,15 @@ async function handleApproveTuning(request, env) {
 
 function getDefaultWeights() {
   return {
-    yearMatchBase: 10,
-    yearRecencyMultiplier: 3,
-    monthMatchBonus: 8,
-    rangeMatchBonus: 30,
-    quarterMatchBonus: 8,
-    annualBonus: 8,
-    keywordFilenameBonus: 2,
+    yearMatchBase: 8,
+    yearRecencyMultiplier: 2,
+    monthMatchBonus: 7,
+    rangeMatchBonus: 22,
+    quarterMatchBonus: 7,
+    annualBonus: 6,
+    keywordFilenameBonus: 6,
     recencyMaxBonus: 3,
-    categoryColBonus: 5,
+    categoryColBonus: 8,
     fileSummaryBonus: 50,
     rerankDirectAnswerBonus: 4,
     rerankNumericBonus: 0.3,
