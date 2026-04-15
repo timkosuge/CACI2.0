@@ -10,6 +10,8 @@ How you use her
 Open CACI, choose your department, and start asking questions. You can keep the scope broad (“across all files”) or narrow it down using the scope bar at the top — to a specific collection or even a single document. She handles natural time expressions (“last quarter”, “March data”, “Q1 vs last year”) and understands when you’re asking for comparisons, totals, trends, or explanations.
 There’s also a special Compliance Scan mode for high-stakes regulatory or legal questions. When activated, she reads every single document in the collection without skipping anything. It’s slower and uses more tokens, but it’s there when missing even one detail could matter. The mode automatically turns off after your query.
 You can speak to her using the microphone button, and she can read her responses aloud if you enable auto-speak. Everything stays inside our Cloudflare environment except for the AI model calls themselves.
+
+
 The Document System
 When you upload a file, a lot happens behind the scenes:
 
