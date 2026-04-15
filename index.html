@@ -2277,22 +2277,23 @@ body::before {
   align-items: center;
 }
 .app-launcher-toggle {
-  width: 32px;
-  height: 56px;
-  background: var(--ink3);
-  border: 1px solid var(--line2);
+  width: 20px;
+  height: 64px;
+  background: rgba(8,12,22,0.92);
+  border: 1px solid rgba(212,168,50,0.35);
   border-right: none;
-  border-radius: 8px 0 0 8px;
-  color: var(--smoke3);
+  border-radius: 4px 0 0 4px;
+  color: rgba(212,168,50,0.65);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  transition: color 0.2s, background 0.2s;
   flex-shrink: 0;
+  box-shadow: -2px 0 8px rgba(0,0,0,0.3);
 }
-.app-launcher-toggle:hover { background: var(--ink4); color: var(--gold-lt); border-color: var(--line3); }
-.app-launcher.open .app-launcher-toggle { background: var(--ink4); color: var(--gold-lt); border-color: var(--line3); }
+.app-launcher-toggle:hover { color: rgba(245,227,152,0.9); background: rgba(12,18,32,0.98); }
+.app-launcher.open .app-launcher-toggle { color: rgba(245,227,152,0.9); background: rgba(12,18,32,0.98); }
 
 .app-launcher-panel {
   width: 0;
@@ -4024,7 +4025,7 @@ body::before {
   <div id="app-launcher" class="app-launcher">
     <button id="app-launcher-toggle" class="app-launcher-toggle" title="Apps" onclick="toggleAppLauncher()">
       <!-- Waffle grid icon -->
-      <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
+      <svg viewBox="0 0 20 20" fill="currentColor" width="10" height="10">
         <rect x="1" y="1" width="7" height="7" rx="1"/><rect x="12" y="1" width="7" height="7" rx="1"/>
         <rect x="1" y="12" width="7" height="7" rx="1"/><rect x="12" y="12" width="7" height="7" rx="1"/>
       </svg>
