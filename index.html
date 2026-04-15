@@ -4483,160 +4483,176 @@ body::before {
       <stop offset="0%"   stop-color="#050810" stop-opacity="0"/>
       <stop offset="100%" stop-color="#050810" stop-opacity="0.75"/>
     </radialGradient>
-    <!-- Glow filter for pulse heads -->
-    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
-      <feGaussianBlur stdDeviation="3" result="blur"/>
+    <filter id="glow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="3.5" result="blur"/>
       <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
-    <filter id="softglow" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur stdDeviation="1.5"/>
+    <filter id="glow2" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
   </defs>
 
   <style>
-    /* Each circuit trace: a tiny bright dash (pulse head) with a short tail travelling along the path */
     .pulse { fill: none; }
 
-    /* Horizontal traces — left to right */
-    @keyframes pLR1 { from { stroke-dashoffset: 1200; } to { stroke-dashoffset: 0; } }
-    @keyframes pLR2 { from { stroke-dashoffset: 900;  } to { stroke-dashoffset: 0; } }
-    @keyframes pLR3 { from { stroke-dashoffset: 1500; } to { stroke-dashoffset: 0; } }
-    @keyframes pLR4 { from { stroke-dashoffset: 700;  } to { stroke-dashoffset: 0; } }
-    @keyframes pLR5 { from { stroke-dashoffset: 1100; } to { stroke-dashoffset: 0; } }
-    @keyframes pLR6 { from { stroke-dashoffset: 1300; } to { stroke-dashoffset: 0; } }
+    /* ── Keyframes — each path length drives its own offset ── */
+    @keyframes p1  { from{stroke-dashoffset:1440} to{stroke-dashoffset:0} }
+    @keyframes p2  { from{stroke-dashoffset:900}  to{stroke-dashoffset:0} }
+    @keyframes p3  { from{stroke-dashoffset:1200} to{stroke-dashoffset:0} }
+    @keyframes p4  { from{stroke-dashoffset:800}  to{stroke-dashoffset:0} }
+    @keyframes p5  { from{stroke-dashoffset:2200} to{stroke-dashoffset:0} }
+    @keyframes p6  { from{stroke-dashoffset:1600} to{stroke-dashoffset:0} }
+    @keyframes p7  { from{stroke-dashoffset:3200} to{stroke-dashoffset:0} }
+    @keyframes p8  { from{stroke-dashoffset:500}  to{stroke-dashoffset:0} }
+    @keyframes p9  { from{stroke-dashoffset:2600} to{stroke-dashoffset:0} }
+    @keyframes p10 { from{stroke-dashoffset:700}  to{stroke-dashoffset:0} }
 
-    /* Vertical traces — top to bottom */
-    @keyframes pTB1 { from { stroke-dashoffset: 1000; } to { stroke-dashoffset: 0; } }
-    @keyframes pTB2 { from { stroke-dashoffset: 800;  } to { stroke-dashoffset: 0; } }
-    @keyframes pTB3 { from { stroke-dashoffset: 1200; } to { stroke-dashoffset: 0; } }
-    @keyframes pTB4 { from { stroke-dashoffset: 600;  } to { stroke-dashoffset: 0; } }
+    /* Head: 3px bright dot. Tail: 28px warm glow behind it */
+    /* Outer border top → right */
+    .a1h { stroke-dasharray:3 1437; animation:p1 7s linear 0s infinite; }
+    .a1t { stroke-dasharray:28 1437;animation:p1 7s linear .12s infinite; opacity:.22; }
+    /* Outer border left → bottom */
+    .a2h { stroke-dasharray:3 897;  animation:p2 5s linear 2.4s infinite; }
+    .a2t { stroke-dasharray:28 897; animation:p2 5s linear 2.52s infinite;opacity:.22; }
 
-    /* L-shaped / corner traces */
-    @keyframes pC1  { from { stroke-dashoffset: 1800; } to { stroke-dashoffset: 0; } }
-    @keyframes pC2  { from { stroke-dashoffset: 1400; } to { stroke-dashoffset: 0; } }
-    @keyframes pC3  { from { stroke-dashoffset: 2000; } to { stroke-dashoffset: 0; } }
-    @keyframes pC4  { from { stroke-dashoffset: 1600; } to { stroke-dashoffset: 0; } }
+    /* Inner octagon frame — clockwise full loop */
+    .b1h { stroke-dasharray:3 2197; animation:p5 13s linear 0.7s infinite; }
+    .b1t { stroke-dasharray:32 2197;animation:p5 13s linear 0.82s infinite;opacity:.20; }
+    /* Inner octagon — second pulse offset */
+    .b2h { stroke-dasharray:3 2197; animation:p5 13s linear 7s infinite; }
+    .b2t { stroke-dasharray:32 2197;animation:p5 13s linear 7.12s infinite;opacity:.20; }
 
-    /* Outer frame traces */
-    @keyframes pF1  { from { stroke-dashoffset: 3000; } to { stroke-dashoffset: 0; } }
-    @keyframes pF2  { from { stroke-dashoffset: 2400; } to { stroke-dashoffset: 0; } }
+    /* Top-center vertical spine down to diamond */
+    .c1h { stroke-dasharray:3 1199; animation:p3 6.5s linear 1.2s infinite; }
+    .c1t { stroke-dasharray:28 1199;animation:p3 6.5s linear 1.32s infinite;opacity:.25; }
+    /* Bottom-center vertical spine up */
+    .c2h { stroke-dasharray:3 1199; animation:p3 6.5s linear 4.8s infinite; }
+    .c2t { stroke-dasharray:28 1199;animation:p3 6.5s linear 4.92s infinite;opacity:.25; }
 
-    /* Pulse head: 2px dash, huge gap so only one dot visible at a time */
-    /* Tail: slightly longer dash behind it */
+    /* Top-left L-trace inward */
+    .d1h { stroke-dasharray:3 1597; animation:p6 9s linear 0.3s infinite; }
+    .d1t { stroke-dasharray:28 1597;animation:p6 9s linear 0.42s infinite;opacity:.22; }
+    /* Top-right L-trace inward */
+    .d2h { stroke-dasharray:3 1597; animation:p6 9s linear 3.1s infinite; }
+    .d2t { stroke-dasharray:28 1597;animation:p6 9s linear 3.22s infinite;opacity:.22; }
+    /* Bottom-left L-trace inward */
+    .d3h { stroke-dasharray:3 1597; animation:p6 9s linear 5.6s infinite; }
+    .d3t { stroke-dasharray:28 1597;animation:p6 9s linear 5.72s infinite;opacity:.22; }
+    /* Bottom-right L-trace inward */
+    .d4h { stroke-dasharray:3 1597; animation:p6 9s linear 7.9s infinite; }
+    .d4t { stroke-dasharray:28 1597;animation:p6 9s linear 8.02s infinite;opacity:.22; }
 
-    /* Horizontal runs — across the width */
-    .hr1  { stroke-dasharray: 2 900;  animation: pLR1 6s  linear 0s    infinite; }
-    .hr1t { stroke-dasharray: 18 900; animation: pLR1 6s  linear 0.08s infinite; opacity: 0.25; }
-    .hr2  { stroke-dasharray: 2 700;  animation: pLR2 5s  linear 1.3s  infinite; }
-    .hr2t { stroke-dasharray: 18 700; animation: pLR2 5s  linear 1.38s infinite; opacity: 0.25; }
-    .hr3  { stroke-dasharray: 2 1100; animation: pLR3 8s  linear 2.7s  infinite; }
-    .hr3t { stroke-dasharray: 18 1100;animation: pLR3 8s  linear 2.78s infinite; opacity: 0.25; }
-    .hr4  { stroke-dasharray: 2 500;  animation: pLR4 4s  linear 0.6s  infinite; }
-    .hr4t { stroke-dasharray: 18 500; animation: pLR4 4s  linear 0.68s infinite; opacity: 0.25; }
-    .hr5  { stroke-dasharray: 2 800;  animation: pLR5 6.5s linear 4.1s infinite; }
-    .hr5t { stroke-dasharray: 18 800; animation: pLR5 6.5s linear 4.18s infinite; opacity: 0.25; }
-    .hr6  { stroke-dasharray: 2 950;  animation: pLR6 7s  linear 1.9s  infinite; }
-    .hr6t { stroke-dasharray: 18 950; animation: pLR6 7s  linear 1.98s infinite; opacity: 0.25; }
+    /* Dense left-side horizontal runs */
+    .e1h { stroke-dasharray:3 499;  animation:p8 3s linear 0s   infinite; }
+    .e1t { stroke-dasharray:22 499; animation:p8 3s linear .11s infinite; opacity:.28; }
+    .e2h { stroke-dasharray:3 499;  animation:p8 3s linear 1.1s infinite; }
+    .e2t { stroke-dasharray:22 499; animation:p8 3s linear 1.21s infinite;opacity:.28; }
+    .e3h { stroke-dasharray:3 499;  animation:p8 3s linear 0.55s infinite; }
+    .e3t { stroke-dasharray:22 499; animation:p8 3s linear 0.66s infinite;opacity:.28; }
+    /* Dense right-side horizontal runs */
+    .e4h { stroke-dasharray:3 499;  animation:p8 3s linear 0.2s infinite; }
+    .e4t { stroke-dasharray:22 499; animation:p8 3s linear 0.31s infinite;opacity:.28; }
+    .e5h { stroke-dasharray:3 499;  animation:p8 3s linear 1.4s infinite; }
+    .e5t { stroke-dasharray:22 499; animation:p8 3s linear 1.51s infinite;opacity:.28; }
+    .e6h { stroke-dasharray:3 499;  animation:p8 3s linear 0.8s infinite; }
+    .e6t { stroke-dasharray:22 499; animation:p8 3s linear 0.91s infinite;opacity:.28; }
 
-    /* Vertical runs */
-    .vr1  { stroke-dasharray: 2 700;  animation: pTB1 5.5s linear 0.4s  infinite; }
-    .vr1t { stroke-dasharray: 18 700; animation: pTB1 5.5s linear 0.48s infinite; opacity: 0.25; }
-    .vr2  { stroke-dasharray: 2 600;  animation: pTB2 4.5s linear 2.2s  infinite; }
-    .vr2t { stroke-dasharray: 18 600; animation: pTB2 4.5s linear 2.28s infinite; opacity: 0.25; }
-    .vr3  { stroke-dasharray: 2 900;  animation: pTB3 7s  linear 3.5s  infinite; }
-    .vr3t { stroke-dasharray: 18 900; animation: pTB3 7s  linear 3.58s infinite; opacity: 0.25; }
-    .vr4  { stroke-dasharray: 2 450;  animation: pTB4 3.5s linear 5.1s  infinite; }
-    .vr4t { stroke-dasharray: 18 450; animation: pTB4 3.5s linear 5.18s infinite; opacity: 0.25; }
-
-    /* Corner / L-traces */
-    .cr1  { stroke-dasharray: 2 1400; animation: pC1 10s linear 0.8s  infinite; }
-    .cr1t { stroke-dasharray: 18 1400;animation: pC1 10s linear 0.88s infinite; opacity: 0.25; }
-    .cr2  { stroke-dasharray: 2 1000; animation: pC2 8s  linear 3.4s  infinite; }
-    .cr2t { stroke-dasharray: 18 1000;animation: pC2 8s  linear 3.48s infinite; opacity: 0.25; }
-    .cr3  { stroke-dasharray: 2 1600; animation: pC3 11s linear 1.6s  infinite; }
-    .cr3t { stroke-dasharray: 18 1600;animation: pC3 11s linear 1.68s infinite; opacity: 0.25; }
-    .cr4  { stroke-dasharray: 2 1200; animation: pC4 9s  linear 5.8s  infinite; }
-    .cr4t { stroke-dasharray: 18 1200;animation: pC4 9s  linear 5.88s infinite; opacity: 0.25; }
-
-    /* Outer frame */
-    .fr1  { stroke-dasharray: 2 2600; animation: pF1 18s linear 0s    infinite; }
-    .fr1t { stroke-dasharray: 22 2600;animation: pF1 18s linear 0.1s  infinite; opacity: 0.20; }
-    .fr2  { stroke-dasharray: 2 2000; animation: pF2 14s linear 7s    infinite; }
-    .fr2t { stroke-dasharray: 22 2000;animation: pF2 14s linear 7.1s  infinite; opacity: 0.20; }
+    /* Corner ornament mini-traces — top-left */
+    .f1h { stroke-dasharray:3 697;  animation:p10 4s linear 0.5s infinite; }
+    .f1t { stroke-dasharray:18 697; animation:p10 4s linear 0.6s  infinite;opacity:.30; }
+    /* top-right */
+    .f2h { stroke-dasharray:3 697;  animation:p10 4s linear 2.1s infinite; }
+    .f2t { stroke-dasharray:18 697; animation:p10 4s linear 2.2s  infinite;opacity:.30; }
+    /* bottom-left */
+    .f3h { stroke-dasharray:3 697;  animation:p10 4s linear 1.3s infinite; }
+    .f3t { stroke-dasharray:18 697; animation:p10 4s linear 1.4s  infinite;opacity:.30; }
+    /* bottom-right */
+    .f4h { stroke-dasharray:3 697;  animation:p10 4s linear 3.2s infinite; }
+    .f4t { stroke-dasharray:18 697; animation:p10 4s linear 3.3s  infinite;opacity:.30; }
   </style>
 
-  <!-- ═══ CIRCUIT TRACES ═══ -->
-  <!-- Colors: bright head = near-white gold, tail = warm gold -->
+  <!-- ═══ OUTER BORDER ═══ -->
+  <path class="pulse a1t" d="M 0,28 L 1440,28"          stroke="#c9a832" stroke-width="1.2"/>
+  <path class="pulse a1h" d="M 0,28 L 1440,28"          stroke="#fff8e8" stroke-width="2.5" filter="url(#glow)"/>
+  <path class="pulse a2t" d="M 0,872 L 1440,872"         stroke="#c9a832" stroke-width="1.2"/>
+  <path class="pulse a2h" d="M 1440,872 L 0,872"         stroke="#fff8e8" stroke-width="2.5" filter="url(#glow)"/>
 
-  <!-- Horizontal traces across the design -->
-  <!-- Top band -->
-  <path class="pulse hr1t" d="M 0,82 L 1440,82"   stroke="#c9a832" stroke-width="1.2"/>
-  <path class="pulse hr1"  d="M 0,82 L 1440,82"   stroke="#fffae8" stroke-width="2"   filter="url(#glow)"/>
-  <!-- Upper mid -->
-  <path class="pulse hr2t" d="M 0,195 L 1440,195"  stroke="#c9a832" stroke-width="1.2"/>
-  <path class="pulse hr2"  d="M 0,195 L 1440,195"  stroke="#fffae8" stroke-width="2"   filter="url(#glow)"/>
-  <!-- Center top of diamond frame -->
-  <path class="pulse hr3t" d="M 180,310 L 1260,310" stroke="#c9a832" stroke-width="1.2"/>
-  <path class="pulse hr3"  d="M 180,310 L 1260,310" stroke="#fffae8" stroke-width="2"   filter="url(#glow)"/>
-  <!-- Center bottom of diamond frame -->
-  <path class="pulse hr4t" d="M 180,590 L 1260,590" stroke="#c9a832" stroke-width="1.2"/>
-  <path class="pulse hr4"  d="M 180,590 L 1260,590" stroke="#fffae8" stroke-width="2"   filter="url(#glow)"/>
-  <!-- Lower mid -->
-  <path class="pulse hr5t" d="M 0,705 L 1440,705"  stroke="#c9a832" stroke-width="1.2"/>
-  <path class="pulse hr5"  d="M 0,705 L 1440,705"  stroke="#fffae8" stroke-width="2"   filter="url(#glow)"/>
-  <!-- Bottom band -->
-  <path class="pulse hr6t" d="M 0,818 L 1440,818"  stroke="#c9a832" stroke-width="1.2"/>
-  <path class="pulse hr6"  d="M 0,818 L 1440,818"  stroke="#fffae8" stroke-width="2"   filter="url(#glow)"/>
-
-  <!-- Vertical traces -->
-  <!-- Left edge trace -->
-  <path class="pulse vr1t" d="M 82,0 L 82,900"    stroke="#c9a832" stroke-width="1.2"/>
-  <path class="pulse vr1"  d="M 82,0 L 82,900"    stroke="#fffae8" stroke-width="2"   filter="url(#glow)"/>
-  <!-- Left inner trace -->
-  <path class="pulse vr2t" d="M 195,0 L 195,900"  stroke="#c9a832" stroke-width="1.2"/>
-  <path class="pulse vr2"  d="M 195,0 L 195,900"  stroke="#fffae8" stroke-width="2"   filter="url(#glow)"/>
-  <!-- Right inner trace -->
-  <path class="pulse vr3t" d="M 1245,0 L 1245,900" stroke="#c9a832" stroke-width="1.2"/>
-  <path class="pulse vr3"  d="M 1245,0 L 1245,900" stroke="#fffae8" stroke-width="2"   filter="url(#glow)"/>
-  <!-- Right edge trace -->
-  <path class="pulse vr4t" d="M 1358,0 L 1358,900" stroke="#c9a832" stroke-width="1.2"/>
-  <path class="pulse vr4"  d="M 1358,0 L 1358,900" stroke="#fffae8" stroke-width="2"   filter="url(#glow)"/>
-
-  <!-- Corner L-traces — top-left cluster -->
-  <path class="pulse cr1t" d="M 82,195 L 195,195 L 195,310 L 360,310 L 360,420 L 480,420 L 480,310"
-        stroke="#c9a832" stroke-width="1.2"/>
-  <path class="pulse cr1"  d="M 82,195 L 195,195 L 195,310 L 360,310 L 360,420 L 480,420 L 480,310"
-        stroke="#fffae8" stroke-width="2" filter="url(#glow)"/>
-
-  <!-- Top-right cluster -->
-  <path class="pulse cr2t" d="M 1358,195 L 1245,195 L 1245,310 L 1080,310 L 1080,420 L 960,420 L 960,310"
-        stroke="#c9a832" stroke-width="1.2"/>
-  <path class="pulse cr2"  d="M 1358,195 L 1245,195 L 1245,310 L 1080,310 L 1080,420 L 960,420 L 960,310"
-        stroke="#fffae8" stroke-width="2" filter="url(#glow)"/>
-
-  <!-- Bottom-left cluster -->
-  <path class="pulse cr3t" d="M 82,705 L 195,705 L 195,590 L 360,590 L 360,480 L 480,480 L 480,590"
-        stroke="#c9a832" stroke-width="1.2"/>
-  <path class="pulse cr3"  d="M 82,705 L 195,705 L 195,590 L 360,590 L 360,480 L 480,480 L 480,590"
-        stroke="#fffae8" stroke-width="2" filter="url(#glow)"/>
-
-  <!-- Bottom-right cluster -->
-  <path class="pulse cr4t" d="M 1358,705 L 1245,705 L 1245,590 L 1080,590 L 1080,480 L 960,480 L 960,590"
-        stroke="#c9a832" stroke-width="1.2"/>
-  <path class="pulse cr4"  d="M 1358,705 L 1245,705 L 1245,590 L 1080,590 L 1080,480 L 960,480 L 960,590"
-        stroke="#fffae8" stroke-width="2" filter="url(#glow)"/>
-
-  <!-- Outer frame — full perimeter pulses -->
-  <path class="pulse fr1t" d="M 0,0 L 1440,0 L 1440,900 L 0,900 Z"
+  <!-- ═══ INNER OCTAGON FRAME — matches the central diamond shape ═══ -->
+  <!-- CW: top-center → top-right corner → right → bottom-right → bottom → bottom-left → left → top-left → top-center -->
+  <path class="pulse b1t" d="M 720,55 L 1100,55 L 1385,170 L 1385,730 L 1100,845 L 720,845 L 340,730 L 340,170 Z"
         stroke="#c9a832" stroke-width="1"/>
-  <path class="pulse fr1"  d="M 0,0 L 1440,0 L 1440,900 L 0,900 Z"
-        stroke="#fff8d0" stroke-width="2.5" filter="url(#glow)"/>
-
-  <!-- Inner frame — the diamond/octagon shape from the art deco design -->
-  <path class="pulse fr2t" d="M 720,30 L 1420,310 L 1420,590 L 720,870 L 20,590 L 20,310 Z"
+  <path class="pulse b1h" d="M 720,55 L 1100,55 L 1385,170 L 1385,730 L 1100,845 L 720,845 L 340,730 L 340,170 Z"
+        stroke="#fff0c0" stroke-width="2.5" filter="url(#glow)"/>
+  <path class="pulse b2t" d="M 720,55 L 1100,55 L 1385,170 L 1385,730 L 1100,845 L 720,845 L 340,730 L 340,170 Z"
         stroke="#c9a832" stroke-width="1"/>
-  <path class="pulse fr2"  d="M 720,30 L 1420,310 L 1420,590 L 720,870 L 20,590 L 20,310 Z"
-        stroke="#fff8d0" stroke-width="2.5" filter="url(#glow)"/>
+  <path class="pulse b2h" d="M 720,55 L 1100,55 L 1385,170 L 1385,730 L 1100,845 L 720,845 L 340,730 L 340,170 Z"
+        stroke="#fff0c0" stroke-width="2.5" filter="url(#glow)"/>
+
+  <!-- ═══ VERTICAL SPINES — center top/bottom pointing inward ═══ -->
+  <path class="pulse c1t" d="M 720,0 L 720,450"          stroke="#c9a832" stroke-width="1.2"/>
+  <path class="pulse c1h" d="M 720,0 L 720,450"          stroke="#e8f4ff" stroke-width="2.5" filter="url(#glow)"/>
+  <path class="pulse c2t" d="M 720,900 L 720,450"         stroke="#c9a832" stroke-width="1.2"/>
+  <path class="pulse c2h" d="M 720,900 L 720,450"         stroke="#e8f4ff" stroke-width="2.5" filter="url(#glow)"/>
+
+  <!-- ═══ L-TRACES — corner clusters routing inward ═══ -->
+  <!-- Top-left: from outer-left down then right into frame -->
+  <path class="pulse d1t" d="M 0,170 L 200,170 L 200,280 L 340,280 L 340,400 L 460,400 L 460,280 L 580,280 L 580,170 L 720,170"
+        stroke="#c9a832" stroke-width="1"/>
+  <path class="pulse d1h" d="M 0,170 L 200,170 L 200,280 L 340,280 L 340,400 L 460,400 L 460,280 L 580,280 L 580,170 L 720,170"
+        stroke="#fff8e8" stroke-width="2" filter="url(#glow2)"/>
+  <!-- Top-right: from outer-right down then left into frame -->
+  <path class="pulse d2t" d="M 1440,170 L 1240,170 L 1240,280 L 1100,280 L 1100,400 L 980,400 L 980,280 L 860,280 L 860,170 L 720,170"
+        stroke="#c9a832" stroke-width="1"/>
+  <path class="pulse d2h" d="M 1440,170 L 1240,170 L 1240,280 L 1100,280 L 1100,400 L 980,400 L 980,280 L 860,280 L 860,170 L 720,170"
+        stroke="#fff8e8" stroke-width="2" filter="url(#glow2)"/>
+  <!-- Bottom-left -->
+  <path class="pulse d3t" d="M 0,730 L 200,730 L 200,620 L 340,620 L 340,500 L 460,500 L 460,620 L 580,620 L 580,730 L 720,730"
+        stroke="#c9a832" stroke-width="1"/>
+  <path class="pulse d3h" d="M 0,730 L 200,730 L 200,620 L 340,620 L 340,500 L 460,500 L 460,620 L 580,620 L 580,730 L 720,730"
+        stroke="#fff8e8" stroke-width="2" filter="url(#glow2)"/>
+  <!-- Bottom-right -->
+  <path class="pulse d4t" d="M 1440,730 L 1240,730 L 1240,620 L 1100,620 L 1100,500 L 980,500 L 980,620 L 860,620 L 860,730 L 720,730"
+        stroke="#c9a832" stroke-width="1"/>
+  <path class="pulse d4h" d="M 1440,730 L 1240,730 L 1240,620 L 1100,620 L 1100,500 L 980,500 L 980,620 L 860,620 L 860,730 L 720,730"
+        stroke="#fff8e8" stroke-width="2" filter="url(#glow2)"/>
+
+  <!-- ═══ DENSE CIRCUIT RUNS — left side horizontal stacks ═══ -->
+  <path class="pulse e1t" d="M 0,340 L 340,340"  stroke="#c9a832" stroke-width="1"/>
+  <path class="pulse e1h" d="M 0,340 L 340,340"  stroke="#e8f0ff" stroke-width="2" filter="url(#glow2)"/>
+  <path class="pulse e2t" d="M 0,380 L 340,380"  stroke="#c9a832" stroke-width="1"/>
+  <path class="pulse e2h" d="M 340,380 L 0,380"  stroke="#e8f0ff" stroke-width="2" filter="url(#glow2)"/>
+  <path class="pulse e3t" d="M 0,420 L 340,420"  stroke="#c9a832" stroke-width="1"/>
+  <path class="pulse e3h" d="M 0,420 L 340,420"  stroke="#e8f0ff" stroke-width="2" filter="url(#glow2)"/>
+  <!-- Right side — mirror, reversed direction -->
+  <path class="pulse e4t" d="M 1440,340 L 1100,340" stroke="#c9a832" stroke-width="1"/>
+  <path class="pulse e4h" d="M 1440,340 L 1100,340" stroke="#e8f0ff" stroke-width="2" filter="url(#glow2)"/>
+  <path class="pulse e5t" d="M 1440,380 L 1100,380" stroke="#c9a832" stroke-width="1"/>
+  <path class="pulse e5h" d="M 1100,380 L 1440,380" stroke="#e8f0ff" stroke-width="2" filter="url(#glow2)"/>
+  <path class="pulse e6t" d="M 1440,420 L 1100,420" stroke="#c9a832" stroke-width="1"/>
+  <path class="pulse e6h" d="M 1440,420 L 1100,420" stroke="#e8f0ff" stroke-width="2" filter="url(#glow2)"/>
+
+  <!-- ═══ CORNER ORNAMENTS — small square cluster traces ═══ -->
+  <!-- Top-left ornament -->
+  <path class="pulse f1t" d="M 60,60 L 200,60 L 200,100 L 260,100 L 260,60 L 340,60 L 340,170 L 260,170 L 260,130 L 200,130 L 200,170"
+        stroke="#c9a832" stroke-width="1"/>
+  <path class="pulse f1h" d="M 60,60 L 200,60 L 200,100 L 260,100 L 260,60 L 340,60 L 340,170 L 260,170 L 260,130 L 200,130 L 200,170"
+        stroke="#fffae8" stroke-width="1.8" filter="url(#glow2)"/>
+  <!-- Top-right ornament -->
+  <path class="pulse f2t" d="M 1380,60 L 1240,60 L 1240,100 L 1180,100 L 1180,60 L 1100,60 L 1100,170 L 1180,170 L 1180,130 L 1240,130 L 1240,170"
+        stroke="#c9a832" stroke-width="1"/>
+  <path class="pulse f2h" d="M 1380,60 L 1240,60 L 1240,100 L 1180,100 L 1180,60 L 1100,60 L 1100,170 L 1180,170 L 1180,130 L 1240,130 L 1240,170"
+        stroke="#fffae8" stroke-width="1.8" filter="url(#glow2)"/>
+  <!-- Bottom-left ornament -->
+  <path class="pulse f3t" d="M 60,840 L 200,840 L 200,800 L 260,800 L 260,840 L 340,840 L 340,730 L 260,730 L 260,770 L 200,770 L 200,730"
+        stroke="#c9a832" stroke-width="1"/>
+  <path class="pulse f3h" d="M 60,840 L 200,840 L 200,800 L 260,800 L 260,840 L 340,840 L 340,730 L 260,730 L 260,770 L 200,770 L 200,730"
+        stroke="#fffae8" stroke-width="1.8" filter="url(#glow2)"/>
+  <!-- Bottom-right ornament -->
+  <path class="pulse f4t" d="M 1380,840 L 1240,840 L 1240,800 L 1180,800 L 1180,840 L 1100,840 L 1100,730 L 1180,730 L 1180,770 L 1240,770 L 1240,730"
+        stroke="#c9a832" stroke-width="1"/>
+  <path class="pulse f4h" d="M 1380,840 L 1240,840 L 1240,800 L 1180,800 L 1180,840 L 1100,840 L 1100,730 L 1180,730 L 1180,770 L 1240,770 L 1240,730"
+        stroke="#fffae8" stroke-width="1.8" filter="url(#glow2)"/>
 
   <rect width="1440" height="900" fill="url(#vignette)"/>
 </svg>      </div>
