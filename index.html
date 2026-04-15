@@ -1153,12 +1153,24 @@ body::before {
   letter-spacing: 0.01em;
 }
 .msg.user .msg-bubble {
-  background: linear-gradient(135deg, var(--gold-metal-2) 0%, var(--gold-metal-3) 50%, var(--gold-metal-2) 100%);
+  background: linear-gradient(160deg,
+    var(--gold-metal-1) 0%,
+    var(--gold-metal-2) 18%,
+    var(--gold-metal-3) 45%,
+    var(--gold-metal-4) 68%,
+    var(--gold-metal-3) 85%,
+    var(--gold-metal-2) 100%
+  );
   color: #0d1020;
   border-radius: 2px 8px 8px 8px;
   font-weight: 500;
-  box-shadow: 0 1px 0 rgba(245,227,152,0.4) inset, 0 2px 8px rgba(212,168,50,0.24);
-  text-shadow: 0 1px 0 rgba(255,240,170,0.2);
+  border: 1px solid var(--gold-metal-1);
+  box-shadow:
+    0 1px 0 rgba(255,248,208,0.55) inset,
+    0 -1px 0 rgba(90,60,0,0.35) inset,
+    0 3px 12px rgba(140,100,10,0.35),
+    0 1px 3px rgba(0,0,0,0.4);
+  text-shadow: 0 1px 0 rgba(255,240,160,0.25);
 }
 .msg.ai .msg-bubble {
   background: var(--ink2);
