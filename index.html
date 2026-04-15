@@ -5120,71 +5120,63 @@ function setupLogin() {
   const turnBtn = document.getElementById('lcard-turn');
   if (turnBtn) turnBtn.addEventListener('click', (e) => { e.stopPropagation(); if (!flipped) doFlip(); });
 
-  /* Password masking — works on both desktop (keydown) and mobile (input event) */
+  /* Password masking — input event handles all platforms.
+     keydown only used for Backspace/Delete/Enter on desktop. */
   const pwEl = $('login-pw');
-  let _lastValue = '';
+  const DOT = '\u00B7';
+  let _masking = false; // flag to skip input events we triggered ourselves
 
-  /* Desktop: intercept keydown for precise control */
+  pwEl.addEventListener('input', function() {
+    if (_masking) return; // our own setValue, ignore
+
+    const raw = pwEl.value;
+    const prevReal = pwEl.dataset.real;
+
+    if (raw.length > prevReal.length) {
+      // Added characters — collect non-dot chars
+      let added = '';
+      for (let i = 0; i < raw.length; i++) {
+        if (raw[i] !== DOT) added += raw[i];
+      }
+      pwEl.dataset.real = prevReal + added;
+    } else {
+      // Deleted — trim real value to match new length
+      pwEl.dataset.real = prevReal.slice(0, raw.length);
+    }
+
+    _masking = true;
+    pwEl.value = DOT.repeat(pwEl.dataset.real.length);
+    _masking = false;
+    try { pwEl.setSelectionRange(pwEl.value.length, pwEl.value.length); } catch(e) {}
+  });
+
   pwEl.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') return;
     if (e.key === 'Backspace') {
       e.preventDefault();
       pwEl.dataset.real = pwEl.dataset.real.slice(0, -1);
-      pwEl.value = '\u00B7'.repeat(pwEl.dataset.real.length);
-      _lastValue = pwEl.value;
+      _masking = true;
+      pwEl.value = DOT.repeat(pwEl.dataset.real.length);
+      _masking = false;
       return;
     }
     if (e.key === 'Delete') {
       e.preventDefault();
       pwEl.dataset.real = '';
+      _masking = true;
       pwEl.value = '';
-      _lastValue = '';
+      _masking = false;
       return;
     }
-    if (e.key.length !== 1 || e.ctrlKey || e.metaKey || e.altKey) return;
-    e.preventDefault();
-    pwEl.dataset.real += e.key;
-    pwEl.value = '\u00B7'.repeat(pwEl.dataset.real.length);
-    _lastValue = pwEl.value;
-  });
-
-  /* Mobile: virtual keyboard fires 'input' not 'keydown' reliably.
-     We diff the raw value to figure out what was typed/deleted. */
-  pwEl.addEventListener('input', function() {
-    const raw = pwEl.value;
-    const dots = '\u00B7'.repeat(pwEl.dataset.real.length);
-
-    // If it looks like our own masked output, ignore (desktop already handled it)
-    if (raw === dots) { _lastValue = raw; return; }
-
-    const prevLen = pwEl.dataset.real.length;
-    const newLen  = raw.length;
-
-    if (newLen > prevLen) {
-      // Characters added — extract the new ones (they won't be dots)
-      for (let i = 0; i < raw.length; i++) {
-        if (raw[i] !== '\u00B7') {
-          pwEl.dataset.real += raw[i];
-        }
-      }
-    } else if (newLen < prevLen) {
-      // Characters deleted
-      pwEl.dataset.real = pwEl.dataset.real.slice(0, newLen);
-    }
-
-    // Re-mask the field
-    pwEl.value = '\u00B7'.repeat(pwEl.dataset.real.length);
-    _lastValue = pwEl.value;
-    // Move cursor to end
-    pwEl.setSelectionRange(pwEl.value.length, pwEl.value.length);
   });
 
   pwEl.addEventListener('paste', function(e) {
     e.preventDefault();
     const pasted = (e.clipboardData || window.clipboardData).getData('text');
     pwEl.dataset.real += pasted;
-    pwEl.value = '\u00B7'.repeat(pwEl.dataset.real.length);
-    _lastValue = pwEl.value;
+    _masking = true;
+    pwEl.value = DOT.repeat(pwEl.dataset.real.length);
+    _masking = false;
   });
 
   async function tryLogin() {
