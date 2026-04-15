@@ -923,7 +923,7 @@ body::before {
     radial-gradient(ellipse 80% 60% at 50% 30%, rgba(30,22,8,0.60) 0%, transparent 70%),
     linear-gradient(170deg, rgba(22,28,44,1) 0%, rgba(10,13,22,1) 45%, rgba(6,8,16,1) 100%);
   position: relative;
-  overflow: hidden;
+  isolation: isolate;
   box-shadow:
     /* outer lift */
     0 4px 16px rgba(0,0,0,0.75),
@@ -1218,7 +1218,7 @@ body::before {
   padding: 12px 16px 11px;
   border-radius: 4px;
   position: relative;
-  overflow: hidden;
+  isolation: isolate;
   /* Raised face — bright metallic border all around */
   border: 1px solid rgba(212,168,50,0.50);
   border-top-color: rgba(245,227,152,0.90);
