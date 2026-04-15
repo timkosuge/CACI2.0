@@ -6628,6 +6628,7 @@ function initTambour() {
   const plate = document.querySelector('.sb-plaque');
   if (!plate) return;
   let clicks = 0, timer = null;
+  plate.addEventListener('mousedown', e => { if (e.detail >= 2) e.preventDefault(); });
   plate.addEventListener('click', () => {
     clicks++;
     clearTimeout(timer);
