@@ -452,6 +452,7 @@ body::before {
   perspective: 900px;
   perspective-origin: 50% 40%;
   width: 100%;
+  overflow: hidden;
 }
 .login-card-flipper {
   position: relative;
@@ -472,6 +473,11 @@ body::before {
   position: absolute;
   top: 0; left: 0; right: 0;
   transform: rotateY(180deg);
+  /* Extra insurance — hide all children on back face until flipped */
+  visibility: hidden;
+}
+.login-card-flipper.flipped .login-card-back {
+  visibility: visible;
 }
 /* During flip, front slides away — keep scene height stable */
 .login-card-flipper.flipped .login-card-front {
