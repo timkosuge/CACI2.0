@@ -1,78 +1,92 @@
+CACI Intelligence Platform
+Internal Operational Intelligence System for Jushi Holdings
+Version 2.0 — April 2026
 
+CACI (pronounced “Cassie”) is our internal AI intelligence platform, built specifically for Jushi. She’s not a general-purpose chatbot. She’s a document-grounded intelligence layer that turns everything we upload — sales reports, shrink files, compliance materials, SOPs, financial summaries, and more — into something we can actually talk to in plain English.
+Every answer she gives comes directly from documents the team has uploaded. She doesn’t guess, doesn’t pull from the internet, and she will clearly tell you when she doesn’t have enough information. What makes her feel different is how well she understands our world: 280E, METRC, shrink, state-by-state regulatory complexity, the difference between medical and adult-use markets, and the mix of people who actually run the business day-to-day. She’s sharp when needed, patient when you’re figuring something out, and has just enough personality to feel like a colleague rather than a tool.
 
+How you use her
+Open CACI, choose your department, and start asking questions. You can keep the scope broad (“across all files”) or narrow it down using the scope bar at the top — to a specific collection or even a single document. She handles natural time expressions (“last quarter”, “March data”, “Q1 vs last year”) and understands when you’re asking for comparisons, totals, trends, or explanations.
+There’s also a special Compliance Scan mode for high-stakes regulatory or legal questions. When activated, she reads every single document in the collection without skipping anything. It’s slower and uses more tokens, but it’s there when missing even one detail could matter. The mode automatically turns off after your query.
+You can speak to her using the microphone button, and she can read her responses aloud if you enable auto-speak. Everything stays inside our Cloudflare environment except for the AI model calls themselves.
+The Document System
+When you upload a file, a lot happens behind the scenes:
 
-DOCUMENT UPLOAD/CLASSIFICATION/STORAGE/RETRIEVAL
+All text extraction runs client-side in your browser (PDF.js for PDFs, Mammoth for Word, SheetJS for Excel/CSV). Nothing gets sent to a third-party extraction service.
+For spreadsheets and CSVs, CACI doesn’t just pull the text — she automatically calculates statistical summaries (sums, averages, min/max per column) and captures important category values. This creates a “FILE SUMMARY” block at the top of each tabular document so she can answer aggregate questions quickly and accurately without scanning every row.
+Documents are organized into Collections. After upload, CACI’s AI (Claude Haiku) reviews each file and suggests the best report name, category, period, and whether it should be treated as a Context Document. You review these suggestions in the AI Classification panel and apply them with one click (or “Apply All”).
 
-Document Storage
-Every document uploaded to CACI gets stored in two places simultaneously on Cloudflare's infrastructure.
-R2 (object storage) holds the raw file binary — the actual PDF, Excel, Word doc, or CSV exactly as you uploaded it. Think of this as a filing cabinet. Files sit there at a path like compliance/Illinois Cannabis Regulations/[id]/filename.pdf. R2 is cheap, durable, and essentially unlimited.
-KV (key-value store) holds everything the AI actually uses — the extracted text, metadata, and computed statistics. Four separate KV entries are written for every file:
+Context Documents are special. These are things like regulations, SOPs, policies, and glossaries. Once marked as context, they’re loaded in full for every question in that collection so CACI always has the foundational rules and background knowledge available before answering.
+For large regulatory PDFs, we have a PDF Splitter tool. It automatically detects Article, Chapter, Section, or § breaks and splits the document into separate, precisely named files. This dramatically improves retrieval accuracy — instead of one giant 300-page blob, CACI can pull exactly the right section when you ask about it.
 
-file:[id] — the complete file record including every text chunk, metadata (name, category, period, report type, states), and pre-computed statistics
-index:[dept] — a department-level index of all files (up to 500 records), without chunks, used for fast listing and browsing
-col:[dept]:[collection] — same lightweight record stored in the collection's own index
-colreg:[dept] — the collection registry, which tracks what collections exist and their descriptions
+Technical Architecture & Implementation Details
+CACI is built with a deliberately minimal, auditable, and edge-native architecture on Cloudflare:
+Core Components
 
+Frontend: Single index.html file containing all HTML, CSS, and vanilla JavaScript. No build step, no frameworks, extremely fast load times.
+Backend: Single Cloudflare Worker (worker.js) that exposes all API routes (/upload, /chat, /ai-classify, /collection-analyze, /files, /collections, etc.).
+Storage:
+R2: Raw file binaries stored at paths like dept/collection/[uuid]/filename.ext
+KV: All structured data with carefully designed keys:
+file:[id] — Complete record including all text chunks, full metadata, and pre-computed stats (expires after 1 year)
+index:[dept] — Lightweight department-level index (capped at 500 most recent records, no chunks)
+col:[dept]:[collection] — Per-collection index of file records
+colreg:[dept] — Collection registry containing name, category, description, and file count
+ctx:[dept]:[collection] — Separate index for Context Documents
+library:map:[dept] — Cached intelligent profile of the entire library (rebuilt on changes, cached for 2 minutes)
 
-Text Extraction
-This all happens in the browser before anything is sent to the server. No file content ever goes to a third-party service for extraction — it's processed entirely client-side.
-PDFs use PDF.js, a Mozilla library loaded from CDN. It reads each page and concatenates the text content items. The result is raw text — no formatting preserved, but all the words are there.
-Word documents use Mammoth, which extracts raw text from the .docx XML structure. Same result — clean prose text.
-Excel and CSV files go through the most sophisticated extraction. SheetJS reads the file, converts each sheet to row objects, then two things happen in parallel:
-First, computeTabularStats analyzes every column. If a column is at least 70% numeric values, it computes sum, average, min, max, and count. If it's a low-cardinality text column (fewer than 30 unique values), it captures all the unique values. This is what later becomes the FILE SUMMARY block — a pre-computed statistical overview that the AI can use to answer aggregate questions without having to scan every row.
-Second, rowsToChunkedText converts rows into self-contained text chunks. Each chunk starts with Columns: col1 | col2 | col3 so it's interpretable in isolation, then lists the rows with their values. The chunk size adapts to column count — wide sheets get smaller batches so chunks don't exceed ~2,000 characters. Chunks are separated by --- markers.
-The final text for a spreadsheet always starts with the FILE SUMMARY block (total rows, column names, all numeric stats, all category values), then the row chunks follow. This means the AI always sees the forest before the trees.
-For prose documents (PDF, Word), a 150-character overlap is preserved between chunks so context isn't lost at boundaries — the last 150 characters of one chunk appear at the start of the next.
+Text Extraction & Chunking (Client-Side)
 
-The Upload Pipeline
-After extraction completes in the browser, a FormData POST goes to the worker's /upload endpoint carrying: the raw file binary, the extracted text, the computed stats as JSON, and all the metadata you filled in (or that was pre-filled by AI classify).
-The worker receives this and does five things:
+PDFs: PDF.js (Mozilla)
+Word (.docx): Mammoth
+Excel/CSV: SheetJS with two parallel pipelines:
+computeTabularStats(): Analyzes every column. Numeric columns (≥70% numeric) get sum/avg/min/max/count. Low-cardinality text columns (<30 unique values) capture full unique value sets.
+rowsToChunkedText(): Generates self-contained chunks starting with Columns: ... followed by numbered rows. Chunk size adapts to column width (smaller batches for wide sheets). Each spreadsheet response always begins with a FILE SUMMARY block.
 
-Detects whether the text is tabular or prose and cleans whitespace accordingly — tabular text preserves newlines, prose gets collapsed
-Chunks the clean text using the specified chunk size (Standard 1500 chars, Fine 800, Ultra-fine 400) with sentence/paragraph boundary awareness
-Stores the raw file to R2
-Writes the complete file record (including all chunks) to KV at file:[id]
-Updates the three index entries (department, collection, collection registry)
-Invalidates the library map cache so CACI's next session sees the new file
+Prose documents use sentence/paragraph boundary-aware chunking with 150-character overlap between chunks. Tabular data preserves natural newlines and uses --- separators.
+AI Classification & Collection Intelligence
 
+Per-file classification uses Claude Haiku via /ai-classify. It receives the first ~2,500 characters (or FILE SUMMARY + first 25 rows for spreadsheets) and returns structured JSON: reportName, category, period, reportType, suggestedCollection, isContextDoc, confidence.
+Low-confidence results are discarded. High/medium results appear in the AI Review Panel for manual approval (individual or “Apply All”).
+After a batch upload, /collection-analyze sends a manifest of all files (names, periods, row counts, columns) to Claude. It generates a 1-2 sentence description, primary category, and ultra-short summary, which is then PATCHed to the collection record via /collections/describe.
 
-AI Classification
-Two AI processes run after upload, both non-blocking — they don't slow down the upload itself.
-Per-file classification fires immediately after each file stores successfully. The system takes the first 2,500 characters of extracted text (or for spreadsheets, the FILE SUMMARY plus the first 25 rows) and sends it to Claude Haiku via the /ai-classify worker endpoint. Haiku reads this sample and returns a JSON object: reportName, category, period, reportType, suggestedCollection, isContextDoc, and confidence. Low confidence results are discarded silently. High and medium confidence results appear in the AI Classification review panel — a panel that slides open on the right side of the Documents view showing each file's suggested metadata. You can apply suggestions individually or hit Apply All. Nothing changes without your approval.
-Collection analysis runs once after the full batch finishes uploading, if AI classification is enabled. It sends a manifest of every file in the collection (names, periods, row counts, column names) to /collection-analyze, which asks the LLM to write a 1-2 sentence description of the collection, assign it a category, and generate a short summary. This description gets stored on the collection record and used in the library map.
+Retrieval Engine (“Reason Then Retrieve”)
+Every chat request follows a multi-stage pipeline:
 
-The Library Map
-This is a persistent understanding of the entire library that gets built and cached in KV at library:map:[dept]. It's rebuilt whenever files or collections change, and cached for 30 minutes between rebuilds.
-The map profiles every collection: file count, context doc count, which years and states appear in the filenames, what file types are present, total row counts, and a sample of the actual file names. It then does two things automatically:
-It detects cross-collection relationships — if a Legal/Compliance collection and a data collection share state coverage, it notes that the regulations govern the operational data. If two data collections share states and years, it notes they can be compared.
-It detects gaps — if operational data exists for a state but no regulatory documents have been uploaded for that state, it flags it.
-This map gets injected into CACI's system prompt at the start of every chat session. She doesn't rediscover the library on every query — she already knows what's there.
+Intent Analysis (analyzeQueryIntent): Regex-based classification into comparative, aggregate, causal, or filtered queries. Influences chunk budget, collection count, and scoring weights.
+Retrieval Planning: For non-trivial queries, a lightweight LLM call generates a 2-3 sentence plan identifying the most relevant collections and expected information types. This plan is injected into the final system prompt.
+Collection Routing & Context Building:
+buildContextMultiCollection for broad scope: scores collections by keyword overlap, category, description, and intent, then pulls top N.
+buildContextTwoPass for single-collection scope: first scores files on index records (date range +30, year match weighted by recency, month +8, etc.), then loads full records only for top candidates.
+Single-file scope bypasses collection scoring entirely.
 
-Query Processing — Reason Then Retrieve
-When you send a message, the worker runs this sequence:
-Step 1 — Intent analysis. The query is analyzed with regex patterns to classify what kind of question it is: comparative (vs, trend, year-over-year), aggregate (total, average, highest), filtered (mentions a state or location), or causal (why, what caused, driving). This shapes how retrieval will work — comparative queries get more files pulled, aggregate queries prioritize the stats block, causal queries look for correlated changes.
-Step 2 — Retrieval planning. For non-trivial queries, before touching any documents, a fast LLM call generates a retrieval plan: which collections are most relevant and what kind of information is expected there. This plan gets injected into the system prompt alongside the retrieved content, so CACI knows why she's pulling what she's pulling.
-Step 3 — Collection routing. If you're scoped to all documents, buildContextMultiCollection scores every collection by keyword relevance and pulls the top 3-4. If you're scoped to a specific collection, buildContextTwoPass runs on that collection. If you're on a single file, just that file's chunks are used.
-Step 4 — File scoring (inside buildContextTwoPass). Every file in the selected collection gets scored against the query:
+File Scoring: Combines date-range matching (+30), year matching (+10–28 based on recency), month/quarter matching (+8), keyword presence (+2), category column value matches (+5), and recency boost (up to +3). PDF files get slight preference over XLSX.
+Chunk Selection: Dynamic budget (typically 18–32 chunks) distributed across selected files. Every file guaranteed at least one chunk. FILE SUMMARY chunks are always included. Chunks are then scored with scoreChunk (keyword density, normalized by length) and expanded with domain synonyms.
+Reranking (rerankChunks): Final pass adds bonuses for:
+Numeric density (aggregate queries)
+Direct-answer signals (number near keyword)
+Multi-year presence (comparative queries)
+Heavy penalty for near-duplicate chunks
 
-Date range match: +30 points if the file falls within an explicit date range in the query
-Year match: +10-28 points depending on recency of the year mentioned
-Month match: +8 points
-Annual/full-year boost: +8 points for annual reports when the query asks for annual data
-Quarter match: +8 points
-Keyword match in filename: +2 per keyword
-Category column boost: +5 if a known category value (like "Illinois" or "Recreational") matches a keyword
-Recency boost: up to +3 for recently uploaded files
-PDF preferred slightly over XLSX
+Context Assembly: System prompt is built in strict order:
+Library map (with relationships and gaps)
+Retrieval plan
+Pre-computed stats summaries (explicitly labeled as authoritative for aggregates)
+Context documents (loaded in full)
+Ranked document chunks (with clear labeling: [collection / filename])
 
-Files are ranked by score. Up to 12 files are selected if there's a strong date signal, otherwise top 3 plus a spread of 7 more for broad coverage.
-Step 5 — Chunk selection. For each selected file, chunks are scored against the query using scoreChunk — keyword proximity, numeric density for aggregate queries, multi-year presence for comparative queries. A total chunk budget is allocated (18-22 chunks depending on how many files are loaded), distributed across files with high-scoring files getting more chunks. Every file is guaranteed at least one chunk, and the FILE SUMMARY chunk from each file is always included regardless of score — so the AI always sees the statistical overview.
-Step 6 — Reranking. The selected chunks go through rerankChunks for a second pass — bonus points for chunks where a number appears near a keyword (direct answer signal), numeric density bonus for aggregate queries, multi-year presence bonus for comparative queries, and a -20 penalty for near-duplicate chunks.
-Step 7 — Context assembly. The system prompt is built in layers, in order: the library map, the retrieval plan, pre-computed stats summaries (labeled as authoritative for aggregate questions), context documents (regulatory/policy reference material attached to the collection), and finally the ranked document chunks. The model is told explicitly that the stats summaries are pre-computed from the full dataset and should be preferred for aggregate answers over scanning row chunks.
-Step 8 — LLM call. The assembled system prompt plus the conversation history (last 20 turns) goes to whichever model is selected. The response comes back and gets rendered through the markdown renderer into tables, headers, bullets, and formatted text.
+The final LLM call includes the last 20 turns of conversation history and uses the user-selected model (Claude Sonnet 4 default).
+Library Map (buildLibraryMap)
+Rebuilt on changes and cached for 2 minutes. Profiles each collection (file count, context docs, years, states, file types, total rows). Automatically detects:
 
-Context Documents
-A special category of file that behaves differently from regular documents. Instead of being retrieved by the scoring system, context documents are loaded in full on every query to that collection — they're injected as background knowledge rather than searched. Regulatory documents, SOPs, policies, and reference material work best as context docs. The AI classify system automatically flags these and suggests converting them.
+Cross-collection relationships (regulatory vs operational data sharing states/years)
+Gaps (operational data exists for a state but no regulatory documents)
 
-Voice
-TTS is handled by two providers selectable in Config. xAI Grok (eve, ara, sal, leo, rex voices) is the primary and highest quality — CACI's text goes to the /tts worker endpoint which proxies to the xAI API and returns an audio blob that plays in the browser. Cloudflare Deepgram Aura 2 is the fallback. Voice input uses the browser's Web Speech API to transcribe speech to text before sending it to the chat. Auto-speak mode plays every AI response automatically.
+This map is injected into every system prompt so CACI begins with real situational awareness.
+Voice Pipeline
+
+STT: Browser Web Speech API (SpeechRecognition)
+TTS: /tts endpoint proxies to xAI Grok TTS (voices: eve, ara, sal, leo, rex) or Cloudflare Deepgram Aura 2
+Auto-speak: Configurable toggle, persists in localStorage
+
+The entire system was designed to be fast, private, auditable, and cheap to run while delivering sophisticated, industry-aware retrieval and document intelligence.
