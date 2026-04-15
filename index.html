@@ -993,7 +993,26 @@ body::before {
   height: 1px;
   background: linear-gradient(90deg, transparent, rgba(212,168,50,0.28) 50%, transparent);
 }
-.sb-nav { padding: 6px 10px; flex-shrink: 0; }
+.sb-content-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  margin: 10px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(212,168,50,0.12);
+  border-top-color: rgba(0,0,0,0.70);
+  border-bottom-color: rgba(245,227,152,0.08);
+  background: linear-gradient(180deg, rgba(3,4,10,0.80) 0%, rgba(5,7,14,0.60) 100%);
+  overflow: hidden;
+  box-shadow:
+    inset 0 3px 8px rgba(0,0,0,0.70),
+    inset 0 1px 4px rgba(0,0,0,0.55),
+    inset 2px 0 6px rgba(0,0,0,0.35),
+    inset -2px 0 6px rgba(0,0,0,0.35),
+    inset 0 -1px 0 rgba(245,227,152,0.05),
+    0 0 0 1px rgba(212,168,50,0.06);
+}
+.sb-nav { padding: 8px 8px 4px; flex-shrink: 0; }
 .nav-btn {
   display: flex; align-items: center; justify-content: center; gap: 10px;
   padding: 9px 12px;
@@ -1041,7 +1060,7 @@ body::before {
 .sb-depts {
   flex: 1;
   overflow-y: auto;
-  padding: 4px 10px 8px;
+  padding: 4px 8px 8px;
   scrollbar-width: none;
 }
 .sb-depts::-webkit-scrollbar { display: none; }
@@ -4100,10 +4119,12 @@ body::before {
         <div class="sb-tagline">Operational Intelligence</div>
       </div>
     </div>
+    <div class="sb-content-panel">
     <div class="sb-nav" id="sb-nav"></div>
     <div class="sb-divider"></div>
     <div class="sb-section-label">Department</div>
     <div class="sb-depts" id="sb-depts"></div>
+    </div>
     <div class="sb-footer">
       <div class="model-pill" id="sb-model-pill">
         <div class="mp-indicator" id="mp-indicator" style="color:#22c55e;background:#22c55e"></div>
