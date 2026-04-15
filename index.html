@@ -1119,7 +1119,7 @@ body::before {
 /* Navy accent lines extending outward from the pull */
 .tambour-handle-bar {
   flex: 1;
-  height: 1px;
+  height: 2px;
   background: linear-gradient(90deg,
     transparent,
     rgba(212,168,50,0.55) 15%,
@@ -4312,12 +4312,14 @@ body::before {
     <ellipse cx="500" cy="720" rx="160" ry="58"/>
     <ellipse cx="500" cy="720" rx="90" ry="32"/>
   </g>
-  <!-- Grid hairlines — horizontals brighter, verticals stay subtle -->
+  <!-- Grid hairlines — two main room dividers bright, rest subtle -->
   <g stroke="#b8960c" stroke-width="0.45" opacity="0.32">
-    <line x1="0" y1="150" x2="1440" y2="150"/>
     <line x1="0" y1="300" x2="1440" y2="300"/>
-    <line x1="0" y1="450" x2="1440" y2="450"/>
     <line x1="0" y1="600" x2="1440" y2="600"/>
+  </g>
+  <g stroke="#b8960c" stroke-width="0.2" opacity="0.07">
+    <line x1="0" y1="150" x2="1440" y2="150"/>
+    <line x1="0" y1="450" x2="1440" y2="450"/>
     <line x1="0" y1="750" x2="1440" y2="750"/>
   </g>
   <g stroke="#b8960c" stroke-width="0.2" opacity="0.06">
