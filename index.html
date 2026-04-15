@@ -836,7 +836,7 @@ body::before {
   font-weight: 300;
   letter-spacing: 0.28em;
   line-height: 1;
-  padding-left: 2px;
+  text-align: center;
   background: linear-gradient(150deg,
     var(--gold-metal-1) 0%,
     var(--gold-metal-2) 40%,
@@ -855,10 +855,13 @@ body::before {
   color: var(--smoke4);
   text-transform: uppercase;
   margin-top: 6px;
+  text-align: center;
 }
 .sb-brand-plate {
-  display: inline-flex;
+  display: flex;
   flex-direction: column;
+  align-items: center;
+  width: 100%;
   padding: 10px 14px 11px;
   border-radius: 6px;
   border: 1px solid rgba(212,168,50,0.20);
@@ -870,6 +873,7 @@ body::before {
     0 1px 3px rgba(0,0,0,0.85),
     inset 0 1px 0 rgba(245,227,152,0.10),
     inset 0 -1px 0 rgba(0,0,0,0.45);
+}
 }
 .sb-divider {
   height: 1px;
@@ -991,23 +995,27 @@ body::before {
   display: flex; align-items: center; gap: 9px;
   padding: 9px 12px;
   border-radius: var(--r);
-  border: 1px solid rgba(212,168,50,0.22);
-  border-top-color: rgba(212,168,50,0.32);
-  border-bottom-color: rgba(0,0,0,0.7);
-  background: linear-gradient(160deg, var(--ink4) 0%, var(--ink3) 60%, var(--ink2) 100%);
+  border: 1px solid rgba(212,168,50,0.20);
+  border-top-color: rgba(245,227,152,0.30);
+  border-bottom-color: rgba(0,0,0,0.65);
+  background: linear-gradient(160deg, var(--ink4) 0%, var(--ink3) 50%, var(--ink2) 100%);
   cursor: pointer;
   transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
   box-shadow:
-    0 2px 6px rgba(0,0,0,0.55),
-    0 1px 2px rgba(0,0,0,0.8),
-    inset 0 1px 0 rgba(245,227,152,0.08),
-    inset 0 -1px 0 rgba(0,0,0,0.4);
+    0 3px 10px rgba(0,0,0,0.6),
+    0 1px 3px rgba(0,0,0,0.85),
+    inset 0 1px 0 rgba(245,227,152,0.10),
+    inset 0 -1px 0 rgba(0,0,0,0.45);
 }
 .model-pill:hover {
   border-color: rgba(212,168,50,0.35);
   border-top-color: rgba(245,227,152,0.45);
   background: linear-gradient(160deg, var(--ink5) 0%, var(--ink4) 60%, var(--ink3) 100%);
-  box-shadow: 0 3px 10px rgba(0,0,0,0.6), 0 1px 3px rgba(0,0,0,0.8), inset 0 1px 0 rgba(245,227,152,0.12), inset 0 -1px 0 rgba(0,0,0,0.4);
+  box-shadow:
+    0 4px 14px rgba(0,0,0,0.65),
+    0 1px 3px rgba(0,0,0,0.90),
+    inset 0 1px 0 rgba(245,227,152,0.14),
+    inset 0 -1px 0 rgba(0,0,0,0.50);
 }
 .mp-indicator {
   width: 6px; height: 6px; border-radius: 50%;
