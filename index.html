@@ -889,10 +889,12 @@ body::before {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  /* Single crisp shadow — no blur stacking */
-  filter: drop-shadow(0 1px 0 rgba(0,0,0,0.95)) drop-shadow(0 0 10px rgba(212,168,50,0.18));
+  /* Crisp shadow — minimal blur for sharp text */
+  filter: drop-shadow(0 1px 0 rgba(0,0,0,0.95)) drop-shadow(0 0 6px rgba(212,168,50,0.12));
   -webkit-font-smoothing: antialiased;
-  text-rendering: geometricPrecision;
+  text-rendering: optimizeLegibility;
+  transform: translateZ(0);
+  will-change: transform;
 }
 .sb-tagline {
   font-family: var(--f-ui);
@@ -1095,10 +1097,10 @@ body::before {
   cursor: pointer;
   pointer-events: all;
   background: linear-gradient(180deg,
-    rgba(6,7,12,1) 0%,
-    rgba(14,11,6,1) 40%,
-    rgba(10,8,4,1) 70%,
-    rgba(5,4,2,1) 100%
+    rgba(6,9,18,1) 0%,
+    rgba(8,12,22,1) 40%,
+    rgba(6,9,18,1) 70%,
+    rgba(5,7,14,1) 100%
   );
   border-top: 1px solid rgba(212,168,50,0.55);
   position: relative;
@@ -1106,35 +1108,35 @@ body::before {
   box-shadow:
     inset 0 1px 0 rgba(245,210,100,0.18),
     inset 0 -1px 0 rgba(0,0,0,0.70),
-    inset 0 0 16px rgba(4,3,1,0.90);
+    inset 0 0 16px rgba(4,6,14,0.90);
 }
 .tambour-handle:hover {
   background: linear-gradient(180deg,
-    rgba(10,10,6,1) 0%,
-    rgba(22,18,8,1) 40%,
-    rgba(16,13,5,1) 70%,
-    rgba(8,6,2,1) 100%
+    rgba(8,12,26,1) 0%,
+    rgba(12,18,34,1) 40%,
+    rgba(9,13,24,1) 70%,
+    rgba(6,9,18,1) 100%
   );
 }
-/* Left rule line */
+/* Navy accent lines extending outward from the pull */
 .tambour-handle-bar {
   flex: 1;
   height: 1px;
   background: linear-gradient(90deg,
     transparent,
-    rgba(212,168,50,0.20) 30%,
-    rgba(212,168,50,0.45) 100%
+    rgba(20,40,90,0.45) 20%,
+    rgba(30,60,130,0.65) 100%
   );
   margin: 0 8px;
 }
 .tambour-handle-bar:last-child {
   background: linear-gradient(90deg,
-    rgba(212,168,50,0.45) 0%,
-    rgba(212,168,50,0.20) 70%,
+    rgba(30,60,130,0.65) 0%,
+    rgba(20,40,90,0.45) 80%,
     transparent
   );
 }
-/* The pull knob */
+/* The pull knob — navy */
 .tambour-handle-pull {
   width: 48px;
   height: 18px;
@@ -1142,9 +1144,9 @@ body::before {
   position: relative;
   flex-shrink: 0;
   background: linear-gradient(180deg,
-    rgba(28,22,8,1) 0%,
-    rgba(16,12,4,1) 50%,
-    rgba(8,6,2,1) 100%
+    rgba(14,22,52,1) 0%,
+    rgba(8,14,36,1) 50%,
+    rgba(5,9,24,1) 100%
   );
   border: 1px solid rgba(212,168,50,0.60);
   border-top-color: rgba(245,227,152,0.85);
@@ -1152,9 +1154,9 @@ body::before {
   box-shadow:
     0 2px 8px rgba(0,0,0,0.80),
     0 1px 2px rgba(0,0,0,0.90),
-    inset 0 1px 0 rgba(245,227,152,0.20),
+    inset 0 1px 0 rgba(40,70,160,0.30),
     inset 0 -1px 0 rgba(0,0,0,0.55),
-    inset 0 0 6px rgba(4,3,1,0.80);
+    inset 0 0 6px rgba(4,8,20,0.80);
   transition: box-shadow 0.2s, border-color 0.2s;
 }
 /* Top highlight edge on pull */
@@ -1192,9 +1194,9 @@ body::before {
   box-shadow:
     0 3px 12px rgba(0,0,0,0.75),
     0 1px 3px rgba(0,0,0,0.90),
-    inset 0 1px 0 rgba(245,227,152,0.25),
+    inset 0 1px 0 rgba(50,90,200,0.25),
     inset 0 -1px 0 rgba(0,0,0,0.55),
-    inset 0 0 8px rgba(10,16,40,0.60),
+    inset 0 0 8px rgba(4,8,24,0.70),
     0 0 8px rgba(212,168,50,0.15);
 }
 .tambour.open .tambour-handle {
@@ -1230,11 +1232,11 @@ body::before {
   /* Raised — outer drop shadow for lift + visible side wall depth */
   box-shadow:
     /* Right wall — catches light differently than left */
-    4px 0 0 rgba(100,72,14,0.45),
+    2px 0 0 rgba(100,72,14,0.35),
     /* Left wall */
-    -4px 0 0 rgba(80,58,10,0.35),
+    -2px 0 0 rgba(80,58,10,0.25),
     /* Bottom wall — darkest, in shadow */
-    0 4px 0 rgba(40,28,4,0.80),
+    0 2px 0 rgba(40,28,4,0.75),
     /* Outer lift shadow */
     0 6px 18px rgba(0,0,0,0.80),
     0 2px 6px rgba(0,0,0,0.90),
