@@ -4873,21 +4873,14 @@ function renderDiscoveryGreeting(text, collections) {
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 
-  // Keep CACI name centered in the messages area (already there from dg-name-above-bar in HTML)
+  // Render greeting above CACI name, all centered in the messages area
   const msgs = $('chat-msgs');
   const nameEl = document.createElement('div');
   nameEl.id = 'discovery-name';
   nameEl.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;text-align:center;pointer-events:none;';
-  nameEl.innerHTML = `<div class="dg-eyebrow" style="margin-bottom:8px">Intelligence Assistant</div><div class="dg-name">CACI</div>`;
+  const greetingHtml = esc(cleanText).replace(/\n/g, '<br>');
+  nameEl.innerHTML = `<div id="discovery-greeting-strip" class="dgs-text" style="margin-bottom:24px;pointer-events:auto;">${greetingHtml}</div><div class="dg-eyebrow" style="margin-bottom:8px">Intelligence Assistant</div><div class="dg-name">CACI</div>`;
   msgs.appendChild(nameEl);
-
-  // Greeting strip injected just above the chat bar
-  const bar = $('chat-bar');
-  const strip = document.createElement('div');
-  strip.id = 'discovery-greeting-strip';
-  const stripHtml = esc(cleanText).replace(/\n/g, '<br>');
-  strip.innerHTML = `<div class="dgs-text">${stripHtml}</div>`;
-  bar.parentNode.insertBefore(strip, bar);
 
   $('chat-empty').style.display = 'none';
 }
