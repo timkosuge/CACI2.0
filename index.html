@@ -5106,38 +5106,83 @@ function setupLogin() {
       document.removeEventListener('keydown', onAnyKey);
     }
   });
+  // Touch tap on front face flips on mobile
+  document.addEventListener('touchstart', function onAnyTouch() {
+    if (!flipped) {
+      doFlip();
+      document.removeEventListener('touchstart', onAnyTouch);
+    }
+  }, { passive: true });
   // Click/tap on the front face also flips
   if (scene) scene.addEventListener('click', () => { if (!flipped) doFlip(); });
   const turnBtn = document.getElementById('lcard-turn');
   if (turnBtn) turnBtn.addEventListener('click', (e) => { e.stopPropagation(); if (!flipped) doFlip(); });
 
-  /* Fake password masking — type="text" so Chrome never triggers autofill styling */
+  /* Password masking — works on both desktop (keydown) and mobile (input event) */
   const pwEl = $('login-pw');
+  let _lastValue = '';
+
+  /* Desktop: intercept keydown for precise control */
   pwEl.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') return; // handled below
+    if (e.key === 'Enter') return;
     if (e.key === 'Backspace') {
       e.preventDefault();
-      const real = pwEl.dataset.real;
-      pwEl.dataset.real = real.slice(0, -1);
+      pwEl.dataset.real = pwEl.dataset.real.slice(0, -1);
       pwEl.value = '\u00B7'.repeat(pwEl.dataset.real.length);
+      _lastValue = pwEl.value;
       return;
     }
     if (e.key === 'Delete') {
       e.preventDefault();
       pwEl.dataset.real = '';
       pwEl.value = '';
+      _lastValue = '';
       return;
     }
     if (e.key.length !== 1 || e.ctrlKey || e.metaKey || e.altKey) return;
     e.preventDefault();
     pwEl.dataset.real += e.key;
     pwEl.value = '\u00B7'.repeat(pwEl.dataset.real.length);
+    _lastValue = pwEl.value;
   });
+
+  /* Mobile: virtual keyboard fires 'input' not 'keydown' reliably.
+     We diff the raw value to figure out what was typed/deleted. */
+  pwEl.addEventListener('input', function() {
+    const raw = pwEl.value;
+    const dots = '\u00B7'.repeat(pwEl.dataset.real.length);
+
+    // If it looks like our own masked output, ignore (desktop already handled it)
+    if (raw === dots) { _lastValue = raw; return; }
+
+    const prevLen = pwEl.dataset.real.length;
+    const newLen  = raw.length;
+
+    if (newLen > prevLen) {
+      // Characters added — extract the new ones (they won't be dots)
+      for (let i = 0; i < raw.length; i++) {
+        if (raw[i] !== '\u00B7') {
+          pwEl.dataset.real += raw[i];
+        }
+      }
+    } else if (newLen < prevLen) {
+      // Characters deleted
+      pwEl.dataset.real = pwEl.dataset.real.slice(0, newLen);
+    }
+
+    // Re-mask the field
+    pwEl.value = '\u00B7'.repeat(pwEl.dataset.real.length);
+    _lastValue = pwEl.value;
+    // Move cursor to end
+    pwEl.setSelectionRange(pwEl.value.length, pwEl.value.length);
+  });
+
   pwEl.addEventListener('paste', function(e) {
     e.preventDefault();
     const pasted = (e.clipboardData || window.clipboardData).getData('text');
     pwEl.dataset.real += pasted;
     pwEl.value = '\u00B7'.repeat(pwEl.dataset.real.length);
+    _lastValue = pwEl.value;
   });
 
   async function tryLogin() {
