@@ -4933,7 +4933,7 @@ function bootApp() {
 /* NAV */
 function buildNav() {
   $('sb-nav').innerHTML = MODS.map(m =>
-    `<button class="nav-btn" data-p="${m.id}"><span class="nav-icon">${m.icon}</span>${m.label}</button>`
+    `<button class="nav-btn" data-p="${m.id}">${m.label}</button>`
   ).join('');
   $('sb-nav').querySelectorAll('.nav-btn').forEach(b => b.addEventListener('click', () => switchPanel(b.dataset.p)));
   $('botbar').innerHTML = MODS.map(m =>
