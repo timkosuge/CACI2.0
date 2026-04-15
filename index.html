@@ -6080,18 +6080,38 @@ function setupLogin() {
   const DOT = '\u00B7';
   let _masking = false; // flag to skip input events we triggered ourselves
 
-  pwEl.addEventListener('input', function() {
+  pwEl.addEventListener('compositionend', function(e) {
+    // Mobile IME composition finished — capture the composed text
+    if (_masking) return;
+    const composed = e.data || '';
+    if (composed) {
+      pwEl.dataset.real += composed;
+      _masking = true;
+      pwEl.value = DOT.repeat(pwEl.dataset.real.length);
+      _masking = false;
+      try { pwEl.setSelectionRange(pwEl.value.length, pwEl.value.length); } catch(e) {}
+    }
+  });
+
+  pwEl.addEventListener('input', function(e) {
     if (_masking) return; // our own setValue, ignore
+    if (e.isComposing) return; // let compositionend handle this
 
     const raw = pwEl.value;
     const prevReal = pwEl.dataset.real;
 
     if (raw.length > prevReal.length) {
-      // Added characters — collect non-dot chars
+      // Added characters — collect non-dot chars, strip any smart quotes or auto-substitutions
       let added = '';
       for (let i = 0; i < raw.length; i++) {
         if (raw[i] !== DOT) added += raw[i];
       }
+      // Normalize: replace smart quotes, curly apostrophes, non-breaking spaces mobile keyboards inject
+      added = added
+        .replace(/[‘’]/g, "'")
+        .replace(/[“”]/g, '"')
+        .replace(/ /g, ' ')
+        .replace(/–|—/g, '-');
       pwEl.dataset.real = prevReal + added;
     } else {
       // Deleted — trim real value to match new length
