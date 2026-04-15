@@ -359,6 +359,7 @@ async function handleDeleteFile(id, env, url) {
       await env.CACI_KV.delete(`file:${id}`);
       const deptIdx = await env.CACI_KV.get(`index:${explicitDept}`, 'json') || [];
       await env.CACI_KV.put(`index:${explicitDept}`, JSON.stringify(deptIdx.filter(f => f.id !== id)));
+      await env.CACI_KV.delete(`library:map:${explicitDept}`).catch(() => {});
       return json({ ok: true });
     }
 
@@ -383,6 +384,8 @@ async function handleDeleteFile(id, env, url) {
         }
       }
       await env.CACI_KV.delete(`file:${id}`);
+      // Invalidate library map for all depts since we don't know which one
+      for (const d of depts) await env.CACI_KV.delete(`library:map:${d}`).catch(() => {});
       return json({ ok: true });
     }
 
@@ -410,6 +413,7 @@ async function handleDeleteFile(id, env, url) {
     }
 
     if (env.CACI_R2) await env.CACI_R2.delete(`${dept}/${collection}/${id}/${name}`).catch(() => {});
+    await env.CACI_KV.delete(`library:map:${dept}`).catch(() => {});
     return json({ ok: true });
   } catch (err) { return json({ error: 'Delete failed: ' + err.message }, 500); }
 }
@@ -534,7 +538,7 @@ Today you're working with the ${dept} team. Here's what you have access to:
 ${discovery.collectionList}
 ${discLibraryPrompt ? '\n' + discLibraryPrompt : ''}
 
-You know this library well — it's yours. When you greet the team, show that awareness naturally. If there are interesting things in the library worth mentioning (new documents, gaps, cross-collection relationships), weave one in naturally — don't list everything, just be a librarian who knows her shelves. Greet them like a colleague — warm, real, not robotic. Keep it short.
+You know this library well — it's yours. When you greet the team, show that awareness naturally. If there are documents explicitly listed above worth mentioning, weave one in naturally — but ONLY reference documents that are actually listed in the library above. If the library is empty or sparse, do not invent or imply documents exist. Greet them like a colleague — warm, real, not robotic. Keep it short.
 
 INDUSTRY KNOWLEDGE — you know this world deeply:
 
@@ -844,7 +848,7 @@ async function buildDiscoveryContext({ dept, env }) {
 async function buildLibraryMap({ dept, env }) {
   try {
     const cached = await env.CACI_KV.get(`library:map:${dept}`, 'json');
-    if (cached && cached.builtAt && (Date.now() - cached.builtAt) < 30 * 60 * 1000) return cached;
+    if (cached && cached.builtAt && (Date.now() - cached.builtAt) < 2 * 60 * 1000) return cached;
 
     const reg = await env.CACI_KV.get(`colreg:${dept}`, 'json') || [];
     if (!reg.length) return null;
