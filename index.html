@@ -2624,6 +2624,7 @@ body::before {
   text-transform: uppercase;
   color: var(--gold);
   opacity: 0.50;
+  margin-top: 4px;
   margin-bottom: 8px;
 }
 .dg-name {
@@ -5057,26 +5058,16 @@ body::before {
     @keyframes p8  { from{stroke-dashoffset:500}  to{stroke-dashoffset:0} }
     @keyframes p9  { from{stroke-dashoffset:2600} to{stroke-dashoffset:0} }
     @keyframes p10 { from{stroke-dashoffset:700}  to{stroke-dashoffset:0} }
-    /* Tail keyframes — tail is BEHIND the head: offset = pathLen + tailLen → tailLen */
-    /* p1: path=1440, tail=22 */
+    /* Tail keyframes — tail BEHIND head: offset = pathLen + tailLen → tailLen */
     @keyframes p1t  { from{stroke-dashoffset:1462} to{stroke-dashoffset:22} }
-    /* p2: path=900, tail=22 */
     @keyframes p2t  { from{stroke-dashoffset:922}  to{stroke-dashoffset:22} }
-    /* p3: path=1200, tail=22 */
     @keyframes p3t  { from{stroke-dashoffset:1222} to{stroke-dashoffset:22} }
-    /* p4: path=800, tail=22 */
     @keyframes p4t  { from{stroke-dashoffset:822}  to{stroke-dashoffset:22} }
-    /* p5: path=2200, tail=26 */
     @keyframes p5t  { from{stroke-dashoffset:2226} to{stroke-dashoffset:26} }
-    /* p6: path=1600, tail=22 */
     @keyframes p6t  { from{stroke-dashoffset:1622} to{stroke-dashoffset:22} }
-    /* p7: path=3200, tail=22 */
     @keyframes p7t  { from{stroke-dashoffset:3222} to{stroke-dashoffset:22} }
-    /* p8: path=500, tail=18 */
     @keyframes p8t  { from{stroke-dashoffset:518}  to{stroke-dashoffset:18} }
-    /* p9: path=2600, tail=22 */
     @keyframes p9t  { from{stroke-dashoffset:2622} to{stroke-dashoffset:22} }
-    /* p10: path=700, tail=14 */
     @keyframes p10t { from{stroke-dashoffset:714}  to{stroke-dashoffset:14} }
                             
     /* Head: 2.4px bright dot. Tail: warm glow that trails immediately behind it */
