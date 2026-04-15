@@ -906,9 +906,59 @@ These summaries were computed at upload time from the full dataset. When a quest
     }
 
     const responseText = await callLLM({ model, system, messages: [...history.slice(-20).map(h => ({ role: h.role, content: h.content })), { role: 'user', content: message }], maxTokens: 8000, env, apiKey });
+
+    // ── Answer verification — only for numeric aggregate/comparative responses ──
+    // Fires when: response contains numbers AND query was aggregate or comparative
+    // AND we have a stats block to check against. Haiku-only, non-blocking on failure.
+    let verifiedResponse = responseText;
+    const responseHasNumbers = /\$[\d,]+|\d[\d,]*\.?\d*\s*(%|k|m|b|million|billion|units|lbs|oz)/i.test(responseText);
+    const shouldVerify = (intent.isAggregate || intent.isComparative) && responseHasNumbers && context.statsContext;
+
+    if (shouldVerify) {
+      try {
+        const verifyPrompt = `You are a fact-checker for a cannabis company's internal AI assistant.
+
+The user asked: "${message}"
+
+The AI gave this response:
+${responseText.slice(0, 2000)}
+
+The authoritative pre-computed data summaries are:
+${context.statsContext.slice(0, 1500)}
+
+Your job: scan the response for any specific numbers (totals, averages, percentages, counts). For each number, check if it's consistent with the data summaries above.
+
+If everything checks out, respond with exactly: VERIFIED
+
+If you find a specific numerical inconsistency (not a style issue, not a missing detail — only a number that contradicts the summaries), respond with:
+CORRECTION: [one sentence describing only the specific number that's wrong and what it should be based on the summaries]
+
+Do not comment on anything else. Do not rewrite the response. Only flag hard numerical contradictions.`;
+
+        const verifyResp = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+          body: JSON.stringify({
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: 120,
+            messages: [{ role: 'user', content: verifyPrompt }],
+          }),
+        });
+        const verifyData = await verifyResp.json();
+        const verdict = verifyData.content?.[0]?.text?.trim() || '';
+
+        if (verdict.startsWith('CORRECTION:')) {
+          // Append a subtle correction note inline — doesn't rewrite, just flags
+          const correction = verdict.replace('CORRECTION:', '').trim();
+          verifiedResponse = responseText + `\n\n> ⚠ *Data check: ${correction}*`;
+        }
+        // VERIFIED or anything else — ship as-is
+      } catch { /* non-blocking — if verify fails, original response ships unchanged */ }
+    }
+
     // Only surface sources if documents were actually retrieved — not for general conversation
     const sourcesToReturn = context.text ? context.sources : [];
-    return json({ ok: true, response: responseText, sources: sourcesToReturn, scope, model: model || 'claude' });
+    return json({ ok: true, response: verifiedResponse, sources: sourcesToReturn, scope, model: model || 'claude', verified: shouldVerify });
   } catch (err) { return json({ error: 'Chat error: ' + err.message }, 500); }
 }
 
