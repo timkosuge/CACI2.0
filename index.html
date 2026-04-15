@@ -434,7 +434,24 @@ body::before {
     inset 0 3px 8px rgba(0,0,0,0.70),
     inset 0 1px 3px rgba(0,0,0,0.55);
 }
-/* Autofill override not needed — input uses type="text" with JS masking */
+/* Kill browser autofill white background — must also re-declare our full shadow stack here
+   because -webkit-box-shadow in autofill rules replaces ALL box-shadow */
+.linput:-webkit-autofill,
+.linput:-webkit-autofill:hover,
+.linput:-webkit-autofill:focus {
+  -webkit-box-shadow:
+    0 0 0 100px rgba(4,7,16,1) inset,
+    inset 0 2px 0 rgba(180,130,20,0.28),
+    inset 2px 0 0 rgba(180,130,20,0.14),
+    inset -2px 0 0 rgba(180,130,20,0.14),
+    inset 0 -1px 0 rgba(180,130,20,0.10),
+    inset 0 3px 8px rgba(0,0,0,0.70),
+    inset 0 1px 3px rgba(0,0,0,0.55);
+  -webkit-text-fill-color: rgba(245,227,152,0.75);
+  caret-color: rgba(212,168,50,0.8);
+  border: none !important;
+  outline: none !important;
+}
 .linput::placeholder {
   color: rgba(212,168,50,0.18);
   letter-spacing: 0.15em;
@@ -3602,7 +3619,7 @@ body::before {
       <div class="lfield-wrap">
         <div class="lfield-rule"><div class="lfield-rule-diamond"></div></div>
         <div class="lfield-label">Credentials</div>
-        <input class="linput" type="text" id="login-pw" placeholder="&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-real="">
+        <input class="linput" type="password" id="login-pw" placeholder="&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;" autocomplete="current-password"/>
         <div class="linput-glow"></div>
       </div>
       <button class="lbtn" id="login-btn">Authenticate</button>
@@ -4396,40 +4413,8 @@ async function apiFetch(path, opts = {}) {
 /* LOGIN */
 function setupLogin() {
   if (token) { bootApp(); return; }
-
-  /* Fake password masking — type="text" so Chrome never triggers autofill styling */
-  const pwEl = $('login-pw');
-  pwEl.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') return; // handled below
-    if (e.key === 'Backspace') {
-      e.preventDefault();
-      const real = pwEl.dataset.real;
-      pwEl.dataset.real = real.slice(0, -1);
-      pwEl.value = '\u00B7'.repeat(pwEl.dataset.real.length);
-      return;
-    }
-    if (e.key === 'Delete') {
-      e.preventDefault();
-      pwEl.dataset.real = '';
-      pwEl.value = '';
-      return;
-    }
-    // Let non-printable keys (Tab, arrows, etc.) pass through normally
-    if (e.key.length !== 1 || e.ctrlKey || e.metaKey || e.altKey) return;
-    e.preventDefault();
-    pwEl.dataset.real += e.key;
-    pwEl.value = '\u00B7'.repeat(pwEl.dataset.real.length);
-  });
-  /* Handle paste */
-  pwEl.addEventListener('paste', function(e) {
-    e.preventDefault();
-    const pasted = (e.clipboardData || window.clipboardData).getData('text');
-    pwEl.dataset.real += pasted;
-    pwEl.value = '\u00B7'.repeat(pwEl.dataset.real.length);
-  });
-
   async function tryLogin() {
-    const pw = pwEl.dataset.real.trim();
+    const pw = $('login-pw').value.trim();
     if (!pw) return;
     $('login-btn').disabled = true;
     $('login-btn').textContent = 'Authenticating\u2026';
@@ -4446,9 +4431,8 @@ function setupLogin() {
         bootApp();
       } else {
         $('login-err').style.display = 'block';
-        pwEl.dataset.real = '';
-        pwEl.value = '';
-        pwEl.focus();
+        $('login-pw').value = '';
+        $('login-pw').focus();
       }
     } catch {
       $('login-err').textContent = 'Cannot reach server \u2014 check Worker deployment';
@@ -4458,7 +4442,7 @@ function setupLogin() {
     $('login-btn').textContent = 'Authenticate';
   }
   $('login-btn').addEventListener('click', tryLogin);
-  pwEl.addEventListener('keydown', e => { if (e.key === 'Enter') tryLogin(); });
+  $('login-pw').addEventListener('keydown', e => { if (e.key === 'Enter') tryLogin(); });
 }
 
 /* BOOT */
