@@ -5942,7 +5942,7 @@ function renderDiscoveryGreeting(text, collections) {
   const msgs = $('chat-msgs');
   const nameEl = document.createElement('div');
   nameEl.id = 'discovery-name';
-  nameEl.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;text-align:center;pointer-events:none;';
+  nameEl.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;text-align:center;pointer-events:none;padding-top:10%;';
   const greetingHtml = esc(cleanText).replace(/\n/g, '<br>');
   nameEl.innerHTML = `<div id="discovery-greeting-strip" style="margin-bottom:56px;pointer-events:auto;"><div class="dgs-text" style="max-width:420px;">${greetingHtml}</div></div><div class="dg-eyebrow" style="margin-bottom:8px">Operational Intelligence</div><div class="dg-name">CACI</div>`;
   msgs.appendChild(nameEl);
