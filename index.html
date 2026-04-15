@@ -4477,128 +4477,168 @@ body::before {
 
     <!-- CHAT -->
     <div class="panel active" data-panel="chat">
-      <div class="chat-bg-overlay" aria-hidden="true"><svg viewBox="0 0 1200 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+      <div class="chat-bg-overlay" aria-hidden="true"><svg viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <radialGradient id="vignette" cx="50%" cy="50%" r="70%">
       <stop offset="0%"   stop-color="#050810" stop-opacity="0"/>
-      <stop offset="100%" stop-color="#050810" stop-opacity="0.88"/>
+      <stop offset="100%" stop-color="#050810" stop-opacity="0.75"/>
     </radialGradient>
-    <filter id="sf" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="1.8"/>
+    <!-- Glow filter for pulse heads -->
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="softglow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="1.5"/>
     </filter>
   </defs>
 
   <style>
-    /* Sparse short sparks — small dashes, wide gaps, slow */
+    /* Each circuit trace: a tiny bright dash (pulse head) with a short tail travelling along the path */
+    .pulse { fill: none; }
 
-    @keyframes sJ1 { from { stroke-dashoffset: 2200; } to { stroke-dashoffset: 0; } }
-    @keyframes sJ2 { from { stroke-dashoffset: 1800; } to { stroke-dashoffset: 0; } }
-    @keyframes sJ3 { from { stroke-dashoffset: 2600; } to { stroke-dashoffset: 0; } }
+    /* Horizontal traces — left to right */
+    @keyframes pLR1 { from { stroke-dashoffset: 1200; } to { stroke-dashoffset: 0; } }
+    @keyframes pLR2 { from { stroke-dashoffset: 900;  } to { stroke-dashoffset: 0; } }
+    @keyframes pLR3 { from { stroke-dashoffset: 1500; } to { stroke-dashoffset: 0; } }
+    @keyframes pLR4 { from { stroke-dashoffset: 700;  } to { stroke-dashoffset: 0; } }
+    @keyframes pLR5 { from { stroke-dashoffset: 1100; } to { stroke-dashoffset: 0; } }
+    @keyframes pLR6 { from { stroke-dashoffset: 1300; } to { stroke-dashoffset: 0; } }
 
-    @keyframes sU1 { from { stroke-dashoffset: 1800; } to { stroke-dashoffset: 0; } }
-    @keyframes sU2 { from { stroke-dashoffset: 1400; } to { stroke-dashoffset: 0; } }
-    @keyframes sU3 { from { stroke-dashoffset: 2200; } to { stroke-dashoffset: 0; } }
+    /* Vertical traces — top to bottom */
+    @keyframes pTB1 { from { stroke-dashoffset: 1000; } to { stroke-dashoffset: 0; } }
+    @keyframes pTB2 { from { stroke-dashoffset: 800;  } to { stroke-dashoffset: 0; } }
+    @keyframes pTB3 { from { stroke-dashoffset: 1200; } to { stroke-dashoffset: 0; } }
+    @keyframes pTB4 { from { stroke-dashoffset: 600;  } to { stroke-dashoffset: 0; } }
 
-    @keyframes sS1 { from { stroke-dashoffset: 1600; } to { stroke-dashoffset: 0; } }
-    @keyframes sS2 { from { stroke-dashoffset: 1200; } to { stroke-dashoffset: 0; } }
-    @keyframes sS3 { from { stroke-dashoffset: 2000; } to { stroke-dashoffset: 0; } }
+    /* L-shaped / corner traces */
+    @keyframes pC1  { from { stroke-dashoffset: 1800; } to { stroke-dashoffset: 0; } }
+    @keyframes pC2  { from { stroke-dashoffset: 1400; } to { stroke-dashoffset: 0; } }
+    @keyframes pC3  { from { stroke-dashoffset: 2000; } to { stroke-dashoffset: 0; } }
+    @keyframes pC4  { from { stroke-dashoffset: 1600; } to { stroke-dashoffset: 0; } }
 
-    @keyframes sH1 { from { stroke-dashoffset: 2000; } to { stroke-dashoffset: 0; } }
-    @keyframes sH2 { from { stroke-dashoffset: 1600; } to { stroke-dashoffset: 0; } }
-    @keyframes sH3 { from { stroke-dashoffset: 2400; } to { stroke-dashoffset: 0; } }
+    /* Outer frame traces */
+    @keyframes pF1  { from { stroke-dashoffset: 3000; } to { stroke-dashoffset: 0; } }
+    @keyframes pF2  { from { stroke-dashoffset: 2400; } to { stroke-dashoffset: 0; } }
 
-    @keyframes sI1 { from { stroke-dashoffset: 1400; } to { stroke-dashoffset: 0; } }
-    @keyframes sI2 { from { stroke-dashoffset: 1000; } to { stroke-dashoffset: 0; } }
-    @keyframes sI3 { from { stroke-dashoffset: 1800; } to { stroke-dashoffset: 0; } }
+    /* Pulse head: 2px dash, huge gap so only one dot visible at a time */
+    /* Tail: slightly longer dash behind it */
 
-    /* Dash halved, gaps wider (~25% fewer dots), speed slowed ~40% */
-    .j1 { stroke-dasharray: 5 160; animation: sJ1 8s linear 0s infinite; }
-    .j2 { stroke-dasharray: 3 120; animation: sJ2 11s linear 1.8s infinite; }
-    .j3 { stroke-dasharray: 7 210; animation: sJ3 14s linear 3.5s infinite; }
+    /* Horizontal runs — across the width */
+    .hr1  { stroke-dasharray: 2 900;  animation: pLR1 6s  linear 0s    infinite; }
+    .hr1t { stroke-dasharray: 18 900; animation: pLR1 6s  linear 0.08s infinite; opacity: 0.25; }
+    .hr2  { stroke-dasharray: 2 700;  animation: pLR2 5s  linear 1.3s  infinite; }
+    .hr2t { stroke-dasharray: 18 700; animation: pLR2 5s  linear 1.38s infinite; opacity: 0.25; }
+    .hr3  { stroke-dasharray: 2 1100; animation: pLR3 8s  linear 2.7s  infinite; }
+    .hr3t { stroke-dasharray: 18 1100;animation: pLR3 8s  linear 2.78s infinite; opacity: 0.25; }
+    .hr4  { stroke-dasharray: 2 500;  animation: pLR4 4s  linear 0.6s  infinite; }
+    .hr4t { stroke-dasharray: 18 500; animation: pLR4 4s  linear 0.68s infinite; opacity: 0.25; }
+    .hr5  { stroke-dasharray: 2 800;  animation: pLR5 6.5s linear 4.1s infinite; }
+    .hr5t { stroke-dasharray: 18 800; animation: pLR5 6.5s linear 4.18s infinite; opacity: 0.25; }
+    .hr6  { stroke-dasharray: 2 950;  animation: pLR6 7s  linear 1.9s  infinite; }
+    .hr6t { stroke-dasharray: 18 950; animation: pLR6 7s  linear 1.98s infinite; opacity: 0.25; }
 
-    .u1 { stroke-dasharray: 5 160; animation: sU1 8s linear 0.6s infinite; }
-    .u2 { stroke-dasharray: 3 120; animation: sU2 11s linear 2.4s infinite; }
-    .u3 { stroke-dasharray: 7 210; animation: sU3 14s linear 4.1s infinite; }
+    /* Vertical runs */
+    .vr1  { stroke-dasharray: 2 700;  animation: pTB1 5.5s linear 0.4s  infinite; }
+    .vr1t { stroke-dasharray: 18 700; animation: pTB1 5.5s linear 0.48s infinite; opacity: 0.25; }
+    .vr2  { stroke-dasharray: 2 600;  animation: pTB2 4.5s linear 2.2s  infinite; }
+    .vr2t { stroke-dasharray: 18 600; animation: pTB2 4.5s linear 2.28s infinite; opacity: 0.25; }
+    .vr3  { stroke-dasharray: 2 900;  animation: pTB3 7s  linear 3.5s  infinite; }
+    .vr3t { stroke-dasharray: 18 900; animation: pTB3 7s  linear 3.58s infinite; opacity: 0.25; }
+    .vr4  { stroke-dasharray: 2 450;  animation: pTB4 3.5s linear 5.1s  infinite; }
+    .vr4t { stroke-dasharray: 18 450; animation: pTB4 3.5s linear 5.18s infinite; opacity: 0.25; }
 
-    .s1 { stroke-dasharray: 5 160; animation: sS1 8s linear 1.2s infinite; }
-    .s2 { stroke-dasharray: 3 120; animation: sS2 11s linear 3.0s infinite; }
-    .s3 { stroke-dasharray: 7 210; animation: sS3 14s linear 0.7s infinite; }
+    /* Corner / L-traces */
+    .cr1  { stroke-dasharray: 2 1400; animation: pC1 10s linear 0.8s  infinite; }
+    .cr1t { stroke-dasharray: 18 1400;animation: pC1 10s linear 0.88s infinite; opacity: 0.25; }
+    .cr2  { stroke-dasharray: 2 1000; animation: pC2 8s  linear 3.4s  infinite; }
+    .cr2t { stroke-dasharray: 18 1000;animation: pC2 8s  linear 3.48s infinite; opacity: 0.25; }
+    .cr3  { stroke-dasharray: 2 1600; animation: pC3 11s linear 1.6s  infinite; }
+    .cr3t { stroke-dasharray: 18 1600;animation: pC3 11s linear 1.68s infinite; opacity: 0.25; }
+    .cr4  { stroke-dasharray: 2 1200; animation: pC4 9s  linear 5.8s  infinite; }
+    .cr4t { stroke-dasharray: 18 1200;animation: pC4 9s  linear 5.88s infinite; opacity: 0.25; }
 
-    .h1 { stroke-dasharray: 5 160; animation: sH1 8s linear 1.8s infinite; }
-    .h2 { stroke-dasharray: 3 120; animation: sH2 11s linear 0.3s infinite; }
-    .h3 { stroke-dasharray: 7 210; animation: sH3 14s linear 5.2s infinite; }
-
-    .i1 { stroke-dasharray: 5 160; animation: sI1 8s linear 2.4s infinite; }
-    .i2 { stroke-dasharray: 3 120; animation: sI2 11s linear 4.7s infinite; }
-    .i3 { stroke-dasharray: 7 210; animation: sI3 14s linear 1.3s infinite; }
-
-    @keyframes fJ { 0%{opacity:1} 18%{opacity:0.12} 22%{opacity:0.9} 44%{opacity:0.55} 47%{opacity:1} 68%{opacity:0.18} 72%{opacity:0.85} 100%{opacity:1} }
-    @keyframes fU { 0%{opacity:0.7} 13%{opacity:1} 30%{opacity:0.08} 34%{opacity:0.95} 56%{opacity:0.65} 59%{opacity:0.04} 63%{opacity:1} 100%{opacity:0.7} }
-    @keyframes fS { 0%{opacity:1} 9%{opacity:0.25} 12%{opacity:1} 38%{opacity:0.75} 41%{opacity:0.04} 45%{opacity:0.9} 74%{opacity:0.18} 78%{opacity:1} 100%{opacity:1} }
-    @keyframes fH { 0%{opacity:0.6} 16%{opacity:1} 20%{opacity:0.35} 24%{opacity:0.95} 50%{opacity:1} 53%{opacity:0.08} 57%{opacity:0.8} 85%{opacity:0.45} 89%{opacity:1} 100%{opacity:0.6} }
-    @keyframes fI { 0%{opacity:1} 23%{opacity:0.65} 27%{opacity:0.04} 31%{opacity:1} 55%{opacity:0.85} 58%{opacity:0.15} 62%{opacity:1} 80%{opacity:0.38} 84%{opacity:1} 100%{opacity:1} }
-
-    .flick-j { animation: fJ 3.7s ease-in-out 0s infinite; }
-    .flick-u { animation: fU 4.9s ease-in-out 0.8s infinite; }
-    .flick-s { animation: fS 3.2s ease-in-out 1.6s infinite; }
-    .flick-h { animation: fH 5.5s ease-in-out 0.4s infinite; }
-    .flick-i { animation: fI 4.1s ease-in-out 2.1s infinite; }
+    /* Outer frame */
+    .fr1  { stroke-dasharray: 2 2600; animation: pF1 18s linear 0s    infinite; }
+    .fr1t { stroke-dasharray: 22 2600;animation: pF1 18s linear 0.1s  infinite; opacity: 0.20; }
+    .fr2  { stroke-dasharray: 2 2000; animation: pF2 14s linear 7s    infinite; }
+    .fr2t { stroke-dasharray: 22 2000;animation: pF2 14s linear 7.1s  infinite; opacity: 0.20; }
   </style>
 
-  <!-- Letter paths — approximate outlines matching JUSHI.jpg chrome letters -->
-  <!-- Shared stroke properties via g elements -->
+  <!-- ═══ CIRCUIT TRACES ═══ -->
+  <!-- Colors: bright head = near-white gold, tail = warm gold -->
 
-  <!-- J -->
-  <g class="flick-j" fill="none" filter="url(#sf)">
-    <path class="j1" d="M 108,210 L 232,210 L 232,590 Q 232,660 196,695 Q 158,732 110,720 Q 72,708 58,680"
-      stroke="#f5e8a0" stroke-width="0.8" opacity="0.56"/>
-    <path class="j2" d="M 108,210 L 232,210 L 232,590 Q 232,660 196,695 Q 158,732 110,720 Q 72,708 58,680"
-      stroke="#ffffff" stroke-width="0.5" opacity="0.35"/>
-    <path class="j3" d="M 108,210 L 232,210 L 232,590 Q 232,660 196,695 Q 158,732 110,720 Q 72,708 58,680"
-      stroke="#d4a832" stroke-width="1.2" opacity="0.22"/>
-  </g>
+  <!-- Horizontal traces across the design -->
+  <!-- Top band -->
+  <path class="pulse hr1t" d="M 0,82 L 1440,82"   stroke="#c9a832" stroke-width="1.2"/>
+  <path class="pulse hr1"  d="M 0,82 L 1440,82"   stroke="#fffae8" stroke-width="2"   filter="url(#glow)"/>
+  <!-- Upper mid -->
+  <path class="pulse hr2t" d="M 0,195 L 1440,195"  stroke="#c9a832" stroke-width="1.2"/>
+  <path class="pulse hr2"  d="M 0,195 L 1440,195"  stroke="#fffae8" stroke-width="2"   filter="url(#glow)"/>
+  <!-- Center top of diamond frame -->
+  <path class="pulse hr3t" d="M 180,310 L 1260,310" stroke="#c9a832" stroke-width="1.2"/>
+  <path class="pulse hr3"  d="M 180,310 L 1260,310" stroke="#fffae8" stroke-width="2"   filter="url(#glow)"/>
+  <!-- Center bottom of diamond frame -->
+  <path class="pulse hr4t" d="M 180,590 L 1260,590" stroke="#c9a832" stroke-width="1.2"/>
+  <path class="pulse hr4"  d="M 180,590 L 1260,590" stroke="#fffae8" stroke-width="2"   filter="url(#glow)"/>
+  <!-- Lower mid -->
+  <path class="pulse hr5t" d="M 0,705 L 1440,705"  stroke="#c9a832" stroke-width="1.2"/>
+  <path class="pulse hr5"  d="M 0,705 L 1440,705"  stroke="#fffae8" stroke-width="2"   filter="url(#glow)"/>
+  <!-- Bottom band -->
+  <path class="pulse hr6t" d="M 0,818 L 1440,818"  stroke="#c9a832" stroke-width="1.2"/>
+  <path class="pulse hr6"  d="M 0,818 L 1440,818"  stroke="#fffae8" stroke-width="2"   filter="url(#glow)"/>
 
-  <!-- U -->
-  <g class="flick-u" fill="none" filter="url(#sf)">
-    <path class="u1" d="M 290,210 L 290,600 Q 290,700 385,718 Q 480,700 480,600 L 480,210"
-      stroke="#f5e8a0" stroke-width="0.8" opacity="0.56"/>
-    <path class="u2" d="M 290,210 L 290,600 Q 290,700 385,718 Q 480,700 480,600 L 480,210"
-      stroke="#ffffff" stroke-width="0.5" opacity="0.35"/>
-    <path class="u3" d="M 290,210 L 290,600 Q 290,700 385,718 Q 480,700 480,600 L 480,210"
-      stroke="#d4a832" stroke-width="1.2" opacity="0.22"/>
-  </g>
+  <!-- Vertical traces -->
+  <!-- Left edge trace -->
+  <path class="pulse vr1t" d="M 82,0 L 82,900"    stroke="#c9a832" stroke-width="1.2"/>
+  <path class="pulse vr1"  d="M 82,0 L 82,900"    stroke="#fffae8" stroke-width="2"   filter="url(#glow)"/>
+  <!-- Left inner trace -->
+  <path class="pulse vr2t" d="M 195,0 L 195,900"  stroke="#c9a832" stroke-width="1.2"/>
+  <path class="pulse vr2"  d="M 195,0 L 195,900"  stroke="#fffae8" stroke-width="2"   filter="url(#glow)"/>
+  <!-- Right inner trace -->
+  <path class="pulse vr3t" d="M 1245,0 L 1245,900" stroke="#c9a832" stroke-width="1.2"/>
+  <path class="pulse vr3"  d="M 1245,0 L 1245,900" stroke="#fffae8" stroke-width="2"   filter="url(#glow)"/>
+  <!-- Right edge trace -->
+  <path class="pulse vr4t" d="M 1358,0 L 1358,900" stroke="#c9a832" stroke-width="1.2"/>
+  <path class="pulse vr4"  d="M 1358,0 L 1358,900" stroke="#fffae8" stroke-width="2"   filter="url(#glow)"/>
 
-  <!-- S -->
-  <g class="flick-s" fill="none" filter="url(#sf)">
-    <path class="s1" d="M 688,268 Q 650,210 600,200 Q 540,188 512,232 Q 492,268 540,308 Q 590,344 630,372 Q 678,408 686,454 Q 696,508 658,552 Q 620,596 568,608 Q 516,618 510,700"
-      stroke="#f5e8a0" stroke-width="0.8" opacity="0.56"/>
-    <path class="s2" d="M 688,268 Q 650,210 600,200 Q 540,188 512,232 Q 492,268 540,308 Q 590,344 630,372 Q 678,408 686,454 Q 696,508 658,552 Q 620,596 568,608 Q 516,618 510,700"
-      stroke="#ffffff" stroke-width="0.5" opacity="0.35"/>
-    <path class="s3" d="M 688,268 Q 650,210 600,200 Q 540,188 512,232 Q 492,268 540,308 Q 590,344 630,372 Q 678,408 686,454 Q 696,508 658,552 Q 620,596 568,608 Q 516,618 510,700"
-      stroke="#d4a832" stroke-width="1.2" opacity="0.22"/>
-  </g>
+  <!-- Corner L-traces — top-left cluster -->
+  <path class="pulse cr1t" d="M 82,195 L 195,195 L 195,310 L 360,310 L 360,420 L 480,420 L 480,310"
+        stroke="#c9a832" stroke-width="1.2"/>
+  <path class="pulse cr1"  d="M 82,195 L 195,195 L 195,310 L 360,310 L 360,420 L 480,420 L 480,310"
+        stroke="#fffae8" stroke-width="2" filter="url(#glow)"/>
 
-  <!-- H -->
-  <g class="flick-h" fill="none" filter="url(#sf)">
-    <path class="h1" d="M 732,210 L 732,710 M 922,210 L 922,710 M 732,452 L 922,452"
-      stroke="#f5e8a0" stroke-width="0.8" opacity="0.56"/>
-    <path class="h2" d="M 732,210 L 732,710 M 922,210 L 922,710 M 732,452 L 922,452"
-      stroke="#ffffff" stroke-width="0.5" opacity="0.35"/>
-    <path class="h3" d="M 732,210 L 732,710 M 922,210 L 922,710 M 732,452 L 922,452"
-      stroke="#d4a832" stroke-width="1.2" opacity="0.22"/>
-  </g>
+  <!-- Top-right cluster -->
+  <path class="pulse cr2t" d="M 1358,195 L 1245,195 L 1245,310 L 1080,310 L 1080,420 L 960,420 L 960,310"
+        stroke="#c9a832" stroke-width="1.2"/>
+  <path class="pulse cr2"  d="M 1358,195 L 1245,195 L 1245,310 L 1080,310 L 1080,420 L 960,420 L 960,310"
+        stroke="#fffae8" stroke-width="2" filter="url(#glow)"/>
 
-  <!-- I -->
-  <g class="flick-i" fill="none" filter="url(#sf)">
-    <path class="i1" d="M 958,210 L 1148,210 M 1053,210 L 1053,710 M 958,710 L 1148,710"
-      stroke="#f5e8a0" stroke-width="0.8" opacity="0.56"/>
-    <path class="i2" d="M 958,210 L 1148,210 M 1053,210 L 1053,710 M 958,710 L 1148,710"
-      stroke="#ffffff" stroke-width="0.5" opacity="0.35"/>
-    <path class="i3" d="M 958,210 L 1148,210 M 1053,210 L 1053,710 M 958,710 L 1148,710"
-      stroke="#d4a832" stroke-width="1.2" opacity="0.22"/>
-  </g>
+  <!-- Bottom-left cluster -->
+  <path class="pulse cr3t" d="M 82,705 L 195,705 L 195,590 L 360,590 L 360,480 L 480,480 L 480,590"
+        stroke="#c9a832" stroke-width="1.2"/>
+  <path class="pulse cr3"  d="M 82,705 L 195,705 L 195,590 L 360,590 L 360,480 L 480,480 L 480,590"
+        stroke="#fffae8" stroke-width="2" filter="url(#glow)"/>
 
-  <rect width="1200" height="900" fill="url(#vignette)"/>
+  <!-- Bottom-right cluster -->
+  <path class="pulse cr4t" d="M 1358,705 L 1245,705 L 1245,590 L 1080,590 L 1080,480 L 960,480 L 960,590"
+        stroke="#c9a832" stroke-width="1.2"/>
+  <path class="pulse cr4"  d="M 1358,705 L 1245,705 L 1245,590 L 1080,590 L 1080,480 L 960,480 L 960,590"
+        stroke="#fffae8" stroke-width="2" filter="url(#glow)"/>
+
+  <!-- Outer frame — full perimeter pulses -->
+  <path class="pulse fr1t" d="M 0,0 L 1440,0 L 1440,900 L 0,900 Z"
+        stroke="#c9a832" stroke-width="1"/>
+  <path class="pulse fr1"  d="M 0,0 L 1440,0 L 1440,900 L 0,900 Z"
+        stroke="#fff8d0" stroke-width="2.5" filter="url(#glow)"/>
+
+  <!-- Inner frame — the diamond/octagon shape from the art deco design -->
+  <path class="pulse fr2t" d="M 720,30 L 1420,310 L 1420,590 L 720,870 L 20,590 L 20,310 Z"
+        stroke="#c9a832" stroke-width="1"/>
+  <path class="pulse fr2"  d="M 720,30 L 1420,310 L 1420,590 L 720,870 L 20,590 L 20,310 Z"
+        stroke="#fff8d0" stroke-width="2.5" filter="url(#glow)"/>
+
+  <rect width="1440" height="900" fill="url(#vignette)"/>
 </svg>      </div>
 
       <!-- Art Deco gold header ornament -->
