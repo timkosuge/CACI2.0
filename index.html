@@ -920,14 +920,22 @@ body::before {
 }
 .sb-section-label {
   font-family: var(--f-ui);
-  font-size: 9px;
-  font-weight: 300;
-  letter-spacing: 0.22em;
-  color: var(--smoke4);
+  font-size: 8px;
+  font-weight: 400;
+  letter-spacing: 0.30em;
+  color: rgba(212,168,50,0.45);
   text-transform: uppercase;
-  padding: 10px 20px 4px;
+  padding: 16px 20px 6px;
   flex-shrink: 0;
   text-align: center;
+  position: relative;
+}
+.sb-section-label::before {
+  content: '';
+  position: absolute;
+  top: 8px; left: 20%; right: 20%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(212,168,50,0.25) 50%, transparent);
 }
 .sb-nav { padding: 6px 10px; flex-shrink: 0; }
 .nav-btn {
