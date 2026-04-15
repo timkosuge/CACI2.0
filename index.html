@@ -791,7 +791,6 @@ body::before {
 /* ── Topbar ────────────────────────────────────────────── */
 #topbar {
   position: fixed; top: 0; right: 0; left: 0;
-  overflow: visible;
   height: var(--topbar);
   background: rgba(5,8,16,0.92);
   backdrop-filter: blur(14px);
@@ -3560,77 +3559,6 @@ body::before {
       <div class="status-pip warn" id="api-pip"></div>
       <span class="tb-status-text" id="api-text">Connecting</span>
     </div>
-  <!-- Art deco crown molding -->
-  <div id="topbar-deco" aria-hidden="true" style="position:absolute;bottom:0;left:200px;right:200px;height:32px;pointer-events:none;overflow:visible;z-index:0;">
-    <svg viewBox="0 0 800 32" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:32px;display:block;">
-      <defs>
-        <linearGradient id="tb-gold" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%"   stop-color="#fff0a0" stop-opacity="0.85"/>
-          <stop offset="40%"  stop-color="#e8c84a" stop-opacity="0.78"/>
-          <stop offset="100%" stop-color="#c9a832" stop-opacity="0.5"/>
-        </linearGradient>
-        <linearGradient id="tb-sub" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%"   stop-color="#e8c84a" stop-opacity="0.5"/>
-          <stop offset="100%" stop-color="#c9a832" stop-opacity="0.28"/>
-        </linearGradient>
-        <linearGradient id="tb-fl" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%"   stop-color="#050810" stop-opacity="1"/>
-          <stop offset="100%" stop-color="#050810" stop-opacity="0"/>
-        </linearGradient>
-        <linearGradient id="tb-fr" x1="100%" y1="0%" x2="0%" y2="0%">
-          <stop offset="0%"   stop-color="#050810" stop-opacity="1"/>
-          <stop offset="100%" stop-color="#050810" stop-opacity="0"/>
-        </linearGradient>
-        <filter id="tb-glow" x="-25%" y="-200%" width="150%" height="600%">
-          <feGaussianBlur stdDeviation="1.0" result="blur"/>
-          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-        </filter>
-        <filter id="tb-soft" x="-5%" y="-50%" width="110%" height="300%">
-          <feGaussianBlur stdDeviation="0.5" result="blur"/>
-          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-        </filter>
-      </defs>
-
-      <!-- Main spine -->
-      <line x1="0"   y1="16" x2="800" y2="16" stroke="url(#tb-gold)" stroke-width="0.9" filter="url(#tb-soft)" opacity="0.9"/>
-      <!-- Echo above -->
-      <line x1="0"   y1="11" x2="800" y2="11" stroke="url(#tb-sub)" stroke-width="0.4" opacity="0.5"/>
-      <!-- Echo below -->
-      <line x1="0"   y1="21" x2="800" y2="21" stroke="url(#tb-sub)" stroke-width="0.4" opacity="0.5"/>
-
-      <!-- Repeating module: 80px wide, pattern centered on x=40,120,200,280,360,440,520,600,680,760 -->
-      <!-- Each module: small vert bar at x+0, diamond at x+40, small vert bar at x+80 -->
-      <!-- Vertical bars every 80px: x=0,80,160,240,320,400,480,560,640,720,800 -->
-      <line x1="0"   y1="10" x2="0"   y2="22" stroke="url(#tb-gold)" stroke-width="0.8" opacity="0.6"/>
-      <line x1="80"  y1="10" x2="80"  y2="22" stroke="url(#tb-gold)" stroke-width="0.8" opacity="0.6"/>
-      <line x1="160" y1="10" x2="160" y2="22" stroke="url(#tb-gold)" stroke-width="0.8" opacity="0.6"/>
-      <line x1="240" y1="10" x2="240" y2="22" stroke="url(#tb-gold)" stroke-width="0.8" opacity="0.6"/>
-      <line x1="320" y1="10" x2="320" y2="22" stroke="url(#tb-gold)" stroke-width="0.8" opacity="0.6"/>
-      <line x1="400" y1="10" x2="400" y2="22" stroke="url(#tb-gold)" stroke-width="0.8" opacity="0.6"/>
-      <line x1="480" y1="10" x2="480" y2="22" stroke="url(#tb-gold)" stroke-width="0.8" opacity="0.6"/>
-      <line x1="560" y1="10" x2="560" y2="22" stroke="url(#tb-gold)" stroke-width="0.8" opacity="0.6"/>
-      <line x1="640" y1="10" x2="640" y2="22" stroke="url(#tb-gold)" stroke-width="0.8" opacity="0.6"/>
-      <line x1="720" y1="10" x2="720" y2="22" stroke="url(#tb-gold)" stroke-width="0.8" opacity="0.6"/>
-      <line x1="800" y1="10" x2="800" y2="22" stroke="url(#tb-gold)" stroke-width="0.8" opacity="0.6"/>
-
-      <!-- Diamonds centered between each pair of bars: x=40,120,200,280,360,440,520,600,680,760 -->
-      <!-- Diamond size: 10 wide, 8 tall -->
-      <polygon points="40,12  45,16  40,20  35,16"  fill="none" stroke="url(#tb-gold)" stroke-width="0.9" filter="url(#tb-glow)" opacity="0.85"/>
-      <polygon points="120,12 125,16 120,20 115,16" fill="none" stroke="url(#tb-gold)" stroke-width="0.9" filter="url(#tb-glow)" opacity="0.85"/>
-      <polygon points="200,12 205,16 200,20 195,16" fill="none" stroke="url(#tb-gold)" stroke-width="0.9" filter="url(#tb-glow)" opacity="0.85"/>
-      <polygon points="280,12 285,16 280,20 275,16" fill="none" stroke="url(#tb-gold)" stroke-width="0.9" filter="url(#tb-glow)" opacity="0.85"/>
-      <polygon points="360,12 365,16 360,20 355,16" fill="none" stroke="url(#tb-gold)" stroke-width="0.9" filter="url(#tb-glow)" opacity="0.85"/>
-      <polygon points="440,12 445,16 440,20 435,16" fill="none" stroke="url(#tb-gold)" stroke-width="0.9" filter="url(#tb-glow)" opacity="0.85"/>
-      <polygon points="520,12 525,16 520,20 515,16" fill="none" stroke="url(#tb-gold)" stroke-width="0.9" filter="url(#tb-glow)" opacity="0.85"/>
-      <polygon points="600,12 605,16 600,20 595,16" fill="none" stroke="url(#tb-gold)" stroke-width="0.9" filter="url(#tb-glow)" opacity="0.85"/>
-      <polygon points="680,12 685,16 680,20 675,16" fill="none" stroke="url(#tb-gold)" stroke-width="0.9" filter="url(#tb-glow)" opacity="0.85"/>
-      <polygon points="760,12 765,16 760,20 755,16" fill="none" stroke="url(#tb-gold)" stroke-width="0.9" filter="url(#tb-glow)" opacity="0.85"/>
-
-      <!-- Fade masks at both ends — uses background color to fade cleanly, no visible rect -->
-      <rect x="0"   y="0" width="60"  height="32" fill="url(#tb-fl)" opacity="0.9"/>
-      <rect x="740" y="0" width="60"  height="32" fill="url(#tb-fr)" opacity="0.9"/>
-    </svg>
-  </div>
   </header>
 
   <!-- Content -->
