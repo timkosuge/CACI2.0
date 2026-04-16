@@ -7512,7 +7512,10 @@ async function initChatGreeting() {
   const ty = appendTyping();
   try {
     const dn = sessionStorage.getItem('caci_displayname') || '';
-    const body = {message: 'hello', dept, model: modelId, scope: 'all', history: [], displayName: dn};
+    const now = new Date();
+    const clientDatetime = now.toLocaleString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric', hour:'numeric', minute:'2-digit', hour12:true });
+    const clientTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const body = {message: 'hello', dept, model: modelId, scope: 'all', history: [], displayName: dn, clientDatetime, clientTimezone};
     const res = await apiFetch('/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
     const d = await res.json();
     ty.remove();
@@ -7582,7 +7585,10 @@ async function sendChat() {
   saveChatHistory();
   const ty = appendTyping();
   try {
-    const body = {message: msg || 'Describe this image.', dept, model:modelId, scope:chatScope, history:chatHistory.slice(-20)};
+    const now = new Date();
+    const clientDatetime = now.toLocaleString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric', hour:'numeric', minute:'2-digit', hour12:true });
+    const clientTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const body = {message: msg || 'Describe this image.', dept, model:modelId, scope:chatScope, history:chatHistory.slice(-20), clientDatetime, clientTimezone};
     if (chatScope === 'collection' && chatCollection) body.collection = chatCollection;
     if (chatScope === 'file' && chatFileId) { body.fileId = chatFileId; body.scope = 'file'; }
     if (imgBase64) { body.imageBase64 = imgBase64; body.imageMimeType = imgMime; }
@@ -7968,11 +7974,12 @@ async function loadIntelligenceTuning() {
     }
 
     // Analyze button
-    const needMore = (s.missed || 0) + (s.incomplete || 0) < 3;
-    html += `<button class="lbtn tune-analyze-btn" id="tune-analyze-btn" ${needMore ? 'disabled title="Need at least 3 missed/incomplete signals"' : ''}>
+    const totalSigs = (s.sharp || 0) + (s.missed || 0) + (s.incomplete || 0);
+    const needMore = totalSigs < 3;
+    html += `<button class="lbtn tune-analyze-btn" id="tune-analyze-btn" ${needMore ? 'disabled title="Collect at least 3 signals to enable analysis"' : ''}>
       Run Analysis &rarr; Generate Suggestions
     </button>`;
-    if (needMore) html += `<div style="font-family:var(--f-mono);font-size:9px;color:var(--smoke4);letter-spacing:.06em;margin-bottom:12px">Collect at least 3 missed or incomplete signals to enable analysis</div>`;
+    if (needMore) html += `<div style="font-family:var(--f-mono);font-size:9px;color:var(--smoke4);letter-spacing:.06em;margin-bottom:12px">Collect at least 3 signals to enable analysis</div>`;
 
     // Pending suggestions
     if (pending.length > 0) {
