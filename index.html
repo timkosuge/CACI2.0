@@ -7673,7 +7673,7 @@ function appendMsg(role, text, sources, scope, model = '', responseId = '', imag
     const spkBtn = el.querySelector('.spk-btn');
     if (spkBtn) {
       spkBtn._spkText = text;
-      spkBtn.addEventListener('click', function() { speakText(this, this._spkText); });
+      spkBtn.addEventListener('click', function() { speakTextQueued(this, this._spkText); });
     }
     const dlBtn = el.querySelector('.dl-btn');
     if (dlBtn) {
@@ -7780,7 +7780,7 @@ function appendMsg(role, text, sources, scope, model = '', responseId = '', imag
   $('chat-msgs').appendChild(el);
   // Reliable scroll: use scrollIntoView on a sentinel element
   el.scrollIntoView({block:'end', behavior:'smooth'});
-  if (role === 'ai' && voiceAutoSpeak) speakText(null, text);
+  if (role === 'ai' && voiceAutoSpeak) speakTextQueued(null, text);
 }
 
 // ── Retrieval Weights UI ──────────────────────────────────────
@@ -9706,98 +9706,122 @@ let _currentSpkBtn  = null;
 let _recognition    = null;
 let _listening      = false;
 
-/* ── Grok TTS ─────────────────────────────────────────── */
-async function speakText(btn, text) {
-  // Stop any current audio before starting new
-  if (_currentAudio) {
-    _currentAudio.pause();
-    _currentAudio = null;
-    if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
-    setVoiceStatus('');
-    const tog = $('spk-toggle-btn');
-    if (tog) tog.classList.toggle('active', voiceAutoSpeak);
+// Sentence-queue TTS pipeline
+let _ttsQueue       = [];   // { text, blob? } — sentences waiting to play
+let _ttsFetching    = false; // a fetch is in flight
+let _ttsPlaying     = false; // audio is currently playing
+let _ttsSessionId   = 0;    // incremented on each new speak session to cancel stale ones
+
+function _splitSentences(text) {
+  // Split on sentence boundaries, keeping punctuation, min 60 chars to avoid tiny fragments
+  const raw = text.match(/[^.!?]+[.!?]+["']?|[^.!?]+$/g) || [text];
+  const out = [];
+  let buf = '';
+  for (const s of raw) {
+    buf += s;
+    if (buf.trim().length >= 60) { out.push(buf.trim()); buf = ''; }
   }
-  if (!text || !text.trim()) return;
-  const clean = text
-    .replace(/\*\*(.*?)\*\*/g, '$1')
-    .replace(/\*(.*?)\*/g, '$1')
-    .replace(/#{1,6}\s/g, '')
-    .replace(/`{1,3}[^`]*`{1,3}/g, '')
-    .replace(/\n+/g, ' ')
-    .trim();
-  const ttsMaxLen = parseInt(localStorage.getItem('caci_tts_length') || '3000', 10);
-  const cleanTrimmed = clean.length > ttsMaxLen
-    ? (() => {
-        let t = clean.slice(0, ttsMaxLen);
-        const lastSent = t.search(/[.!?][^.!?]*$/);
-        return (lastSent > ttsMaxLen * 0.4) ? t.slice(0, lastSent + 1) : t;
-      })()
-    : clean;
+  if (buf.trim()) {
+    if (out.length) out[out.length - 1] += ' ' + buf.trim();
+    else out.push(buf.trim());
+  }
+  return out.filter(Boolean);
+}
+
+async function _fetchTTSBlob(text) {
+  const provider  = localStorage.getItem('caci_tts_provider') || 'grok';
+  const grokVoice = localStorage.getItem('caci_tts_grok_voice') || 'eve';
+  const res = await apiFetch('/tts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, provider, voice: grokVoice }),
+  });
+  if (!res.ok) throw new Error('TTS fetch failed');
+  return await res.blob();
+}
+
+function _ttsPlayNext(sessionId) {
+  if (sessionId !== _ttsSessionId) return; // stale session
+  const item = _ttsQueue.find(i => i.blob && !i.played);
+  if (!item) { _ttsPlaying = false; if (_ttsQueue.every(i => i.done)) _ttsFinish(); return; }
+  item.played = true;
+  _ttsPlaying = true;
+  const url = URL.createObjectURL(item.blob);
+  const audio = new Audio(url);
+  _currentAudio = audio;
   setVoiceStatus('Speaking…', true);
+  audio.onended = () => {
+    URL.revokeObjectURL(url);
+    _currentAudio = null;
+    _ttsPlayNext(sessionId);
+  };
+  audio.onerror = () => { URL.revokeObjectURL(url); _currentAudio = null; _ttsPlayNext(sessionId); };
+  audio.play().catch(() => {});
+}
+
+function _ttsFinish() {
+  _ttsPlaying = false;
+  _ttsFetching = false;
+  _ttsQueue = [];
+  if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
+  const t = $('spk-toggle-btn');
+  if (t) t.classList.toggle('active', voiceAutoSpeak);
+  setVoiceStatus('');
+}
+
+async function speakTextQueued(btn, text) {
+  // Stop any running session
+  _ttsSessionId++;
+  const sessionId = _ttsSessionId;
+  if (_currentAudio) { _currentAudio.pause(); _currentAudio = null; }
+  speechSynthesis.cancel();
+  _ttsQueue = [];
+  _ttsPlaying = false;
+  _ttsFetching = false;
+
+  if (!text || !text.trim()) return;
+
+  const clean = text
+    .replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1')
+    .replace(/#{1,6}\s/g, '').replace(/`{1,3}[^`]*`{1,3}/g, '')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/\n+/g, ' ').trim();
+
+  const ttsMaxLen = parseInt(localStorage.getItem('caci_tts_length') || '3000', 10);
+  const capped = clean.length > ttsMaxLen ? clean.slice(0, ttsMaxLen) : clean;
+  const sentences = _splitSentences(capped);
+
+  // Build queue entries
+  _ttsQueue = sentences.map(s => ({ text: s, blob: null, played: false, done: false }));
+
   if (btn) { btn.classList.add('playing'); _currentSpkBtn = btn; }
   const tog = $('spk-toggle-btn');
   if (tog) tog.classList.add('active');
-  try {
-    const provider  = localStorage.getItem('caci_tts_provider') || 'grok';
-    const grokVoice = localStorage.getItem('caci_tts_grok_voice') || 'eve';
-    const res = await apiFetch('/tts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: cleanTrimmed, provider: provider, voice: grokVoice }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(function() { return { error: 'TTS failed' }; });
-      throw new Error(err.error || 'TTS request failed');
-    }
-    const blob  = await res.blob();
-    const url   = URL.createObjectURL(blob);
-    const audio = new Audio(url);
-    _currentAudio = audio;
-    audio.onended = function() {
-      URL.revokeObjectURL(url);
-      _currentAudio = null;
-      if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
-      const t = $('spk-toggle-btn');
-      if (t) t.classList.toggle('active', voiceAutoSpeak);
-      setVoiceStatus('');
-    };
-    audio.onerror = function() {
-      URL.revokeObjectURL(url);
-      _currentAudio = null;
-      if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
-      setVoiceStatus('');
-    };
-    audio.play();
-  } catch(e) {
-    console.warn('TTS error:', e.message);
-    // Fallback to browser speech synthesis
+  setVoiceStatus('Loading voice…', true);
+
+  // Fetch all sentences in parallel, play as they arrive
+  const fetches = _ttsQueue.map(async (item, i) => {
     try {
-      speechSynthesis.cancel();
-      const utt = new SpeechSynthesisUtterance(clean);
-      utt.rate = 1.0; utt.pitch = 1;
-      const voices = speechSynthesis.getVoices();
-      const preferred = voices.find(v => /samantha|aria|zira/i.test(v.name))
-                     || voices.find(v => v.lang === 'en-US') || voices[0];
-      if (preferred) utt.voice = preferred;
-      utt.onend = function() {
-        if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
-        const t = $('spk-toggle-btn');
-        if (t) t.classList.toggle('active', voiceAutoSpeak);
-        setVoiceStatus('');
-      };
-      setVoiceStatus('Speaking… (browser)', true);
-      speechSynthesis.speak(utt);
-    } catch(e2) {
-      setVoiceStatus('Voice unavailable');
-      if (btn) btn.classList.remove('playing');
-      if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
-      const t = $('spk-toggle-btn');
-      if (t) t.classList.toggle('active', voiceAutoSpeak);
-      setTimeout(function() { setVoiceStatus(''); }, 3000);
+      item.blob = await _fetchTTSBlob(item.text);
+      item.done = true;
+      if (sessionId !== _ttsSessionId) return;
+      if (!_ttsPlaying) _ttsPlayNext(sessionId);
+    } catch {
+      item.done = true;
+      item.blob = null; // skip this chunk silently
+      if (sessionId !== _ttsSessionId) return;
+      if (!_ttsPlaying) _ttsPlayNext(sessionId);
     }
-  }
+  });
+
+  await Promise.allSettled(fetches);
 }
+
 function stopSpeaking() {
+  _ttsSessionId++; // cancel any in-flight session
+  _ttsQueue = [];
+  _ttsPlaying = false;
+  _ttsFetching = false;
   if (_currentAudio) { _currentAudio.pause(); _currentAudio = null; }
   speechSynthesis.cancel();
   if (_currentSpkBtn) { _currentSpkBtn.classList.remove('playing'); _currentSpkBtn = null; }
