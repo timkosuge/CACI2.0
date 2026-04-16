@@ -3946,20 +3946,11 @@ async function handleEmbedFile(request, env) {
 }
 
 // GET /embed-status
-// Returns embedding coverage across ALL unique files regardless of dept.
+// Counts unique files from index:global only — the canonical upload index.
 async function handleEmbedStatus(url, env) {
   try {
-    const DEPTS = ['global','retail','compliance','commercial','human_resources','finance','operations','technology'];
-
-    // Collect all unique files across every dept index
-    const seen = new Set();
-    const allFiles = [];
-    for (const d of DEPTS) {
-      const idx = await env.CACI_KV.get(`index:${d}`, 'json') || [];
-      for (const f of idx) {
-        if (!f.isContext && !seen.has(f.id)) { seen.add(f.id); allFiles.push(f); }
-      }
-    }
+    const globalIdx = await env.CACI_KV.get('index:global', 'json') || [];
+    const allFiles = globalIdx.filter(f => !f.isContext);
 
     let totalFiles = 0, indexedFiles = 0, totalChunks = 0, indexedChunks = 0;
 
@@ -3978,7 +3969,7 @@ async function handleEmbedStatus(url, env) {
 
     const pct = totalFiles > 0 ? Math.round(indexedFiles / totalFiles * 100) : 0;
     return json({
-      ok: true, dept: 'all',
+      ok: true, dept: 'global',
       totalFiles, indexedFiles, totalChunks, indexedChunks,
       coveragePct: pct,
       aiAvailable: !!env.AI,
