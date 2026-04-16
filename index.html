@@ -2568,6 +2568,44 @@ body::before {
     inset 0 1px 3px rgba(0,0,0,0.70);
 }
 .send-btn:disabled { opacity: 0.25; cursor: default; }
+.img-attach-btn {
+  flex-shrink: 0;
+  width: 32px; height: 32px;
+  background: none;
+  border: 1px solid rgba(212,168,50,0.22);
+  border-radius: var(--r);
+  color: rgba(212,168,50,0.5);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.img-attach-btn:hover { border-color: rgba(212,168,50,0.55); color: rgba(212,168,50,0.9); background: rgba(212,168,50,0.06); }
+.img-attach-btn.has-image { border-color: rgba(212,168,50,0.7); color: rgba(212,168,50,1); background: rgba(212,168,50,0.10); }
+.img-preview-strip {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0 2px;
+  font-family: var(--f-mono);
+  font-size: 9px;
+  color: var(--smoke4);
+  letter-spacing: 0.06em;
+}
+.img-preview-strip.visible { display: flex; }
+.img-preview-thumb {
+  width: 40px; height: 40px;
+  border-radius: 3px;
+  object-fit: cover;
+  border: 1px solid rgba(212,168,50,0.3);
+  flex-shrink: 0;
+}
+.img-preview-clear {
+  background: none; border: none; color: rgba(220,90,90,0.6);
+  cursor: pointer; font-size: 14px; padding: 0 4px; line-height: 1;
+  transition: color 0.15s;
+}
+.img-preview-clear:hover { color: rgba(220,90,90,1); }
+.msg-image { max-width: 280px; max-height: 200px; border-radius: 4px; border: 1px solid rgba(212,168,50,0.2); margin-bottom: 6px; display: block; }
 
 /* New conversation button */
 .new-chat-btn {
@@ -5637,7 +5675,16 @@ body::before {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 010 7.07"/><path d="M19.07 4.93a10 10 0 010 14.14"/></svg>
             </button>
             <textarea class="chat-ta" id="chat-ta" rows="1" placeholder="Ask anything..."></textarea>
+            <button class="img-attach-btn" id="img-attach-btn" title="Attach image">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="2.5" width="12" height="9" rx="1.5" stroke="currentColor" stroke-width="1.1"/><circle cx="4.5" cy="5.5" r="1" fill="currentColor"/><path d="M1 9.5l3-3 2.5 2.5 2-2 3.5 3" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <input type="file" id="img-attach-input" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none"/>
             <button class="send-btn" id="send-btn">&#8593;</button>
+          </div>
+          <div class="img-preview-strip" id="img-preview-strip">
+            <img class="img-preview-thumb" id="img-preview-thumb" src="" alt=""/>
+            <span id="img-preview-name"></span>
+            <button class="img-preview-clear" id="img-preview-clear" title="Remove image">&times;</button>
           </div>
           <div class="voice-status" id="voice-status"></div>
           <button class="new-chat-btn" id="new-chat-btn">&#43; New Conversation</button>
@@ -5691,8 +5738,8 @@ body::before {
               <button class="upload-btn ctx-upload-btn" id="ctx-upload-btn" style="display:none">&#8593; Add Context Doc</button>
               <input type="file" id="split-pdf-input" accept=".pdf" style="display:none"/>
             </div>
-            <input type="file" id="file-input" multiple accept=".pdf,.doc,.docx,.csv,.xlsx,.xls,.txt,.md" style="display:none"/>
-            <input type="file" id="ctx-file-input" multiple accept=".pdf,.doc,.docx,.csv,.xlsx,.xls,.txt,.md" style="display:none"/>
+            <input type="file" id="file-input" multiple accept=".pdf,.doc,.docx,.csv,.xlsx,.xls,.txt,.md,.png,.jpg,.jpeg,.gif,.webp" style="display:none"/>
+            <input type="file" id="ctx-file-input" multiple accept=".pdf,.doc,.docx,.csv,.xlsx,.xls,.txt,.md,.png,.jpg,.jpeg,.gif,.webp" style="display:none"/>
             <div class="uprog" id="uprog">
               <div class="plabel" id="plabel">Initializing...</div>
               <div class="ptrack"><div class="pfill" id="pfill" style="width:0%"></div></div>
@@ -6222,6 +6269,9 @@ let dept    = localStorage.getItem('caci_dept')    || 'retail';
 let modelId = localStorage.getItem('caci_model')   || 'grok';
 let chatHistory = [];
 let curPanel = 'chat';
+let _chatImageBase64 = null;   // base64 string of attached image
+let _chatImageMime   = null;   // mime type e.g. 'image/jpeg'
+let _chatImageName   = null;   // original filename for display
 
 // ── Chat history persistence ─────────────────────────────────
 function chatHistoryKey() { return 'caci_history_' + dept; }
@@ -6907,6 +6957,29 @@ function bootApp() {
     this.style.height = 'auto';
     this.style.height = Math.min(this.scrollHeight, 140) + 'px';
   });
+
+  // ── Image attach button ──────────────────────────────────────
+  $('img-attach-btn')?.addEventListener('click', () => $('img-attach-input')?.click());
+  $('img-attach-input')?.addEventListener('change', e => {
+    const f = e.target.files?.[0];
+    if (f) setChatImage(f);
+    e.target.value = '';
+  });
+  $('img-preview-clear')?.addEventListener('click', clearChatImage);
+
+  // Paste image from clipboard into chat
+  $('chat-ta').addEventListener('paste', e => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const f = item.getAsFile();
+        if (f) setChatImage(f);
+        break;
+      }
+    }
+  });
   document.querySelectorAll('.hint').forEach(b => b.addEventListener('click', () => {
     $('chat-ta').value = b.dataset.h; sendChat();
   }));
@@ -7451,26 +7524,68 @@ async function initChatGreeting() {
   } catch(e) { ty.remove(); }
 }
 
+function setChatImage(file) {
+  const mimeType = file.type || 'image/jpeg';
+  const reader = new FileReader();
+  reader.onload = e => {
+    const dataUrl = e.target.result;
+    _chatImageBase64 = dataUrl.split(',')[1];
+    _chatImageMime   = mimeType;
+    _chatImageName   = file.name;
+    // Show preview strip
+    const strip = $('img-preview-strip');
+    const thumb = $('img-preview-thumb');
+    const name  = $('img-preview-name');
+    const btn   = $('img-attach-btn');
+    if (thumb) thumb.src = dataUrl;
+    if (name)  name.textContent = file.name.length > 28 ? file.name.slice(0,25) + '\u2026' : file.name;
+    if (strip) strip.classList.add('visible');
+    if (btn)   btn.classList.add('has-image');
+    $('chat-ta')?.focus();
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearChatImage() {
+  _chatImageBase64 = null;
+  _chatImageMime   = null;
+  _chatImageName   = null;
+  const strip = $('img-preview-strip');
+  const thumb = $('img-preview-thumb');
+  const btn   = $('img-attach-btn');
+  if (strip) strip.classList.remove('visible');
+  if (thumb) thumb.src = '';
+  if (btn)   btn.classList.remove('has-image');
+}
+
 async function sendChat() {
   const ta = $('chat-ta'), msg = ta.value.trim();
-  if (!msg) return;
+  if (!msg && !_chatImageBase64) return;
   $('chat-empty').style.display = 'none';
   ta.value = ''; ta.style.height = 'auto';
   $('send-btn').disabled = true;
+
+  // Capture image before clearing
+  const imgBase64 = _chatImageBase64;
+  const imgMime   = _chatImageMime;
+  const imgName   = _chatImageName;
+  if (imgBase64) clearChatImage();
+
   // Collapse discovery elements on first message
   ['discovery-name', 'discovery-greeting-strip'].forEach(id => {
     const el = document.getElementById(id);
     if (el) { el.style.opacity = '0'; el.style.transition = 'opacity 0.25s'; setTimeout(() => el.remove(), 250); }
   });
   transitionToChat();
-  appendMsg('user', msg);
+  appendMsg('user', msg, null, null, null, null, imgBase64 ? `data:${imgMime};base64,${imgBase64}` : null);
   chatHistory.push({role:'user', content:msg});
   saveChatHistory();
   const ty = appendTyping();
   try {
-    const body = {message:msg, dept, model:modelId, scope:chatScope, history:chatHistory.slice(-20)};
+    const body = {message: msg || 'Describe this image.', dept, model:modelId, scope:chatScope, history:chatHistory.slice(-20)};
     if (chatScope === 'collection' && chatCollection) body.collection = chatCollection;
     if (chatScope === 'file' && chatFileId) { body.fileId = chatFileId; body.scope = 'file'; }
+    if (imgBase64) { body.imageBase64 = imgBase64; body.imageMimeType = imgMime; }
     // Compliance mode — fires once then disarms
     if (window._getComplianceMode && window._getComplianceMode()) {
       body.complianceMode = true;
@@ -7502,11 +7617,12 @@ async function sendChat() {
   finally { $('send-btn').disabled = false; }
 }
 
-function appendMsg(role, text, sources, scope, model = '', responseId = '') {
+function appendMsg(role, text, sources, scope, model = '', responseId = '', imageDataUrl = null) {
   const el = document.createElement('div');
   el.className = 'msg ' + role;
   const displayName = sessionStorage.getItem('caci_displayname') || '';
   const av = role === 'user' ? (getInitials(displayName) || 'YOU') : 'CACI';
+  const imgHtml = (role === 'user' && imageDataUrl) ? `<img class="msg-image" src="${imageDataUrl}" alt="attached image"/>` : '';
   const src = sources && sources.length ? `<div class="msg-sources">Sources &mdash; <b>${sources.join(' \u00b7 ')}</b></div>` : '';
   const sc = scope && scope !== 'all' ? `<div class="msg-scope">Scope: ${scope === 'file' ? chatFileName : scope === 'collection' ? chatCollection : 'all'}</div>` : '';
   const spk = role === 'ai' ? `<button class="spk-btn" title="Read aloud" data-spk="1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 010 7.07"/><path d="M19.07 4.93a10 10 0 010 14.14"/></svg></button>` : '';
@@ -7546,7 +7662,7 @@ function appendMsg(role, text, sources, scope, model = '', responseId = '') {
   const modelNames = { claude: 'Claude · Anthropic', grok: 'Grok · xAI', cloudflare: 'Cloudflare AI · Llama', ollama: 'Ollama · Local' };
   const modelLabel = (role === 'ai' && model) ? `<div style="font-family:var(--f-mono);font-size:8px;letter-spacing:0.12em;color:rgba(212,168,50,0.40);text-transform:uppercase;margin-top:6px;padding-left:2px">${modelNames[model] || model}</div>` : '';
   const bubbleContent = role === 'ai' ? renderMarkdown(text) : esc(text);
-  el.innerHTML = `<div class="msg-av">${av}</div><div class="msg-body">${sc}\x3Cdiv class="msg-bubble">${bubbleContent}\x3C/div>${src}${modelLabel}${spk}${actions}\x3C/div>`;
+  el.innerHTML = `<div class="msg-av">${av}</div><div class="msg-body">${sc}\x3Cdiv class="msg-bubble">${imgHtml}${bubbleContent}\x3C/div>${src}${modelLabel}${spk}${actions}\x3C/div>`;
   if (role === 'ai') {
     const spkBtn = el.querySelector('.spk-btn');
     if (spkBtn) {
@@ -8455,12 +8571,55 @@ async function extractText(file, log) {
   const e = file.name.split('.').pop().toLowerCase();
   if (e === 'csv') { const raw = await file.text(); return parseCsv(raw); }
   if (['xlsx','xls'].includes(e)) return extractExcel(file, log);
+  if (['png','jpg','jpeg','gif','webp'].includes(e)) return extractImage(file, log);
   let text = '';
   if (['txt','md','json'].includes(e)) text = await file.text();
   else if (e === 'pdf') text = await extractPdf(file, log);
   else if (['doc','docx'].includes(e)) text = await extractWord(file, log);
   else { try { text = await file.text(); } catch { text = ''; } }
   return { text, stats: {} };
+}
+
+async function extractImage(file, log) {
+  try {
+    addLog(log, '\u2192 Reading image with vision AI\u2026');
+    const mimeType = file.type || 'image/jpeg';
+    // Compress if large — vision models don't need full resolution
+    const base64 = await new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const MAX = 1200;
+        let { width: w, height: h } = img;
+        if (w > MAX || h > MAX) {
+          const scale = MAX / Math.max(w, h);
+          w = Math.round(w * scale);
+          h = Math.round(h * scale);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        resolve(dataUrl.split(',')[1]);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Image load failed')); };
+      img.src = url;
+    });
+
+    const res  = await apiFetch('/vision-describe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageBase64: base64, mimeType: 'image/jpeg', fileName: file.name }),
+    });
+    const data = await res.json();
+    if (!data.ok) { addLog(log, '\u26A0 Vision: ' + (data.error || 'failed')); return { text: '', stats: {} }; }
+    addLog(log, '\u2713 Image described \u2014 ' + data.description.length + ' chars');
+    return { text: `[IMAGE: ${file.name}]\n\n${data.description}`, stats: {} };
+  } catch (e) {
+    addLog(log, '\u26A0 Image: ' + e.message);
+    return { text: '', stats: {} };
+  }
 }
 async function extractPdf(file, log) {
   try {
@@ -10753,7 +10912,7 @@ function queueAiClassify(fileId, fileName, collection, extractedText) {
   }
 
   const ext = (fileName || '').split('.').pop().toLowerCase();
-  if (!['pdf','docx','doc','xlsx','xls','csv'].includes(ext)) {
+  if (!['pdf','docx','doc','xlsx','xls','csv','png','jpg','jpeg','gif','webp'].includes(ext)) {
     console.log(`[CACI CLASSIFY] ⏭ Skipped — file type ".${ext}" not eligible`);
     return;
   }
