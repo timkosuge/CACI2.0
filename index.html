@@ -7856,7 +7856,7 @@ async function loadSemanticIndex() {
   wrap.innerHTML = '<div class="tune-empty">Checking index status...</div>';
 
   try {
-    const res  = await apiFetch(`/embed-status`);
+    const res  = await apiFetch(`/embed-status?dept=${encodeURIComponent(dept)}`);
     const data = await res.json();
 
     if (!data.ok) { wrap.innerHTML = `<div class="tune-empty">Error: ${data.error}</div>`; return; }
@@ -7944,10 +7944,20 @@ async function runSemanticBackfill(statusData) {
   const logProg = msg => { if (progEl) { progEl.innerHTML += msg + '<br>'; progEl.scrollTop = 9999; } };
 
   try {
-    // Fetch all unique files across every department in one call
-    const res   = await apiFetch(`/files?dept=all`);
-    const files = await res.json();
-    if (!Array.isArray(files) || !files.length) {
+    // Fetch files matching the retrieval scope: active dept + global (deduped)
+    // This mirrors exactly how retrieval works so status and backfill stay in sync
+    const [res1, res2] = await Promise.all([
+      apiFetch(`/files?dept=${encodeURIComponent(dept)}`),
+      dept !== 'global' ? apiFetch(`/files?dept=global`) : Promise.resolve(null),
+    ]);
+    const deptFiles   = await res1.json();
+    const globalFiles = res2 ? await res2.json() : [];
+    const seen = new Set();
+    const files = [];
+    for (const f of [...(Array.isArray(deptFiles) ? deptFiles : []), ...(Array.isArray(globalFiles) ? globalFiles : [])]) {
+      if (!seen.has(f.id)) { seen.add(f.id); files.push(f); }
+    }
+    if (!files.length) {
       if (statusEl) { statusEl.className = 'weight-status'; statusEl.textContent = 'No files found'; }
       btn.disabled = false; btn.textContent = 'Index All Files';
       return;
