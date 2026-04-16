@@ -2243,6 +2243,71 @@ body::before {
   position: relative; z-index: 1;
 }
 .resp-body { flex: 1; overflow-y: auto; padding: 20px 24px; }
+.resp-search-bar {
+  padding: 12px 24px 10px;
+  border-bottom: 1px solid rgba(0,0,0,0.50);
+  flex-shrink: 0;
+  position: relative;
+  background: linear-gradient(180deg, rgba(14,19,34,0.98) 0%, rgba(8,12,22,1) 100%);
+  box-shadow: inset 0 2px 6px rgba(0,0,0,0.40), 0 1px 0 rgba(212,168,50,0.06);
+}
+.resp-search-input {
+  width: 100%;
+  padding: 8px 36px 8px 12px;
+  background: rgba(2,4,10,1);
+  border: 1px solid rgba(212,168,50,0.22);
+  border-top-color: rgba(0,0,0,0.80);
+  border-radius: 3px;
+  color: var(--smoke);
+  font-family: var(--f-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  outline: none;
+  box-sizing: border-box;
+  box-shadow: inset 0 2px 6px rgba(0,0,0,0.70), inset 0 1px 3px rgba(0,0,0,0.50);
+  transition: border-color 0.2s;
+}
+.resp-search-input::placeholder { color: var(--smoke4); }
+.resp-search-input:focus { border-color: rgba(212,168,50,0.45); }
+.resp-search-bar { position: relative; }
+.resp-search-clear {
+  position: absolute; right: 30px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; color: var(--smoke4);
+  font-size: 16px; cursor: pointer; line-height: 1;
+  display: none; padding: 0 4px;
+}
+.resp-search-clear.visible { display: block; }
+.resp-topic-chips {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 10px 24px 12px;
+  border-bottom: 1px solid rgba(0,0,0,0.40);
+  flex-shrink: 0;
+  background: rgba(6,9,18,0.95);
+  min-height: 0;
+}
+.resp-topic-chips:empty { display: none; }
+.resp-chip {
+  padding: 3px 10px;
+  border: 1px solid rgba(212,168,50,0.22);
+  border-radius: 20px;
+  background: rgba(10,14,24,0.90);
+  color: rgba(212,168,50,0.55);
+  font-family: var(--f-mono);
+  font-size: 9px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.15s;
+  box-shadow: inset 0 1px 0 rgba(245,227,152,0.06), 0 1px 3px rgba(0,0,0,0.50);
+}
+.resp-chip:hover { border-color: rgba(212,168,50,0.50); color: rgba(212,168,50,0.90); background: rgba(16,20,36,1); }
+.resp-chip.active { border-color: rgba(212,168,50,0.70); color: rgba(245,227,152,0.95); background: rgba(212,168,50,0.10); }
+.resp-count {
+  font-family: var(--f-mono); font-size: 9px;
+  color: var(--smoke4); letter-spacing: 0.08em;
+  padding: 0 24px 8px;
+  flex-shrink: 0;
+}
 .resp-empty {
   display: flex; flex-direction: column; align-items: center;
   justify-content: center; height: 200px;
@@ -5595,6 +5660,12 @@ body::before {
           <div class="resp-title">Saved Responses</div>
           <div class="resp-sub">Overviews, summaries, and key intelligence saved from chat. Download any response as a Markdown file.</div>
         </div>
+        <div class="resp-search-bar">
+          <input class="resp-search-input" id="resp-search" placeholder="Search responses..." autocomplete="off" autocorrect="off" spellcheck="false"/>
+          <button class="resp-search-clear" id="resp-search-clear" title="Clear search">&times;</button>
+        </div>
+        <div class="resp-topic-chips" id="resp-chips"></div>
+        <div class="resp-count" id="resp-count" style="display:none"></div>
         <div class="resp-body" id="resp-body"></div>
       </div>
     </div>
@@ -6286,6 +6357,28 @@ function bootApp() {
   if (window.innerWidth < 768) $('tb-model-chip').style.display = 'flex';
 
   $('send-btn').addEventListener('click', sendChat);
+
+  // ── Responses search bar wiring ───────────────────────────────
+  const respSearch = $('resp-search');
+  const respClear  = $('resp-search-clear');
+  if (respSearch) {
+    respSearch.addEventListener('input', () => {
+      _respSearchQuery = respSearch.value;
+      _respActiveChip = '';
+      if (respClear) respClear.classList.toggle('visible', !!respSearch.value);
+      // Update chip active states
+      document.querySelectorAll('.resp-chip').forEach(c => c.classList.remove('active'));
+      loadResponses();
+    });
+  }
+  if (respClear) {
+    respClear.addEventListener('click', () => {
+      _respSearchQuery = '';
+      if (respSearch) respSearch.value = '';
+      respClear.classList.remove('visible');
+      loadResponses();
+    });
+  }
 
   // ── Restore chat history from previous session ───────────────
   try {
@@ -7507,15 +7600,47 @@ function saveResponse(prompt, text) {
   localStorage.setItem('caci_saved_responses', JSON.stringify(stored));
 }
 
-function loadResponses() {
-  const stored = JSON.parse(localStorage.getItem('caci_saved_responses') || '[]');
+let _respSearchQuery = '';
+let _respActiveChip = '';
+
+// Extract meaningful topic keywords from responses
+function extractRespTopics(responses) {
+  const stopWords = new Set(['the','a','an','and','or','in','of','to','for','with','on','at','by','from','as','is','was','are','were','be','been','has','have','had','that','this','it','its','we','our','they','their','you','your','not','but','so','if','when','what','how','which','who','all','any','can','will','would','should','could','more','also','about','into','than','then','just','like','up','out','do','did','get','got','i','my','me']);
+  const freq = {};
+  responses.forEach(r => {
+    const text = ((r.prompt || '') + ' ' + (r.text || '')).toLowerCase();
+    const words = text.match(/[a-z]{4,}/g) || [];
+    words.forEach(w => {
+      if (!stopWords.has(w)) freq[w] = (freq[w] || 0) + 1;
+    });
+  });
+  return Object.entries(freq)
+    .filter(([,c]) => c >= 2)
+    .sort((a,b) => b[1]-a[1])
+    .slice(0, 12)
+    .map(([w]) => w);
+}
+
+function renderRespCards(responses) {
   const body = $('resp-body');
   if (!body) return;
-  if (!stored.length) {
-    body.innerHTML = `<div class="resp-empty"><div class="resp-empty-icon">\u2193</div><div>No saved responses yet.<br>Use the <strong style="color:var(--smoke2)">Save</strong> button on any AI message.</div></div>`;
+  if (!responses.length) {
+    body.innerHTML = `<div class="resp-empty"><div class="resp-empty-icon">&#8595;</div><div>${_respSearchQuery || _respActiveChip ? 'No responses match your search.' : 'No saved responses yet.<br>Use the <strong style="color:var(--smoke2)">Save</strong> button on any AI message.'}</div></div>`;
+    const countEl = $('resp-count');
+    if (countEl) countEl.style.display = 'none';
     return;
   }
-  body.innerHTML = stored.map(r => {
+  const countEl = $('resp-count');
+  const allStored = JSON.parse(localStorage.getItem('caci_saved_responses') || '[]');
+  if (countEl) {
+    if (responses.length < allStored.length) {
+      countEl.style.display = 'block';
+      countEl.textContent = responses.length + ' of ' + allStored.length + ' responses';
+    } else {
+      countEl.style.display = 'none';
+    }
+  }
+  body.innerHTML = responses.map(r => {
     const ts = new Date(r.savedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit',hour:'2-digit',minute:'2-digit'});
     const preview = esc(r.text);
     return `<div class="resp-card" data-rid="${r.id}">
@@ -7533,6 +7658,53 @@ function loadResponses() {
       <button class="resp-expand-btn" onclick="toggleRespExpand(${r.id}, this)">Show full response &darr;</button>
     </div>`;
   }).join('');
+}
+
+function loadResponses() {
+  const stored = JSON.parse(localStorage.getItem('caci_saved_responses') || '[]');
+  const body = $('resp-body');
+  if (!body) return;
+
+  // Build topic chips from full dataset
+  const chipsEl = $('resp-chips');
+  if (chipsEl && stored.length) {
+    const topics = extractRespTopics(stored);
+    chipsEl.innerHTML = topics.map(t =>
+      `<button class="resp-chip${_respActiveChip === t ? ' active' : ''}" data-topic="${t}">${t}</button>`
+    ).join('');
+    chipsEl.querySelectorAll('.resp-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const topic = chip.dataset.topic;
+        _respActiveChip = (_respActiveChip === topic) ? '' : topic;
+        _respSearchQuery = '';
+        const si = $('resp-search');
+        if (si) { si.value = ''; }
+        const cl = $('resp-search-clear');
+        if (cl) cl.classList.remove('visible');
+        loadResponses();
+      });
+    });
+  } else if (chipsEl) {
+    chipsEl.innerHTML = '';
+  }
+
+  // Apply filters
+  let filtered = stored;
+  const q = (_respSearchQuery || '').toLowerCase().trim();
+  if (q) {
+    filtered = filtered.filter(r =>
+      (r.prompt || '').toLowerCase().includes(q) ||
+      (r.text || '').toLowerCase().includes(q)
+    );
+  }
+  if (_respActiveChip) {
+    filtered = filtered.filter(r =>
+      (r.prompt || '').toLowerCase().includes(_respActiveChip) ||
+      (r.text || '').toLowerCase().includes(_respActiveChip)
+    );
+  }
+
+  renderRespCards(filtered);
 }
 
 function toggleRespExpand(id, btn) {
