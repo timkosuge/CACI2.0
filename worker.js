@@ -94,10 +94,10 @@ export default {
     if (path === '/duplicate-check' && method === 'POST') return handleDuplicateCheck(request, env);
     if (path === '/files'     && method === 'GET')    return handleListFiles(url, env);
     if (path.startsWith('/files/') && path.endsWith('/meta') && method === 'PATCH') return handlePatchFileMeta(path, request, env);
-    if (path.startsWith('/files/') && method === 'DELETE') return handleDeleteFile(path.replace('/files/', ''), env, url);
+    if (path.startsWith('/files/') && method === 'DELETE') return handleDeleteFile(path.replace('/files/', ''), env, url, verifyToken(request, env));
     if (path === '/collections' && method === 'GET')  return handleListCollections(url, env);
     if (path === '/collections/create' && method === 'POST') return handleCreateCollection(request, env);
-    if (path.startsWith('/collections/') && method === 'DELETE') return handleDeleteCollection(path.replace('/collections/', ''), url, env);
+    if (path.startsWith('/collections/') && method === 'DELETE') return handleDeleteCollection(path.replace('/collections/', ''), url, env, verifyToken(request, env));
     if (path === '/tts'       && method === 'POST')   return handleTTS(request, env);
     if (path === '/tts-debug'  && method === 'POST')   return handleTTSDebug(request, env);
     if (path === '/score-debug' && method === 'POST') {
@@ -128,6 +128,12 @@ export default {
     if (path === '/embed-file'   && method === 'POST') return handleEmbedFile(request, env);
     if (path === '/embed-status' && method === 'GET')  return handleEmbedStatus(url, env);
     if (path === '/chat'      && method === 'POST')   return handleChat(request, env);
+    if (path === '/saved'                    && method === 'GET')    return handleListSaved(request, env);
+    if (path === '/saved'                    && method === 'POST')   return handleCreateSaved(request, env);
+    if (path.startsWith('/saved/') && method === 'DELETE') return handleDeleteSaved(path, request, env);
+    if (path.startsWith('/history/') && method === 'GET')  return handleGetHistory(path, request, env);
+    if (path.startsWith('/history/') && method === 'POST') return handleSaveHistory(path, request, env);
+    if (path === '/audit'     && method === 'GET')    return handleGetAudit(request, url, env);
     if (path === '/presence'  && method === 'POST')   return handlePresencePing(request, env);
     if (path === '/presence'  && method === 'GET')    return handlePresenceList(request, env);
     if (path === '/feedback'  && method === 'POST')   return handleFeedback(request, env);
@@ -243,6 +249,8 @@ async function handleCreateUser(request, env) {
     idx.unshift({ username: clean, displayName: userRecord.displayName, role: userRecord.role, createdAt: userRecord.createdAt });
     await env.CACI_KV.put('users:index', JSON.stringify(idx));
 
+    const creator = requireAdmin(request, env);
+    writeAudit(env, creator, 'user.create', { dept: 'global', newUsername: clean, role: userRecord.role });
     return json({ ok: true, username: clean, role: userRecord.role });
   } catch (e) { return json({ error: e.message }, 500); }
 }
@@ -529,6 +537,9 @@ async function handleUpload(request, env) {
       storeChunkEmbeddings(id, chunksToEmbed, env).catch(() => {});
     }
 
+    const uploadUser = verifyToken(request, env);
+    writeAudit(env, uploadUser, 'file.upload', { dept, collection, name, chunks: finalChunks.length, displayName: uploadUser?.username });
+
     return json({ ok: true, id, name, collection, chunks: finalChunks.length, charCount: cleanText.length, isContext, hasParentSummary: !!parentSummary });
   } catch (err) {
     return json({ error: 'Upload failed: ' + err.message }, 500);
@@ -658,7 +669,7 @@ async function handleListCollections(url, env) {
 }
 
 // ── Delete File ───────────────────────────────────────────────
-async function handleDeleteFile(id, env, url) {
+async function handleDeleteFile(id, env, url, caller) {
   try {
     const explicitDept = url?.searchParams.get('dept');
     const explicitCol  = url?.searchParams.get('col');
@@ -726,12 +737,13 @@ async function handleDeleteFile(id, env, url) {
 
     if (env.CACI_R2) await env.CACI_R2.delete(`${dept}/${collection}/${id}/${name}`).catch(() => {});
     await env.CACI_KV.delete(`library:map:${dept}`).catch(() => {});
+    writeAudit(env, caller, 'file.delete', { dept, collection, name, fileId: id });
     return json({ ok: true });
   } catch (err) { return json({ error: 'Delete failed: ' + err.message }, 500); }
 }
 
 // ── Delete Collection ─────────────────────────────────────────
-async function handleDeleteCollection(encodedName, url, env) {
+async function handleDeleteCollection(encodedName, url, env, caller) {
   try {
     const dept = url.searchParams.get('dept') || 'global';
     const name = decodeURIComponent(encodedName);
@@ -748,6 +760,7 @@ async function handleDeleteCollection(encodedName, url, env) {
     await env.CACI_KV.delete(colKey);
     const reg = await env.CACI_KV.get(`colreg:${dept}`, 'json') || [];
     await env.CACI_KV.put(`colreg:${dept}`, JSON.stringify(reg.filter(c => c.name !== name)));
+    writeAudit(env, caller, 'collection.delete', { dept, collection: name, fileCount: files.length });
     return json({ ok: true, deleted: files.length });
   } catch (err) { return json({ error: 'Delete collection failed: ' + err.message }, 500); }
 }
@@ -825,7 +838,7 @@ async function callLLMLight({ model, system, messages, maxTokens = 500, env, api
 // ── Chat ──────────────────────────────────────────────────────
 async function handleChat(request, env) {
   try {
-    const { message, dept, collection, fileId, scope = 'all', model, history = [] } = await request.json();
+    const { message, dept, collection, fileId, scope = 'all', model, history = [], displayName = '' } = await request.json();
     if (!message) return json({ error: 'Message required' }, 400);
 
     const apiKey = (await env.CACI_KV.get('config:ANTHROPIC_API_KEY')) || env.ANTHROPIC_API_KEY;
@@ -850,7 +863,8 @@ Today you're working with the ${dept} team. Here's what you have access to:
 ${discovery.collectionList}
 ${discLibraryPrompt ? '\n' + discLibraryPrompt : ''}
 
-Greet the team like a colleague — warm, real, a little personality. Exactly 2 sentences. No lists, no bullet points, no line breaks. Do NOT mention specific documents or file names. Use this example only as a length reference — do not reuse its structure, phrasing, or wording: "Hey there, I'm Caci, your internal AI sidekick at Jushi—always ready to jump in and help out. Great to connect with the compliance crew today; what's on your mind?" Write something original every time with the same approximate length. Sentence 1 is a warm opener, sentence 2 references the department and ends with a question.
+${displayName ? `The person you're talking to is ${displayName}. Use their first name naturally — once, in the greeting, not repeatedly.` : ""}
+Greet the team like a colleague — warm, real, a little personality. Exactly 2 sentences. No lists, no bullet points, no line breaks. Do NOT mention specific documents or file names. Use this example only as a length reference — do not reuse its structure, phrasing, or wording: "Hey there, I'm Caci, your internal AI sidekick at Jushi—always ready to jump in and help out. Great to connect with the compliance crew today; what's on your mind?" Write something original every time with the same approximate length. Sentence 1 is a warm opener${displayName ? " — use their name" : ""}, sentence 2 references the department and ends with a question.
 
 INDUSTRY KNOWLEDGE — you know this world deeply:
 
@@ -2284,6 +2298,7 @@ async function handleAdminSave(request, env) {
         saved.push(key);
       }
     }
+    if (saved.length) writeAudit(env, requireAdmin(request, env), 'config.save', { dept: 'global', keys: saved });
     return json({ ok: true, saved });
   } catch (err) { return json({ error: err.message }, 500); }
 }
@@ -2332,6 +2347,7 @@ async function handleSaveWeights(request, env) {
     sanitized._lastUpdated = new Date().toISOString();
     sanitized._appliedCount = weights._appliedCount || 0;
     await env.CACI_KV.put(`config:scoring-weights:${dept}`, JSON.stringify(sanitized));
+    writeAudit(env, requireAdmin(request, env), 'weights.save', { dept });
     return json({ ok: true, weights: sanitized });
   } catch (err) { return json({ error: err.message }, 500); }
 }
@@ -2538,7 +2554,7 @@ async function handleApproveTuning(request, env) {
     pending.appliedAt = new Date().toISOString();
     pending.appliedChanges = changes;
     await env.CACI_KV.put(pendingKey, JSON.stringify(pending));
-
+    writeAudit(env, requireAdmin(request, env), 'tuning.approve', { dept, changeCount: changes.length });
     return json({ ok: true, changes });
   } catch (err) { return json({ error: err.message }, 500); }
 }
@@ -3132,6 +3148,127 @@ async function handleConnectorFetch(path, request, env) {
   } catch(e) {
     return json({ error: e.message }, 502);
   }
+}
+
+// ── Audit Trail ───────────────────────────────────────────────
+// Thin append-only log. writeAudit is called from mutation handlers.
+// KV key: audit:{dept}:{paddedTimestamp}:{username}
+// 90-day TTL — audit logs expire automatically.
+
+async function writeAudit(env, user, action, details = {}) {
+  if (!env?.CACI_KV) return;
+  try {
+    const username = user?.username || 'unknown';
+    const dept     = details.dept || 'global';
+    const ts       = Date.now();
+    const key      = `audit:${dept}:${String(ts).padStart(16,'0')}:${username}`;
+    const entry    = {
+      ts:          new Date(ts).toISOString(),
+      username,
+      displayName: details.displayName || username,
+      role:        user?.role || 'user',
+      dept,
+      action,
+      details:     { ...details, dept: undefined, displayName: undefined },
+    };
+    await env.CACI_KV.put(key, JSON.stringify(entry), { expirationTtl: 60 * 60 * 24 * 90 });
+  } catch { /* non-blocking */ }
+}
+
+async function handleGetAudit(request, url, env) {
+  if (!requireAdmin(request, env)) return json({ error: 'Admin required' }, 403);
+  try {
+    const dept  = url.searchParams.get('dept') || 'global';
+    const limit = Math.min(parseInt(url.searchParams.get('limit') || '100'), 500);
+    const list  = await env.CACI_KV.list({ prefix: `audit:${dept}:` });
+    // Keys are sorted ascending by timestamp — reverse for newest-first
+    const keys  = (list.keys || []).reverse().slice(0, limit);
+    const entries = await Promise.all(keys.map(k => env.CACI_KV.get(k.name, 'json').catch(() => null)));
+    return json({ ok: true, entries: entries.filter(Boolean) });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+// ── Saved Responses (server-side, per user) ───────────────────
+// KV key: saved:{username}:{id}  (id = timestamp string)
+
+async function handleListSaved(request, env) {
+  const user = requireAuth(request, env);
+  if (!user) return json({ error: 'Unauthorized' }, 401);
+  try {
+    const username = user.legacy ? 'admin' : user.username;
+    const list = await env.CACI_KV.list({ prefix: `saved:${username}:` });
+    const items = await Promise.all(
+      (list.keys || []).reverse().map(k => env.CACI_KV.get(k.name, 'json').catch(() => null))
+    );
+    return json({ ok: true, items: items.filter(Boolean) });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+async function handleCreateSaved(request, env) {
+  const user = requireAuth(request, env);
+  if (!user) return json({ error: 'Unauthorized' }, 401);
+  try {
+    const { prompt, text, dept: savedDept } = await request.json();
+    if (!text) return json({ error: 'text required' }, 400);
+    const username = user.legacy ? 'admin' : user.username;
+    const id = Date.now().toString();
+    const entry = {
+      id, prompt: (prompt || '').slice(0, 200), text,
+      dept: savedDept || 'global',
+      username,
+      savedAt: new Date().toISOString(),
+    };
+    await env.CACI_KV.put(
+      `saved:${username}:${id}`,
+      JSON.stringify(entry),
+      { expirationTtl: 60 * 60 * 24 * 365 }
+    );
+    return json({ ok: true, id });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+async function handleDeleteSaved(path, request, env) {
+  const user = requireAuth(request, env);
+  if (!user) return json({ error: 'Unauthorized' }, 401);
+  try {
+    const id = path.replace('/saved/', '');
+    const username = user.legacy ? 'admin' : user.username;
+    await env.CACI_KV.delete(`saved:${username}:${id}`);
+    return json({ ok: true });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+// ── Chat History (server-side, per user per dept) ─────────────
+// KV key: history:{username}:{dept}
+// Stores last 40 turns, 1yr TTL
+
+async function handleGetHistory(path, request, env) {
+  const user = requireAuth(request, env);
+  if (!user) return json({ error: 'Unauthorized' }, 401);
+  try {
+    const deptId   = path.replace('/history/', '');
+    const username = user.legacy ? 'admin' : user.username;
+    const stored   = await env.CACI_KV.get(`history:${username}:${deptId}`, 'json');
+    return json({ ok: true, history: stored || [] });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+async function handleSaveHistory(path, request, env) {
+  const user = requireAuth(request, env);
+  if (!user) return json({ error: 'Unauthorized' }, 401);
+  try {
+    const deptId   = path.replace('/history/', '');
+    const username = user.legacy ? 'admin' : user.username;
+    const { history } = await request.json();
+    if (!Array.isArray(history)) return json({ error: 'history must be array' }, 400);
+    const toSave = history.slice(-40); // keep last 40 turns
+    await env.CACI_KV.put(
+      `history:${username}:${deptId}`,
+      JSON.stringify(toSave),
+      { expirationTtl: 60 * 60 * 24 * 365 }
+    );
+    return json({ ok: true });
+  } catch (e) { return json({ error: e.message }, 500); }
 }
 
 // ── Presence / Activity Tracking ─────────────────────────────
