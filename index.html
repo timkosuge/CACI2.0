@@ -5699,7 +5699,7 @@ body::before {
         <!-- AI CONFIGURATION -->
         <div class="asec">
           <div class="asec-head"><div class="asec-title">AI Configuration</div><div class="asec-line"></div></div>
-          <div class="acard">
+          <div class="acard admin-only">
             <div class="acard-title">Claude &mdash; Anthropic</div>
             <div class="acard-sub">claude-sonnet-4 &nbsp;&middot;&nbsp; Powers all document Q&A and report generation</div>
             <div class="arow"><input class="ainput" type="password" id="ant-key" placeholder="sk-ant-api03-..." autocomplete="off"/><button class="asave" id="ant-save">Save Key</button></div>
@@ -5751,7 +5751,7 @@ body::before {
         </div>
 
         <!-- RETRIEVAL INTELLIGENCE -->
-        <div class="asec">
+        <div class="asec admin-only">
           <div class="asec-head"><div class="asec-title">Retrieval Intelligence</div><div class="asec-line"></div></div>
           <div class="asec-sub-title" style="margin:-8px 0 14px">
             Controls how CACI scores and ranks documents when answering questions.
@@ -5776,7 +5776,7 @@ body::before {
         </div>
 
         <!-- INTELLIGENCE TUNING -->
-        <div class="asec">
+        <div class="asec admin-only">
           <div class="asec-head"><div class="asec-title">Intelligence Tuning</div><div class="asec-line"></div></div>
           <div class="asec-sub-title" style="margin:-8px 0 14px">
             CACI learns from your feedback — Sharp, Missed, and Incomplete signals on every response.
@@ -7508,6 +7508,7 @@ let _defaultWeights = null;
 async function loadRetrievalWeights() {
   const wrap = document.getElementById('weights-wrap');
   if (!wrap) return;
+  if ((sessionStorage.getItem('caci_role') || 'admin') !== 'admin') return;
   wrap.innerHTML = '<div class="tune-empty">Loading...</div>';
   try {
     const res  = await apiFetch(`/admin/weights?dept=${encodeURIComponent(dept)}`);
@@ -7636,6 +7637,7 @@ async function submitFeedback(responseId, signal, comment, query, sources) {
 async function loadIntelligenceTuning() {
   const wrap = $('tune-wrap');
   if (!wrap) return;
+  if ((sessionStorage.getItem('caci_role') || 'admin') !== 'admin') return;
   wrap.innerHTML = `<div class="tune-empty">Loading...</div>`;
 
   try {
