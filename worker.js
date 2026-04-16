@@ -1280,7 +1280,8 @@ Do not comment on anything else. Do not rewrite the response. Only flag hard num
 
     // Only surface sources if documents were actually retrieved — not for general conversation
     const sourcesToReturn = context.text ? context.sources : [];
-    return json({ ok: true, response: verifiedResponse, sources: sourcesToReturn, scope, model: model || 'claude', verified: shouldVerify });
+    const mainRespId = `${dept}:${Date.now()}:${Math.random().toString(36).slice(2,8)}`;
+    return json({ ok: true, response: verifiedResponse, sources: sourcesToReturn, scope, model: model || 'claude', verified: shouldVerify, responseId: mainRespId });
   } catch (err) { return json({ error: 'Chat error: ' + err.message }, 500); }
 }
 
