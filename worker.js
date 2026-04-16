@@ -128,6 +128,8 @@ export default {
     if (path === '/embed-file'   && method === 'POST') return handleEmbedFile(request, env);
     if (path === '/embed-status' && method === 'GET')  return handleEmbedStatus(url, env);
     if (path === '/chat'      && method === 'POST')   return handleChat(request, env);
+    if (path === '/presence'  && method === 'POST')   return handlePresencePing(request, env);
+    if (path === '/presence'  && method === 'GET')    return handlePresenceList(request, env);
     if (path === '/feedback'  && method === 'POST')   return handleFeedback(request, env);
     if (path === '/feedback/analyze' && method === 'POST') return handleAnalyzeFeedback(request, env);
     if (path === '/feedback/approve' && method === 'POST') return handleApproveTuning(request, env);
@@ -3130,6 +3132,62 @@ async function handleConnectorFetch(path, request, env) {
   } catch(e) {
     return json({ error: e.message }, 502);
   }
+}
+
+// ── Presence / Activity Tracking ─────────────────────────────
+// Lightweight "who's online" system. Presence records have a 10-minute TTL.
+// Clients ping POST /presence every 2 minutes while active.
+// GET /presence returns everyone seen in the last 10 minutes (admin only).
+// KV key: presence:{username} → { username, displayName, role, dept, page, lastSeen }
+
+const PRESENCE_TTL = 60 * 10; // 10 minutes in seconds
+
+async function handlePresencePing(request, env) {
+  const user = requireAuth(request, env);
+  if (!user) return json({ error: 'Unauthorized' }, 401);
+  try {
+    const { dept, page } = await request.json().catch(() => ({}));
+    const displayName = user.legacy ? 'Admin' : (() => {
+      // Best-effort: read from KV record if available, else use username
+      return null;
+    })();
+
+    // For named users, pull displayName from their record
+    let dn = user.username;
+    if (!user.legacy) {
+      const rec = await env.CACI_KV.get(`user:${user.username}`, 'json').catch(() => null);
+      if (rec?.displayName) dn = rec.displayName;
+    }
+
+    const record = {
+      username:    user.username,
+      displayName: dn,
+      role:        user.role,
+      dept:        dept || 'unknown',
+      page:        page || 'chat',
+      lastSeen:    new Date().toISOString(),
+    };
+    await env.CACI_KV.put(
+      `presence:${user.username}`,
+      JSON.stringify(record),
+      { expirationTtl: PRESENCE_TTL }
+    );
+    return json({ ok: true });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+async function handlePresenceList(request, env) {
+  if (!requireAdmin(request, env)) return json({ error: 'Admin required' }, 403);
+  try {
+    const list = await env.CACI_KV.list({ prefix: 'presence:' });
+    const records = await Promise.all(
+      (list.keys || []).map(k => env.CACI_KV.get(k.name, 'json').catch(() => null))
+    );
+    const active = records
+      .filter(Boolean)
+      .sort((a, b) => new Date(b.lastSeen) - new Date(a.lastSeen));
+    return json({ ok: true, active, count: active.length });
+  } catch (e) { return json({ error: e.message }, 500); }
 }
 
 // ── Semantic Embedding Backfill ───────────────────────────────
