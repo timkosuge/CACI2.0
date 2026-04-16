@@ -1003,7 +1003,7 @@ ABSOLUTE RESTRICTION — never discuss, reference, or include any information ab
         }
       }
       const discRespId = `${dept}:${Date.now()}:${Math.random().toString(36).slice(2,8)}`;
-      writeQueryLog(env, { message, dept, username: verifyToken(request, env)?.username || 'unknown', collection: collection || null, retrieval: false, scope: 'discovery' });
+      await writeQueryLog(env, { message, dept, username: verifyToken(request, env)?.username || 'unknown', collection: collection || null, retrieval: false, scope: 'discovery' });
       return json({ ok: true, response: discResponse, sources: [], scope: 'discovery', collections: discovery.rawCollections, model: model || 'claude', responseId: discRespId });
     }
 
@@ -1019,7 +1019,7 @@ ${discovery.collectionList}
 Be direct and conversational. List them clearly.`;
       const colRes = await callLLM({ model, system: colSystem, messages: [{ role: 'user', content: message }], maxTokens: 400, env, apiKey });
       const colRespId = `${dept}:${Date.now()}:${Math.random().toString(36).slice(2,8)}`;
-      writeQueryLog(env, { message, dept, username: verifyToken(request, env)?.username || 'unknown', collection: collection || null, retrieval: true, scope });
+      await writeQueryLog(env, { message, dept, username: verifyToken(request, env)?.username || 'unknown', collection: collection || null, retrieval: true, scope });
       return json({ ok: true, response: colRes, sources: [], scope: scope, model: model || 'claude', responseId: colRespId });
     }
 
@@ -1041,7 +1041,7 @@ Your personality: You work in cannabis. You know these people. You're sharp, a l
 Answer this question about yourself directly and authentically. Do not mention documents, data, or your library. Just be yourself.`;
       const personalRes = await callLLM({ model, system: personalSystem, messages: [...history.slice(-6).map(h => ({ role: h.role, content: h.content })), { role: 'user', content: message }], maxTokens: 600, env, apiKey });
       const personalRespId = `${dept}:${Date.now()}:${Math.random().toString(36).slice(2,8)}`;
-      writeQueryLog(env, { message, dept, username: verifyToken(request, env)?.username || 'unknown', collection: collection || null, retrieval: false, scope });
+      await writeQueryLog(env, { message, dept, username: verifyToken(request, env)?.username || 'unknown', collection: collection || null, retrieval: false, scope });
       return json({ ok: true, response: personalRes, sources: [], scope: scope, model: model || 'claude', responseId: personalRespId });
     }
 
@@ -1359,7 +1359,7 @@ Do not comment on anything else. Do not rewrite the response. Only flag hard num
     }
 
     // Log query for analytics — fire and forget
-    writeQueryLog(env, { message, dept, username: verifyToken(request, env)?.username || 'unknown', collection: collection || null, retrieval: !!context.text, scope });
+    await writeQueryLog(env, { message, dept, username: verifyToken(request, env)?.username || 'unknown', collection: collection || null, retrieval: !!context.text, scope });
 
     // Only surface sources if documents were actually retrieved — not for general conversation
     const sourcesToReturn = context.text ? context.sources : [];
