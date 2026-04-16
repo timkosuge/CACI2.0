@@ -766,8 +766,9 @@ async function handleGetFileContent(path, env, request) {
     const id = path.split('/')[2];
     const stored = await env.CACI_KV.get(`file:${id}`, 'json');
     if (!stored) return json({ error: 'File not found' }, 404);
-    const text = stored.chunks ? stored.chunks.join('\n\n') : '';
-    return json({ ok: true, id, name: stored.name || id, text, chunkCount: stored.chunks?.length || 0, charCount: text.length });
+    const chunks = stored.chunks || [];
+    const text = chunks.join('\n\n────────────────────\n\n');
+    return json({ ok: true, id, name: stored.name || id, text, chunks, chunkCount: chunks.length, charCount: text.length });
   } catch (e) { return json({ error: e.message }, 500); }
 }
 
@@ -3129,15 +3130,16 @@ function chunkText(text, size = 1500) {
   }
 
   // For prose/PDF/DOCX: chunk on paragraph or sentence boundaries
-  // Never slice mid-sentence — look back up to 300 chars for a good break
+  // Use larger chunks for dense regulatory/legal text
+  const effectiveSize = Math.max(size, 2000);
   const chunks = [];
   let start = 0;
   while (start < text.length) {
-    let end = Math.min(start + size, text.length);
+    let end = Math.min(start + effectiveSize, text.length);
     if (end < text.length) {
       // Try to break at paragraph boundary first
       const paraBreak = text.lastIndexOf('\n\n', end);
-      if (paraBreak > start + size * 0.5) {
+      if (paraBreak > start + effectiveSize * 0.5) {
         end = paraBreak;
       } else {
         // Fall back to sentence boundary
@@ -3147,12 +3149,14 @@ function chunkText(text, size = 1500) {
           text.lastIndexOf('? ', end),
           text.lastIndexOf('! ', end)
         );
-        if (sentBreak > start + size * 0.5) end = sentBreak + 1;
+        if (sentBreak > start + effectiveSize * 0.5) end = sentBreak + 1;
       }
     }
-    chunks.push(text.slice(start, end).trim());
-    // Overlap: back up 150 chars to preserve cross-boundary context
-    start = Math.max(start + 1, end - 150);
+    const chunk = text.slice(start, end).trim();
+    if (chunk.length > 50) chunks.push(chunk);
+    // Minimal overlap — just enough to preserve a sentence boundary reference
+    // 50 chars is sufficient; 150 was causing cascading duplicate fragments
+    start = Math.max(start + 1, end - 50);
     if (start >= text.length) break;
   }
   return chunks.filter(c => c.length > 50);
