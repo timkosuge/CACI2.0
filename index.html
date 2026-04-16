@@ -5751,6 +5751,18 @@ body::before {
           </div>
         </div>
 
+        <!-- SEMANTIC INDEX -->
+        <div class="asec">
+          <div class="asec-head"><div class="asec-title">Semantic Index</div><div class="asec-line"></div></div>
+          <div class="asec-sub-title" style="margin:-8px 0 14px">
+            Hybrid retrieval blends keyword scoring with semantic (embedding) similarity.
+            New uploads are indexed automatically. Use the tool below to backfill existing files.
+          </div>
+          <div id="semidx-wrap">
+            <div class="tune-empty">Loading...</div>
+          </div>
+        </div>
+
         <!-- INTELLIGENCE TUNING -->
         <div class="asec">
           <div class="asec-head"><div class="asec-title">Intelligence Tuning</div><div class="asec-line"></div></div>
@@ -6641,7 +6653,7 @@ function switchPanel(id) {
   $('tb-module').textContent = MODS.find(m => m.id === id)?.label || '';
   if (id === 'responses') loadResponses();
   if (id === 'files') { loadCollections(); loadFiles(); loadContextDocs(); }
-  if (id === 'aisettings') { loadAdminConfig(); loadRetrievalWeights(); loadIntelligenceTuning(); }
+  if (id === 'aisettings') { loadAdminConfig(); loadRetrievalWeights(); loadIntelligenceTuning(); loadSemanticIndex(); }
   if (id === 'admin') { loadAdminConfig(); loadIntegrationStatuses(); loadConnectorStatuses(); }
   if (id === 'chat') {
     initChatGreeting();
@@ -7582,6 +7594,151 @@ async function rejectTuning(deptKey) {
     });
     await loadIntelligenceTuning();
   } catch (e) { console.error('Reject failed:', e); }
+}
+
+// ── Semantic Index UI ─────────────────────────────────────────
+async function loadSemanticIndex() {
+  const wrap = $('semidx-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = '<div class="tune-empty">Checking index status...</div>';
+
+  try {
+    const res  = await apiFetch(`/embed-status?dept=${encodeURIComponent(dept)}`);
+    const data = await res.json();
+
+    if (!data.ok) { wrap.innerHTML = `<div class="tune-empty">Error: ${data.error}</div>`; return; }
+
+    if (!data.aiAvailable) {
+      wrap.innerHTML = `<div class="tune-empty" style="color:rgba(220,170,60,0.8)">
+        ⚠ Cloudflare AI binding not available — semantic retrieval disabled.<br>
+        <span style="color:var(--smoke4)">Keyword retrieval is still fully active. To enable hybrid search, ensure the <code>[ai]</code> binding is present in wrangler.toml and the worker is redeployed.</span>
+      </div>`;
+      return;
+    }
+
+    const { totalFiles, indexedFiles, coveragePct, model, alpha } = data;
+    const allIndexed = coveragePct >= 95;
+    const barColor   = allIndexed ? 'var(--green-lt)' : coveragePct > 50 ? 'rgba(220,170,60,0.8)' : 'rgba(220,90,90,0.8)';
+
+    wrap.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:14px">
+
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+          <div class="scard ok">
+            <div class="scard-label">Coverage</div>
+            <div class="scard-val" style="color:${barColor}">${coveragePct}%</div>
+            <div class="srow"><div class="srow-text">${indexedFiles} of ${totalFiles} files indexed</div></div>
+          </div>
+          <div class="scard">
+            <div class="scard-label">Model</div>
+            <div class="scard-val" style="font-size:11px;letter-spacing:0.02em">bge-base-en</div>
+            <div class="srow"><div class="srow-text">768-dim · Cloudflare AI</div></div>
+          </div>
+          <div class="scard">
+            <div class="scard-label">Blend (α)</div>
+            <div class="scard-val">${alpha}</div>
+            <div class="srow"><div class="srow-text">${Math.round(alpha*100)}% semantic · ${Math.round((1-alpha)*100)}% keyword</div></div>
+          </div>
+        </div>
+
+        <div style="height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden">
+          <div style="height:100%;width:${coveragePct}%;background:${barColor};transition:width 0.5s;border-radius:2px"></div>
+        </div>
+
+        ${!allIndexed ? `
+        <div style="font-family:var(--f-mono);font-size:10px;color:var(--smoke3);letter-spacing:0.04em;line-height:1.7">
+          ${indexedFiles === 0
+            ? 'No files have been indexed yet. New uploads are indexed automatically. Use the button below to index existing files.'
+            : `${totalFiles - indexedFiles} file${totalFiles - indexedFiles !== 1 ? 's' : ''} not yet indexed. Run backfill to enable hybrid retrieval for all files.`}
+        </div>` : `
+        <div style="font-family:var(--f-mono);font-size:10px;color:rgba(100,220,130,0.8);letter-spacing:0.04em">
+          ✓ All files indexed — hybrid retrieval fully active
+        </div>`}
+
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="lbtn" id="semidx-backfill-btn" ${allIndexed ? 'disabled' : ''}>
+            ${allIndexed ? 'Fully Indexed' : 'Index All Files'}
+          </button>
+          <button class="lbtn" style="color:var(--smoke4);border-color:var(--line2)" id="semidx-refresh-btn">Refresh Status</button>
+          <div class="weight-status" id="semidx-status"></div>
+        </div>
+
+        <div id="semidx-progress" style="display:none;font-family:var(--f-mono);font-size:9px;color:var(--smoke4);letter-spacing:0.06em;line-height:2;max-height:120px;overflow-y:auto"></div>
+      </div>`;
+
+    $('semidx-refresh-btn')?.addEventListener('click', loadSemanticIndex);
+
+    const backfillBtn = $('semidx-backfill-btn');
+    if (backfillBtn && !allIndexed) {
+      backfillBtn.addEventListener('click', () => runSemanticBackfill(data));
+    }
+
+  } catch (e) {
+    wrap.innerHTML = `<div class="tune-empty">Failed: ${e.message}</div>`;
+  }
+}
+
+async function runSemanticBackfill(statusData) {
+  const btn      = $('semidx-backfill-btn');
+  const statusEl = $('semidx-status');
+  const progEl   = $('semidx-progress');
+  if (!btn) return;
+
+  btn.disabled    = true;
+  btn.textContent = 'Indexing…';
+  if (progEl) progEl.style.display = 'block';
+
+  const logProg = msg => { if (progEl) { progEl.innerHTML += msg + '<br>'; progEl.scrollTop = 9999; } };
+
+  try {
+    // Fetch all files for this dept
+    const res   = await apiFetch(`/files?dept=${encodeURIComponent(dept)}`);
+    const files = await res.json();
+    if (!Array.isArray(files) || !files.length) {
+      if (statusEl) { statusEl.className = 'weight-status'; statusEl.textContent = 'No files found'; }
+      btn.disabled = false; btn.textContent = 'Index All Files';
+      return;
+    }
+
+    let done = 0, skipped = 0, failed = 0;
+    logProg(`Found ${files.length} files to check…`);
+
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      try {
+        const r = await apiFetch('/embed-file', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileId: f.id, dept }),
+        });
+        const d = await r.json();
+        if (d.ok) {
+          if (d.embedded > 0) { done++; logProg(`✓ ${f.name} — ${d.embedded} chunks indexed`); }
+          else                { skipped++; }
+        } else {
+          failed++;
+          logProg(`✗ ${f.name} — ${d.error || 'failed'}`);
+        }
+      } catch (e) { failed++; logProg(`✗ ${f.name} — ${e.message}`); }
+
+      // Update progress text on the button
+      btn.textContent = `Indexing… ${i+1}/${files.length}`;
+      if (statusEl) statusEl.textContent = `${done} indexed · ${skipped} skipped · ${failed} failed`;
+
+      // Small yield between files to keep browser responsive
+      await new Promise(r => setTimeout(r, 80));
+    }
+
+    logProg(`Done — ${done} newly indexed, ${skipped} already done, ${failed} failed`);
+    if (statusEl) { statusEl.className = 'weight-status ok'; statusEl.textContent = `✓ ${done} files indexed`; }
+    btn.textContent = 'Refresh Status';
+    btn.disabled    = false;
+    btn.onclick     = loadSemanticIndex;
+
+  } catch (e) {
+    if (statusEl) { statusEl.className = 'weight-status'; statusEl.textContent = 'Error: ' + e.message; }
+    btn.disabled = false; btn.textContent = 'Retry';
+  }
 }
 
 function downloadResponse(text) {
