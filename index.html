@@ -6556,8 +6556,12 @@ function applyIdentityUI() {
         <button id="sb-chpw-btn" title="Change password" style="flex-shrink:0;background:none;border:1px solid rgba(212,168,50,0.18);border-radius:3px;padding:4px 5px;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0.55;transition:opacity 0.15s,border-color 0.15s;" onmouseover="this.style.opacity='1';this.style.borderColor='rgba(212,168,50,0.45)'" onmouseout="this.style.opacity='0.55';this.style.borderColor='rgba(212,168,50,0.18)'">
           <svg width="11" height="12" viewBox="0 0 11 12" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="5" width="9" height="6.5" rx="1.2" stroke="rgba(212,168,50,0.8)" stroke-width="1.1"/><path d="M3 5V3.5a2.5 2.5 0 0 1 5 0V5" stroke="rgba(212,168,50,0.8)" stroke-width="1.1" stroke-linecap="round"/><circle cx="5.5" cy="8.2" r="0.9" fill="rgba(212,168,50,0.8)"/></svg>
         </button>
+        <button id="sb-logout-btn" title="Log out" style="flex-shrink:0;background:none;border:1px solid rgba(212,168,50,0.18);border-radius:3px;padding:4px 5px;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0.55;transition:opacity 0.15s,border-color 0.15s;" onmouseover="this.style.opacity='1';this.style.borderColor='rgba(212,168,50,0.45)'" onmouseout="this.style.opacity='0.55';this.style.borderColor='rgba(212,168,50,0.18)'">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4.5 6h6M8 3.5L10.5 6 8 8.5" stroke="rgba(212,168,50,0.8)" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 1.5H2a.5.5 0 0 0-.5.5v8a.5.5 0 0 0 .5.5h5" stroke="rgba(212,168,50,0.8)" stroke-width="1.1" stroke-linecap="round"/></svg>
+        </button>
       </div>`;
     $("sb-chpw-btn")?.addEventListener("click", openChangePasswordModal);
+    $("sb-logout-btn")?.addEventListener("click", logout);
   }
 
   // Show/hide admin-gated elements
@@ -6586,6 +6590,23 @@ function saveUserPref(key, value) {
 }
 
 /* BOOT */
+function logout() {
+  sessionStorage.removeItem('caci_token');
+  sessionStorage.removeItem('caci_username');
+  sessionStorage.removeItem('caci_role');
+  sessionStorage.removeItem('caci_displayname');
+  token = '';
+  $('app').style.display = 'none';
+  $('login-screen').style.display = '';
+  // Clear login fields so they don't persist
+  const userEl = $('login-user');
+  const pwEl   = $('login-pw');
+  if (userEl) userEl.value = '';
+  if (pwEl)   pwEl.value   = '';
+  const fb = $('login-fb');
+  if (fb) { fb.className = 'lfb'; fb.textContent = ''; }
+}
+
 function bootApp() {
   $('login-screen').style.display = 'none';
   $('app').style.display = 'block';
