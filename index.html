@@ -6202,6 +6202,20 @@ body::before {
 </div>
 
 <!-- Model Modal -->
+<div class="modal-bg" id="file-viewer-modal" style="display:none;">
+  <div class="modal-box" style="width:min(800px,92vw);max-height:85vh;display:flex;flex-direction:column">
+    <div class="modal-head" style="display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+      <div style="font-family:var(--f-mono);font-size:11px;letter-spacing:0.1em;color:var(--gold);text-transform:uppercase" id="fv-title">Document</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="asave" id="fv-download-btn" style="font-size:9px;padding:5px 12px">&#8595; Download</button>
+        <button class="modal-close" id="fv-close">&times;</button>
+      </div>
+    </div>
+    <div style="font-family:var(--f-mono);font-size:9px;color:var(--smoke4);letter-spacing:0.06em;margin:4px 0 12px;flex-shrink:0" id="fv-meta"></div>
+    <div id="fv-content" style="flex:1;overflow-y:auto;background:rgba(0,0,0,0.2);border:1px solid var(--line);border-radius:4px;padding:16px;font-family:var(--f-mono);font-size:10px;line-height:1.7;color:var(--smoke2);white-space:pre-wrap;word-break:break-word;scrollbar-width:thin;scrollbar-color:rgba(212,168,50,0.3) transparent">Loading...</div>
+  </div>
+</div>
+
 <div class="modal-bg" id="chpw-modal" style="display:none;">
   <div class="modal-sheet" style="max-width:360px">
     <div class="modal-handle"></div>
@@ -7609,15 +7623,99 @@ async function sendChat() {
       }
     }
 
-    const res = await apiFetch('/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
-    const d = await res.json();
+    // ── Streaming chat ──
+    const streamRes = await apiFetch('/chat-stream', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    if (!streamRes.ok) { ty.remove(); appendMsg('ai', '\u26A0  Request failed'); return; }
+
     ty.remove();
-    if (d.error) appendMsg('ai', '\u26A0  ' + d.error);
-    else {
-      appendMsg('ai', d.response, d.sources, d.scope, d.model, d.responseId || '');
-      chatHistory.push({role:'assistant', content:d.response});
-      saveChatHistory();
-      if (d.collections) window._caciCollections = d.collections;
+
+    // Create a live bubble for streaming text
+    const msgEl = document.createElement('div');
+    msgEl.className = 'msg ai';
+    const streamAv = 'CACI';
+    const streamSc = body.scope && body.scope !== 'all' ? `<div class="msg-scope">Scope: ${body.scope === 'collection' ? chatCollection : body.scope}</div>` : '';
+    msgEl.innerHTML = `<div class="msg-av">${streamAv}</div><div class="msg-body">${streamSc}<div class="msg-bubble" id="stream-bubble-${Date.now()}"></div></div>`;
+    $('chat-msgs').appendChild(msgEl);
+    msgEl.scrollIntoView({block:'end', behavior:'smooth'});
+
+    const bubbleId = msgEl.querySelector('[id^="stream-bubble-"]').id;
+    const getBubble = () => document.getElementById(bubbleId);
+    let fullText = '';
+    let ttsBuffer = '';
+    let ttsFired = false;
+
+    const reader = streamRes.body.getReader();
+    const decoder = new TextDecoder();
+    let sseBuffer = '';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        sseBuffer += decoder.decode(value, { stream: true });
+        const lines = sseBuffer.split('\n');
+        sseBuffer = lines.pop();
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          let evt;
+          try { evt = JSON.parse(line.slice(6).trim()); } catch { continue; }
+
+          if (evt.error) {
+            const b = getBubble(); if (b) b.innerHTML = '\u26A0 ' + esc(evt.error);
+            break;
+          }
+
+          if (evt.t) {
+            fullText += evt.t;
+            ttsBuffer += evt.t;
+            const b = getBubble(); if (b) b.innerHTML = renderMarkdown(fullText);
+            msgEl.scrollIntoView({block:'end', behavior:'smooth'});
+
+            // Fire TTS on first complete sentence if auto-speak on
+            if (voiceAutoSpeak && !ttsFired) {
+              const sentenceEnd = ttsBuffer.search(/[.!?]\s/);
+              if (sentenceEnd > 40) {
+                ttsFired = true;
+                const firstSentence = ttsBuffer.slice(0, sentenceEnd + 1).trim();
+                ttsBuffer = ttsBuffer.slice(sentenceEnd + 2);
+                speakTextQueued(null, firstSentence);
+              }
+            }
+          }
+
+          if (evt.done) {
+            if (evt.correction) fullText += `\n\n> \u26A0 *Data check: ${evt.correction}*`;
+
+            // Replace live bubble with full appendMsg bubble (sources, feedback buttons, etc.)
+            msgEl.remove();
+            appendMsg('ai', fullText, evt.sources || [], evt.scope || body.scope, evt.model || 'claude', evt.responseId || '');
+
+            // Queue remaining TTS text
+            if (voiceAutoSpeak) {
+              if (!ttsFired) {
+                speakTextQueued(null, fullText);
+              } else if (ttsBuffer.trim()) {
+                speakTextQueued(null, ttsBuffer.trim());
+              }
+            }
+
+            chatHistory.push({role:'assistant', content:fullText});
+            saveChatHistory();
+            if (evt.collections) window._caciCollections = evt.collections;
+          }
+        }
+      }
+    } catch(streamErr) {
+      if (fullText) {
+        msgEl.remove();
+        appendMsg('ai', fullText, [], body.scope, 'claude', '');
+        chatHistory.push({role:'assistant', content:fullText});
+        saveChatHistory();
+      } else {
+        msgEl.remove();
+        appendMsg('ai', '\u26A0  ' + streamErr.message);
+      }
     }
   } catch(e) { ty.remove(); appendMsg('ai', '\u26A0  ' + e.message); }
   finally { $('send-btn').disabled = false; }
@@ -8548,11 +8646,13 @@ async function loadFiles() {
           <div class="fmeta">${esc(f.collection)} &nbsp;&middot;&nbsp; ${(f.charCount||0).toLocaleString()} chars &nbsp;&middot;&nbsp; ${dstr(f.uploadedAt)}</div>
         </div>
         <div class="factions">
+          <button class="fact-btn view-file" data-id="${f.id}" data-name="${esc(f.name)}">View</button>
           <button class="fact-btn focus${chatFileId === f.id ? ' focus-active' : ''}" data-id="${f.id}" data-col="${esc(f.collection)}" data-name="${esc(f.name)}">Focus</button>
           <button class="fact-btn edit-meta" data-id="${f.id}" data-name="${esc(f.name)}" data-col="${esc(f.collection)}" data-reportname="${esc(f.meta?.reportName||f.reportName||'')}" data-category="${esc(f.meta?.category||f.category||'')}" data-period="${esc(f.meta?.period||f.period||'')}" data-reporttype="${esc(f.meta?.reportType||f.reportType||'')}">Edit</button>
           <button class="fact-btn del" data-id="${f.id}">Remove</button>
         </div>
       </div>`).join('');
+    list.querySelectorAll('.fact-btn.view-file').forEach(b => b.addEventListener('click', () => openFileViewer(b.dataset.id, b.dataset.name)));
     list.querySelectorAll('.fact-btn.focus').forEach(b => b.addEventListener('click', () => {
       chatFileId = b.dataset.id; chatFileName = b.dataset.name; chatCollection = b.dataset.col;
       setScope('file', b.dataset.col, b.dataset.id, b.dataset.name);
@@ -8561,6 +8661,45 @@ async function loadFiles() {
     list.querySelectorAll('.fact-btn.edit-meta').forEach(b => b.addEventListener('click', () => openEditFileModal(b.dataset)));
     list.querySelectorAll('.fact-btn.del').forEach(b => b.addEventListener('click', () => deleteFile(b.dataset.id)));
   } catch(e) { $('flist').innerHTML = `<div class="fempty">${e.message}</div>`; }
+}
+
+async function openFileViewer(id, name) {
+  const modal = $('file-viewer-modal');
+  const title = $('fv-title');
+  const meta  = $('fv-meta');
+  const content = $('fv-content');
+  const dlBtn = $('fv-download-btn');
+
+  title.textContent = name || 'Document';
+  meta.textContent = 'Loading…';
+  content.textContent = 'Loading…';
+  modal.style.display = 'flex';
+
+  // Close handlers
+  $('fv-close').onclick = () => { modal.style.display = 'none'; };
+  modal.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
+
+  try {
+    const res = await apiFetch(`/files/${id}`);
+    const d = await res.json();
+    if (!d.ok) { content.textContent = 'Error: ' + (d.error || 'Failed to load'); return; }
+
+    meta.textContent = `${(d.chunkCount||0)} chunks · ${(d.charCount||0).toLocaleString()} chars`;
+    content.textContent = d.text || '(No text content extracted)';
+
+    // Download button
+    dlBtn.onclick = () => {
+      const blob = new Blob([d.text || ''], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = (name || 'document').replace(/\.[^.]+$/, '') + '_extracted.txt';
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+  } catch(e) {
+    content.textContent = 'Failed to load: ' + e.message;
+  }
 }
 
 async function deleteFile(id) {
