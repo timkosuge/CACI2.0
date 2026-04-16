@@ -7653,6 +7653,20 @@ async function loadFiles() {
     const files = await res.json();
     $('fbadge').textContent = files.length + ' file' + (files.length !== 1 ? 's' : '');
     $('ftitle').textContent = _colView === 'uncollected' ? 'Unsorted Files' : (selectedCollection || 'All Documents');
+
+    // Populate filter dropdowns with unique values from current file set
+    const allFiles = files;
+    const curCat = $('f-category')?.value || '';
+    const curPer = $('f-period')?.value || '';
+    const curSt  = $('f-state')?.value || '';
+    const cats   = [...new Set(allFiles.map(f => f.meta?.category || f.category || '').filter(Boolean))].sort();
+    const pers   = [...new Set(allFiles.map(f => f.meta?.period   || f.period   || '').filter(Boolean))].sort();
+    const sts    = [...new Set((allFiles.flatMap(f => f.meta?.states || (f.meta?.state ? [f.meta.state] : []))).filter(Boolean))].sort();
+    const fcEl = $('f-category'), fpEl = $('f-period'), fsEl = $('f-state');
+    if (fcEl) { fcEl.innerHTML = '<option value="">All Categories</option>' + cats.map(c => `<option value="${esc(c)}"${c===curCat?' selected':''}>${esc(c)}</option>`).join(''); }
+    if (fpEl) { fpEl.innerHTML = '<option value="">All Periods</option>'    + pers.map(p => `<option value="${esc(p)}"${p===curPer?' selected':''}>${esc(p)}</option>`).join(''); }
+    if (fsEl) { fsEl.innerHTML = '<option value="">All States</option>'     + sts.map(s  => `<option value="${esc(s)}"${s===curSt?' selected':''}>${esc(s)}</option>`).join('');  }
+
     const list = $('flist');
     if (!files.length) {
       list.innerHTML = `<div class="fempty"><div class="fempty-title">${_colView === 'uncollected' ? 'No unsorted files' : 'No documents'}</div>${_colView === 'uncollected' ? 'All files are assigned to collections' : 'Enter a collection name above<br>and upload files to get started'}</div>`;
