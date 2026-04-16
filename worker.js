@@ -14,10 +14,57 @@ function json(data, status = 200) {
   });
 }
 
+// ── Token helpers ─────────────────────────────────────────────
+// Token format: "username:role:SESSION_SECRET"
+// Legacy tokens (bare SESSION_SECRET) still accepted — treated as admin
+// so existing sessions don't break during migration.
+
+function makeToken(username, role, secret) {
+  return `${username}:${role}:${secret}`;
+}
+
 function verifyToken(request, env) {
   const auth = request.headers.get('Authorization') || '';
   const token = auth.replace('Bearer ', '').trim();
-  return token && (token === env.SESSION_SECRET || token === 'dev-token');
+  if (!token) return null;
+  const secret = env.SESSION_SECRET || 'dev-token';
+
+  // Legacy bare token — admin fallback
+  if (token === secret || token === 'dev-token') {
+    return { username: 'admin', role: 'admin', legacy: true };
+  }
+
+  // Structured token: username:role:secret
+  const parts = token.split(':');
+  if (parts.length >= 3) {
+    const sig = parts.slice(2).join(':');
+    if (sig === secret || sig === 'dev-token') {
+      return { username: parts[0], role: parts[1] };
+    }
+  }
+  return null;
+}
+
+function requireAuth(request, env) {
+  return verifyToken(request, env);
+}
+
+function requireAdmin(request, env) {
+  const user = verifyToken(request, env);
+  return user?.role === 'admin' ? user : null;
+}
+
+// Simple password hash using Web Crypto (SHA-256 + salt)
+async function hashPassword(password, salt) {
+  const enc = new TextEncoder();
+  const data = enc.encode(salt + ':' + password);
+  const buf  = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+async function verifyPassword(password, storedHash, salt) {
+  const hash = await hashPassword(password, salt);
+  return hash === storedHash;
 }
 
 export default {
@@ -31,6 +78,17 @@ export default {
     if (path === '/health') return json({ ok: true, version: '6.1.0' });
 
     if (!verifyToken(request, env)) return json({ error: 'Unauthorized' }, 401);
+
+    // ── User management (admin only) ──────────────────────────
+    if (path === '/users'                    && method === 'GET')    return handleListUsers(request, env);
+    if (path === '/users/create'             && method === 'POST')   return handleCreateUser(request, env);
+    if (path.startsWith('/users/') && path.endsWith('/role')   && method === 'PATCH') return handleUpdateUserRole(path, request, env);
+    if (path.startsWith('/users/') && path.endsWith('/reset')  && method === 'POST')  return handleResetUserPassword(path, request, env);
+    if (path.startsWith('/users/') && method === 'DELETE')     return handleDeleteUser(path, request, env);
+    // ── Per-user preferences (any authenticated user) ─────────
+    if (path === '/users/me'                 && method === 'GET')    return handleGetMe(request, env);
+    if (path === '/users/me/prefs'           && method === 'POST')   return handleSavePrefs(request, env);
+    if (path === '/users/me/password'        && method === 'POST')   return handleChangePassword(request, env);
 
     if (path === '/upload'    && method === 'POST')   return handleUpload(request, env);
     if (path === '/duplicate-check' && method === 'POST') return handleDuplicateCheck(request, env);
@@ -103,14 +161,210 @@ export default {
 // ── Auth ──────────────────────────────────────────────────────
 async function handleLogin(request, env) {
   try {
-    const { password } = await request.json();
+    const { username, password } = await request.json();
     if (!password) return json({ error: 'Password required' }, 400);
     const cleanPassword = password.trim();
+    const secret = env.SESSION_SECRET || 'dev-token';
+
+    // ── Named user login ──────────────────────────────────────
+    if (username && username.trim()) {
+      const cleanUser = username.trim().toLowerCase();
+      const userRecord = await env.CACI_KV.get(`user:${cleanUser}`, 'json');
+
+      if (userRecord) {
+        const valid = await verifyPassword(cleanPassword, userRecord.passwordHash, userRecord.salt);
+        if (!valid) return json({ error: 'Invalid username or password' }, 401);
+        const token = makeToken(cleanUser, userRecord.role, secret);
+        return json({
+          ok: true, token,
+          username: cleanUser,
+          role: userRecord.role,
+          prefs: userRecord.prefs || {},
+          displayName: userRecord.displayName || cleanUser,
+        });
+      }
+      // Username provided but not found — don't fall through to legacy
+      // (prevents username enumeration via timing, but still safe since
+      //  we only reach legacy if NO username is given)
+      return json({ error: 'Invalid username or password' }, 401);
+    }
+
+    // ── Legacy single-password login (no username field) ─────
+    // Keeps existing sessions working during migration.
+    // Once all users have accounts, this path can be disabled.
     if (cleanPassword === env.CACI_PASSWORD || cleanPassword === (env.CACI_PASSWORD||'').trim() || cleanPassword === 'caci-dev') {
-      return json({ ok: true, token: env.SESSION_SECRET || 'dev-token' });
+      return json({ ok: true, token: secret, username: 'admin', role: 'admin', legacy: true });
     }
     return json({ error: 'Invalid password' }, 401);
   } catch { return json({ error: 'Bad request' }, 400); }
+}
+
+// ── User Management ───────────────────────────────────────────
+
+// GET /users — list all users (admin only)
+async function handleListUsers(request, env) {
+  if (!requireAdmin(request, env)) return json({ error: 'Admin required' }, 403);
+  try {
+    const idx = await env.CACI_KV.get('users:index', 'json') || [];
+    return json({ ok: true, users: idx });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+// POST /users/create — create a new user (admin only)
+async function handleCreateUser(request, env) {
+  if (!requireAdmin(request, env)) return json({ error: 'Admin required' }, 403);
+  try {
+    const { username, password, role = 'user', displayName } = await request.json();
+    if (!username || !password) return json({ error: 'username and password required' }, 400);
+    const clean = username.trim().toLowerCase();
+    if (!/^[a-z0-9_.-]{2,32}$/.test(clean)) return json({ error: 'Username must be 2-32 chars, letters/numbers/._- only' }, 400);
+
+    const existing = await env.CACI_KV.get(`user:${clean}`, 'json');
+    if (existing) return json({ error: 'Username already exists' }, 409);
+
+    const salt = crypto.randomUUID();
+    const passwordHash = await hashPassword(password.trim(), salt);
+
+    const userRecord = {
+      username: clean,
+      displayName: (displayName || clean).trim(),
+      role: ['admin','user'].includes(role) ? role : 'user',
+      salt,
+      passwordHash,
+      prefs: {},
+      createdAt: new Date().toISOString(),
+    };
+    await env.CACI_KV.put(`user:${clean}`, JSON.stringify(userRecord));
+
+    // Add to index
+    const idx = await env.CACI_KV.get('users:index', 'json') || [];
+    idx.unshift({ username: clean, displayName: userRecord.displayName, role: userRecord.role, createdAt: userRecord.createdAt });
+    await env.CACI_KV.put('users:index', JSON.stringify(idx));
+
+    return json({ ok: true, username: clean, role: userRecord.role });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+// PATCH /users/:username/role — change role (admin only)
+async function handleUpdateUserRole(path, request, env) {
+  if (!requireAdmin(request, env)) return json({ error: 'Admin required' }, 403);
+  try {
+    const username = path.replace('/users/', '').replace('/role', '');
+    const { role } = await request.json();
+    if (!['admin','user'].includes(role)) return json({ error: 'Invalid role' }, 400);
+
+    const record = await env.CACI_KV.get(`user:${username}`, 'json');
+    if (!record) return json({ error: 'User not found' }, 404);
+    record.role = role;
+    await env.CACI_KV.put(`user:${username}`, JSON.stringify(record));
+
+    // Update index
+    const idx = await env.CACI_KV.get('users:index', 'json') || [];
+    const entry = idx.find(u => u.username === username);
+    if (entry) { entry.role = role; await env.CACI_KV.put('users:index', JSON.stringify(idx)); }
+
+    return json({ ok: true });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+// POST /users/:username/reset — reset password (admin only)
+async function handleResetUserPassword(path, request, env) {
+  if (!requireAdmin(request, env)) return json({ error: 'Admin required' }, 403);
+  try {
+    const username = path.replace('/users/', '').replace('/reset', '');
+    const { password } = await request.json();
+    if (!password) return json({ error: 'password required' }, 400);
+
+    const record = await env.CACI_KV.get(`user:${username}`, 'json');
+    if (!record) return json({ error: 'User not found' }, 404);
+
+    const salt = crypto.randomUUID();
+    record.salt         = salt;
+    record.passwordHash = await hashPassword(password.trim(), salt);
+    await env.CACI_KV.put(`user:${username}`, JSON.stringify(record));
+    return json({ ok: true });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+// DELETE /users/:username — delete user (admin only)
+async function handleDeleteUser(path, request, env) {
+  const caller = requireAdmin(request, env);
+  if (!caller) return json({ error: 'Admin required' }, 403);
+  try {
+    const username = path.replace('/users/', '');
+    if (username === caller.username) return json({ error: 'Cannot delete your own account' }, 400);
+    await env.CACI_KV.delete(`user:${username}`);
+    const idx = await env.CACI_KV.get('users:index', 'json') || [];
+    await env.CACI_KV.put('users:index', JSON.stringify(idx.filter(u => u.username !== username)));
+    return json({ ok: true });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+// GET /users/me — get current user info + prefs
+async function handleGetMe(request, env) {
+  const user = requireAuth(request, env);
+  if (!user) return json({ error: 'Unauthorized' }, 401);
+  try {
+    if (user.legacy) return json({ ok: true, username: 'admin', role: 'admin', displayName: 'Admin', prefs: {}, legacy: true });
+    const record = await env.CACI_KV.get(`user:${user.username}`, 'json');
+    if (!record) return json({ error: 'User not found' }, 404);
+    return json({ ok: true, username: record.username, displayName: record.displayName, role: record.role, prefs: record.prefs || {} });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+// POST /users/me/prefs — save personal preferences
+async function handleSavePrefs(request, env) {
+  const user = requireAuth(request, env);
+  if (!user) return json({ error: 'Unauthorized' }, 401);
+  if (user.legacy) return json({ ok: true, note: 'Prefs not persisted for legacy sessions' });
+  try {
+    const body = await request.json();
+    const record = await env.CACI_KV.get(`user:${user.username}`, 'json');
+    if (!record) return json({ error: 'User not found' }, 404);
+
+    // Only allow safe pref keys — no role/password changes here
+    const ALLOWED_PREFS = ['dept','model','ttsVoice','ttsLength','ttsAuto','ttsProvider','sbCollapsed','displayName'];
+    const prefs = record.prefs || {};
+    for (const key of ALLOWED_PREFS) {
+      if (body[key] !== undefined) {
+        if (key === 'displayName') {
+          record.displayName = String(body[key]).trim().slice(0, 40);
+          // Also update index entry
+          const idx = await env.CACI_KV.get('users:index', 'json') || [];
+          const entry = idx.find(u => u.username === user.username);
+          if (entry) { entry.displayName = record.displayName; await env.CACI_KV.put('users:index', JSON.stringify(idx)); }
+        } else {
+          prefs[key] = body[key];
+        }
+      }
+    }
+    record.prefs = prefs;
+    await env.CACI_KV.put(`user:${user.username}`, JSON.stringify(record));
+    return json({ ok: true, prefs });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+// POST /users/me/password — change own password
+async function handleChangePassword(request, env) {
+  const user = requireAuth(request, env);
+  if (!user || user.legacy) return json({ error: 'Must be logged in with a named account' }, 401);
+  try {
+    const { currentPassword, newPassword } = await request.json();
+    if (!currentPassword || !newPassword) return json({ error: 'currentPassword and newPassword required' }, 400);
+    if (newPassword.trim().length < 6) return json({ error: 'New password must be at least 6 characters' }, 400);
+
+    const record = await env.CACI_KV.get(`user:${user.username}`, 'json');
+    if (!record) return json({ error: 'User not found' }, 404);
+
+    const valid = await verifyPassword(currentPassword.trim(), record.passwordHash, record.salt);
+    if (!valid) return json({ error: 'Current password is incorrect' }, 401);
+
+    const salt = crypto.randomUUID();
+    record.salt         = salt;
+    record.passwordHash = await hashPassword(newPassword.trim(), salt);
+    await env.CACI_KV.put(`user:${user.username}`, JSON.stringify(record));
+    return json({ ok: true });
+  } catch (e) { return json({ error: e.message }, 500); }
 }
 
 // ── Duplicate Check ───────────────────────────────────────────
@@ -2018,6 +2272,7 @@ Rules:
 
 // ── Admin ─────────────────────────────────────────────────────
 async function handleAdminSave(request, env) {
+  if (!requireAdmin(request, env)) return json({ error: 'Admin required' }, 403);
   try {
     const body = await request.json();
     const saved = [];
@@ -2061,6 +2316,7 @@ async function handleGetWeights(request, env) {
 }
 
 async function handleSaveWeights(request, env) {
+  if (!requireAdmin(request, env)) return json({ error: 'Admin required' }, 403);
   try {
     const { dept, weights } = await request.json();
     if (!dept || !weights) return json({ error: 'dept and weights required' }, 400);
@@ -2079,6 +2335,7 @@ async function handleSaveWeights(request, env) {
 }
 
 async function handleResetWeights(request, env) {
+  if (!requireAdmin(request, env)) return json({ error: 'Admin required' }, 403);
   try {
     const { dept } = await request.json();
     if (!dept) return json({ error: 'dept required' }, 400);
@@ -2137,6 +2394,7 @@ async function handleGetFeedbackLog(url, env) {
 }
 
 async function handleAnalyzeFeedback(request, env) {
+  if (!requireAdmin(request, env)) return json({ error: 'Admin required' }, 403);
   try {
     const { dept } = await request.json();
     if (!dept) return json({ error: 'dept required' }, 400);
@@ -2232,6 +2490,7 @@ async function handleGetPendingTuning(env) {
 }
 
 async function handleApproveTuning(request, env) {
+  if (!requireAdmin(request, env)) return json({ error: 'Admin required' }, 403);
   try {
     const { dept, approvedIndices, action } = await request.json();
     // action: 'approve' | 'reject_all'
