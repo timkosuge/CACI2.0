@@ -564,6 +564,20 @@ async function handleListFiles(url, env) {
 
     const isContext = url.searchParams.get('context') === 'true';
 
+    // dept=all → return every unique file across all departments (used by backfill)
+    if (dept === 'all' && !col && !uncollected && !isContext) {
+      const ALL_DEPTS = ['global','retail','compliance','commercial','human_resources','finance','operations','technology'];
+      const seen = new Set();
+      const allFiles = [];
+      for (const d of ALL_DEPTS) {
+        const idx = await env.CACI_KV.get(`index:${d}`, 'json') || [];
+        for (const f of idx) {
+          if (!f.isContext && !seen.has(f.id)) { seen.add(f.id); allFiles.push(f); }
+        }
+      }
+      return json(allFiles);
+    }
+
     let files;
     if (isContext && col) {
       files = await env.CACI_KV.get(`ctx:${dept}:${col}`, 'json') || [];
