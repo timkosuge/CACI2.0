@@ -1528,26 +1528,45 @@ body::before {
 .dept-chip-wrap { position: relative; }
 .dept-chip {
   display: flex; align-items: center; gap: 8px;
-  padding: 5px 12px;
-  border: 1px solid rgba(212,168,50,0.16);
-  border-top-color: rgba(0,0,0,0.55);
-  border-radius: 3px;
-  background: rgba(4,6,14,0.60);
+  padding: 5px 14px 5px 12px;
+  /* Gold left+right walls, bright top edge, dark bottom — raised plate */
+  border-top: 1px solid rgba(245,227,152,0.22);
+  border-bottom: 1px solid rgba(0,0,0,0.75);
+  border-left: 1px solid rgba(212,168,50,0.55);
+  border-right: 1px solid rgba(212,168,50,0.55);
+  border-radius: 2px;
+  background: linear-gradient(180deg, rgba(22,28,46,0.97) 0%, rgba(10,14,26,0.99) 100%);
   cursor: pointer;
+  position: relative;
   transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+  /* Raised — top highlight, drop shadow underneath */
   box-shadow:
-    inset 0 1px 3px rgba(0,0,0,0.60),
-    inset 0 1px 1px rgba(0,0,0,0.40),
-    0 1px 0 rgba(245,227,152,0.05);
+    inset 0 1px 0 rgba(245,227,152,0.12),
+    inset 0 -1px 0 rgba(0,0,0,0.55),
+    0 3px 10px rgba(0,0,0,0.70),
+    0 1px 3px rgba(0,0,0,0.90),
+    /* Gold side glow */
+    -1px 0 6px rgba(212,168,50,0.12),
+    1px 0 6px rgba(212,168,50,0.12);
+}
+/* Gold shimmer line across top */
+.dept-chip::before {
+  content: '';
+  position: absolute; top: 0; left: 8%; right: 8%; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(245,227,152,0.55) 40%, rgba(245,227,152,0.55) 60%, transparent);
 }
 .dept-chip:hover {
-  border-color: rgba(212,168,50,0.28);
-  border-top-color: rgba(0,0,0,0.40);
-  background: rgba(8,12,24,0.70);
+  border-left-color: rgba(212,168,50,0.80);
+  border-right-color: rgba(212,168,50,0.80);
+  border-top-color: rgba(245,227,152,0.35);
+  background: linear-gradient(180deg, rgba(28,36,58,0.98) 0%, rgba(14,18,34,1) 100%);
   box-shadow:
-    inset 0 1px 3px rgba(0,0,0,0.50),
-    inset 0 1px 1px rgba(0,0,0,0.30),
-    0 1px 0 rgba(245,227,152,0.07);
+    inset 0 1px 0 rgba(245,227,152,0.18),
+    inset 0 -1px 0 rgba(0,0,0,0.60),
+    0 4px 14px rgba(0,0,0,0.75),
+    0 1px 4px rgba(0,0,0,0.90),
+    -2px 0 10px rgba(212,168,50,0.18),
+    2px 0 10px rgba(212,168,50,0.18);
 }
 .dc-pip { display: none; }
 .dc-name {
