@@ -254,7 +254,7 @@ async function handleCreateUser(request, env) {
     await env.CACI_KV.put('users:index', JSON.stringify(idx));
 
     const creator = requireAdmin(request, env);
-    writeAudit(env, creator, 'user.create', { dept: 'global', newUsername: clean, role: userRecord.role });
+    await writeAudit(env, creator, 'user.create', { dept: 'global', newUsername: clean, role: userRecord.role });
     return json({ ok: true, username: clean, role: userRecord.role });
   } catch (e) { return json({ error: e.message }, 500); }
 }
@@ -613,7 +613,7 @@ async function handleUpload(request, env) {
     }
 
     const uploadUser = verifyToken(request, env);
-    writeAudit(env, uploadUser, 'file.upload', { dept, collection, name, chunks: finalChunks.length, displayName: uploadUser?.username });
+    await writeAudit(env, uploadUser, 'file.upload', { dept, collection, name, chunks: finalChunks.length, displayName: uploadUser?.username });
 
     return json({ ok: true, id, name, collection, chunks: finalChunks.length, charCount: cleanText.length, isContext, hasParentSummary: !!parentSummary });
   } catch (err) {
@@ -826,7 +826,7 @@ async function handleDeleteFile(id, env, url, caller) {
 
     if (env.CACI_R2) await env.CACI_R2.delete(`${dept}/${collection}/${id}/${name}`).catch(() => {});
     await env.CACI_KV.delete(`library:map:${dept}`).catch(() => {});
-    writeAudit(env, caller, 'file.delete', { dept, collection, name, fileId: id });
+    await writeAudit(env, caller, 'file.delete', { dept, collection, name, fileId: id });
     return json({ ok: true });
   } catch (err) { return json({ error: 'Delete failed: ' + err.message }, 500); }
 }
@@ -849,7 +849,7 @@ async function handleDeleteCollection(encodedName, url, env, caller) {
     await env.CACI_KV.delete(colKey);
     const reg = await env.CACI_KV.get(`colreg:${dept}`, 'json') || [];
     await env.CACI_KV.put(`colreg:${dept}`, JSON.stringify(reg.filter(c => c.name !== name)));
-    writeAudit(env, caller, 'collection.delete', { dept, collection: name, fileCount: files.length });
+    await writeAudit(env, caller, 'collection.delete', { dept, collection: name, fileCount: files.length });
     return json({ ok: true, deleted: files.length });
   } catch (err) { return json({ error: 'Delete collection failed: ' + err.message }, 500); }
 }
@@ -2402,7 +2402,7 @@ async function handleAdminSave(request, env) {
         saved.push(key);
       }
     }
-    if (saved.length) writeAudit(env, requireAdmin(request, env), 'config.save', { dept: 'global', keys: saved });
+    if (saved.length) await writeAudit(env, requireAdmin(request, env), 'config.save', { dept: 'global', keys: saved });
     return json({ ok: true, saved });
   } catch (err) { return json({ error: err.message }, 500); }
 }
@@ -2451,7 +2451,7 @@ async function handleSaveWeights(request, env) {
     sanitized._lastUpdated = new Date().toISOString();
     sanitized._appliedCount = weights._appliedCount || 0;
     await env.CACI_KV.put(`config:scoring-weights:${dept}`, JSON.stringify(sanitized));
-    writeAudit(env, requireAdmin(request, env), 'weights.save', { dept });
+    await writeAudit(env, requireAdmin(request, env), 'weights.save', { dept });
     return json({ ok: true, weights: sanitized });
   } catch (err) { return json({ error: err.message }, 500); }
 }
@@ -2658,7 +2658,7 @@ async function handleApproveTuning(request, env) {
     pending.appliedAt = new Date().toISOString();
     pending.appliedChanges = changes;
     await env.CACI_KV.put(pendingKey, JSON.stringify(pending));
-    writeAudit(env, requireAdmin(request, env), 'tuning.approve', { dept, changeCount: changes.length });
+    await writeAudit(env, requireAdmin(request, env), 'tuning.approve', { dept, changeCount: changes.length });
     return json({ ok: true, changes });
   } catch (err) { return json({ error: err.message }, 500); }
 }
