@@ -976,67 +976,30 @@ body::before {
 }
 .sb-section-label {
   font-family: var(--f-ui);
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 400;
-  letter-spacing: 0.25em;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
-  padding: 16px 20px 14px;
+  color: rgba(212,168,50,0.70);
+  display: block;
+  width: 100%;
+  padding: 7px 20px;
+  margin: 8px 0 4px;
   flex-shrink: 0;
-  text-align: center;
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background: linear-gradient(180deg, rgba(20,26,42,0.90) 0%, rgba(14,18,32,0.95) 100%);
+  border-top: 1px solid rgba(212,168,50,0.18);
+  border-bottom: 1px solid rgba(0,0,0,0.60);
+  box-shadow: inset 0 1px 0 rgba(245,227,152,0.06), 0 2px 6px rgba(0,0,0,0.40);
 }
-/* The raised plate — sits centered in the sidebar */
 .sb-section-label::before {
-  content: attr(data-label);
-  position: absolute;
-  left: 50%; transform: translateX(-50%);
-  white-space: nowrap;
-  font-family: var(--f-ui);
-  font-size: 10px;
-  letter-spacing: 0.25em;
-  text-transform: uppercase;
-  /* Gold gradient text */
-  background: linear-gradient(160deg, #fff8d0 0%, #e8c84a 35%, #c9a832 65%, #a07820 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  display: none; /* use span approach below */
-}
-.sb-section-label-plate {
-  display: inline-flex;
-  align-items: center;
-  padding: 5px 12px;
-  position: relative;
-  border-radius: 3px;
-  background: linear-gradient(180deg, rgba(18,24,40,0.96) 0%, rgba(10,13,24,0.98) 100%);
-  border: 1px solid rgba(212,168,50,0.28);
-  border-top-color: rgba(245,227,152,0.12);
-  border-bottom-color: rgba(0,0,0,0.60);
-  box-shadow:
-    inset 0 1px 0 rgba(245,227,152,0.08),
-    inset 0 -1px 0 rgba(0,0,0,0.45),
-    0 2px 6px rgba(0,0,0,0.60),
-    0 1px 2px rgba(0,0,0,0.80);
-}
-.sb-section-label-plate::before {
   content: '';
-  position: absolute; top: 0; left: 12%; right: 12%; height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(245,227,152,0.30) 50%, transparent);
+  position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent 5%, rgba(212,168,50,0.28) 30%, rgba(245,227,152,0.42) 50%, rgba(212,168,50,0.28) 70%, transparent 95%);
 }
-.sb-section-label-plate::after { display: none; }
-/* Gold gradient text inside plate */
-.sb-section-label-text {
-  color: rgba(212,168,50,0.80);
-  font-family: var(--f-ui);
-  font-size: 10px;
-  font-weight: 400;
-  letter-spacing: 0.25em;
-  text-transform: uppercase;
-  position: relative; z-index: 1;
-}
+.sb-section-label::after { display: none; }
+.sb-section-label-plate { display: contents; }
+.sb-section-label-text { display: contents; }
 .sb-content-panel {
   flex: 1;
   display: flex;
