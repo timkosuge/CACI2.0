@@ -134,6 +134,9 @@ export default {
     if (path.startsWith('/history/') && method === 'GET')  return handleGetHistory(path, request, env);
     if (path.startsWith('/history/') && method === 'POST') return handleSaveHistory(path, request, env);
     if (path === '/audit'     && method === 'GET')    return handleGetAudit(request, url, env);
+    if (path === '/analytics'                 && method === 'GET')  return handleGetAnalytics(url, env, request);
+    if (path === '/analytics/insights'        && method === 'POST') return handleGenerateInsights(request, env);
+    if (path === '/analytics/insights/cached' && method === 'GET')  return handleGetCachedInsights(env, request);
     if (path === '/presence'  && method === 'POST')   return handlePresencePing(request, env);
     if (path === '/presence'  && method === 'GET')    return handlePresenceList(request, env);
     if (path === '/feedback'  && method === 'POST')   return handleFeedback(request, env);
@@ -1271,6 +1274,9 @@ Do not comment on anything else. Do not rewrite the response. Only flag hard num
         // VERIFIED or anything else — ship as-is
       } catch { /* non-blocking — if verify fails, original response ships unchanged */ }
     }
+
+    // Log query for analytics — fire and forget
+    writeQueryLog(env, { message, dept, username: verifyToken(request, env)?.username || 'unknown', collection: collection || null, retrieval: !!context.text, scope });
 
     // Only surface sources if documents were actually retrieved — not for general conversation
     const sourcesToReturn = context.text ? context.sources : [];
@@ -3168,6 +3174,174 @@ async function handleConnectorFetch(path, request, env) {
 // Thin append-only log. writeAudit is called from mutation handlers.
 // KV key: audit:{dept}:{paddedTimestamp}:{username}
 // 90-day TTL — audit logs expire automatically.
+
+// ── Query Log ─────────────────────────────────────────────────
+async function writeQueryLog(env, { message, dept, username, collection, retrieval, scope }) {
+  if (!env?.CACI_KV) return;
+  try {
+    const ts  = Date.now();
+    const key = `qlog:${String(ts).padStart(16,'0')}:${username}`;
+    const entry = {
+      ts:         new Date(ts).toISOString(),
+      username,
+      dept:       dept || 'global',
+      message:    message?.slice(0, 300) || '',
+      collection: collection || null,
+      retrieval,  // true = docs found, false = no retrieval hit
+      scope,
+    };
+    await env.CACI_KV.put(key, JSON.stringify(entry), { expirationTtl: 60 * 60 * 24 * 90 });
+  } catch { /* non-blocking */ }
+}
+
+// ── GET /analytics ────────────────────────────────────────────
+async function handleGetAnalytics(url, env, request) {
+  if (!requireAdmin(request, env)) return json({ error: 'Admin required' }, 403);
+  try {
+    const limit = Math.min(parseInt(url.searchParams.get('limit') || '500'), 2000);
+    const list  = await env.CACI_KV.list({ prefix: 'qlog:' });
+    const keys  = (list.keys || []).reverse().slice(0, limit);
+    const entries = await Promise.all(keys.map(k => env.CACI_KV.get(k.name, 'json').catch(() => null)));
+    const logs = entries.filter(Boolean);
+
+    // Aggregates
+    const userSet    = new Set();
+    const deptCounts = {};
+    const dayCounts  = {};
+    let   missCount  = 0;
+
+    for (const e of logs) {
+      userSet.add(e.username);
+      deptCounts[e.dept] = (deptCounts[e.dept] || 0) + 1;
+      const day = e.ts?.slice(0, 10) || 'unknown';
+      dayCounts[day] = (dayCounts[day] || 0) + 1;
+      if (!e.retrieval) missCount++;
+    }
+
+    // Top queries — simple dedup by normalized message
+    const msgMap = {};
+    for (const e of logs) {
+      const key = e.message.toLowerCase().trim().slice(0, 120);
+      msgMap[key] = (msgMap[key] || 0) + 1;
+    }
+    const topQueries = Object.entries(msgMap)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([msg, count]) => ({ msg, count }));
+
+    return json({
+      ok: true,
+      totalQueries: logs.length,
+      uniqueUsers:  userSet.size,
+      missCount,
+      deptCounts,
+      dayCounts,
+      topQueries,
+      recentLogs: logs.slice(0, 200),
+    });
+  } catch (err) {
+    return json({ error: err.message }, 500);
+  }
+}
+
+// ── POST /analytics/insights ──────────────────────────────────
+async function handleGenerateInsights(request, env) {
+  if (!requireAdmin(request, env)) return json({ error: 'Admin required' }, 403);
+  try {
+    const apiKey = (await env.CACI_KV.get('config:ANTHROPIC_API_KEY')) || env.ANTHROPIC_API_KEY;
+    const xaiKey = (await env.CACI_KV.get('config:XAI_API_KEY'))       || env.XAI_API_KEY;
+    if (!apiKey && !xaiKey) return json({ error: 'No AI key configured' }, 400);
+
+    // Pull up to 500 recent logs for analysis
+    const list  = await env.CACI_KV.list({ prefix: 'qlog:' });
+    const keys  = (list.keys || []).reverse().slice(0, 500);
+    const entries = await Promise.all(keys.map(k => env.CACI_KV.get(k.name, 'json').catch(() => null)));
+    const logs  = entries.filter(Boolean);
+
+    if (logs.length === 0) return json({ error: 'No query data yet — ask some questions first.' }, 400);
+
+    // Build summary for the prompt
+    const userSet    = new Set(logs.map(e => e.username));
+    const deptCounts = {};
+    const missLogs   = [];
+    const msgMap     = {};
+
+    for (const e of logs) {
+      deptCounts[e.dept] = (deptCounts[e.dept] || 0) + 1;
+      if (!e.retrieval) missLogs.push(e.message);
+      const k = e.message.toLowerCase().trim().slice(0, 120);
+      msgMap[k] = (msgMap[k] || 0) + 1;
+    }
+
+    const topQueries = Object.entries(msgMap).sort((a,b)=>b[1]-a[1]).slice(0,15).map(([m,c])=>`"${m}" (${c}x)`).join('\n');
+    const missExamples = [...new Set(missLogs)].slice(0, 20).map(m => `- ${m}`).join('\n');
+    const deptBreakdown = Object.entries(deptCounts).map(([d,c])=>`${d}: ${c}`).join(', ');
+
+    const prompt = `You are Caci, the internal AI assistant for Jushi Holdings. You are analyzing your own query log data to identify patterns and improvement opportunities. Be direct, specific, and actionable. Do not pad the response.
+
+QUERY LOG SUMMARY:
+- Total queries: ${logs.length}
+- Unique users: ${userSet.size}
+- Date range: ${logs[logs.length-1]?.ts?.slice(0,10)} to ${logs[0]?.ts?.slice(0,10)}
+- Queries with no document match (retrieval miss): ${missLogs.length}
+- Department breakdown: ${deptBreakdown}
+
+TOP REPEATED QUESTIONS:
+${topQueries}
+
+QUESTIONS WITH NO DOCUMENT MATCH (sample):
+${missExamples || '(none)'}
+
+Based on this data, provide:
+1. 2-3 specific observations about what the team is actually using you for
+2. The clearest knowledge gaps (questions being asked that have no document support)
+3. 2-3 concrete recommendations — specific file types or SOPs to upload, collections to create, or topics to document
+4. One thing that's working well
+
+Keep it under 300 words. Be specific to cannabis operations where relevant.`;
+
+    let insights = '';
+    if (apiKey) {
+      const res  = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 600, messages: [{ role: 'user', content: prompt }] }),
+      });
+      const d = await res.json();
+      insights = d.content?.[0]?.text || '';
+    } else {
+      const res  = await fetch('https://api.x.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${xaiKey}` },
+        body: JSON.stringify({ model: 'grok-3-mini-fast-beta', max_tokens: 600, messages: [{ role: 'user', content: prompt }] }),
+      });
+      const d = await res.json();
+      insights = d.choices?.[0]?.message?.content || '';
+    }
+
+    // Cache the insights in KV
+    await env.CACI_KV.put('analytics:insights:last', JSON.stringify({
+      insights,
+      generatedAt: new Date().toISOString(),
+      queryCount:  logs.length,
+    }), { expirationTtl: 60 * 60 * 24 * 30 });
+
+    return json({ ok: true, insights, generatedAt: new Date().toISOString(), queryCount: logs.length });
+  } catch (err) {
+    return json({ error: err.message }, 500);
+  }
+}
+
+async function handleGetCachedInsights(env, request) {
+  if (!requireAdmin(request, env)) return json({ error: 'Admin required' }, 403);
+  try {
+    const cached = await env.CACI_KV.get('analytics:insights:last', 'json');
+    if (!cached) return json({ ok: false });
+    return json({ ok: true, ...cached });
+  } catch (err) {
+    return json({ error: err.message }, 500);
+  }
+}
 
 async function writeAudit(env, user, action, details = {}) {
   if (!env?.CACI_KV) return;
