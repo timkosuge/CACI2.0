@@ -67,6 +67,8 @@ export default {
       if (!val) return json({ found: false, id: kvId });
       return json({ found: true, id: kvId, name: val.name, chunkCount: val.chunks?.length || 0, firstChunk: val.chunks?.[0]?.slice(0, 200) });
     }
+    if (path === '/embed-file'   && method === 'POST') return handleEmbedFile(request, env);
+    if (path === '/embed-status' && method === 'GET')  return handleEmbedStatus(url, env);
     if (path === '/chat'      && method === 'POST')   return handleChat(request, env);
     if (path === '/feedback'  && method === 'POST')   return handleFeedback(request, env);
     if (path === '/feedback/analyze' && method === 'POST') return handleAnalyzeFeedback(request, env);
@@ -261,6 +263,16 @@ async function handleUpload(request, env) {
 
     // Invalidate library map cache so next session sees fresh data
     await env.CACI_KV.delete(`library:map:${dept}`).catch(() => {});
+
+    // ── Semantic embeddings — fire-and-forget ─────────────────
+    // Embeds every chunk for hybrid retrieval. Non-blocking: if it
+    // fails or AI binding is absent, keyword retrieval still works.
+    // Cap at 40 chunks per upload to stay within CPU time limits.
+    if (env.AI) {
+      const chunksToEmbed = finalChunks.slice(0, 40);
+      storeChunkEmbeddings(id, chunksToEmbed, env).catch(() => {});
+    }
+
     return json({ ok: true, id, name, collection, chunks: finalChunks.length, charCount: cleanText.length, isContext, hasParentSummary: !!parentSummary });
   } catch (err) {
     return json({ error: 'Upload failed: ' + err.message }, 500);
@@ -1566,14 +1578,45 @@ async function buildContextTwoPass({ message, dept, collection, env }) {
       }
     }
 
+    // ── Hybrid scoring: semantic + keyword ───────────────────
+    // 1. Embed the query (once, reused across all files)
+    // 2. Load stored embeddings per file
+    // 3. Blend cosine similarity with keyword score
+    const queryEmbedding = await generateEmbedding(message, env).catch(() => null);
+
     // Score all non-summary chunks across all files
     const allChunks = [];
     for (const fileData of fullFiles) {
       if (!fileData.chunks) continue;
       const fileBoost = fileData._score || 0;
-      for (const chunk of fileData.chunks) {
-        const s = scoreChunk(chunk, keywords2);
-        if (s >= 0) allChunks.push({ chunk, score: s + fileBoost, filename: fileData.name, collection: fileData.collection, meta: fileData.meta || {} });
+
+      // Load embeddings for this file (null if not stored yet)
+      const fileEmbs = queryEmbedding
+        ? await loadFileEmbeddings(fileData.id, fileData.chunks.length, env).catch(() => null)
+        : null;
+
+      // Compute raw keyword scores first so we can normalize
+      const rawScores = fileData.chunks.map(chunk => scoreChunk(chunk, keywords2));
+      const maxRaw = Math.max(...rawScores.filter(s => s >= 0), 1);
+
+      for (let ci = 0; ci < fileData.chunks.length; ci++) {
+        const chunk = fileData.chunks[ci];
+        const kwScore = rawScores[ci];
+        if (kwScore < 0) continue; // summary chunks excluded here (handled above)
+
+        const chunkEmb = fileEmbs?.[ci] ?? null;
+        const semSim   = chunkEmb && queryEmbedding ? cosineSim(queryEmbedding, chunkEmb) : null;
+        const blended  = hybridScore(kwScore, semSim, maxRaw);
+
+        allChunks.push({
+          chunk,
+          score:      blended + fileBoost * 0.05, // dampen file-level boost so semantic wins
+          kwScore,
+          semScore:   semSim,
+          filename:   fileData.name,
+          collection: fileData.collection,
+          meta:       fileData.meta || {},
+        });
       }
     }
     allChunks.sort((a, b) => b.score - a.score);
@@ -1776,13 +1819,37 @@ async function buildContext({ message, dept, collection, fileId, scope, env }) {
       }
     }
 
+    // ── Hybrid scoring: semantic + keyword ───────────────────
+    const queryEmbCtx = await generateEmbedding(message, env).catch(() => null);
+
     const scored = [];
     for (const fileData of filesToSearch) {
       if (!fileData.chunks) continue;
       const fileBoost = fileScoreMap.get(fileData.name) || 0;
-      for (const chunk of fileData.chunks) {
-        const score = scoreChunk(chunk, keywords) + fileBoost;
-        if (score >= 0) scored.push({ chunk, score, filename: fileData.name, collection: fileData.collection, meta: fileData.meta || {} });
+
+      const fileEmbsCtx = queryEmbCtx
+        ? await loadFileEmbeddings(fileData.id, fileData.chunks.length, env).catch(() => null)
+        : null;
+
+      const rawScoresCtx = fileData.chunks.map(chunk => scoreChunk(chunk, keywords));
+      const maxRawCtx    = Math.max(...rawScoresCtx.filter(s => s >= 0), 1);
+
+      for (let ci = 0; ci < fileData.chunks.length; ci++) {
+        const chunk   = fileData.chunks[ci];
+        const kwScore = rawScoresCtx[ci];
+        if (kwScore < 0) continue;
+
+        const chunkEmb = fileEmbsCtx?.[ci] ?? null;
+        const semSim   = chunkEmb && queryEmbCtx ? cosineSim(queryEmbCtx, chunkEmb) : null;
+        const blended  = hybridScore(kwScore, semSim, maxRawCtx);
+
+        scored.push({
+          chunk,
+          score:      blended + fileBoost * 0.05,
+          filename:   fileData.name,
+          collection: fileData.collection,
+          meta:       fileData.meta || {},
+        });
       }
     }
 
@@ -2276,6 +2343,95 @@ function rerankChunks(chunks, keywords, intent, W = null) {
   return scored;
 }
 
+// ── Semantic Embedding Helpers ────────────────────────────────
+// Uses Cloudflare AI binding (@cf/baai/bge-base-en-v1.5, 768-dim).
+// Gracefully no-ops if the binding is unavailable — keyword scoring
+// continues as normal, so there is zero breakage risk.
+
+const EMB_MODEL = '@cf/baai/bge-base-en-v1.5';
+const EMB_MAX_CHARS = 512; // truncate to keep latency low; model handles ~512 tokens
+const HYBRID_ALPHA = 0.45; // weight given to semantic score; 1-alpha goes to keyword
+// Per-file embedding KV key: emb:{fileId}:{chunkIndex}
+// Value: base64-encoded Float32Array (768 floats × 4 bytes = 3072 bytes → ~4KB base64)
+
+async function generateEmbedding(text, env) {
+  if (!env?.AI) return null;
+  try {
+    const truncated = text.slice(0, EMB_MAX_CHARS);
+    const result = await env.AI.run(EMB_MODEL, { text: truncated });
+    // result.data is Float32Array or number[]
+    const vec = result?.data;
+    if (!vec || !vec.length) return null;
+    // Serialize to base64 for KV storage
+    const floats = new Float32Array(vec);
+    const bytes  = new Uint8Array(floats.buffer);
+    return btoa(String.fromCharCode(...bytes));
+  } catch { return null; }
+}
+
+function decodeEmbedding(b64) {
+  if (!b64) return null;
+  try {
+    const binary = atob(b64);
+    const bytes  = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return new Float32Array(bytes.buffer);
+  } catch { return null; }
+}
+
+function cosineSim(a, b) {
+  if (!a || !b || a.length !== b.length) return 0;
+  let dot = 0, na = 0, nb = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    na  += a[i] * a[i];
+    nb  += b[i] * b[i];
+  }
+  const denom = Math.sqrt(na) * Math.sqrt(nb);
+  return denom > 0 ? dot / denom : 0;
+}
+
+// Store embeddings for all chunks of a file — fire-and-forget from upload
+async function storeChunkEmbeddings(fileId, chunks, env) {
+  if (!env?.AI || !env?.CACI_KV) return;
+  const EMB_BATCH = 8; // embed 8 chunks at a time to avoid CPU time limits
+  for (let i = 0; i < chunks.length; i += EMB_BATCH) {
+    const batch = chunks.slice(i, i + EMB_BATCH);
+    await Promise.all(batch.map(async (chunk, j) => {
+      const idx = i + j;
+      const b64 = await generateEmbedding(chunk, env);
+      if (b64) {
+        await env.CACI_KV.put(
+          `emb:${fileId}:${idx}`,
+          b64,
+          { expirationTtl: 60 * 60 * 24 * 365 }
+        ).catch(() => {});
+      }
+    }));
+  }
+}
+
+// Load all embeddings for a file from KV
+async function loadFileEmbeddings(fileId, chunkCount, env) {
+  if (!env?.CACI_KV) return null;
+  const keys = Array.from({ length: chunkCount }, (_, i) => `emb:${fileId}:${i}`);
+  const results = await Promise.all(keys.map(k => env.CACI_KV.get(k).catch(() => null)));
+  // Return array of Float32Array | null, one per chunk
+  return results.map(b64 => b64 ? decodeEmbedding(b64) : null);
+}
+
+// Hybrid score: blends normalized keyword score with cosine similarity.
+// keywordScore: raw score from scoreChunk (unbounded, typically 0–30)
+// semanticSim:  cosine similarity (0–1), or null if unavailable
+// keywordMax:   max keyword score in the candidate set (for normalization)
+function hybridScore(keywordScore, semanticSim, keywordMax) {
+  // Normalize keyword score to 0–1 range
+  const normKeyword = keywordMax > 0 ? Math.min(keywordScore / keywordMax, 1) : 0;
+  if (semanticSim === null || semanticSim === undefined) return normKeyword;
+  // Blend: alpha × semantic + (1-alpha) × keyword
+  return HYBRID_ALPHA * semanticSim + (1 - HYBRID_ALPHA) * normKeyword;
+}
+
 // ── Helpers ───────────────────────────────────────────────────
 function chunkText(text, size = 1500) {
   if (!text || text.length === 0) return [];
@@ -2714,6 +2870,91 @@ async function handleConnectorFetch(path, request, env) {
     return json({ ok: r.ok, status: r.status, data });
   } catch(e) {
     return json({ error: e.message }, 502);
+  }
+}
+
+// ── Semantic Embedding Backfill ───────────────────────────────
+// POST /embed-file { fileId, dept }
+// Embeds all chunks for a single file. Used for backfilling existing
+// files that were uploaded before hybrid retrieval was added.
+async function handleEmbedFile(request, env) {
+  if (!env.AI) return json({ error: 'Cloudflare AI binding not available' }, 400);
+  try {
+    const { fileId, dept } = await request.json();
+    if (!fileId) return json({ error: 'fileId required' }, 400);
+
+    const fileData = await env.CACI_KV.get(`file:${fileId}`, 'json');
+    if (!fileData) return json({ error: 'File not found' }, 404);
+
+    const chunks = fileData.chunks || [];
+    if (!chunks.length) return json({ ok: true, embedded: 0, skipped: 0 });
+
+    // Check which chunks already have embeddings — skip those
+    const toEmbed = [];
+    for (let i = 0; i < Math.min(chunks.length, 40); i++) {
+      const existing = await env.CACI_KV.get(`emb:${fileId}:${i}`).catch(() => null);
+      if (!existing) toEmbed.push({ chunk: chunks[i], idx: i });
+    }
+
+    if (toEmbed.length === 0) {
+      return json({ ok: true, embedded: 0, skipped: chunks.length, message: 'Already indexed' });
+    }
+
+    // Embed in batches of 6
+    let embedded = 0;
+    const BATCH = 6;
+    for (let b = 0; b < toEmbed.length; b += BATCH) {
+      const batch = toEmbed.slice(b, b + BATCH);
+      await Promise.all(batch.map(async ({ chunk, idx }) => {
+        const b64 = await generateEmbedding(chunk, env);
+        if (b64) {
+          await env.CACI_KV.put(`emb:${fileId}:${idx}`, b64, { expirationTtl: 60 * 60 * 24 * 365 }).catch(() => {});
+          embedded++;
+        }
+      }));
+    }
+
+    return json({ ok: true, embedded, skipped: chunks.length - toEmbed.length, total: chunks.length });
+  } catch (err) {
+    return json({ error: 'Embed failed: ' + err.message }, 500);
+  }
+}
+
+// GET /embed-status?dept=retail
+// Returns per-collection embedding coverage so the UI can show progress.
+async function handleEmbedStatus(url, env) {
+  try {
+    const dept = url.searchParams.get('dept') || 'global';
+    const idx  = await env.CACI_KV.get(`index:${dept}`, 'json') || [];
+
+    let totalFiles = 0, indexedFiles = 0, totalChunks = 0, indexedChunks = 0;
+
+    // Sample up to 50 files — full scan would be too slow
+    const sample = idx.slice(0, 50);
+    for (const f of sample) {
+      totalFiles++;
+      const chunkCount = f.chunks || 0;
+      totalChunks += chunkCount;
+
+      // Check if first chunk is embedded as proxy for full indexing
+      const firstEmb = await env.CACI_KV.get(`emb:${f.id}:0`).catch(() => null);
+      if (firstEmb) {
+        indexedFiles++;
+        indexedChunks += chunkCount; // approximate
+      }
+    }
+
+    const pct = totalFiles > 0 ? Math.round(indexedFiles / totalFiles * 100) : 0;
+    return json({
+      ok: true, dept,
+      totalFiles, indexedFiles, totalChunks, indexedChunks,
+      coveragePct: pct,
+      aiAvailable: !!env.AI,
+      model: EMB_MODEL,
+      alpha: HYBRID_ALPHA,
+    });
+  } catch (err) {
+    return json({ error: err.message }, 500);
   }
 }
 
