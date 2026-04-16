@@ -7271,23 +7271,9 @@ function resetSendState() {
 }
 
 function setDept(id) {
-  resetSendState();
-  dept = id; localStorage.setItem('caci_dept', dept); saveUserPref('dept', id);
-  selectedCollection = null; chatCollection = null; chatFileId = null; chatFileName = null;
-  _colView = 'all';
-  // Reset chat bar to floating state and clear history for new dept
-  chatHistory = [];
-  clearChatHistory();
-  window._caciCollections = null;
-  ['discovery-name', 'discovery-greeting-strip'].forEach(id => { const el = document.getElementById(id); if (el) el.remove(); });
-  const bar = $('chat-bar'), msgs = $('chat-msgs');
-  if (bar) bar.classList.remove('has-messages');
-  if (msgs) { msgs.classList.remove('has-messages'); msgs.innerHTML = ''; }
-  const chatEmpty = $('chat-empty'); if (chatEmpty) chatEmpty.style.display = 'none';
-  setScope('all'); syncDept();
-  renderScopeCollections([]);
-  if (curPanel === 'files') { loadCollections(); loadFiles(); }
-  if (curPanel === 'chat') initChatGreeting();
+  localStorage.setItem('caci_dept', id);
+  saveUserPref('dept', id);
+  location.reload();
 }
 function syncDept() {
   const d = DEPTS.find(x => x.id === dept) || DEPTS[0];
