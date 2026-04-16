@@ -5052,8 +5052,13 @@ body::before {
         <div class="login-card login-card-back">
           <div class="corner tl"></div><div class="corner tr"></div>
           <div class="corner bl"></div><div class="corner br"></div>
+          <div class="lfield-wrap" style="margin-bottom:10px;">
+            <div class="lfield-label" style="margin-top:4px;">Username <span style="opacity:0.4;font-size:8px">(optional)</span></div>
+            <input class="linput" type="text" id="login-user" placeholder="your name" autocomplete="username" autocorrect="off" autocapitalize="off" spellcheck="false" style="letter-spacing:0.08em;text-align:left;padding-left:16px;">
+            <div class="linput-glow"></div>
+          </div>
           <div class="lfield-wrap">
-            <div class="lfield-label" style="margin-top:4px;">Credentials</div>
+            <div class="lfield-label">Password</div>
             <input class="linput" type="text" id="login-pw" placeholder="&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;&#xB7;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-real="" readonly>
             <div class="linput-glow"></div>
           </div>
@@ -5151,6 +5156,12 @@ body::before {
       <span class="tb-status-text" id="api-text">Connecting</span>
     </div>
 
+    <!-- User identity chip -->
+    <div id="tb-user-chip" style="display:none;align-items:center;gap:7px;padding:5px 11px;border:1px solid rgba(212,168,50,0.18);border-radius:3px;background:rgba(4,6,14,0.60);cursor:pointer;position:relative;" title="Account">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:11px;height:11px;color:rgba(212,168,50,0.55);flex-shrink:0"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+      <span id="tb-user-name" style="font-family:var(--f-ui);font-size:9px;font-weight:300;letter-spacing:0.14em;color:rgba(212,168,50,0.65);text-transform:uppercase;white-space:nowrap"></span>
+      <span id="tb-user-role" style="font-family:var(--f-mono);font-size:8px;color:rgba(212,168,50,0.35);letter-spacing:0.1em;text-transform:uppercase"></span>
+    </div>
 
   </header>
 
@@ -5781,6 +5792,16 @@ body::before {
 
     <div class="panel" data-panel="admin">
       <div class="admin-wrap">
+
+        <!-- USERS (admin only) -->
+        <div class="asec" id="users-asec">
+          <div class="asec-head"><div class="asec-title">Users</div><div class="asec-line"></div></div>
+          <div class="asec-sub-title" style="margin:-8px 0 14px">
+            Manage named user accounts. Each user has their own password, role, and preferences that follow them across devices.
+          </div>
+          <div id="users-wrap"><div class="tune-empty">Loading...</div></div>
+        </div>
+
         <div class="asec">
           <div class="asec-head"><div class="asec-title">System Status</div><div class="asec-line"></div></div>
           <div class="sgrid">
@@ -6211,11 +6232,12 @@ function setupLogin() {
       setTimeout(() => frameBox.classList.remove('flipping'), 750);
     }
     setTimeout(() => {
+      const userEl = $('login-user');
       const pw = $('login-pw');
-      if (pw) {
-        pw.removeAttribute('readonly');
-        pw.focus();
-      }
+      if (pw) pw.removeAttribute('readonly');
+      // Focus username if empty, otherwise password
+      if (userEl && !userEl.value.trim()) userEl.focus();
+      else if (pw) pw.focus();
     }, 750);
   }
 
@@ -6319,7 +6341,9 @@ function setupLogin() {
   });
 
   async function tryLogin() {
-    const pw = pwEl.dataset.real.trim();
+    const pw       = pwEl.dataset.real.trim();
+    const userEl   = $('login-user');
+    const username = userEl ? userEl.value.trim() : '';
     if (!pw) return;
     $('login-btn').disabled = true;
     $('login-btn').textContent = 'Authenticating\u2026';
@@ -6327,14 +6351,21 @@ function setupLogin() {
     try {
       const res = await fetch(API + '/auth/login', {
         method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({password: pw}),
+        body: JSON.stringify({ username: username || undefined, password: pw }),
       });
       const d = await res.json();
       if (d.token) {
         token = d.token;
         sessionStorage.setItem('caci_token', token);
+        // Store identity
+        sessionStorage.setItem('caci_username',    d.username    || 'admin');
+        sessionStorage.setItem('caci_role',        d.role        || 'admin');
+        sessionStorage.setItem('caci_displayname', d.displayName || d.username || 'Admin');
+        // Apply server-side prefs if present (override localStorage defaults)
+        if (d.prefs && !d.legacy) applyUserPrefs(d.prefs);
         bootApp();
       } else {
+        $('login-err').textContent = d.error || 'Access denied \u2014 invalid code';
         $('login-err').style.display = 'block';
         pwEl.dataset.real = '';
         pwEl.value = '';
@@ -6347,8 +6378,41 @@ function setupLogin() {
     $('login-btn').disabled = false;
     $('login-btn').textContent = 'Authenticate';
   }
+  // Tab from username → password
+  if ($('login-user')) {
+    $('login-user').addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        pwEl.removeAttribute('readonly');
+        pwEl.focus();
+      }
+    });
+  }
   $('login-btn').addEventListener('click', tryLogin);
   pwEl.addEventListener('keydown', e => { if (e.key === 'Enter') tryLogin(); });
+}
+
+// Apply prefs received from server on login
+function applyUserPrefs(prefs) {
+  if (prefs.dept)        { dept    = prefs.dept;    localStorage.setItem('caci_dept',  dept); }
+  if (prefs.model)       { modelId = prefs.model;   localStorage.setItem('caci_model', modelId); }
+  if (prefs.ttsVoice)    localStorage.setItem('caci_tts_grok_voice', prefs.ttsVoice);
+  if (prefs.ttsLength)   localStorage.setItem('caci_tts_length',     String(prefs.ttsLength));
+  if (prefs.ttsAuto)     localStorage.setItem('caci_voice_auto',     String(prefs.ttsAuto));
+  if (prefs.ttsProvider) localStorage.setItem('caci_tts_provider',   prefs.ttsProvider);
+  if (prefs.sbCollapsed !== undefined) localStorage.setItem('caci_sb_collapsed', prefs.sbCollapsed ? '1' : '0');
+}
+
+// Save a single pref to server (fire-and-forget)
+function saveUserPref(key, value) {
+  const t = sessionStorage.getItem('caci_token');
+  if (!t || sessionStorage.getItem('caci_role') === null) return;
+  if (sessionStorage.getItem('caci_username') === 'admin' && !sessionStorage.getItem('caci_role')) return;
+  fetch(API + '/users/me/prefs', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + t },
+    body: JSON.stringify({ [key]: value }),
+  }).catch(() => {});
 }
 
 /* BOOT */
@@ -6367,6 +6431,7 @@ function bootApp() {
     sbToggle.classList.toggle('collapsed', collapsed);
     if (contentEl) contentEl.classList.toggle('sb-collapsed', collapsed);
     localStorage.setItem('caci_sb_collapsed', collapsed ? '1' : '0');
+    saveUserPref('sbCollapsed', collapsed);
   });
   // Restore state
   if (localStorage.getItem('caci_sb_collapsed') === '1') {
@@ -6375,6 +6440,27 @@ function bootApp() {
     if (contentEl) contentEl.classList.add('sb-collapsed');
   }
   checkHealth(); loadAdminConfig();
+
+  // ── Identity display ────────────────────────────────────────
+  const username    = sessionStorage.getItem('caci_username')    || '';
+  const role        = sessionStorage.getItem('caci_role')        || 'user';
+  const displayName = sessionStorage.getItem('caci_displayname') || username;
+  const userChip    = $('tb-user-chip');
+  if (userChip && username) {
+    $('tb-user-name').textContent = displayName || username;
+    $('tb-user-role').textContent = role === 'admin' ? 'Admin' : '';
+    userChip.style.display = 'flex';
+    // Clicking the chip goes to admin panel (admin) or shows a simple account info tooltip
+    userChip.addEventListener('click', () => {
+      if (role === 'admin') switchPanel('admin');
+    });
+  }
+  // Gate admin-only nav items by role
+  const isAdmin = role === 'admin';
+  document.querySelectorAll('.admin-only').forEach(el => { el.style.display = isAdmin ? '' : 'none'; });
+  // Gate admin nav buttons — hide Configurations nav for non-admins
+  document.querySelectorAll('.nav-btn[data-p="admin"]').forEach(b => { b.style.display = isAdmin ? '' : 'none'; });
+  document.querySelectorAll('.tab-btn[data-p="admin"]').forEach(b => { b.style.display = isAdmin ? '' : 'none'; });
 
   if (window.innerWidth < 768) $('tb-model-chip').style.display = 'flex';
 
@@ -6654,7 +6740,10 @@ function switchPanel(id) {
   if (id === 'responses') loadResponses();
   if (id === 'files') { loadCollections(); loadFiles(); loadContextDocs(); }
   if (id === 'aisettings') { loadAdminConfig(); loadRetrievalWeights(); loadIntelligenceTuning(); loadSemanticIndex(); }
-  if (id === 'admin') { loadAdminConfig(); loadIntegrationStatuses(); loadConnectorStatuses(); }
+  if (id === 'admin') { loadAdminConfig(); loadIntegrationStatuses(); loadConnectorStatuses(); loadUsersPanel(); }
+  // Gate admin-only sections based on role
+  const isAdmin = sessionStorage.getItem('caci_role') === 'admin';
+  document.querySelectorAll('.admin-only').forEach(el => { el.style.display = isAdmin ? '' : 'none'; });
   if (id === 'chat') {
     initChatGreeting();
     // Always refresh pills when entering chat — loadCollections populates scope bar
@@ -6803,7 +6892,7 @@ document.addEventListener('click', e => {
 });
 
 function setDept(id) {
-  dept = id; localStorage.setItem('caci_dept', dept);
+  dept = id; localStorage.setItem('caci_dept', dept); saveUserPref('dept', id);
   selectedCollection = null; chatCollection = null; chatFileId = null; chatFileName = null;
   _colView = 'all';
   // Reset chat bar to floating state and clear history for new dept
@@ -6839,7 +6928,7 @@ function buildModelList() {
   ).join('');
   $('model-list').querySelectorAll('.moption').forEach(el => el.addEventListener('click', () => { setModel(el.dataset.m); $('model-modal').classList.remove('open'); }));
 }
-function setModel(id) { modelId = id; localStorage.setItem('caci_model', id); syncModel(); }
+function setModel(id) { modelId = id; localStorage.setItem('caci_model', id); syncModel(); saveUserPref('model', id); }
 function syncModel() {
   const m = MODELS.find(x => x.id === modelId) || MODELS[0];
   $('mp-name').textContent = m.name;
@@ -9271,6 +9360,7 @@ function initVoiceInput() {
       // Otherwise toggle auto-speak
       voiceAutoSpeak = !voiceAutoSpeak;
       localStorage.setItem('caci_voice_auto', voiceAutoSpeak);
+      saveUserPref('ttsAuto', voiceAutoSpeak);
       spkToggle.classList.toggle('active', voiceAutoSpeak);
       spkToggle.title = voiceAutoSpeak ? 'Auto-speak ON — click to turn off' : 'Auto-speak OFF — click to turn on';
       setVoiceStatus(voiceAutoSpeak ? 'Auto-speak on' : 'Auto-speak off', voiceAutoSpeak);
@@ -9343,18 +9433,18 @@ function initVoiceSettings() {
   const providerSel = $('tts-provider');
   if (providerSel) {
     providerSel.value = localStorage.getItem('caci_tts_provider') || 'grok';
-    providerSel.addEventListener('change', () => localStorage.setItem('caci_tts_provider', providerSel.value));
+    providerSel.addEventListener('change', () => { localStorage.setItem('caci_tts_provider', providerSel.value); saveUserPref('ttsProvider', providerSel.value); });
   }
 
   // Grok voice select
   const voiceSel = $('tts-grok-voice');
   if (voiceSel) {
     voiceSel.value = localStorage.getItem('caci_tts_grok_voice') || 'eve';
-    voiceSel.addEventListener('change', () => localStorage.setItem('caci_tts_grok_voice', voiceSel.value));
+    voiceSel.addEventListener('change', () => { localStorage.setItem('caci_tts_grok_voice', voiceSel.value); saveUserPref('ttsVoice', voiceSel.value); });
     const lengthSel = $('tts-length');
     if (lengthSel) {
       lengthSel.value = localStorage.getItem('caci_tts_length') || '3000';
-      lengthSel.addEventListener('change', () => localStorage.setItem('caci_tts_length', lengthSel.value));
+      lengthSel.addEventListener('change', () => { localStorage.setItem('caci_tts_length', lengthSel.value); saveUserPref('ttsLength', parseInt(lengthSel.value)); });
     }
   }
 
@@ -9365,6 +9455,7 @@ function initVoiceSettings() {
     autoChk.addEventListener('change', () => {
       voiceAutoSpeak = autoChk.checked;
       localStorage.setItem('caci_voice_auto', voiceAutoSpeak);
+      saveUserPref('ttsAuto', voiceAutoSpeak);
       const tog = $('spk-toggle-btn');
       if (tog) tog.classList.toggle('active', voiceAutoSpeak);
     });
@@ -9589,6 +9680,224 @@ function disconnectConnector(id) {
   setConFb(id, 'Removed.', '');
   loadConnectorStatuses();
 }
+
+/* ═══════════════════════════════════════════════════════════
+   USER MANAGEMENT PANEL
+═══════════════════════════════════════════════════════════ */
+
+async function loadUsersPanel() {
+  const wrap = $('users-wrap');
+  if (!wrap) return;
+
+  const role = sessionStorage.getItem('caci_role');
+  if (role !== 'admin') {
+    wrap.innerHTML = '<div class="tune-empty">Admin access required to manage users.</div>';
+    return;
+  }
+
+  wrap.innerHTML = '<div class="tune-empty">Loading users...</div>';
+
+  try {
+    const res  = await apiFetch('/users');
+    const data = await res.json();
+    if (!data.ok) { wrap.innerHTML = `<div class="tune-empty">Error: ${data.error}</div>`; return; }
+
+    const users = data.users || [];
+    const currentUser = sessionStorage.getItem('caci_username') || '';
+
+    wrap.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:12px">
+
+        <!-- User list -->
+        <div id="user-list-wrap">
+          ${users.length === 0
+            ? '<div class="tune-empty" style="margin:0">No named accounts yet. Create one below to enable per-user login.</div>'
+            : users.map(u => `
+              <div class="acard" style="padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;gap:12px" id="ucard-${u.username}">
+                <div style="flex:1;min-width:0">
+                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+                    <span style="font-family:var(--f-mono);font-size:11px;color:var(--smoke);letter-spacing:0.06em">${esc(u.displayName || u.username)}</span>
+                    <span style="font-family:var(--f-mono);font-size:8px;letter-spacing:0.1em;text-transform:uppercase;padding:1px 6px;border-radius:2px;border:1px solid ${u.role === 'admin' ? 'rgba(212,168,50,0.4)' : 'rgba(255,255,255,0.1)'};color:${u.role === 'admin' ? 'var(--gold-lt)' : 'var(--smoke4)'}">${u.role}</span>
+                    ${u.username === currentUser ? '<span style="font-family:var(--f-mono);font-size:8px;color:rgba(100,220,130,0.7);letter-spacing:0.08em">YOU</span>' : ''}
+                  </div>
+                  <div style="font-family:var(--f-mono);font-size:9px;color:var(--smoke4);letter-spacing:0.05em">@${esc(u.username)} &nbsp;·&nbsp; joined ${u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '—'}</div>
+                </div>
+                <div style="display:flex;gap:6px;flex-shrink:0">
+                  ${u.role !== 'admin' ? `<button class="resp-card-btn" onclick="promoteUser('${esc(u.username)}')">Make Admin</button>` : u.username !== currentUser ? `<button class="resp-card-btn" onclick="demoteUser('${esc(u.username)}')">Make User</button>` : ''}
+                  <button class="resp-card-btn" onclick="resetUserPasswordPrompt('${esc(u.username)}')">Reset PW</button>
+                  ${u.username !== currentUser ? `<button class="resp-card-btn del" onclick="deleteUserConfirm('${esc(u.username)}')">Delete</button>` : ''}
+                </div>
+              </div>`).join('')}
+        </div>
+
+        <!-- Create user form -->
+        <div class="acard" style="padding:16px 18px">
+          <div class="acard-title" style="font-size:14px;margin-bottom:2px">Create Account</div>
+          <div class="acard-sub">New users can log in with their own password and will have their preferences saved server-side.</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+            <div>
+              <div style="font-family:var(--f-mono);font-size:8px;letter-spacing:0.14em;color:var(--smoke4);text-transform:uppercase;margin-bottom:5px">Username</div>
+              <input class="ainput" id="nu-username" placeholder="e.g. sarah.jones" style="width:100%" autocomplete="off" autocapitalize="off" spellcheck="false"/>
+            </div>
+            <div>
+              <div style="font-family:var(--f-mono);font-size:8px;letter-spacing:0.14em;color:var(--smoke4);text-transform:uppercase;margin-bottom:5px">Display Name</div>
+              <input class="ainput" id="nu-display" placeholder="e.g. Sarah Jones" style="width:100%" autocomplete="off"/>
+            </div>
+            <div>
+              <div style="font-family:var(--f-mono);font-size:8px;letter-spacing:0.14em;color:var(--smoke4);text-transform:uppercase;margin-bottom:5px">Password</div>
+              <input class="ainput" id="nu-password" type="password" placeholder="min 6 characters" style="width:100%" autocomplete="new-password"/>
+            </div>
+            <div>
+              <div style="font-family:var(--f-mono);font-size:8px;letter-spacing:0.14em;color:var(--smoke4);text-transform:uppercase;margin-bottom:5px">Role</div>
+              <select class="ainput" id="nu-role" style="width:100%;cursor:pointer">
+                <option value="user">User</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <button class="asave" id="nu-submit">Create Account</button>
+            <div class="afb" id="nu-fb"></div>
+          </div>
+        </div>
+
+        <!-- Change own password -->
+        <div class="acard" style="padding:16px 18px">
+          <div class="acard-title" style="font-size:14px;margin-bottom:2px">Change My Password</div>
+          <div class="acard-sub">Only available for named accounts — not legacy single-password sessions.</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+            <div>
+              <div style="font-family:var(--f-mono);font-size:8px;letter-spacing:0.14em;color:var(--smoke4);text-transform:uppercase;margin-bottom:5px">Current Password</div>
+              <input class="ainput" id="cp-current" type="password" placeholder="current password" style="width:100%" autocomplete="current-password"/>
+            </div>
+            <div>
+              <div style="font-family:var(--f-mono);font-size:8px;letter-spacing:0.14em;color:var(--smoke4);text-transform:uppercase;margin-bottom:5px">New Password</div>
+              <input class="ainput" id="cp-new" type="password" placeholder="min 6 characters" style="width:100%" autocomplete="new-password"/>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <button class="asave" id="cp-submit">Update Password</button>
+            <div class="afb" id="cp-fb"></div>
+          </div>
+        </div>
+
+      </div>`;
+
+    // Wire create form
+    $('nu-submit')?.addEventListener('click', createUserFromForm);
+
+    // Wire change password form
+    $('cp-submit')?.addEventListener('click', changeOwnPassword);
+
+  } catch (e) {
+    wrap.innerHTML = `<div class="tune-empty">Failed to load users: ${e.message}</div>`;
+  }
+}
+
+async function createUserFromForm() {
+  const username    = ($('nu-username')?.value  || '').trim();
+  const displayName = ($('nu-display')?.value   || '').trim();
+  const password    = ($('nu-password')?.value  || '').trim();
+  const role        = ($('nu-role')?.value      || 'user');
+  const fb          = $('nu-fb');
+
+  if (!username) { if (fb) { fb.className='afb err'; fb.textContent='Username required'; } return; }
+  if (!password) { if (fb) { fb.className='afb err'; fb.textContent='Password required'; } return; }
+  if (password.length < 6) { if (fb) { fb.className='afb err'; fb.textContent='Password must be at least 6 characters'; } return; }
+
+  const btn = $('nu-submit');
+  if (btn) { btn.disabled = true; btn.textContent = 'Creating\u2026'; }
+  if (fb)  { fb.className='afb'; fb.textContent = ''; }
+
+  try {
+    const res  = await apiFetch('/users/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, displayName, password, role }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      if (fb) { fb.className='afb ok'; fb.textContent=`\u2713 @${username} created`; }
+      if ($('nu-username')) $('nu-username').value = '';
+      if ($('nu-display'))  $('nu-display').value  = '';
+      if ($('nu-password')) $('nu-password').value = '';
+      setTimeout(loadUsersPanel, 600);
+    } else {
+      if (fb) { fb.className='afb err'; fb.textContent = data.error || 'Create failed'; }
+    }
+  } catch (e) {
+    if (fb) { fb.className='afb err'; fb.textContent = e.message; }
+  }
+  if (btn) { btn.disabled = false; btn.textContent = 'Create Account'; }
+}
+
+async function changeOwnPassword() {
+  const current = ($('cp-current')?.value || '').trim();
+  const newPw   = ($('cp-new')?.value     || '').trim();
+  const fb      = $('cp-fb');
+
+  if (!current || !newPw) { if (fb) { fb.className='afb err'; fb.textContent='Both fields required'; } return; }
+  if (newPw.length < 6)   { if (fb) { fb.className='afb err'; fb.textContent='New password must be at least 6 characters'; } return; }
+
+  const btn = $('cp-submit');
+  if (btn) { btn.disabled = true; btn.textContent = 'Updating\u2026'; }
+
+  try {
+    const res  = await apiFetch('/users/me/password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ currentPassword: current, newPassword: newPw }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      if (fb) { fb.className='afb ok'; fb.textContent='\u2713 Password updated'; }
+      if ($('cp-current')) $('cp-current').value = '';
+      if ($('cp-new'))     $('cp-new').value     = '';
+    } else {
+      if (fb) { fb.className='afb err'; fb.textContent = data.error || 'Update failed'; }
+    }
+  } catch (e) {
+    if (fb) { fb.className='afb err'; fb.textContent = e.message; }
+  }
+  if (btn) { btn.disabled = false; btn.textContent = 'Update Password'; }
+}
+
+async function promoteUser(username) {
+  await apiFetch(`/users/${encodeURIComponent(username)}/role`, {
+    method: 'PATCH', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ role: 'admin' }),
+  });
+  loadUsersPanel();
+}
+
+async function demoteUser(username) {
+  await apiFetch(`/users/${encodeURIComponent(username)}/role`, {
+    method: 'PATCH', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ role: 'user' }),
+  });
+  loadUsersPanel();
+}
+
+function resetUserPasswordPrompt(username) {
+  const newPw = prompt(`Reset password for @${username}.\n\nEnter new password (min 6 characters):`);
+  if (!newPw || newPw.trim().length < 6) { if (newPw !== null) alert('Password must be at least 6 characters.'); return; }
+  apiFetch(`/users/${encodeURIComponent(username)}/reset`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ password: newPw.trim() }),
+  }).then(r => r.json()).then(d => {
+    if (d.ok) alert(`Password for @${username} has been reset.`);
+    else alert('Reset failed: ' + (d.error || 'unknown error'));
+  }).catch(e => alert('Reset failed: ' + e.message));
+}
+
+function deleteUserConfirm(username) {
+  if (!confirm(`Delete @${username}? This cannot be undone.`)) return;
+  apiFetch(`/users/${encodeURIComponent(username)}`, { method: 'DELETE' })
+    .then(r => r.json())
+    .then(d => { if (d.ok) loadUsersPanel(); else alert('Delete failed: ' + (d.error || 'unknown')); })
+    .catch(e => alert('Delete failed: ' + e.message));
+}
+
 
 /* ═══════════════════════════════════════════════════════════
    AI AUTO-CLASSIFICATION ENGINE
