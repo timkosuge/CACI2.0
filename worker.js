@@ -3389,42 +3389,41 @@ async function handleEmbedFile(request, env) {
 }
 
 // GET /embed-status
-// Returns global embedding coverage across ALL departments so the UI
-// shows a consistent 100% on every device regardless of active dept.
+// Returns embedding coverage for the active dept's retrieval scope,
+// which mirrors how retrieval works: dept files + global files, deduped.
 async function handleEmbedStatus(url, env) {
   try {
-    const ALL_DEPTS = ['global','retail','compliance','commercial','human_resources','finance','operations','technology'];
+    const dept = url.searchParams.get('dept') || 'global';
 
-    // Collect all unique files across every dept (dedupe by id)
+    // Mirror retrieval: dept index + global index (skip double-count if dept=global)
+    const deptIdx   = await env.CACI_KV.get(`index:${dept}`, 'json') || [];
+    const globalIdx = dept !== 'global' ? (await env.CACI_KV.get('index:global', 'json') || []) : [];
+
+    // Dedupe by id
     const seen = new Set();
     const allFiles = [];
-    for (const d of ALL_DEPTS) {
-      const idx = await env.CACI_KV.get(`index:${d}`, 'json') || [];
-      for (const f of idx) {
-        if (!seen.has(f.id)) { seen.add(f.id); allFiles.push(f); }
-      }
+    for (const f of [...deptIdx, ...globalIdx]) {
+      if (!f.isContext && !seen.has(f.id)) { seen.add(f.id); allFiles.push(f); }
     }
 
     let totalFiles = 0, indexedFiles = 0, totalChunks = 0, indexedChunks = 0;
 
-    // Sample up to 200 files — deduplicated global set
     const sample = allFiles.slice(0, 200);
     for (const f of sample) {
       totalFiles++;
       const chunkCount = f.chunks || 0;
       totalChunks += chunkCount;
 
-      // Check if first chunk is embedded as proxy for full indexing
       const firstEmb = await env.CACI_KV.get(`emb:${f.id}:0`).catch(() => null);
       if (firstEmb) {
         indexedFiles++;
-        indexedChunks += chunkCount; // approximate
+        indexedChunks += chunkCount;
       }
     }
 
     const pct = totalFiles > 0 ? Math.round(indexedFiles / totalFiles * 100) : 0;
     return json({
-      ok: true, dept: 'all',
+      ok: true, dept,
       totalFiles, indexedFiles, totalChunks, indexedChunks,
       coveragePct: pct,
       aiAvailable: !!env.AI,
