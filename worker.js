@@ -91,6 +91,7 @@ export default {
     if (path === '/users/me/password'        && method === 'POST')   return handleChangePassword(request, env);
 
     if (path === '/upload'    && method === 'POST')   return handleUpload(request, env);
+    if (path === '/vision-describe' && method === 'POST') return handleVisionDescribe(request, env);
     if (path === '/duplicate-check' && method === 'POST') return handleDuplicateCheck(request, env);
     if (path === '/files'     && method === 'GET')    return handleListFiles(url, env);
     if (path.startsWith('/files/') && path.endsWith('/meta') && method === 'PATCH') return handlePatchFileMeta(path, request, env);
@@ -396,6 +397,77 @@ async function handleDuplicateCheck(request, env) {
 }
 
 // ── Upload ────────────────────────────────────────────────────
+// ── POST /vision-describe — describe an image for library ingestion ──
+async function handleVisionDescribe(request, env) {
+  try {
+    const apiKey = (await env.CACI_KV.get('config:ANTHROPIC_API_KEY')) || env.ANTHROPIC_API_KEY;
+    const xaiKey = (await env.CACI_KV.get('config:XAI_API_KEY'))       || env.XAI_API_KEY;
+    if (!apiKey && !xaiKey) return json({ error: 'No AI provider configured.' }, 400);
+
+    const { imageBase64, mimeType = 'image/jpeg', fileName = 'image' } = await request.json();
+    if (!imageBase64) return json({ error: 'imageBase64 required' }, 400);
+
+    const prompt = `You are analyzing an image uploaded to a cannabis company's internal knowledge base.
+
+Describe this image thoroughly and extract ALL useful information. Structure your response as:
+
+IMAGE TYPE: (photo / chart / graph / table / diagram / screenshot / document / other)
+SUBJECT: (what this shows in one sentence)
+
+CONTENT:
+(Detailed description of everything visible — all text, numbers, labels, axes, legends, data points, trends, colors used to encode information, any dates or time periods shown)
+
+KEY DATA POINTS:
+(List every specific number, percentage, value, or metric visible)
+
+INSIGHTS:
+(What conclusions or patterns are apparent from this image)
+
+File name for context: ${fileName}
+
+Be thorough — this description will be the only way this image can be searched and retrieved.`;
+
+    let description = '';
+    if (apiKey) {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 1000,
+          messages: [{ role: 'user', content: [
+            { type: 'image', source: { type: 'base64', media_type: mimeType, data: imageBase64 } },
+            { type: 'text', text: prompt },
+          ]}],
+        }),
+      });
+      const d = await res.json();
+      description = d.content?.[0]?.text?.trim() || '';
+    } else {
+      // Grok vision fallback
+      const res = await fetch('https://api.x.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${xaiKey}` },
+        body: JSON.stringify({
+          model: 'grok-2-vision-latest',
+          max_tokens: 1000,
+          messages: [{ role: 'user', content: [
+            { type: 'image_url', image_url: { url: `data:${mimeType};base64,${imageBase64}` } },
+            { type: 'text', text: prompt },
+          ]}],
+        }),
+      });
+      const d = await res.json();
+      description = d.choices?.[0]?.message?.content?.trim() || '';
+    }
+
+    if (!description) return json({ error: 'Vision model returned no description' }, 500);
+    return json({ ok: true, description });
+  } catch (err) {
+    return json({ error: 'Vision describe error: ' + err.message }, 500);
+  }
+}
+
 async function handleUpload(request, env) {
   try {
     const formData = await request.formData();
@@ -855,7 +927,7 @@ async function callLLMLight({ model, system, messages, maxTokens = 500, env, api
 // ── Chat ──────────────────────────────────────────────────────
 async function handleChat(request, env) {
   try {
-    const { message, dept, collection, fileId, scope = 'all', model, history = [], displayName = '' } = await request.json();
+    const { message, dept, collection, fileId, scope = 'all', model, history = [], displayName = '', imageBase64 = null, imageMimeType = null } = await request.json();
     if (!message) return json({ error: 'Message required' }, 400);
 
     const apiKey = (await env.CACI_KV.get('config:ANTHROPIC_API_KEY')) || env.ANTHROPIC_API_KEY;
@@ -1224,7 +1296,15 @@ These summaries were computed at upload time from the full dataset. When a quest
       system += `\n\nNote: this response draws from ${context.collectionsSearched.length} collections: ${context.collectionsSearched.join(', ')}.`;
     }
 
-    const responseText = await callLLM({ model, system, messages: [...history.slice(-20).map(h => ({ role: h.role, content: h.content })), { role: 'user', content: message }], maxTokens: 8000, env, apiKey });
+    // Build user message — include image if provided
+    const userMessageContent = imageBase64
+      ? [
+          { type: 'image', source: { type: 'base64', media_type: imageMimeType || 'image/jpeg', data: imageBase64 } },
+          { type: 'text', text: message },
+        ]
+      : message;
+
+    const responseText = await callLLM({ model, system, messages: [...history.slice(-20).map(h => ({ role: h.role, content: h.content })), { role: 'user', content: userMessageContent }], maxTokens: 8000, env, apiKey });
 
     // ── Answer verification — only for numeric aggregate/comparative responses ──
     // Fires when: response contains numbers AND query was aggregate or comparative
