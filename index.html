@@ -7636,7 +7636,7 @@ async function sendChat() {
 
     // ── Streaming chat ──
     const streamRes = await apiFetch('/chat-stream', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
-    if (!streamRes.ok) { ty.remove(); appendMsg('ai', '\u26A0  Request failed'); return; }
+    if (!streamRes.ok) { ty.remove(); appendMsg('ai', '\u26A0  Request failed'); resetSendState(); return; }
 
     ty.remove();
 
@@ -7728,7 +7728,7 @@ async function sendChat() {
         appendMsg('ai', '\u26A0  ' + streamErr.message);
       }
     }
-  } catch(e) { ty.remove(); appendMsg('ai', '\u26A0  ' + e.message); }
+  } catch(e) { ty.remove(); appendMsg('ai', '\u26A0  ' + e.message); resetSendState(); }
   finally { resetSendState(); }
 }
 
