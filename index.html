@@ -6216,7 +6216,35 @@ async function apiFetch(path, opts = {}) {
 
 /* LOGIN */
 function setupLogin() {
-  if (token) { bootApp(); return; }
+  if (token) {
+    // Restore identity if missing from sessionStorage (e.g. page refresh)
+    const storedRole = sessionStorage.getItem('caci_role');
+    if (!storedRole) {
+      // Re-hydrate from server — fire and continue immediately, apply when resolved
+      fetch(API + '/users/me', {
+        headers: { 'Authorization': 'Bearer ' + token }
+      }).then(r => r.ok ? r.json() : null).then(d => {
+        if (d && d.ok) {
+          sessionStorage.setItem('caci_username',    d.username    || 'admin');
+          sessionStorage.setItem('caci_role',        d.role        || 'admin');
+          sessionStorage.setItem('caci_displayname', d.displayName || d.username || 'Admin');
+          if (d.prefs && !d.legacy) applyUserPrefs(d.prefs);
+        } else {
+          // Server unreachable or legacy token — treat as admin
+          sessionStorage.setItem('caci_username',    'admin');
+          sessionStorage.setItem('caci_role',        'admin');
+          sessionStorage.setItem('caci_displayname', 'Admin');
+        }
+        // Re-apply identity UI now that we have role
+        applyIdentityUI();
+      }).catch(() => {
+        sessionStorage.setItem('caci_role', 'admin');
+        applyIdentityUI();
+      });
+    }
+    bootApp();
+    return;
+  }
 
   const scene   = $('login-card-scene');
   const flipper = $('login-card-flipper');
@@ -6403,6 +6431,37 @@ function applyUserPrefs(prefs) {
   if (prefs.sbCollapsed !== undefined) localStorage.setItem('caci_sb_collapsed', prefs.sbCollapsed ? '1' : '0');
 }
 
+// Apply identity UI — safe to call multiple times (idempotent)
+// Called from bootApp on fresh login AND from the refresh path once /users/me resolves
+function applyIdentityUI() {
+  const username    = sessionStorage.getItem('caci_username')    || '';
+  const role        = sessionStorage.getItem('caci_role')        || 'admin'; // default admin until we know otherwise
+  const displayName = sessionStorage.getItem('caci_displayname') || username;
+  const isAdmin     = role === 'admin';
+
+  // User chip in topbar
+  const userChip = $('tb-user-chip');
+  if (userChip) {
+    if (username) {
+      const nameEl = $('tb-user-name');
+      const roleEl = $('tb-user-role');
+      if (nameEl) nameEl.textContent = displayName || username;
+      if (roleEl) roleEl.textContent = isAdmin ? 'Admin' : '';
+      userChip.style.display = 'flex';
+      // Only attach listener once
+      if (!userChip._listenerAttached) {
+        userChip._listenerAttached = true;
+        userChip.addEventListener('click', () => { if (sessionStorage.getItem('caci_role') === 'admin') switchPanel('admin'); });
+      }
+    }
+  }
+
+  // Show/hide admin-gated elements
+  document.querySelectorAll('.admin-only').forEach(el => { el.style.display = isAdmin ? '' : 'none'; });
+  document.querySelectorAll('.nav-btn[data-p="admin"]').forEach(b => { b.style.display = isAdmin ? '' : 'none'; });
+  document.querySelectorAll('.tab-btn[data-p="admin"]').forEach(b => { b.style.display = isAdmin ? '' : 'none'; });
+}
+
 // Save a single pref to server (fire-and-forget)
 function saveUserPref(key, value) {
   const t = sessionStorage.getItem('caci_token');
@@ -6442,25 +6501,7 @@ function bootApp() {
   checkHealth(); loadAdminConfig();
 
   // ── Identity display ────────────────────────────────────────
-  const username    = sessionStorage.getItem('caci_username')    || '';
-  const role        = sessionStorage.getItem('caci_role')        || 'user';
-  const displayName = sessionStorage.getItem('caci_displayname') || username;
-  const userChip    = $('tb-user-chip');
-  if (userChip && username) {
-    $('tb-user-name').textContent = displayName || username;
-    $('tb-user-role').textContent = role === 'admin' ? 'Admin' : '';
-    userChip.style.display = 'flex';
-    // Clicking the chip goes to admin panel (admin) or shows a simple account info tooltip
-    userChip.addEventListener('click', () => {
-      if (role === 'admin') switchPanel('admin');
-    });
-  }
-  // Gate admin-only nav items by role
-  const isAdmin = role === 'admin';
-  document.querySelectorAll('.admin-only').forEach(el => { el.style.display = isAdmin ? '' : 'none'; });
-  // Gate admin nav buttons — hide Configurations nav for non-admins
-  document.querySelectorAll('.nav-btn[data-p="admin"]').forEach(b => { b.style.display = isAdmin ? '' : 'none'; });
-  document.querySelectorAll('.tab-btn[data-p="admin"]').forEach(b => { b.style.display = isAdmin ? '' : 'none'; });
+  applyIdentityUI();
 
   if (window.innerWidth < 768) $('tb-model-chip').style.display = 'flex';
 
@@ -6742,7 +6783,7 @@ function switchPanel(id) {
   if (id === 'aisettings') { loadAdminConfig(); loadRetrievalWeights(); loadIntelligenceTuning(); loadSemanticIndex(); }
   if (id === 'admin') { loadAdminConfig(); loadIntegrationStatuses(); loadConnectorStatuses(); loadUsersPanel(); }
   // Gate admin-only sections based on role
-  const isAdmin = sessionStorage.getItem('caci_role') === 'admin';
+  const isAdmin = (sessionStorage.getItem('caci_role') || 'admin') === 'admin';
   document.querySelectorAll('.admin-only').forEach(el => { el.style.display = isAdmin ? '' : 'none'; });
   if (id === 'chat') {
     initChatGreeting();
