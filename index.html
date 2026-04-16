@@ -2758,7 +2758,7 @@ body::before {
 }
 /* Greeting strip — sits just above the input bar */
 #discovery-greeting-strip {
-  padding: 12px 80px 0;
+  padding: 12px 0 0;
   text-align: center;
   animation: dg-in 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s both;
   position: relative;
@@ -7009,8 +7009,7 @@ async function initChatGreeting() {
     ty.remove();
     if (!d.error) {
       renderDiscoveryGreeting(d.response, d.collections);
-      chatHistory.push({role:'assistant', content:d.response});
-      saveChatHistory();
+      // Don't save greeting to history — it's UI only, not a real conversation turn
       if (d.collections) window._caciCollections = d.collections;
     }
   } catch(e) { ty.remove(); }
