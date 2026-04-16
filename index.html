@@ -10535,7 +10535,7 @@ function renderAnalyticsQueries(data) {
       </label>
       <span id="aq-count" style="font-family:var(--f-mono);font-size:9px;color:var(--smoke4);letter-spacing:0.06em"></span>
     </div>
-    <div id="aq-table-wrap" style="max-height:420px;overflow-y:auto"></div>`;
+    <div id="aq-table-wrap" style="max-height:360px;overflow-y:auto;border:1px solid rgba(255,255,255,0.06);border-radius:4px;scrollbar-width:thin;scrollbar-color:rgba(212,168,50,0.3) transparent"></div>`;
 
   function renderTable() {
     const deptF  = $('aq-dept-filter')?.value || 'all';
