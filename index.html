@@ -7856,7 +7856,7 @@ async function loadSemanticIndex() {
   wrap.innerHTML = '<div class="tune-empty">Checking index status...</div>';
 
   try {
-    const res  = await apiFetch(`/embed-status?dept=${encodeURIComponent(dept)}`);
+    const res  = await apiFetch(`/embed-status`);
     const data = await res.json();
 
     if (!data.ok) { wrap.innerHTML = `<div class="tune-empty">Error: ${data.error}</div>`; return; }
@@ -7944,10 +7944,18 @@ async function runSemanticBackfill(statusData) {
   const logProg = msg => { if (progEl) { progEl.innerHTML += msg + '<br>'; progEl.scrollTop = 9999; } };
 
   try {
-    // Fetch all files for this dept
-    const res   = await apiFetch(`/files?dept=${encodeURIComponent(dept)}`);
-    const files = await res.json();
-    if (!Array.isArray(files) || !files.length) {
+    // Fetch all files across every department (deduplicated by id)
+    const ALL_DEPTS = ['global','retail','compliance','commercial','human_resources','finance','operations','technology'];
+    const seen = new Set();
+    let files = [];
+    for (const d of ALL_DEPTS) {
+      const res2  = await apiFetch(`/files?dept=${encodeURIComponent(d)}`);
+      const batch = await res2.json();
+      if (Array.isArray(batch)) {
+        for (const f of batch) { if (!seen.has(f.id)) { seen.add(f.id); files.push(f); } }
+      }
+    }
+    if (!files.length) {
       if (statusEl) { statusEl.className = 'weight-status'; statusEl.textContent = 'No files found'; }
       btn.disabled = false; btn.textContent = 'Index All Files';
       return;
