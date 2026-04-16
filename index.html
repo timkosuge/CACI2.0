@@ -5103,6 +5103,7 @@ body::before {
       </div>
     </div>
     </div>
+    <div id="sb-user-block"></div>
     <div class="sb-footer">
       <div class="model-pill" id="sb-model-pill">
         <div class="mp-indicator" id="mp-indicator" style="color:#22c55e;background:#22c55e"></div>
@@ -5793,6 +5794,24 @@ body::before {
     <div class="panel" data-panel="admin">
       <div class="admin-wrap">
 
+        <!-- WHO'S ONLINE (admin only) -->
+        <div class="asec" id="presence-asec">
+          <div class="asec-head"><div class="asec-title">Who's Online</div><div class="asec-line"></div></div>
+          <div class="asec-sub-title" style="margin:-8px 0 14px">
+            Users active in the last 10 minutes. Updates every 30 seconds.
+          </div>
+          <div id="presence-wrap"><div class="tune-empty">Loading...</div></div>
+        </div>
+
+        <!-- WHO'S ONLINE (admin only) -->
+        <div class="asec" id="presence-asec">
+          <div class="asec-head"><div class="asec-title">Who's Online</div><div class="asec-line"></div></div>
+          <div class="asec-sub-title" style="margin:-8px 0 14px">
+            Users active in the last 10 minutes. Updates every 30 seconds.
+          </div>
+          <div id="presence-wrap"><div class="tune-empty">Loading...</div></div>
+        </div>
+
         <!-- USERS (admin only) -->
         <div class="asec" id="users-asec">
           <div class="asec-head"><div class="asec-title">Users</div><div class="asec-line"></div></div>
@@ -6435,31 +6454,53 @@ function applyUserPrefs(prefs) {
 // Called from bootApp on fresh login AND from the refresh path once /users/me resolves
 function applyIdentityUI() {
   const username    = sessionStorage.getItem('caci_username')    || '';
-  const role        = sessionStorage.getItem('caci_role')        || 'admin'; // default admin until we know otherwise
-  const displayName = sessionStorage.getItem('caci_displayname') || username;
+  const role        = sessionStorage.getItem('caci_role')        || 'admin';
+  const displayName = sessionStorage.getItem('caci_displayname') || username || 'Admin';
   const isAdmin     = role === 'admin';
 
-  // User chip in topbar
+  // User chip in topbar — always show once app is booted
   const userChip = $('tb-user-chip');
   if (userChip) {
-    if (username) {
-      const nameEl = $('tb-user-name');
-      const roleEl = $('tb-user-role');
-      if (nameEl) nameEl.textContent = displayName || username;
-      if (roleEl) roleEl.textContent = isAdmin ? 'Admin' : '';
-      userChip.style.display = 'flex';
-      // Only attach listener once
-      if (!userChip._listenerAttached) {
-        userChip._listenerAttached = true;
-        userChip.addEventListener('click', () => { if (sessionStorage.getItem('caci_role') === 'admin') switchPanel('admin'); });
-      }
+    const nameEl = $('tb-user-name');
+    const roleEl = $('tb-user-role');
+    if (nameEl) nameEl.textContent = displayName;
+    if (roleEl) roleEl.textContent = isAdmin ? 'Admin' : 'User';
+    userChip.style.display = 'flex';
+    if (!userChip._listenerAttached) {
+      userChip._listenerAttached = true;
+      userChip.addEventListener('click', () => {
+        if ((sessionStorage.getItem('caci_role') || 'admin') === 'admin') switchPanel('admin');
+      });
     }
+  }
+
+  // Sidebar user block
+  const sbUser = $('sb-user-block');
+  if (sbUser) {
+    const initials = getInitials(displayName);
+    sbUser.innerHTML = `
+      <div style="display:flex;align-items:center;gap:9px;padding:10px 14px 10px;border-top:1px solid rgba(212,168,50,0.10);">
+        <div style="width:26px;height:26px;border-radius:4px;background:linear-gradient(135deg,rgba(212,168,50,0.18),rgba(212,168,50,0.08));border:1px solid rgba(212,168,50,0.28);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <span style="font-family:var(--f-mono);font-size:9px;font-weight:500;letter-spacing:0.05em;color:rgba(212,168,50,0.8)">${initials}</span>
+        </div>
+        <div style="min-width:0;flex:1">
+          <div style="font-family:var(--f-ui);font-size:11px;font-weight:300;color:var(--smoke2);letter-spacing:0.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(displayName)}</div>
+          <div style="font-family:var(--f-mono);font-size:8px;letter-spacing:0.10em;color:rgba(212,168,50,0.40);text-transform:uppercase;margin-top:1px">${isAdmin ? 'Admin' : 'User'}</div>
+        </div>
+      </div>`;
   }
 
   // Show/hide admin-gated elements
   document.querySelectorAll('.admin-only').forEach(el => { el.style.display = isAdmin ? '' : 'none'; });
   document.querySelectorAll('.nav-btn[data-p="admin"]').forEach(b => { b.style.display = isAdmin ? '' : 'none'; });
   document.querySelectorAll('.tab-btn[data-p="admin"]').forEach(b => { b.style.display = isAdmin ? '' : 'none'; });
+}
+
+function getInitials(name) {
+  if (!name) return '?';
+  const parts = name.trim().split(/[\s._-]+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  return name.slice(0, 2).toUpperCase();
 }
 
 // Save a single pref to server (fire-and-forget)
@@ -6499,6 +6540,20 @@ function bootApp() {
     if (contentEl) contentEl.classList.add('sb-collapsed');
   }
   checkHealth(); loadAdminConfig();
+
+  // ── Presence heartbeat — ping every 2 minutes ───────────────
+  function pingPresence() {
+    const page = document.querySelector('.nav-btn.active')?.dataset?.p || 'chat';
+    apiFetch('/presence', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dept, page }),
+    }).catch(() => {});
+  }
+  pingPresence(); // ping immediately on boot
+  setInterval(pingPresence, 2 * 60 * 1000); // then every 2 minutes
+  // Also ping on panel switch so page label stays current
+  window._presencePing = pingPresence;
 
   // ── Identity display ────────────────────────────────────────
   applyIdentityUI();
@@ -6767,6 +6822,8 @@ function buildNav() {
 }
 function switchPanel(id) {
   curPanel = id;
+  if (id !== 'admin' && _presenceInterval) { clearInterval(_presenceInterval); _presenceInterval = null; }
+  if (window._presencePing) setTimeout(window._presencePing, 100);
   // Always clean up discovery elements when switching away from chat
   if (id !== 'chat') {
     ['discovery-name', 'discovery-greeting-strip'].forEach(eid => {
@@ -6781,7 +6838,9 @@ function switchPanel(id) {
   if (id === 'responses') loadResponses();
   if (id === 'files') { loadCollections(); loadFiles(); loadContextDocs(); }
   if (id === 'aisettings') { loadAdminConfig(); loadRetrievalWeights(); loadIntelligenceTuning(); loadSemanticIndex(); }
-  if (id === 'admin') { loadAdminConfig(); loadIntegrationStatuses(); loadConnectorStatuses(); loadUsersPanel(); }
+  if (id === 'admin') {
+    loadAdminConfig(); loadIntegrationStatuses(); loadConnectorStatuses(); loadUsersPanel(); loadPresence();
+  }
   // Gate admin-only sections based on role
   const isAdmin = (sessionStorage.getItem('caci_role') || 'admin') === 'admin';
   document.querySelectorAll('.admin-only').forEach(el => { el.style.display = isAdmin ? '' : 'none'; });
@@ -7261,7 +7320,8 @@ async function sendChat() {
 function appendMsg(role, text, sources, scope, model = '', responseId = '') {
   const el = document.createElement('div');
   el.className = 'msg ' + role;
-  const av = role === 'user' ? 'YOU' : 'CACI';
+  const displayName = sessionStorage.getItem('caci_displayname') || '';
+  const av = role === 'user' ? (getInitials(displayName) || 'YOU') : 'CACI';
   const src = sources && sources.length ? `<div class="msg-sources">Sources &mdash; <b>${sources.join(' \u00b7 ')}</b></div>` : '';
   const sc = scope && scope !== 'all' ? `<div class="msg-scope">Scope: ${scope === 'file' ? chatFileName : scope === 'collection' ? chatCollection : 'all'}</div>` : '';
   const spk = role === 'ai' ? `<button class="spk-btn" title="Read aloud" data-spk="1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 010 7.07"/><path d="M19.07 4.93a10 10 0 010 14.14"/></svg></button>` : '';
@@ -9955,6 +10015,79 @@ function deleteUserConfirm(username) {
     .then(r => r.json())
     .then(d => { if (d.ok) loadUsersPanel(); else alert('Delete failed: ' + (d.error || 'unknown')); })
     .catch(e => alert('Delete failed: ' + e.message));
+}
+
+// ── Who's Online ──────────────────────────────────────────────
+let _presenceInterval = null;
+
+async function loadPresence() {
+  const wrap = $('presence-wrap');
+  if (!wrap) return;
+
+  const role = sessionStorage.getItem('caci_role') || 'admin';
+  if (role !== 'admin') { wrap.innerHTML = ''; return; }
+
+  async function refresh() {
+    try {
+      const res  = await apiFetch('/presence');
+      const data = await res.json();
+      if (!data.ok) { wrap.innerHTML = `<div class="tune-empty">Error: ${data.error}</div>`; return; }
+
+      const active = data.active || [];
+      const now    = Date.now();
+      const currentUser = sessionStorage.getItem('caci_username') || '';
+
+      const PAGE_LABELS = { chat: 'Intelligence', files: 'Documents', responses: 'Responses', admin: 'Configurations', aisettings: 'AI Settings' };
+      const DEPT_LABELS = { retail:'Retail', compliance:'Compliance', commercial:'Commercial', hr:'HR', finance:'Finance', operations:'Operations', it:'Technology', global:'Global' };
+
+      if (!active.length) {
+        wrap.innerHTML = '<div class="tune-empty" style="margin:0">No active users in the last 10 minutes.</div>';
+        return;
+      }
+
+      wrap.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px">
+          ${active.map(u => {
+            const minsAgo = Math.round((now - new Date(u.lastSeen).getTime()) / 60000);
+            const freshness = minsAgo === 0 ? 'just now' : `${minsAgo}m ago`;
+            const isOnline  = minsAgo < 3;
+            const isSelf    = u.username === currentUser;
+            const initials  = getInitials(u.displayName || u.username);
+            const pageLbl   = PAGE_LABELS[u.page]  || u.page  || '—';
+            const deptLbl   = DEPT_LABELS[u.dept]  || u.dept  || '—';
+            return `
+            <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:linear-gradient(160deg,rgba(10,15,26,0.99),rgba(6,9,18,1));border:1px solid rgba(212,168,50,${isOnline ? '0.22' : '0.10'});border-radius:6px;">
+              <div style="position:relative;flex-shrink:0">
+                <div style="width:30px;height:30px;border-radius:4px;background:linear-gradient(135deg,rgba(212,168,50,0.18),rgba(212,168,50,0.08));border:1px solid rgba(212,168,50,0.28);display:flex;align-items:center;justify-content:center;">
+                  <span style="font-family:var(--f-mono);font-size:10px;font-weight:500;color:rgba(212,168,50,0.85)">${initials}</span>
+                </div>
+                <div style="position:absolute;bottom:-2px;right:-2px;width:8px;height:8px;border-radius:50%;background:${isOnline ? 'var(--green-lt)' : 'var(--smoke4)'};border:1.5px solid var(--ink2);${isOnline ? 'box-shadow:0 0 5px var(--green-lt)' : ''}"></div>
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="display:flex;align-items:center;gap:7px;margin-bottom:2px">
+                  <span style="font-family:var(--f-ui);font-size:12px;font-weight:300;color:var(--smoke);letter-spacing:0.02em">${esc(u.displayName || u.username)}</span>
+                  ${u.role === 'admin' ? `<span style="font-family:var(--f-mono);font-size:7px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(212,168,50,0.5);border:1px solid rgba(212,168,50,0.25);padding:1px 5px;border-radius:2px">Admin</span>` : ''}
+                  ${isSelf ? `<span style="font-family:var(--f-mono);font-size:7px;letter-spacing:0.1em;color:rgba(100,220,130,0.6)">YOU</span>` : ''}
+                </div>
+                <div style="font-family:var(--f-mono);font-size:9px;color:var(--smoke4);letter-spacing:0.05em">
+                  ${deptLbl} &nbsp;·&nbsp; ${pageLbl} &nbsp;·&nbsp; ${freshness}
+                </div>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+        <div style="font-family:var(--f-mono);font-size:9px;color:var(--smoke4);letter-spacing:0.06em;text-align:right">
+          ${active.length} active &nbsp;·&nbsp; refreshes every 30s
+        </div>`;
+    } catch (e) {
+      wrap.innerHTML = `<div class="tune-empty">Failed: ${e.message}</div>`;
+    }
+  }
+
+  // Clear any existing interval
+  if (_presenceInterval) clearInterval(_presenceInterval);
+  await refresh();
+  _presenceInterval = setInterval(refresh, 30 * 1000);
 }
 
 
