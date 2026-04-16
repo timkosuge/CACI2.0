@@ -3946,21 +3946,19 @@ async function handleEmbedFile(request, env) {
 }
 
 // GET /embed-status
-// Returns embedding coverage for the active dept's retrieval scope,
-// which mirrors how retrieval works: dept files + global files, deduped.
+// Returns embedding coverage across ALL unique files regardless of dept.
 async function handleEmbedStatus(url, env) {
   try {
-    const dept = url.searchParams.get('dept') || 'global';
+    const DEPTS = ['global','retail','compliance','commercial','human_resources','finance','operations','technology'];
 
-    // Mirror retrieval: dept index + global index (skip double-count if dept=global)
-    const deptIdx   = await env.CACI_KV.get(`index:${dept}`, 'json') || [];
-    const globalIdx = dept !== 'global' ? (await env.CACI_KV.get('index:global', 'json') || []) : [];
-
-    // Dedupe by id
+    // Collect all unique files across every dept index
     const seen = new Set();
     const allFiles = [];
-    for (const f of [...deptIdx, ...globalIdx]) {
-      if (!f.isContext && !seen.has(f.id)) { seen.add(f.id); allFiles.push(f); }
+    for (const d of DEPTS) {
+      const idx = await env.CACI_KV.get(`index:${d}`, 'json') || [];
+      for (const f of idx) {
+        if (!f.isContext && !seen.has(f.id)) { seen.add(f.id); allFiles.push(f); }
+      }
     }
 
     let totalFiles = 0, indexedFiles = 0, totalChunks = 0, indexedChunks = 0;
@@ -3980,7 +3978,7 @@ async function handleEmbedStatus(url, env) {
 
     const pct = totalFiles > 0 ? Math.round(indexedFiles / totalFiles * 100) : 0;
     return json({
-      ok: true, dept,
+      ok: true, dept: 'all',
       totalFiles, indexedFiles, totalChunks, indexedChunks,
       coveragePct: pct,
       aiAvailable: !!env.AI,
