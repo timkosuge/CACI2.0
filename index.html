@@ -6450,17 +6450,18 @@ function bootApp() {
     updateComplianceBtn();
   }
 
-  $('compliance-btn').addEventListener('click', () => {
+  // compliance-btn removed from UI — guard all listeners
+  if ($('compliance-btn')) $('compliance-btn').addEventListener('click', () => {
     if (_complianceMode) { disarmCompliance(); return; }
     if (chatScope !== 'collection' || !isComplianceCollection(chatCollection)) return;
-    $('compliance-modal-bg').classList.add('open');
+    if ($('compliance-modal-bg')) $('compliance-modal-bg').classList.add('open');
   });
-  $('compliance-modal-cancel').addEventListener('click', () => $('compliance-modal-bg').classList.remove('open'));
-  $('compliance-modal-confirm').addEventListener('click', () => {
+  if ($('compliance-modal-cancel')) $('compliance-modal-cancel').addEventListener('click', () => $('compliance-modal-bg').classList.remove('open'));
+  if ($('compliance-modal-confirm')) $('compliance-modal-confirm').addEventListener('click', () => {
     $('compliance-modal-bg').classList.remove('open');
     armCompliance();
   });
-  $('compliance-modal-bg').addEventListener('click', e => {
+  if ($('compliance-modal-bg')) $('compliance-modal-bg').addEventListener('click', e => {
     if (e.target === $('compliance-modal-bg')) $('compliance-modal-bg').classList.remove('open');
   });
 
