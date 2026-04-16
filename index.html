@@ -6264,37 +6264,41 @@ function bootApp() {
   }
   checkHealth(); loadAdminConfig();
 
-  // ── Restore chat history from previous session ───────────────
-  const savedHistory = loadChatHistory();
-  if (savedHistory.length > 0) {
-    chatHistory = savedHistory;
-    // Re-render messages — skip the greeting call
-    const msgs = $('chat-msgs');
-    if (msgs) {
-      msgs.innerHTML = '';
-      // Filter out the greeting (first assistant message with no prior user message)
-      let startIdx = 0;
-      if (savedHistory[0] && savedHistory[0].role === 'assistant') startIdx = 1;
-      for (let i = startIdx; i < savedHistory.length; i++) {
-        const h = savedHistory[i];
-        appendMsg(h.role, h.content, h.sources || null, h.scope || null, h.model || '', '');
-      }
-      // Show a subtle "session restored" indicator
-      const restoreEl = document.createElement('div');
-      restoreEl.style.cssText = 'text-align:center;font-family:var(--f-mono);font-size:9px;color:rgba(212,168,50,0.35);letter-spacing:0.12em;padding:8px 0 4px;text-transform:uppercase;';
-      restoreEl.textContent = '— Session restored —';
-      msgs.insertBefore(restoreEl, msgs.firstChild);
-      setTimeout(() => { restoreEl.style.transition = 'opacity 1.5s'; restoreEl.style.opacity = '0'; setTimeout(() => restoreEl.remove(), 1500); }, 3000);
-      // Mark as having messages
-      $('chat-bar').classList.add('has-messages');
-      msgs.classList.add('has-messages');
-      $('chat-empty').style.display = 'none';
-    }
-  }
-
   if (window.innerWidth < 768) $('tb-model-chip').style.display = 'flex';
 
   $('send-btn').addEventListener('click', sendChat);
+
+  // ── Restore chat history from previous session ───────────────
+  try {
+    const savedHistory = loadChatHistory();
+    if (savedHistory.length > 0) {
+      chatHistory = savedHistory;
+      // Re-render messages — skip the greeting call
+      const msgs = $('chat-msgs');
+      if (msgs) {
+        msgs.innerHTML = '';
+        // Filter out the greeting (first assistant message with no prior user message)
+        let startIdx = 0;
+        if (savedHistory[0] && savedHistory[0].role === 'assistant') startIdx = 1;
+        for (let i = startIdx; i < savedHistory.length; i++) {
+          try {
+            const h = savedHistory[i];
+            appendMsg(h.role, h.content, h.sources || null, h.scope || null, h.model || '', '');
+          } catch(e) { /* skip malformed message */ }
+        }
+        // Show a subtle "session restored" indicator
+        const restoreEl = document.createElement('div');
+        restoreEl.style.cssText = 'text-align:center;font-family:var(--f-mono);font-size:9px;color:rgba(212,168,50,0.35);letter-spacing:0.12em;padding:8px 0 4px;text-transform:uppercase;';
+        restoreEl.textContent = '— Session restored —';
+        msgs.insertBefore(restoreEl, msgs.firstChild);
+        setTimeout(() => { restoreEl.style.transition = 'opacity 1.5s'; restoreEl.style.opacity = '0'; setTimeout(() => restoreEl.remove(), 1500); }, 3000);
+        // Mark as having messages
+        $('chat-bar').classList.add('has-messages');
+        msgs.classList.add('has-messages');
+        $('chat-empty').style.display = 'none';
+      }
+    }
+  } catch(e) { chatHistory = []; clearChatHistory(); }
   const newChatBtn = $('new-chat-btn');
   if (newChatBtn) {
     newChatBtn.addEventListener('click', () => {
