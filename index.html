@@ -5830,6 +5830,19 @@ body::before {
             <div class="scard ok"><div class="scard-label">Extraction</div><div class="scard-val">Client-Side</div><div class="srow"><div class="spip"></div><span class="srow-text">PDF &middot; Word &middot; Excel</span></div></div>
           </div>
         </div>
+        <!-- AUDIT LOG (admin only) -->
+        <div class="asec">
+          <div class="asec-head"><div class="asec-title">Audit Log</div><div class="asec-line"></div></div>
+          <div class="asec-sub-title" style="margin:-8px 0 14px">
+            Record of uploads, deletions, user creation, config changes, and weight updates. Last 90 days.
+          </div>
+          <div style="margin-bottom:10px;display:flex;gap:8px;align-items:center">
+            <select class="ainput" id="audit-dept-select" style="width:160px;cursor:pointer"></select>
+            <button class="asave" id="audit-refresh-btn" style="padding:8px 16px">Refresh</button>
+          </div>
+          <div id="audit-wrap"><div class="tune-empty">Loading...</div></div>
+        </div>
+
         <!-- INTEGRATIONS — Microsoft 365 -->
         <div class="asec">
           <div class="asec-head"><div class="asec-title">Microsoft 365 Integrations</div><div class="asec-line"></div></div>
@@ -6119,21 +6132,51 @@ function chatHistoryKey() { return 'caci_history_' + dept; }
 
 function saveChatHistory() {
   try {
-    // Save last 40 turns (20 exchanges) — enough context, not too heavy
     const toSave = chatHistory.slice(-40);
+    // Always write localStorage for instant restore
     localStorage.setItem(chatHistoryKey(), JSON.stringify(toSave));
+    // Persist to server (fire-and-forget) — syncs across devices
+    apiFetch('/history/' + encodeURIComponent(dept), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ history: toSave }),
+    }).catch(() => {});
   } catch(e) {}
 }
 
 function loadChatHistory() {
+  // Return localStorage immediately (fast, works offline)
+  // Server history is loaded async in bootApp and merged on next saveChatHistory
   try {
     const raw = localStorage.getItem(chatHistoryKey());
     return raw ? JSON.parse(raw) : [];
   } catch(e) { return []; }
 }
 
+async function loadChatHistoryFromServer() {
+  try {
+    const res  = await apiFetch('/history/' + encodeURIComponent(dept));
+    const data = await res.json();
+    if (data.ok && Array.isArray(data.history) && data.history.length > 0) {
+      // Use server history if it's longer than what we have locally
+      const local = loadChatHistory();
+      if (data.history.length > local.length) {
+        localStorage.setItem(chatHistoryKey(), JSON.stringify(data.history));
+        return data.history;
+      }
+    }
+  } catch {}
+  return null; // null = use local
+}
+
 function clearChatHistory() {
   try { localStorage.removeItem(chatHistoryKey()); } catch(e) {}
+  // Clear on server too
+  apiFetch('/history/' + encodeURIComponent(dept), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ history: [] }),
+  }).catch(() => {});
 }
 let chatScope = 'all';
 let chatCollection = null;
@@ -6586,6 +6629,7 @@ function bootApp() {
 
   // ── Restore chat history from previous session ───────────────
   try {
+    // Load local immediately, then check server for a longer history (cross-device sync)
     const savedHistory = loadChatHistory();
     if (savedHistory.length > 0) {
       chatHistory = savedHistory;
@@ -6614,6 +6658,21 @@ function bootApp() {
         $('chat-empty').style.display = 'none';
       }
     }
+    // Async: check server for longer history (cross-device sync), re-render if newer
+    loadChatHistoryFromServer().then(serverHistory => {
+      if (serverHistory && serverHistory.length > chatHistory.length && $('chat-msgs')) {
+        chatHistory = serverHistory;
+        const msgs = $('chat-msgs');
+        msgs.innerHTML = '';
+        let startIdx = serverHistory[0]?.role === 'assistant' ? 1 : 0;
+        for (let i = startIdx; i < serverHistory.length; i++) {
+          try { appendMsg(serverHistory[i].role, serverHistory[i].content, serverHistory[i].sources || null, serverHistory[i].scope || null, serverHistory[i].model || '', ''); } catch {}
+        }
+        $('chat-bar').classList.add('has-messages');
+        msgs.classList.add('has-messages');
+        $('chat-empty').style.display = 'none';
+      }
+    }).catch(() => {});
   } catch(e) { chatHistory = []; clearChatHistory(); }
   const newChatBtn = $('new-chat-btn');
   if (newChatBtn) {
@@ -6839,7 +6898,8 @@ function switchPanel(id) {
   if (id === 'files') { loadCollections(); loadFiles(); loadContextDocs(); }
   if (id === 'aisettings') { loadAdminConfig(); loadRetrievalWeights(); loadIntelligenceTuning(); loadSemanticIndex(); }
   if (id === 'admin') {
-    loadAdminConfig(); loadIntegrationStatuses(); loadConnectorStatuses(); loadUsersPanel(); loadPresence();
+    loadAdminConfig(); loadIntegrationStatuses(); loadConnectorStatuses();
+    loadUsersPanel(); loadPresence(); loadAuditLog();
   }
   // Gate admin-only sections based on role
   const isAdmin = (sessionStorage.getItem('caci_role') || 'admin') === 'admin';
@@ -7254,7 +7314,8 @@ async function initChatGreeting() {
   if (chatHistory.length > 0) return; // already greeted or restored
   const ty = appendTyping();
   try {
-    const body = {message: 'hello', dept, model: modelId, scope: 'all', history: []};
+    const dn = sessionStorage.getItem('caci_displayname') || '';
+    const body = {message: 'hello', dept, model: modelId, scope: 'all', history: [], displayName: dn};
     const res = await apiFetch('/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
     const d = await res.json();
     ty.remove();
@@ -7946,17 +8007,25 @@ function downloadResponse(text) {
 }
 
 function saveResponse(prompt, text) {
-  const stored = JSON.parse(localStorage.getItem('caci_saved_responses') || '[]');
-  stored.unshift({
+  const entry = {
     id: Date.now(),
     prompt: prompt.slice(0, 200),
-    text,
-    dept,
-    savedAt: new Date().toISOString()
-  });
-  // Keep max 100 saved responses
-  if (stored.length > 100) stored.splice(100);
-  localStorage.setItem('caci_saved_responses', JSON.stringify(stored));
+    text, dept,
+    savedAt: new Date().toISOString(),
+  };
+  // Optimistic local write for instant UI
+  try {
+    const stored = JSON.parse(localStorage.getItem('caci_saved_responses') || '[]');
+    stored.unshift(entry);
+    if (stored.length > 100) stored.splice(100);
+    localStorage.setItem('caci_saved_responses', JSON.stringify(stored));
+  } catch {}
+  // Persist to server (fire-and-forget)
+  apiFetch('/saved', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt: entry.prompt, text, dept }),
+  }).catch(() => {});
 }
 
 let _respSearchQuery = '';
@@ -8020,16 +8089,32 @@ function renderRespCards(responses) {
 }
 
 function loadResponses() {
-  const stored = JSON.parse(localStorage.getItem('caci_saved_responses') || '[]');
   const body = $('resp-body');
   if (!body) return;
 
-  // Build topic chips from full dataset
+  apiFetch('/saved').then(r => r.json()).then(data => {
+    const serverItems = data.ok ? (data.items || []) : [];
+    const localItems  = JSON.parse(localStorage.getItem('caci_saved_responses') || '[]');
+    const serverIds   = new Set(serverItems.map(i => String(i.id)));
+    const localOnly   = localItems.filter(i => !serverIds.has(String(i.id)));
+    const merged      = [...serverItems, ...localOnly]
+      .sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt)).slice(0, 100);
+    _renderResponsesPanel(merged);
+  }).catch(() => {
+    const stored = JSON.parse(localStorage.getItem('caci_saved_responses') || '[]');
+    _renderResponsesPanel(stored);
+  });
+}
+
+function _renderResponsesPanel(stored) {
+  const body = $('resp-body');
+  if (!body) return;
+
   const chipsEl = $('resp-chips');
   if (chipsEl && stored.length) {
     const topics = extractRespTopics(stored);
     chipsEl.innerHTML = topics.map(t =>
-      `<button class="resp-chip${_respActiveChip === t ? ' active' : ''}" data-topic="${t}">${t}</button>`
+      '<button class="resp-chip' + (_respActiveChip === t ? ' active' : '') + '" data-topic="' + t + '">' + t + '</button>'
     ).join('');
     chipsEl.querySelectorAll('.resp-chip').forEach(chip => {
       chip.addEventListener('click', () => {
@@ -8037,35 +8122,27 @@ function loadResponses() {
         _respActiveChip = (_respActiveChip === topic) ? '' : topic;
         _respSearchQuery = '';
         const si = $('resp-search');
-        if (si) { si.value = ''; }
+        if (si) si.value = '';
         const cl = $('resp-search-clear');
         if (cl) cl.classList.remove('visible');
-        loadResponses();
+        _renderResponsesPanel(stored);
       });
     });
   } else if (chipsEl) {
     chipsEl.innerHTML = '';
   }
 
-  // Apply filters
   let filtered = stored;
   const q = (_respSearchQuery || '').toLowerCase().trim();
-  if (q) {
-    filtered = filtered.filter(r =>
-      (r.prompt || '').toLowerCase().includes(q) ||
-      (r.text || '').toLowerCase().includes(q)
-    );
-  }
-  if (_respActiveChip) {
-    filtered = filtered.filter(r =>
-      (r.prompt || '').toLowerCase().includes(_respActiveChip) ||
-      (r.text || '').toLowerCase().includes(_respActiveChip)
-    );
-  }
+  if (q) filtered = filtered.filter(r =>
+    (r.prompt || '').toLowerCase().includes(q) || (r.text || '').toLowerCase().includes(q)
+  );
+  if (_respActiveChip) filtered = filtered.filter(r =>
+    (r.prompt || '').toLowerCase().includes(_respActiveChip) || (r.text || '').toLowerCase().includes(_respActiveChip)
+  );
 
   renderRespCards(filtered);
 }
-
 function toggleRespExpand(id, btn) {
   const prev = $('rprev-' + id);
   if (!prev) return;
@@ -8074,9 +8151,12 @@ function toggleRespExpand(id, btn) {
 }
 
 function deleteResponse(id) {
+  // Remove from localStorage immediately
   let stored = JSON.parse(localStorage.getItem('caci_saved_responses') || '[]');
   stored = stored.filter(r => r.id !== id);
   localStorage.setItem('caci_saved_responses', JSON.stringify(stored));
+  // Delete from server (fire-and-forget)
+  apiFetch('/saved/' + id, { method: 'DELETE' }).catch(() => {});
   loadResponses();
 }
 function appendTyping() {
@@ -10092,6 +10172,91 @@ async function loadPresence() {
   _presenceInterval = setInterval(refresh, 30 * 1000);
 }
 
+
+// ── Audit Log ─────────────────────────────────────────────────
+const AUDIT_ACTION_LABELS = {
+  'file.upload':       '↑ Upload',
+  'file.delete':       '✕ Delete File',
+  'collection.delete': '✕ Delete Collection',
+  'user.create':       '+ Create User',
+  'weights.save':      '⚙ Save Weights',
+  'tuning.approve':    '✓ Approve Tuning',
+  'config.save':       '⚙ Save Config',
+};
+
+async function loadAuditLog() {
+  const wrap = $('audit-wrap');
+  if (!wrap) return;
+
+  // Populate dept selector
+  const deptSel = $('audit-dept-select');
+  if (deptSel && deptSel.options.length === 0) {
+    [['global','Global'],['retail','Retail'],['compliance','Compliance'],
+     ['commercial','Commercial'],['hr','HR'],['finance','Finance'],
+     ['operations','Operations'],['it','Technology']
+    ].forEach(([v,l]) => {
+      const o = document.createElement('option'); o.value=v; o.textContent=l;
+      deptSel.appendChild(o);
+    });
+  }
+  if (deptSel) {
+    deptSel.value = dept;
+    deptSel.addEventListener('change', loadAuditLog);
+  }
+
+  const auditDept = deptSel ? deptSel.value : dept;
+  wrap.innerHTML = '<div class="tune-empty">Loading...</div>';
+
+  try {
+    const res  = await apiFetch(`/audit?dept=${encodeURIComponent(auditDept)}&limit=100`);
+    const data = await res.json();
+    if (!data.ok) { wrap.innerHTML = `<div class="tune-empty">Error: ${data.error}</div>`; return; }
+
+    const entries = data.entries || [];
+    if (!entries.length) {
+      wrap.innerHTML = '<div class="tune-empty">No audit events recorded yet. Actions like file uploads, deletions, and config changes will appear here.</div>';
+      return;
+    }
+
+    wrap.innerHTML = `
+      <div style="font-family:var(--f-mono);font-size:9px;color:var(--smoke4);letter-spacing:0.06em;margin-bottom:10px">${entries.length} events</div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        ${entries.map(e => {
+          const label   = AUDIT_ACTION_LABELS[e.action] || e.action;
+          const ts      = new Date(e.ts).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+          const isWrite = e.action.includes('delete') || e.action.includes('save') || e.action.includes('approve');
+          const color   = e.action.includes('delete') ? 'rgba(220,90,90,0.7)' :
+                          e.action.includes('save') || e.action.includes('approve') ? 'rgba(212,168,50,0.7)' :
+                          'rgba(100,220,130,0.7)';
+          // Build detail string from action-specific fields
+          const d = e.details || {};
+          const detail = e.action === 'file.upload'       ? esc(d.name || '') + (d.collection ? ' → ' + esc(d.collection) : '') :
+                         e.action === 'file.delete'       ? esc(d.name || d.fileId || '') :
+                         e.action === 'collection.delete' ? esc(d.collection || '') + (d.fileCount ? ' (' + d.fileCount + ' files)' : '') :
+                         e.action === 'user.create'       ? '@' + esc(d.newUsername || '') + ' · ' + (d.role || 'user') :
+                         e.action === 'weights.save'      ? 'dept: ' + esc(d.dept || '') :
+                         e.action === 'tuning.approve'    ? (d.changeCount || 0) + ' weight' + (d.changeCount !== 1 ? 's' : '') + ' changed' :
+                         e.action === 'config.save'       ? (d.keys || []).join(', ') : '';
+          return `<div style="display:flex;align-items:baseline;gap:10px;padding:7px 12px;background:rgba(255,255,255,0.015);border:1px solid rgba(255,255,255,0.04);border-radius:4px;">
+            <span style="font-family:var(--f-mono);font-size:9px;color:${color};letter-spacing:0.08em;white-space:nowrap;min-width:110px">${label}</span>
+            <span style="font-family:var(--f-ui);font-size:11px;color:var(--smoke2);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${detail}</span>
+            <span style="font-family:var(--f-mono);font-size:9px;color:var(--smoke4);white-space:nowrap">${esc(e.displayName || e.username || '')}</span>
+            <span style="font-family:var(--f-mono);font-size:9px;color:var(--smoke4);white-space:nowrap">${ts}</span>
+          </div>`;
+        }).join('')}
+      </div>`;
+
+    // Wire refresh button (idempotent)
+    const refreshBtn = $('audit-refresh-btn');
+    if (refreshBtn && !refreshBtn._auditWired) {
+      refreshBtn._auditWired = true;
+      refreshBtn.addEventListener('click', loadAuditLog);
+    }
+
+  } catch(e) {
+    wrap.innerHTML = `<div class="tune-empty">Failed: ${e.message}</div>`;
+  }
+}
 
 /* ═══════════════════════════════════════════════════════════
    AI AUTO-CLASSIFICATION ENGINE
