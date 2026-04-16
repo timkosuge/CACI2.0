@@ -976,22 +976,81 @@ body::before {
 }
 .sb-section-label {
   font-family: var(--f-ui);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 400;
   letter-spacing: 0.25em;
-  color: rgba(212,168,50,0.55);
   text-transform: uppercase;
-  padding: 18px 20px 8px;
+  padding: 16px 20px 14px;
   flex-shrink: 0;
   text-align: center;
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
+/* The raised plate — sits centered in the sidebar */
 .sb-section-label::before {
-  content: '';
+  content: attr(data-label);
   position: absolute;
-  top: 8px; left: 15%; right: 15%;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(212,168,50,0.28) 50%, transparent);
+  left: 50%; transform: translateX(-50%);
+  white-space: nowrap;
+  font-family: var(--f-ui);
+  font-size: 10px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  /* Gold gradient text */
+  background: linear-gradient(160deg, #fff8d0 0%, #e8c84a 35%, #c9a832 65%, #a07820 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  display: none; /* use span approach below */
+}
+.sb-section-label-plate {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 16px 5px;
+  position: relative;
+  border-radius: 2px;
+  /* Raised plate face */
+  background: linear-gradient(180deg, rgba(30,38,62,1) 0%, rgba(18,24,42,1) 55%, rgba(12,16,30,1) 100%);
+  border-top: 1px solid rgba(245,227,152,0.18);
+  border-bottom: 2px solid rgba(212,168,50,0.60);
+  border-left: 1px solid rgba(212,168,50,0.50);
+  border-right: 1px solid rgba(212,168,50,0.50);
+  box-shadow:
+    inset 0 1px 0 rgba(245,227,152,0.10),
+    0 4px 14px rgba(0,0,0,0.85),
+    0 2px 5px rgba(0,0,0,0.95),
+    0 3px 10px rgba(212,168,50,0.20),
+    -2px 0 8px rgba(212,168,50,0.10),
+    2px 0 8px rgba(212,168,50,0.10);
+}
+/* Top shimmer on plate */
+.sb-section-label-plate::before {
+  content: '';
+  position: absolute; top: 0; left: 8%; right: 8%; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(245,227,152,0.50) 40%, rgba(245,227,152,0.50) 60%, transparent);
+}
+/* Base glow below plate */
+.sb-section-label-plate::after {
+  content: '';
+  position: absolute; bottom: -5px; left: 4px; right: 4px; height: 4px;
+  background: linear-gradient(90deg, transparent 5%, rgba(212,168,50,0.32) 20%, rgba(245,227,152,0.55) 50%, rgba(212,168,50,0.32) 80%, transparent 95%);
+  border-radius: 0 0 2px 2px;
+  filter: blur(2px);
+}
+/* Gold gradient text inside plate */
+.sb-section-label-text {
+  background: linear-gradient(160deg, #fff8d0 0%, #e8c84a 35%, #c9a832 65%, #a07820 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-family: var(--f-ui);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  position: relative; z-index: 1;
 }
 .sb-content-panel {
   flex: 1;
@@ -1528,56 +1587,36 @@ body::before {
 .dept-chip-wrap { position: relative; }
 .dept-chip {
   display: flex; align-items: center; gap: 8px;
-  padding: 5px 14px 6px 12px;
-  /* Full gold frame — top highlight, bright side walls, gold bottom base */
-  border-top: 1px solid rgba(245,227,152,0.20);
-  border-bottom: 2px solid rgba(212,168,50,0.60);
-  border-left: 1px solid rgba(212,168,50,0.50);
-  border-right: 1px solid rgba(212,168,50,0.50);
-  border-radius: 2px;
-  background: linear-gradient(180deg, rgba(32,42,68,1) 0%, rgba(18,24,42,1) 60%, rgba(12,16,30,1) 100%);
+  padding: 5px 12px;
+  border: 1px solid rgba(212,168,50,0.28);
+  border-top-color: rgba(245,227,152,0.12);
+  border-bottom-color: rgba(0,0,0,0.60);
+  border-radius: 3px;
+  background: linear-gradient(180deg, rgba(18,24,40,0.96) 0%, rgba(10,13,24,0.98) 100%);
   cursor: pointer;
   position: relative;
   transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
   box-shadow:
-    /* Top inner highlight */
-    inset 0 1px 0 rgba(245,227,152,0.14),
-    /* Drop shadow — lifts it off the surface */
-    0 4px 12px rgba(0,0,0,0.80),
-    0 2px 4px rgba(0,0,0,0.90),
-    /* Gold bottom glow — the base catching light */
-    0 2px 8px rgba(212,168,50,0.20),
-    /* Side wall glow */
-    -1px 0 5px rgba(212,168,50,0.10),
-    1px 0 5px rgba(212,168,50,0.10);
+    inset 0 1px 0 rgba(245,227,152,0.08),
+    inset 0 -1px 0 rgba(0,0,0,0.45),
+    0 2px 6px rgba(0,0,0,0.60),
+    0 1px 2px rgba(0,0,0,0.80);
 }
-/* Gold shimmer line across top */
 .dept-chip::before {
   content: '';
-  position: absolute; top: 0; left: 8%; right: 8%; height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(245,227,152,0.50) 40%, rgba(245,227,152,0.50) 60%, transparent);
+  position: absolute; top: 0; left: 12%; right: 12%; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(245,227,152,0.30) 50%, transparent);
 }
-/* Gold base plate visible below the chip */
-.dept-chip::after {
-  content: '';
-  position: absolute; bottom: -4px; left: 4px; right: 4px; height: 3px;
-  background: linear-gradient(90deg, transparent 5%, rgba(212,168,50,0.30) 20%, rgba(245,227,152,0.55) 50%, rgba(212,168,50,0.30) 80%, transparent 95%);
-  border-radius: 0 0 2px 2px;
-  filter: blur(1px);
-}
+.dept-chip::after { display: none; }
 .dept-chip:hover {
-  border-left-color: rgba(212,168,50,0.75);
-  border-right-color: rgba(212,168,50,0.75);
-  border-bottom-color: rgba(245,227,152,0.80);
-  border-top-color: rgba(245,227,152,0.30);
-  background: linear-gradient(180deg, rgba(28,36,58,0.98) 0%, rgba(14,18,34,1) 100%);
+  border-color: rgba(212,168,50,0.45);
+  border-top-color: rgba(245,227,152,0.18);
+  background: linear-gradient(180deg, rgba(22,28,48,0.98) 0%, rgba(12,16,28,1) 100%);
   box-shadow:
-    inset 0 1px 0 rgba(245,227,152,0.16),
-    0 4px 16px rgba(0,0,0,0.80),
-    0 2px 5px rgba(0,0,0,0.90),
-    0 3px 12px rgba(212,168,50,0.30),
-    -2px 0 8px rgba(212,168,50,0.16),
-    2px 0 8px rgba(212,168,50,0.16);
+    inset 0 1px 0 rgba(245,227,152,0.12),
+    inset 0 -1px 0 rgba(0,0,0,0.50),
+    0 3px 8px rgba(0,0,0,0.65),
+    0 0 10px rgba(212,168,50,0.06);
 }
 .dc-pip { display: none; }
 .dc-name {
@@ -5153,7 +5192,7 @@ body::before {
     <div class="sb-content-panel">
     <div class="sb-nav" id="sb-nav"></div>
     <div class="sb-divider"></div>
-    <div class="sb-section-label">Department</div>
+    <div class="sb-section-label"><div class="sb-section-label-plate"><span class="sb-section-label-text">Department</span></div></div>
     <div class="sb-depts" id="sb-depts"></div>
     <!-- Tambour shutter -->
     <div class="tambour" id="tambour">
