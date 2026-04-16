@@ -5791,6 +5791,40 @@ body::before {
       </div>
     </div>
 
+    <div class="panel" data-panel="analytics">
+      <div class="admin-wrap">
+
+        <!-- STATS ROW -->
+        <div class="asec" id="analytics-stats-asec">
+          <div class="asec-head"><div class="asec-title">Usage Overview</div><div class="asec-line"></div></div>
+          <div id="analytics-stats-wrap"><div class="tune-empty">Loading...</div></div>
+        </div>
+
+        <!-- QUERY BROWSER -->
+        <div class="asec" id="analytics-queries-asec">
+          <div class="asec-head"><div class="asec-title">Query Log</div><div class="asec-line"></div></div>
+          <div class="asec-sub-title" style="margin:-8px 0 14px">Every question submitted to Caci — newest first.</div>
+          <div id="analytics-queries-wrap"><div class="tune-empty">Loading...</div></div>
+        </div>
+
+        <!-- CACI INSIGHTS -->
+        <div class="asec" id="analytics-insights-asec">
+          <div class="asec-head"><div class="asec-title">Caci Insights</div><div class="asec-line"></div></div>
+          <div class="asec-sub-title" style="margin:-8px 0 14px">On-demand analysis of query patterns, knowledge gaps, and recommendations. Generate when you have meaningful data.</div>
+          <div id="analytics-insights-wrap">
+            <div id="analytics-insights-content" style="display:none"></div>
+            <div style="display:flex;align-items:center;gap:12px;margin-top:8px">
+              <button class="asave" id="analytics-insights-btn">Generate Analysis</button>
+              <div class="afb" id="analytics-insights-fb"></div>
+              <span id="analytics-insights-ts" style="font-family:var(--f-mono);font-size:9px;color:var(--smoke4);letter-spacing:0.06em"></span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+
     <div class="panel" data-panel="admin">
       <div class="admin-wrap">
 
@@ -6140,6 +6174,7 @@ const MODS = [
   {id:'chat',         label:'Intelligence',  icon:'\u25C8'},
   {id:'files',        label:'Documents',     icon:'\u2261'},
   {id:'responses',    label:'Responses',     icon:'\u2193'},
+  {id:'analytics',    label:'Analytics',     icon:'\u25F0'},
   {id:'admin',        label:'Configurations',icon:'\u2699'},
   {id:'aisettings',   label:'AI Settings',   icon:'\u2736'},
 ];
@@ -6568,6 +6603,8 @@ function applyIdentityUI() {
   document.querySelectorAll('.admin-only').forEach(el => { el.style.display = isAdmin ? '' : 'none'; });
   document.querySelectorAll('.nav-btn[data-p="admin"]').forEach(b => { b.style.display = isAdmin ? '' : 'none'; });
   document.querySelectorAll('.tab-btn[data-p="admin"]').forEach(b => { b.style.display = isAdmin ? '' : 'none'; });
+  document.querySelectorAll('.nav-btn[data-p="analytics"]').forEach(b => { b.style.display = isAdmin ? '' : 'none'; });
+  document.querySelectorAll('.tab-btn[data-p="analytics"]').forEach(b => { b.style.display = isAdmin ? '' : 'none'; });
 }
 
 function getInitials(name) {
@@ -6942,6 +6979,7 @@ function switchPanel(id) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.p === id));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.p === id));
   $('tb-module').textContent = MODS.find(m => m.id === id)?.label || '';
+  if (id === 'analytics') { loadAnalytics(); }
   if (id === 'responses') loadResponses();
   if (id === 'files') { loadCollections(); loadFiles(); loadContextDocs(); }
   if (id === 'aisettings') { loadAdminConfig(); loadRetrievalWeights(); loadIntelligenceTuning(); loadSemanticIndex(); }
@@ -10168,6 +10206,235 @@ async function submitChangePasswordModal() {
     if (fb) { fb.className='afb err'; fb.textContent = e.message; }
   }
   if (btn) { btn.disabled = false; btn.textContent = 'Update Password'; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ANALYTICS
+═══════════════════════════════════════════════════════════ */
+
+let _analyticsData = null;
+
+async function loadAnalytics() {
+  const statsWrap   = $('analytics-stats-wrap');
+  const queriesWrap = $('analytics-queries-wrap');
+  if (!statsWrap) return;
+
+  statsWrap.innerHTML   = '<div class="tune-empty">Loading...</div>';
+  queriesWrap.innerHTML = '<div class="tune-empty">Loading...</div>';
+
+  try {
+    const res  = await apiFetch('/analytics?limit=500');
+    const data = await res.json();
+    if (!data.ok) { statsWrap.innerHTML = `<div class="tune-empty">Error: ${data.error}</div>`; return; }
+    _analyticsData = data;
+    renderAnalyticsStats(data);
+    renderAnalyticsQueries(data);
+    loadCachedInsights();
+  } catch (e) {
+    statsWrap.innerHTML = `<div class="tune-empty">Failed: ${e.message}</div>`;
+  }
+}
+
+function renderAnalyticsStats(data) {
+  const wrap = $('analytics-stats-wrap');
+  if (!wrap) return;
+
+  const { totalQueries, uniqueUsers, missCount, deptCounts, dayCounts, topQueries } = data;
+  const hitRate = totalQueries > 0 ? Math.round(((totalQueries - missCount) / totalQueries) * 100) : 0;
+
+  // Build dept breakdown rows
+  const deptRows = Object.entries(deptCounts)
+    .sort((a,b) => b[1]-a[1])
+    .map(([d,c]) => {
+      const pct = Math.round(c / totalQueries * 100);
+      return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+        <div style="font-family:var(--f-mono);font-size:10px;color:var(--smoke2);letter-spacing:0.05em;width:110px;text-transform:capitalize">${esc(d)}</div>
+        <div style="flex:1;height:3px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:rgba(212,168,50,0.5);border-radius:2px"></div>
+        </div>
+        <div style="font-family:var(--f-mono);font-size:9px;color:var(--smoke4);width:40px;text-align:right">${c} (${pct}%)</div>
+      </div>`;
+    }).join('');
+
+  // Build top queries list
+  const topRows = topQueries.length === 0
+    ? '<div class="tune-empty" style="margin:0">No repeated queries yet.</div>'
+    : topQueries.map(q => `
+        <div style="display:flex;align-items:baseline;gap:10px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.04)">
+          <div style="font-family:var(--f-mono);font-size:9px;color:rgba(212,168,50,0.7);font-weight:600;flex-shrink:0;width:20px">${q.count}×</div>
+          <div style="font-family:var(--f-mono);font-size:10px;color:var(--smoke2);letter-spacing:0.02em;line-height:1.4">${esc(q.msg)}</div>
+        </div>`).join('');
+
+  wrap.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:16px">
+
+      <!-- Stat cards -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+        <div class="scard ok">
+          <div class="scard-label">Total Queries</div>
+          <div class="scard-val">${totalQueries.toLocaleString()}</div>
+        </div>
+        <div class="scard">
+          <div class="scard-label">Unique Users</div>
+          <div class="scard-val">${uniqueUsers}</div>
+        </div>
+        <div class="scard">
+          <div class="scard-label">Retrieval Hit Rate</div>
+          <div class="scard-val" style="color:${hitRate>=70?'var(--green-lt)':hitRate>=40?'rgba(220,170,60,0.8)':'rgba(220,90,90,0.8)'}">${hitRate}%</div>
+          <div class="srow"><div class="srow-text">${totalQueries - missCount} hits · ${missCount} misses</div></div>
+        </div>
+        <div class="scard">
+          <div class="scard-label">Dept Coverage</div>
+          <div class="scard-val">${Object.keys(deptCounts).length}</div>
+          <div class="srow"><div class="srow-text">departments active</div></div>
+        </div>
+      </div>
+
+      <!-- Dept breakdown + Top queries side by side -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="acard" style="padding:14px 16px">
+          <div class="acard-title" style="font-size:12px;margin-bottom:10px">Queries by Department</div>
+          ${deptRows || '<div class="tune-empty" style="margin:0">No data yet.</div>'}
+        </div>
+        <div class="acard" style="padding:14px 16px">
+          <div class="acard-title" style="font-size:12px;margin-bottom:10px">Top Repeated Questions</div>
+          ${topRows}
+        </div>
+      </div>
+
+    </div>`;
+}
+
+function renderAnalyticsQueries(data) {
+  const wrap = $('analytics-queries-wrap');
+  if (!wrap) return;
+
+  const logs = data.recentLogs || [];
+  if (!logs.length) {
+    wrap.innerHTML = '<div class="tune-empty">No queries logged yet. Queries will appear here as users interact with Caci.</div>';
+    return;
+  }
+
+  // Filter bar
+  const depts = [...new Set(logs.map(l => l.dept))].sort();
+  const deptOptions = ['all', ...depts].map(d =>
+    `<option value="${esc(d)}">${d === 'all' ? 'All Departments' : esc(d)}</option>`).join('');
+
+  wrap.innerHTML = `
+    <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;flex-wrap:wrap">
+      <select class="ainput" id="aq-dept-filter" style="width:160px;cursor:pointer">${deptOptions}</select>
+      <input class="ainput" id="aq-search" placeholder="Search queries…" style="flex:1;min-width:140px" autocomplete="off"/>
+      <label style="display:flex;align-items:center;gap:6px;font-family:var(--f-mono);font-size:9px;color:var(--smoke4);letter-spacing:0.08em;cursor:pointer">
+        <input type="checkbox" id="aq-miss-only" style="cursor:pointer"/> Misses only
+      </label>
+      <span id="aq-count" style="font-family:var(--f-mono);font-size:9px;color:var(--smoke4);letter-spacing:0.06em"></span>
+    </div>
+    <div id="aq-table-wrap" style="max-height:420px;overflow-y:auto"></div>`;
+
+  function renderTable() {
+    const deptF  = $('aq-dept-filter')?.value || 'all';
+    const search = ($('aq-search')?.value || '').toLowerCase();
+    const missOnly = $('aq-miss-only')?.checked;
+
+    const filtered = logs.filter(l =>
+      (deptF === 'all' || l.dept === deptF) &&
+      (!search || l.message.toLowerCase().includes(search) || l.username.toLowerCase().includes(search)) &&
+      (!missOnly || !l.retrieval)
+    );
+
+    $('aq-count').textContent = `${filtered.length} of ${logs.length}`;
+
+    if (!filtered.length) {
+      $('aq-table-wrap').innerHTML = '<div class="tune-empty">No matching queries.</div>';
+      return;
+    }
+
+    $('aq-table-wrap').innerHTML = `
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.08)">
+            <th style="font-family:var(--f-mono);font-size:8px;letter-spacing:0.12em;color:var(--smoke4);text-transform:uppercase;padding:6px 10px 6px 0;text-align:left;width:130px">Time</th>
+            <th style="font-family:var(--f-mono);font-size:8px;letter-spacing:0.12em;color:var(--smoke4);text-transform:uppercase;padding:6px 10px;text-align:left;width:90px">User</th>
+            <th style="font-family:var(--f-mono);font-size:8px;letter-spacing:0.12em;color:var(--smoke4);text-transform:uppercase;padding:6px 10px;text-align:left;width:80px">Dept</th>
+            <th style="font-family:var(--f-mono);font-size:8px;letter-spacing:0.12em;color:var(--smoke4);text-transform:uppercase;padding:6px 10px;text-align:left">Query</th>
+            <th style="font-family:var(--f-mono);font-size:8px;letter-spacing:0.12em;color:var(--smoke4);text-transform:uppercase;padding:6px 0 6px 10px;text-align:center;width:50px">Hit</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${filtered.map(l => `
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.03)">
+              <td style="font-family:var(--f-mono);font-size:9px;color:var(--smoke4);padding:7px 10px 7px 0;white-space:nowrap">${new Date(l.ts).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</td>
+              <td style="font-family:var(--f-mono);font-size:9px;color:var(--smoke3);padding:7px 10px">${esc(l.username)}</td>
+              <td style="font-family:var(--f-mono);font-size:9px;color:var(--smoke3);padding:7px 10px;text-transform:capitalize">${esc(l.dept)}</td>
+              <td style="font-family:var(--f-mono);font-size:10px;color:var(--smoke);padding:7px 10px;line-height:1.4">${esc(l.message)}</td>
+              <td style="text-align:center;padding:7px 0 7px 10px;font-size:11px">${l.retrieval ? '<span style="color:rgba(100,220,130,0.8)">✓</span>' : '<span style="color:rgba(220,90,90,0.7)">✗</span>'}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  renderTable();
+  $('aq-dept-filter')?.addEventListener('change', renderTable);
+  $('aq-search')?.addEventListener('input', renderTable);
+  $('aq-miss-only')?.addEventListener('change', renderTable);
+}
+
+async function loadCachedInsights() {
+  const btn = $('analytics-insights-btn');
+  if (btn && !btn._wired) {
+    btn._wired = true;
+    btn.addEventListener('click', generateInsights);
+  }
+  // Load previously generated insights if they exist
+  try {
+    const res  = await apiFetch('/analytics/insights/cached');
+    const data = await res.json();
+    if (data.ok && data.insights) {
+      const content = $('analytics-insights-content');
+      const ts      = $('analytics-insights-ts');
+      if (content) {
+        content.style.display = 'block';
+        content.innerHTML = `<div class="acard" style="padding:16px 18px;margin-bottom:12px"><div style="font-family:var(--f-mono);font-size:10px;color:var(--smoke2);letter-spacing:0.02em;line-height:1.8;white-space:pre-wrap">${esc(data.insights)}</div></div>`;
+      }
+      if (ts) ts.textContent = `Generated ${new Date(data.generatedAt).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})} · ${data.queryCount} queries analyzed`;
+      if (btn) btn.textContent = 'Regenerate';
+    }
+  } catch { /* no cached insights yet — leave button as-is */ }
+}
+
+async function generateInsights() {
+  const btn  = $('analytics-insights-btn');
+  const fb   = $('analytics-insights-fb');
+  const ts   = $('analytics-insights-ts');
+  const content = $('analytics-insights-content');
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Analyzing\u2026'; }
+  if (fb)  { fb.className = 'afb'; fb.textContent = ''; }
+
+  try {
+    const res  = await apiFetch('/analytics/insights', { method: 'POST', headers: {'Content-Type':'application/json'}, body: '{}' });
+    const data = await res.json();
+
+    if (!data.ok) {
+      if (fb) { fb.className = 'afb err'; fb.textContent = data.error || 'Failed'; }
+      if (btn) { btn.disabled = false; btn.textContent = 'Generate Analysis'; }
+      return;
+    }
+
+    if (content) {
+      content.style.display = 'block';
+      content.innerHTML = `
+        <div class="acard" style="padding:16px 18px;margin-bottom:12px">
+          <div style="font-family:var(--f-mono);font-size:10px;color:var(--smoke2);letter-spacing:0.02em;line-height:1.8;white-space:pre-wrap">${esc(data.insights)}</div>
+        </div>`;
+    }
+    if (ts) ts.textContent = `Generated ${new Date(data.generatedAt).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})} · ${data.queryCount} queries analyzed`;
+    if (btn) { btn.disabled = false; btn.textContent = 'Regenerate'; }
+
+  } catch (e) {
+    if (fb)  { fb.className = 'afb err'; fb.textContent = e.message; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Generate Analysis'; }
+  }
 }
 
 async function promoteUser(username) {
