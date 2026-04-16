@@ -2486,6 +2486,25 @@ body::before {
 }
 .send-btn:disabled { opacity: 0.25; cursor: default; }
 
+/* New conversation button */
+.new-chat-btn {
+  display: none;
+  margin: 4px auto 0;
+  padding: 3px 14px;
+  background: none;
+  border: 1px solid rgba(212,168,50,0.20);
+  border-radius: 20px;
+  color: rgba(212,168,50,0.40);
+  font-family: var(--f-mono);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.new-chat-btn:hover { border-color: rgba(212,168,50,0.55); color: rgba(212,168,50,0.85); }
+.chat-bar.has-messages .new-chat-btn { display: block; }
+
 /* ── Compliance Mode ─────────────────────────────────────── */
 .compliance-btn {
   width: 32px; height: 32px;
@@ -5452,6 +5471,7 @@ body::before {
             <button class="send-btn" id="send-btn">&#8593;</button>
           </div>
           <div class="voice-status" id="voice-status"></div>
+          <button class="new-chat-btn" id="new-chat-btn">&#43; New Conversation</button>
         </div>
       </div>
     </div>
@@ -5604,6 +5624,16 @@ body::before {
                 <input type="checkbox" id="gtts-auto" style="accent-color:var(--gold)"/> Auto-speak AI responses
               </label>
               <button class="asave" id="gtts-test" style="flex-shrink:0">Test Voice</button>
+            </div>
+            <div class="arow" style="margin-top:12px;align-items:center;gap:12px;flex-wrap:wrap">
+              <label style="font-family:var(--f-mono);font-size:10px;color:var(--smoke3);letter-spacing:.06em;white-space:nowrap">Response Length</label>
+              <select class="ainput" id="tts-length" style="flex:1;min-width:160px">
+                <option value="800">Short &mdash; ~10 seconds</option>
+                <option value="1500">Medium &mdash; ~20 seconds</option>
+                <option value="3000" selected>Standard &mdash; ~40 seconds</option>
+                <option value="5000">Long &mdash; ~60 seconds</option>
+                <option value="8000">Full &mdash; No limit</option>
+              </select>
             </div>
           </div>
         </div>
@@ -5931,6 +5961,28 @@ let dept    = localStorage.getItem('caci_dept')    || 'retail';
 let modelId = localStorage.getItem('caci_model')   || 'grok';
 let chatHistory = [];
 let curPanel = 'chat';
+
+// ── Chat history persistence ─────────────────────────────────
+function chatHistoryKey() { return 'caci_history_' + dept; }
+
+function saveChatHistory() {
+  try {
+    // Save last 40 turns (20 exchanges) — enough context, not too heavy
+    const toSave = chatHistory.slice(-40);
+    localStorage.setItem(chatHistoryKey(), JSON.stringify(toSave));
+  } catch(e) {}
+}
+
+function loadChatHistory() {
+  try {
+    const raw = localStorage.getItem(chatHistoryKey());
+    return raw ? JSON.parse(raw) : [];
+  } catch(e) { return []; }
+}
+
+function clearChatHistory() {
+  try { localStorage.removeItem(chatHistoryKey()); } catch(e) {}
+}
 let chatScope = 'all';
 let chatCollection = null;
 let chatFileId = null;
@@ -6212,9 +6264,52 @@ function bootApp() {
   }
   checkHealth(); loadAdminConfig();
 
+  // ── Restore chat history from previous session ───────────────
+  const savedHistory = loadChatHistory();
+  if (savedHistory.length > 0) {
+    chatHistory = savedHistory;
+    // Re-render messages — skip the greeting call
+    const msgs = $('chat-msgs');
+    if (msgs) {
+      msgs.innerHTML = '';
+      // Filter out the greeting (first assistant message with no prior user message)
+      let startIdx = 0;
+      if (savedHistory[0] && savedHistory[0].role === 'assistant') startIdx = 1;
+      for (let i = startIdx; i < savedHistory.length; i++) {
+        const h = savedHistory[i];
+        appendMsg(h.role, h.content, h.sources || null, h.scope || null, h.model || '', '');
+      }
+      // Show a subtle "session restored" indicator
+      const restoreEl = document.createElement('div');
+      restoreEl.style.cssText = 'text-align:center;font-family:var(--f-mono);font-size:9px;color:rgba(212,168,50,0.35);letter-spacing:0.12em;padding:8px 0 4px;text-transform:uppercase;';
+      restoreEl.textContent = '— Session restored —';
+      msgs.insertBefore(restoreEl, msgs.firstChild);
+      setTimeout(() => { restoreEl.style.transition = 'opacity 1.5s'; restoreEl.style.opacity = '0'; setTimeout(() => restoreEl.remove(), 1500); }, 3000);
+      // Mark as having messages
+      $('chat-bar').classList.add('has-messages');
+      msgs.classList.add('has-messages');
+      $('chat-empty').style.display = 'none';
+    }
+  }
+
   if (window.innerWidth < 768) $('tb-model-chip').style.display = 'flex';
 
   $('send-btn').addEventListener('click', sendChat);
+  const newChatBtn = $('new-chat-btn');
+  if (newChatBtn) {
+    newChatBtn.addEventListener('click', () => {
+      chatHistory = [];
+      clearChatHistory();
+      const msgs = $('chat-msgs');
+      if (msgs) { msgs.innerHTML = ''; msgs.classList.remove('has-messages'); }
+      $('chat-bar').classList.remove('has-messages');
+      $('chat-empty').style.display = 'none';
+      selectedCollection = null; chatCollection = null; chatFileId = null; chatFileName = null;
+      setScope('all');
+      renderScopeCollections(window._caciCollections || []);
+      initChatGreeting();
+    });
+  }
   // ── Compliance Mode ──────────────────────────────────────────
   let _complianceMode = false;
 
@@ -6574,6 +6669,7 @@ function setDept(id) {
   _colView = 'all';
   // Reset chat bar to floating state and clear history for new dept
   chatHistory = [];
+  clearChatHistory();
   window._caciCollections = null;
   ['discovery-name', 'discovery-greeting-strip'].forEach(id => { const el = document.getElementById(id); if (el) el.remove(); });
   const bar = $('chat-bar'), msgs = $('chat-msgs');
@@ -6827,7 +6923,7 @@ function transitionToChat() {
 
 // Sends the CACI greeting on first load (discovery mode)
 async function initChatGreeting() {
-  if (chatHistory.length > 0) return; // already greeted
+  if (chatHistory.length > 0) return; // already greeted or restored
   const ty = appendTyping();
   try {
     const body = {message: 'hello', dept, model: modelId, scope: 'all', history: []};
@@ -6837,6 +6933,7 @@ async function initChatGreeting() {
     if (!d.error) {
       renderDiscoveryGreeting(d.response, d.collections);
       chatHistory.push({role:'assistant', content:d.response});
+      saveChatHistory();
       if (d.collections) window._caciCollections = d.collections;
     }
   } catch(e) { ty.remove(); }
@@ -6856,6 +6953,7 @@ async function sendChat() {
   transitionToChat();
   appendMsg('user', msg);
   chatHistory.push({role:'user', content:msg});
+  saveChatHistory();
   const ty = appendTyping();
   try {
     const body = {message:msg, dept, model:modelId, scope:chatScope, history:chatHistory.slice(-20)};
@@ -6885,6 +6983,7 @@ async function sendChat() {
     else {
       appendMsg('ai', d.response, d.sources, d.scope, d.model, d.responseId || '');
       chatHistory.push({role:'assistant', content:d.response});
+      saveChatHistory();
       if (d.collections) window._caciCollections = d.collections;
     }
   } catch(e) { ty.remove(); appendMsg('ai', '\u26A0  ' + e.message); }
@@ -8677,8 +8776,15 @@ async function speakText(btn, text) {
     .replace(/#{1,6}\s/g, '')
     .replace(/`{1,3}[^`]*`{1,3}/g, '')
     .replace(/\n+/g, ' ')
-    .trim()
-    .slice(0, 4500);
+    .trim();
+  const ttsMaxLen = parseInt(localStorage.getItem('caci_tts_length') || '3000', 10);
+  const cleanTrimmed = clean.length > ttsMaxLen
+    ? (() => {
+        let t = clean.slice(0, ttsMaxLen);
+        const lastSent = t.search(/[.!?][^.!?]*$/);
+        return (lastSent > ttsMaxLen * 0.4) ? t.slice(0, lastSent + 1) : t;
+      })()
+    : clean;
   setVoiceStatus('Speaking…', true);
   if (btn) { btn.classList.add('playing'); _currentSpkBtn = btn; }
   const tog = $('spk-toggle-btn');
@@ -8689,7 +8795,7 @@ async function speakText(btn, text) {
     const res = await apiFetch('/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: clean, provider: provider, voice: grokVoice }),
+      body: JSON.stringify({ text: cleanTrimmed, provider: provider, voice: grokVoice }),
     });
     if (!res.ok) {
       const err = await res.json().catch(function() { return { error: 'TTS failed' }; });
@@ -8869,6 +8975,11 @@ function initVoiceSettings() {
   if (voiceSel) {
     voiceSel.value = localStorage.getItem('caci_tts_grok_voice') || 'eve';
     voiceSel.addEventListener('change', () => localStorage.setItem('caci_tts_grok_voice', voiceSel.value));
+    const lengthSel = $('tts-length');
+    if (lengthSel) {
+      lengthSel.value = localStorage.getItem('caci_tts_length') || '3000';
+      lengthSel.addEventListener('change', () => localStorage.setItem('caci_tts_length', lengthSel.value));
+    }
   }
 
   // Auto-speak toggle
