@@ -7095,9 +7095,9 @@ function appendMsg(role, text, sources, scope, model = '', responseId = '') {
     if (responseId) {
       let selectedSignal = null;
       const fbBtns = el.querySelectorAll('[data-fb]');
-      const fbWrap = el.querySelector(`#fb-wrap-${responseId}`);
-      const fbInput = el.querySelector(`#fb-input-${responseId}`);
-      const fbSend = el.querySelector(`#fb-send-${responseId}`);
+      const fbWrap = document.getElementById(`fb-wrap-${responseId}`);
+      const fbInput = document.getElementById(`fb-input-${responseId}`);
+      const fbSend = document.getElementById(`fb-send-${responseId}`);
 
       // Get the query that prompted this response
       const queryMsgs = $('chat-msgs').querySelectorAll('.msg.user .msg-bubble');
