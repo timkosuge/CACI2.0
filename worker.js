@@ -94,6 +94,7 @@ export default {
     if (path === '/vision-describe' && method === 'POST') return handleVisionDescribe(request, env);
     if (path === '/duplicate-check' && method === 'POST') return handleDuplicateCheck(request, env);
     if (path === '/files'     && method === 'GET')    return handleListFiles(url, env);
+    if (path.startsWith('/files/') && method === 'GET' && !path.endsWith('/meta') && path.split('/').length === 3) return handleGetFileContent(path, env, request);
     if (path.startsWith('/files/') && path.endsWith('/meta') && method === 'PATCH') return handlePatchFileMeta(path, request, env);
     if (path.startsWith('/files/') && method === 'DELETE') return handleDeleteFile(path.replace('/files/', ''), env, url, verifyToken(request, env));
     if (path === '/collections' && method === 'GET')  return handleListCollections(url, env);
@@ -128,7 +129,8 @@ export default {
     }
     if (path === '/embed-file'   && method === 'POST') return handleEmbedFile(request, env);
     if (path === '/embed-status' && method === 'GET')  return handleEmbedStatus(url, env);
-    if (path === '/chat'      && method === 'POST')   return handleChat(request, env);
+    if (path === '/chat'        && method === 'POST')   return handleChat(request, env);
+    if (path === '/chat-stream' && method === 'POST')   return handleChatStream(request, env);
     if (path === '/saved'                    && method === 'GET')    return handleListSaved(request, env);
     if (path === '/saved'                    && method === 'POST')   return handleCreateSaved(request, env);
     if (path.startsWith('/saved/') && method === 'DELETE') return handleDeleteSaved(path, request, env);
@@ -758,6 +760,17 @@ async function handleListCollections(url, env) {
 }
 
 // ── Delete File ───────────────────────────────────────────────
+async function handleGetFileContent(path, env, request) {
+  if (!verifyToken(request, env)) return json({ error: 'Unauthorized' }, 401);
+  try {
+    const id = path.split('/')[2];
+    const stored = await env.CACI_KV.get(`file:${id}`, 'json');
+    if (!stored) return json({ error: 'File not found' }, 404);
+    const text = stored.chunks ? stored.chunks.join('\n\n') : '';
+    return json({ ok: true, id, name: stored.name || id, text, chunkCount: stored.chunks?.length || 0, charCount: text.length });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
 async function handleDeleteFile(id, env, url, caller) {
   try {
     const explicitDept = url?.searchParams.get('dept');
@@ -1370,7 +1383,284 @@ Do not comment on anything else. Do not rewrite the response. Only flag hard num
   } catch (err) { return json({ error: 'Chat error: ' + err.message }, 500); }
 }
 
-// ── Discovery Context Builder ─────────────────────────────────
+// ── Streaming Chat ────────────────────────────────────────────
+// Same pre-processing as handleChat, but streams the LLM response via SSE.
+// Sends token deltas as: data: {"t":"..."}\n\n
+// Sends final metadata as: data: {"done":true,"sources":[...],"responseId":"...","scope":"...","model":"...","correction":"..."}\n\n
+async function handleChatStream(request, env) {
+  const { readable, writable } = new TransformStream();
+  const writer = writable.getWriter();
+  const enc = new TextEncoder();
+
+  const send = async (obj) => {
+    await writer.write(enc.encode('data: ' + JSON.stringify(obj) + '\n\n'));
+  };
+
+  // Run everything async — response is already committed via SSE headers
+  (async () => {
+    try {
+      const body = await request.json();
+      const { message, dept, collection, fileId, scope = 'all', model, history = [], displayName = '', imageBase64 = null, imageMimeType = null, clientDatetime = null, clientTimezone = null } = body;
+
+      if (!message) { await send({ error: 'Message required' }); await writer.close(); return; }
+
+      const apiKey = (await env.CACI_KV.get('config:ANTHROPIC_API_KEY')) || env.ANTHROPIC_API_KEY;
+      if (!apiKey) { await send({ error: 'Anthropic API key not configured.' }); await writer.close(); return; }
+
+      // ── Re-use all the same pre-processing logic as handleChat ──
+      // Query rewrite
+      let retrievalMessage = message;
+      if (history.length > 0 && message.length < 80) {
+        try {
+          const rewriteResp = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 80,
+              messages: [{ role: 'user', content: `Given this conversation history:\n${history.slice(-4).map(h=>`${h.role}: ${h.content}`).join('\n')}\n\nUser's new message: "${message}"\n\nRewrite the new message as a standalone search query that captures the full context needed to find relevant documents. Output only the rewritten query, nothing else. If the message is already self-contained, output it unchanged.` }] }),
+          });
+          if (rewriteResp.ok) { const d = await rewriteResp.json(); retrievalMessage = d.content?.[0]?.text?.trim() || message; }
+        } catch { /* use original */ }
+      }
+
+      // Intent analysis
+      const intent = analyzeQueryIntent(message);
+
+      // Retrieval plan (non-blocking)
+      let retrievalPlan = null;
+      const libraryMap = await buildLibraryMap({ dept, env });
+      const libraryMapPrompt = libraryMapToPrompt(libraryMap);
+      let rewrittenQueries = null;
+      if (libraryMap.collections.length > 3 && !collection && !fileId && scope === 'all') {
+        try {
+          const planResponse = await callLLM({ model, system: 'You are a precise research assistant. Identify which document collections contain the information needed. Be brief.', messages: [{ role: 'user', content: `User asked: "${retrievalMessage}"\nLibrary:\n${libraryMapToPrompt(libraryMap)}\nScope: ${collection ? '"'+collection+'" collection' : 'all'}\nIn 2-3 sentences: which collections are most relevant and why?` }], maxTokens: 150, env, apiKey });
+          retrievalPlan = planResponse;
+        } catch { /* non-blocking */ }
+      }
+
+      // Collection routing
+      let activeCollection = collection;
+      let activeScope = scope;
+      if (scope === 'collection' && collection) {
+        const reg = await env.CACI_KV.get(`colreg:${dept}`, 'json') || [];
+        const msgLower = message.toLowerCase();
+        const matchedCol = reg.find(c => c.name !== collection && msgLower.includes(c.name.toLowerCase()));
+        if (matchedCol) { activeCollection = matchedCol.name; activeScope = 'collection'; }
+      }
+
+      // Context retrieval
+      let context;
+      const useMultiCollection = activeScope === 'all' && !fileId && !activeCollection;
+      if (useMultiCollection) {
+        context = await buildContextMultiCollection({ message: retrievalMessage, dept, env, maxCollections: intent.isComparative ? 6 : 5 });
+        if (!context.text && !context.statsContext) context = await buildContext({ message: retrievalMessage, dept, collection: null, fileId: null, scope: 'all', env });
+      } else {
+        context = await buildContext({ message: retrievalMessage, dept, collection: activeCollection, fileId, scope: activeScope, env });
+      }
+
+      // Context docs
+      let contextDocs = '';
+      const GLOBAL_CTX_COLLECTION = 'Internal Reference';
+      const globalCtxFiles = await env.CACI_KV.get(`ctx:${dept}:${GLOBAL_CTX_COLLECTION}`, 'json') || [];
+      if (globalCtxFiles.length) {
+        const texts = [];
+        for (const f of globalCtxFiles.slice(0, 10)) { const full = await env.CACI_KV.get(`file:${f.id}`, 'json'); if (full?.chunks) texts.push(`[Context: ${f.name}]\n${full.chunks.join('\n\n')}`); }
+        if (texts.length) contextDocs = texts.join('\n\n');
+      }
+      if (activeCollection && collection !== GLOBAL_CTX_COLLECTION) {
+        const ctxFiles = await env.CACI_KV.get(`ctx:${dept}:${collection}`, 'json') || [];
+        if (ctxFiles.length) {
+          const texts = [];
+          for (const f of ctxFiles.slice(0, 5)) { const full = await env.CACI_KV.get(`file:${f.id}`, 'json'); if (full?.chunks) texts.push(`[Context: ${f.name}]\n${full.chunks.join('\n\n')}`); }
+          if (texts.length) contextDocs = contextDocs ? contextDocs + '\n\n' + texts.join('\n\n') : texts.join('\n\n');
+        }
+      }
+
+      const scopeLabel = scope === 'file' ? `the document ${context.focusFile}` : scope === 'collection' ? `the ${collection} collection` : `all ${dept} documents`;
+
+      // System prompt — identical to handleChat
+      let system = `You are Caci (your name rhymes with "Cassie") — the internal AI intelligence assistant for Jushi Holdings, built specifically for this team. Do NOT introduce yourself or state your name unless directly asked. Never say "Hi, I'm Caci" in follow-up responses. Just answer.
+
+Today is ${clientDatetime || new Date().toLocaleString('en-US', {weekday:'long', year:'numeric', month:'long', day:'numeric', hour:'numeric', minute:'2-digit', hour12:true})}${clientTimezone ? ` (${clientTimezone})` : ''}. The full calendar year 2025 is complete. When discussing 2025 data, treat it as a full historical year.
+
+Your personality: You work in cannabis. You know these people. You're sharp, a little goofy, genuinely funny when the moment calls for it, and you have zero interest in sounding impressive — you just are. You have street smarts alongside serious analytical ability. You don't talk down to anyone and you don't perform intelligence. You're warm, patient, and kind. You have grace and tact in how you communicate — honest without being harsh, direct without being cold. You have a thin filter because you value truth more than comfort. You know how to read a room and navigate people.
+
+You're not just a number cruncher. You can talk about anything — but you also happen to be extremely good at analyzing data and documents when that's needed.
+
+Right now you're analyzing ${scopeLabel} for the ${dept} team at Jushi Holdings.
+
+When answering from documents:
+- Cite the specific document name and period when referencing data
+- Never fabricate numbers — if the data isn't there, say so plainly
+- Lead with the insight, not the methodology
+- If something is interesting or surprising in the data, say so — have a point of view
+- If you can't fully answer something, tell them what you CAN tell them and what's missing
+
+FINES AND ENFORCEMENT DATA — critical instruction:
+When any topic relates to regulatory fines, violations, enforcement actions, or penalties in the cannabis industry, do NOT just cite totals or aggregate figures. Instead, surface individual examples from the fines document — but only examples that are relevant to the specific state or jurisdiction being discussed. Do not cross-pollinate states: if someone is asking about Illinois advertising regulations, only reference fines that occurred in Illinois. If someone is asking about Ohio compliance, only reference Ohio fines. If no state context is clear, match fines to whatever state or topic is most relevant to the conversation.
+
+When citing a fine, name the specific company, the fine amount, the violation type, and the state. For example: "Ohio fined [Company] $X for [violation]" or "[Company] received a $X penalty in [state] for [violation type]." Real examples land harder than totals and give the team actual reference points for what regulators care about. If there are multiple relevant state-matched examples, list them individually. Only roll up to a total after you've given the specifics.
+
+RESPONSE DEPTH — this is critical:
+- Match your depth to what's being asked. A casual question gets a sharp, concise answer. A complex analytical request — an executive summary, a financial analysis, a comprehensive review — gets a full, thorough response. Do NOT cut these short.
+- For executive-level requests (earnings summaries, strategic analyses, board-ready content, CEO/leadership briefings): write the complete, polished output. Use sections, headers, and structure. Cover every major topic area. Do not truncate or summarize prematurely.
+- For detailed data questions: pull every relevant figure, explain what it means, and flag anything notable. Don't stop at the first number you find.
+- Never sacrifice completeness for brevity on substantive requests. If someone asks for a comprehensive analysis, they mean it — give them everything the data supports.
+- Structure long responses with clear headers and sections so they are easy to navigate, not just easy to write.
+
+ABSOLUTE RESTRICTION — never discuss, reference, or include any information about:
+- Executive compensation, C-suite salaries, bonuses, equity grants, or pay packages for any Jushi leadership or named individuals
+- If asked directly about executive compensation, decline simply: "That's not something I cover — happy to dig into anything else."
+
+INDUSTRY KNOWLEDGE — you know this world deeply:
+
+Jushi Holdings is a vertically integrated multi-state operator (MSO). They grow, process, and sell cannabis across multiple states including Pennsylvania, Illinois, Nevada, Ohio, Virginia, Massachusetts, Florida, and New Jersey. They operate retail dispensaries under the Nature's Remedy, Beyond/Hello, and other brand names. Like all MSOs, they navigate a patchwork of state regulations, each with its own licensing, compliance, and reporting requirements.
+
+Cannabis industry realities you understand:
+- 280E tax burden: cannabis companies can't deduct normal business expenses because of federal scheduling, which crushes margins
+- Banking is still a nightmare for most operators — limited access, high fees, cash-heavy operations
+- METRC is the seed-to-sale tracking system used by most states — every plant, every package, every transfer gets a tag
+- State-by-state compliance is genuinely complex: what's legal in IL isn't the same as PA, and both change constantly
+- Shrink (inventory loss) is a big deal in cannabis retail — it includes theft, damaged product, system errors, and adjustments
+- Dutchie, iHeartJane, LeafTrade, MJ Freeway are real platforms these teams use daily
+- The difference between medical and adult-use markets matters — different customer bases, different price points, different regulations
+
+Cannabis product knowledge:
+- The indica/sativa distinction is largely marketing — terpene profiles and cannabinoid ratios matter more than the label
+- THC percentage is overemphasized by consumers but doesn't tell the whole story — onset, duration, entourage effect all matter
+- Major cannabinoids: THC, CBD, CBN, CBG, CBC, THCV — each with different effects and regulatory treatment
+- Major terpenes: myrcene (earthy, sedating), limonene (citrus, uplifting), caryophyllene (spicy, anti-inflammatory), linalool (floral, calming), pinene (pine, alertness)
+- Product categories: flower, pre-rolls, vapes (distillate vs live resin vs rosin), concentrates (wax, shatter, badder, sugar, diamonds), edibles, tinctures, topicals, capsules
+- Live resin and rosin are considered higher quality by connoisseurs — full spectrum, more terpenes preserved
+- Shelf categories typically: value/budget, mid, premium/craft
+
+The people you work with:
+- Cannabis industry workers are a unique mix — former hospitality, healthcare, finance, tech, and longtime advocates all thrown together
+- The culture tends toward irreverence, passion, and a genuine belief in the plant
+- Smart people who don't always look or sound "corporate" — that's a feature, not a bug
+- Compliance teams are perpetually stressed; retail teams are customer-focused; ops teams are problem-solvers
+- Everyone is used to things changing fast and figuring it out as they go`;
+
+    // ── Data injection — order matters ────────────────────────
+    // 0. Library map + retrieval plan — Caci's awareness of the full library
+    if (libraryMapPrompt) system += libraryMapPrompt;
+    if (retrievalPlan) system += `\n\nMY RETRIEVAL PLAN FOR THIS QUERY: ${retrievalPlan}`;
+    if (rewrittenQueries?.length) system += `\n\nQUERY VARIANTS USED FOR RETRIEVAL: ${rewrittenQueries.join(' | ')} — these synonyms and expansions were used to find relevant documents. You don't need to mention this to the user.`;
+
+    // 1. Stats block: pre-computed numeric summaries and category inventories.
+    //    Tell the model exactly what this is and how to use it.
+    if (context.statsContext) {
+      system += `\n\nPRE-COMPUTED DATA SUMMARIES (authoritative — use these numbers directly for aggregate questions like totals, averages, min/max):
+${context.statsContext}
+
+These summaries were computed at upload time from the full dataset. When a question can be answered from these summaries alone, prefer them over scanning row chunks.`;
+    }
+
+    // 2. Context docs (SOPs, policies, reference material)
+    if (contextDocs) system += `\n\nBACKGROUND KNOWLEDGE (this is yours — you just know it, you work here):\n${contextDocs}\n\nUse this knowledge the way a sharp colleague would: naturally, when it's genuinely relevant, without announcing it or making it weird. You don't recite it. You don't reference it. You don't say "based on our internal documents." It just informs how you think and what you know. If something comes up that connects to this, you have something real to say about it — but only if it actually fits. You're not a company brochure. You just work here and you know things.`;
+
+    // 3. Document/row chunks — the actual retrievable content
+    if (context.text) {
+      system += `\n\nDOCUMENT CONTENT:\nFormat note: tabular data appears as self-contained row chunks, each starting with "Columns: ..." followed by numbered rows. Each chunk is a slice of a larger dataset — rows may not be sequential across chunks.\n\n${context.text}\n\nWhen answering: cite the document name and period. For numeric questions, cross-reference the DATA SUMMARIES above with the row chunks below to give precise answers. If the row chunks don't contain enough detail to answer fully, say what you CAN answer from the summaries and note what's missing.`;
+    } else {
+      system += `\n\nNo documents found matching this query. Let the user know and ask them to upload relevant files or switch to a different collection.`;
+    }
+
+    // ── Intent hint appended to system prompt ────────────────────
+    if (intent.expansionHint) {
+      system += `\n\nQuery context: ${intent.expansionHint}. `;
+      if (intent.isComparative) system += 'Compare across time periods where possible. Highlight trends and changes.';
+      if (intent.isCausal) system += 'Identify likely drivers. Look for correlated changes across metrics.';
+      if (intent.isAggregate && context.statsContext) system += 'The DATA SUMMARIES above contain authoritative totals — use them directly.';
+    }
+    if (useMultiCollection && context.collectionsSearched?.length) {
+      system += `\n\nNote: this response draws from ${context.collectionsSearched.length} collections: ${context.collectionsSearched.join(', ')}.`;
+    }
+
+      // User message content
+      const userMessageContent = imageBase64
+        ? [{ type: 'image', source: { type: 'base64', media_type: imageMimeType || 'image/jpeg', data: imageBase64 } }, { type: 'text', text: message }]
+        : message;
+
+      const messages = [...history.slice(-20).map(h => ({ role: h.role, content: h.content })), { role: 'user', content: userMessageContent }];
+
+      // ── Stream from Anthropic ──
+      let fullText = '';
+      if (!model || model === 'claude') {
+        const streamRes = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 8000, system, messages, stream: true }),
+        });
+        if (!streamRes.ok) { const e = await streamRes.text(); await send({ error: `Claude API error (${streamRes.status}): ${e}` }); await writer.close(); return; }
+
+        const reader = streamRes.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          const lines = buf.split('\n');
+          buf = lines.pop(); // keep incomplete line
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const data = line.slice(6).trim();
+            if (data === '[DONE]') continue;
+            try {
+              const evt = JSON.parse(data);
+              if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
+                const t = evt.delta.text;
+                fullText += t;
+                await send({ t });
+              }
+            } catch { /* skip malformed */ }
+          }
+        }
+      } else {
+        // Non-Claude models — fall back to non-streaming, send full text as one chunk
+        fullText = await callLLM({ model, system, messages, maxTokens: 8000, env, apiKey });
+        await send({ t: fullText });
+      }
+
+      // ── Verification (post-stream, same logic as handleChat) ──
+      let correction = null;
+      const responseHasNumbers = /\$[\d,]+|\d[\d,]*\.?\d*\s*(%|k|m|b|million|billion|units|lbs|oz)/i.test(fullText);
+      const shouldVerify = (intent.isAggregate || intent.isComparative) && responseHasNumbers && context.statsContext;
+      if (shouldVerify) {
+        try {
+          const verifyResp = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+            body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 120, messages: [{ role: 'user', content: `User asked: "${message}"\n\nAI response:\n${fullText.slice(0,2000)}\n\nAuthoritative summaries:\n${context.statsContext.slice(0,1500)}\n\nCheck only for hard numerical contradictions. Reply "VERIFIED" or "CORRECTION: [one sentence]".` }] }),
+          });
+          const vd = await verifyResp.json();
+          const verdict = vd.content?.[0]?.text?.trim() || '';
+          if (verdict.startsWith('CORRECTION:')) correction = verdict.replace('CORRECTION:', '').trim();
+        } catch { /* non-blocking */ }
+      }
+
+      // ── Logging ──
+      await writeQueryLog(env, { message, dept, username: verifyToken(request, env)?.username || 'unknown', collection: collection || null, retrieval: !!context.text, scope });
+
+      // ── Final metadata event ──
+      const responseId = `${dept}:${Date.now()}:${Math.random().toString(36).slice(2,8)}`;
+      const sourcesToReturn = context.text ? context.sources : [];
+      await send({ done: true, sources: sourcesToReturn, responseId, scope, model: model || 'claude', correction });
+
+    } catch (err) {
+      try { await send({ error: 'Stream error: ' + err.message }); } catch {}
+    } finally {
+      try { await writer.close(); } catch {}
+    }
+  })();
+
+  return new Response(readable, {
+    headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', ...CORS },
+  });
+}
+
+
+
 async function buildDiscoveryContext({ dept, env }) {
   try {
     const reg = await env.CACI_KV.get(`colreg:${dept}`, 'json') || [];
