@@ -183,10 +183,9 @@ async function handleLogin(request, env) {
           displayName: userRecord.displayName || cleanUser,
         });
       }
-      // Username provided but not found — don't fall through to legacy
-      // (prevents username enumeration via timing, but still safe since
-      //  we only reach legacy if NO username is given)
-      return json({ error: 'Invalid username or password' }, 401);
+      // Username not found — fall through to legacy password check
+      // so existing users can still log in with just the shared password
+      // even if they type their name in the username field
     }
 
     // ── Legacy single-password login (no username field) ─────
@@ -216,8 +215,9 @@ async function handleCreateUser(request, env) {
   try {
     const { username, password, role = 'user', displayName } = await request.json();
     if (!username || !password) return json({ error: 'username and password required' }, 400);
-    const clean = username.trim().toLowerCase();
-    if (!/^[a-z0-9_.-]{2,32}$/.test(clean)) return json({ error: 'Username must be 2-32 chars, letters/numbers/._- only' }, 400);
+    const clean = username.trim().toLowerCase().replace(/\s+/g, '.').replace(/[^a-z0-9_.-]/g, '');
+    if (!clean || clean.length < 2) return json({ error: 'Username too short — must be at least 2 characters' }, 400);
+    if (clean.length > 32) return json({ error: 'Username too long — max 32 characters' }, 400);
 
     const existing = await env.CACI_KV.get(`user:${clean}`, 'json');
     if (existing) return json({ error: 'Username already exists' }, 409);
