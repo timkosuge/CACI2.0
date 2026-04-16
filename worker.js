@@ -582,7 +582,7 @@ Today you're working with the ${dept} team. Here's what you have access to:
 ${discovery.collectionList}
 ${discLibraryPrompt ? '\n' + discLibraryPrompt : ''}
 
-Greet the team like a colleague — warm, real, a little personality. No less than 2 sentences and no more than 3. No lists, no bullet points, no line breaks. Do NOT mention specific documents or file names.
+Greet the team like a colleague — warm, real, a little personality. Exactly 2 sentences. No lists, no bullet points, no line breaks. Do NOT mention specific documents or file names. Use this example only as a length reference — do not reuse its structure, phrasing, or wording: "Hey there, I'm Caci, your internal AI sidekick at Jushi—always ready to jump in and help out. Great to connect with the compliance crew today; what's on your mind?" Write something original every time with the same approximate length. Sentence 1 is a warm opener, sentence 2 references the department and ends with a question.
 
 INDUSTRY KNOWLEDGE — you know this world deeply:
 
@@ -670,6 +670,74 @@ Answer this question about yourself directly and authentically. Do not mention d
       const personalRespId = `${dept}:${Date.now()}:${Math.random().toString(36).slice(2,8)}`;
       return json({ ok: true, response: personalRes, sources: [], scope: scope, model: model || 'claude', responseId: personalRespId });
     }
+
+    // ── Report generation — detect report requests and route accordingly ──
+    const reportTriggers = [
+      'generate a report', 'generate report', 'create a report', 'write a report',
+      'executive summary', 'exec summary', 'give me a report', 'full report',
+      'full analysis', 'full breakdown', 'full summary',
+      'monthly report', 'weekly report', 'quarterly report', 'annual report', 'year-end report',
+      'monthly summary', 'quarterly summary', 'quarterly analysis', 'annual summary',
+      'summarize everything', 'summarize all', 'summarize the data', 'summarize this collection',
+      'build a report', 'produce a report', 'generate an analysis', 'generate a summary',
+    ];
+    const msgLowerForReport = message.toLowerCase();
+    const isReportRequest = reportTriggers.some(t => msgLowerForReport.includes(t));
+
+    if (isReportRequest) {
+      const repActiveCol = activeCollection || collection;
+      const repActiveScope = activeScope || scope;
+      const reportContext = await buildContext({ message, dept, collection: repActiveCol, fileId, scope: repActiveScope, env });
+
+      const repGlobalCtx = await env.CACI_KV.get('ctx:' + dept + ':Internal Reference', 'json') || [];
+      let reportCtxDocs = '';
+      if (repGlobalCtx.length) {
+        const texts = [];
+        for (const f of repGlobalCtx.slice(0, 10)) {
+          const full = await env.CACI_KV.get('file:' + f.id, 'json');
+          if (full && full.chunks) texts.push(full.chunks.join('\n\n'));
+        }
+        if (texts.length) reportCtxDocs = texts.join('\n\n');
+      }
+
+      const reportSections = [
+        '1. Executive Summary (2-3 sentences — lead with the most important finding)',
+        '2. Key Findings (specific numbers, cite source file and period)',
+        '3. Detailed Analysis (by category, state, or store as relevant)',
+        '4. Period-over-Period Comparison (only if multiple time periods are present)',
+        '5. State/Store Breakdown (only if location data is present)',
+        '6. Recommendations (grounded in the data)',
+        '7. Data Sources (list files used)',
+      ].join('\n');
+
+      const reportParts = [
+        'You are generating a professional internal business report for Jushi Holdings.',
+        '',
+        'Report request: ' + message,
+        '',
+      ];
+      if (reportCtxDocs) reportParts.push('BACKGROUND KNOWLEDGE:\n' + reportCtxDocs + '\n');
+      if (reportContext.statsContext) reportParts.push('PRE-COMPUTED DATA SUMMARIES (authoritative totals/averages):\n' + reportContext.statsContext + '\n');
+      if (reportContext.text) reportParts.push('SOURCE DOCUMENTS:\n' + reportContext.text + '\n');
+      reportParts.push('Generate a well-structured internal report. Include only sections supported by the data:\n' + reportSections);
+      reportParts.push('\nFormat in clean Markdown. Use ## for sections, tables where data warrants it. Be precise — never round or estimate when exact figures are available. Omit sections where data is insufficient rather than speculating.');
+
+      const reportPromptText = reportParts.join('\n');
+
+      const reportMsgs = [...history.slice(-6).map(h => ({ role: h.role, content: h.content })), { role: 'user', content: reportPromptText }];
+      const reportResponse = await callLLM({
+        model,
+        system: 'You are a precise business analyst generating internal reports for Jushi Holdings. Use markdown formatting — headers, tables, and bullets where appropriate. Cite document names and periods for every data point.',
+        messages: reportMsgs,
+        maxTokens: 8000,
+        env,
+        apiKey,
+      });
+
+      const reportRespId = dept + ':' + Date.now() + ':' + Math.random().toString(36).slice(2,8);
+      return json({ ok: true, response: reportResponse, sources: reportContext.sources, scope: scope, model: model || 'claude', responseId: reportRespId });
+    }
+
 
     // ── Intent analysis — shapes retrieval strategy ─────────────
     const intent = analyzeQueryIntent(message);
