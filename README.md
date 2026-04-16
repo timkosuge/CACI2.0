@@ -2,7 +2,7 @@ CACI Intelligence Platform
 Internal Operational Intelligence System for Jushi Holdings
 Version 6.1 — April 2026
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 WHAT CACI IS
 
 CACI (pronounced "Cassie") is Jushi's internal AI intelligence platform. She
@@ -25,7 +25,6 @@ She is sharp when needed, patient when you are figuring something out, and has
 just enough personality to feel like a colleague rather than a tool.
 
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 DEPARTMENTS
 
 CACI is multi-tenant by department. Every collection, document library,
@@ -38,7 +37,7 @@ The Global department is shared across all departments — files uploaded there
 are accessible company-wide.
 
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 HOW TO USE CACI
 
 Open CACI, choose your department, and start asking questions. You can keep
@@ -66,7 +65,6 @@ Responses tab. Saved responses are searchable by keyword and filterable by
 auto-generated topic chips derived from your actual response content.
 
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 AI MODELS
 
 Four models are available and selectable from the Intelligence Engine modal:
@@ -81,7 +79,6 @@ verification, feedback analysis) always use Claude Haiku for speed and cost
 efficiency regardless of the selected model.
 
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 THE DOCUMENT SYSTEM
 
 Supported file types: PDF, DOCX, CSV, XLSX, XLS, TXT, MD
@@ -144,7 +141,6 @@ The Documents panel filter bar auto-populates with the actual categories,
 periods, and states from uploaded files — no manual configuration required.
 
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 TECHNICAL ARCHITECTURE & INTELLIGENCE LAYER
 
 STORAGE
@@ -227,7 +223,6 @@ Relative date parsing handles: last month, this quarter, YTD, last N months,
 last N quarters, and more.
 
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 FEEDBACK & SELF-IMPROVEMENT
 
 Every AI response has three feedback signals:
@@ -248,7 +243,6 @@ trail.
   rerankNumericBonus, rerankComparativeBonus, xlsxPenalty
 
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 VOICE (TTS)
 
 Primary provider: xAI Grok TTS
@@ -263,7 +257,6 @@ Smart sentence-end truncation prevents mid-sentence cutoffs. Hard ceiling of
 8,000 characters on the worker side regardless of setting.
 
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 INTEGRATIONS & CONNECTORS (configured, credential storage active)
 
 MICROSOFT 365 INTEGRATIONS
@@ -283,7 +276,6 @@ Note: Credential storage and API verification are active for all connectors.
 Live data injection into chat queries is the next phase of development.
 
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 CHAT HISTORY & SESSION MANAGEMENT
 
 Chat history persists across sessions per department using localStorage. On
@@ -293,7 +285,6 @@ indicator. The greeting fires fresh on every load — it is not saved to history
 history for the previous department.
 
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 DEPLOYMENT
 
 Frontend: Cloudflare Pages (single HTML file, ~404 KB, ~10,400 lines)
