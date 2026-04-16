@@ -9827,6 +9827,20 @@ async function loadUsersPanel() {
     // Wire create form
     $('nu-submit')?.addEventListener('click', createUserFromForm);
 
+    // Live slug preview on username field
+    const nuUser = $('nu-username');
+    const nuDisplay = $('nu-display');
+    if (nuUser) {
+      nuUser.addEventListener('input', () => {
+        const slug = nuUser.value.toLowerCase().replace(/\s+/g, '.').replace(/[^a-z0-9_.-]/g, '');
+        nuUser.title = slug ? `Will be saved as: @${slug}` : '';
+        // Auto-fill display name if it's still empty
+        if (nuDisplay && !nuDisplay.value.trim()) {
+          nuDisplay.placeholder = nuUser.value.trim() || 'e.g. Sarah Jones';
+        }
+      });
+    }
+
     // Wire change password form
     $('cp-submit')?.addEventListener('click', changeOwnPassword);
 
@@ -9836,8 +9850,12 @@ async function loadUsersPanel() {
 }
 
 async function createUserFromForm() {
-  const username    = ($('nu-username')?.value  || '').trim();
-  const displayName = ($('nu-display')?.value   || '').trim();
+  const rawUsername = ($('nu-username')?.value  || '').trim();
+  // Auto-slugify: lowercase, spaces→dots, strip invalid chars
+  const username    = rawUsername.toLowerCase().replace(/\s+/g, '.').replace(/[^a-z0-9_.-]/g, '');
+  const displayName = ($('nu-display')?.value   || '').trim() || rawUsername;
+  // Update the field to show what was actually used
+  if ($('nu-username') && username !== rawUsername) $('nu-username').value = username;
   const password    = ($('nu-password')?.value  || '').trim();
   const role        = ($('nu-role')?.value      || 'user');
   const fb          = $('nu-fb');
