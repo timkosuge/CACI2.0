@@ -6280,6 +6280,7 @@ const MODS = [
 
 let token   = sessionStorage.getItem('caci_token') || '';
 let dept    = localStorage.getItem('caci_dept')    || 'retail';
+let _isSending = false; // guard against stuck send button
 let modelId = localStorage.getItem('caci_model')   || 'grok';
 let chatHistory = [];
 let curPanel = 'chat';
@@ -7090,6 +7091,7 @@ function buildNav() {
   $('botbar').querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => switchPanel(b.dataset.p)));
 }
 function switchPanel(id) {
+  resetSendState();
   curPanel = id;
   if (id !== 'admin' && _presenceInterval) { clearInterval(_presenceInterval); _presenceInterval = null; }
   if (window._presencePing) setTimeout(window._presencePing, 100);
@@ -7262,7 +7264,14 @@ document.addEventListener('click', e => {
   }
 });
 
+function resetSendState() {
+  _isSending = false;
+  const btn = $('send-btn');
+  if (btn) btn.disabled = false;
+}
+
 function setDept(id) {
+  resetSendState();
   dept = id; localStorage.setItem('caci_dept', dept); saveUserPref('dept', id);
   selectedCollection = null; chatCollection = null; chatFileId = null; chatFileName = null;
   _colView = 'all';
@@ -7578,6 +7587,8 @@ function clearChatImage() {
 async function sendChat() {
   const ta = $('chat-ta'), msg = ta.value.trim();
   if (!msg && !_chatImageBase64) return;
+  if (_isSending) return; // prevent double-send
+  _isSending = true;
   $('chat-empty').style.display = 'none';
   ta.value = ''; ta.style.height = 'auto';
   $('send-btn').disabled = true;
@@ -7718,7 +7729,7 @@ async function sendChat() {
       }
     }
   } catch(e) { ty.remove(); appendMsg('ai', '\u26A0  ' + e.message); }
-  finally { $('send-btn').disabled = false; }
+  finally { resetSendState(); }
 }
 
 function appendMsg(role, text, sources, scope, model = '', responseId = '', imageDataUrl = null) {
