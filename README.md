@@ -4,7 +4,6 @@ Version 6.1 — April 2026
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 WHAT CACI IS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 CACI (pronounced "Cassie") is Jushi's internal AI intelligence platform. She
 is not a general-purpose chatbot. She is a document-grounded intelligence
@@ -28,7 +27,6 @@ just enough personality to feel like a colleague rather than a tool.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 DEPARTMENTS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 CACI is multi-tenant by department. Every collection, document library,
 scoring weight, and context doc is isolated per department. Departments:
@@ -42,7 +40,6 @@ are accessible company-wide.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 HOW TO USE CACI
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Open CACI, choose your department, and start asking questions. You can keep
 the scope broad ("across all files") or narrow it using the scope bar at the
@@ -71,7 +68,6 @@ auto-generated topic chips derived from your actual response content.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 AI MODELS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Four models are available and selectable from the Intelligence Engine modal:
 
@@ -87,7 +83,6 @@ efficiency regardless of the selected model.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 THE DOCUMENT SYSTEM
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Supported file types: PDF, DOCX, CSV, XLSX, XLS, TXT, MD
 
@@ -151,7 +146,6 @@ periods, and states from uploaded files — no manual configuration required.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 TECHNICAL ARCHITECTURE & INTELLIGENCE LAYER
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 STORAGE
   Cloudflare R2    — Raw file binary storage
@@ -235,7 +229,6 @@ last N quarters, and more.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 FEEDBACK & SELF-IMPROVEMENT
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Every AI response has three feedback signals:
   Sharp      — Retrieval was correct and the answer was good
@@ -257,7 +250,6 @@ trail.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 VOICE (TTS)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Primary provider: xAI Grok TTS
   Voices: Eve (expressive), Ara (warm), Sal (clear), Leo (deep), Rex (authoritative)
@@ -273,7 +265,6 @@ Smart sentence-end truncation prevents mid-sentence cutoffs. Hard ceiling of
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 INTEGRATIONS & CONNECTORS (configured, credential storage active)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 MICROSOFT 365 INTEGRATIONS
   Excel, Word, Teams, Power BI
@@ -294,7 +285,6 @@ Live data injection into chat queries is the next phase of development.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 CHAT HISTORY & SESSION MANAGEMENT
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Chat history persists across sessions per department using localStorage. On
 refresh, previous conversations are restored with a subtle "Session restored"
@@ -305,7 +295,6 @@ history for the previous department.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 DEPLOYMENT
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Frontend: Cloudflare Pages (single HTML file, ~404 KB, ~10,400 lines)
 Backend:  Cloudflare Workers v6.1 (~141 KB, ~2,765 lines, 13.8% of free tier)
