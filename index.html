@@ -10767,7 +10767,7 @@ async function loadCachedInsights() {
       const ts      = $('analytics-insights-ts');
       if (content) {
         content.style.display = 'block';
-        content.innerHTML = `<div class="acard" style="padding:16px 18px;margin-bottom:12px"><div style="font-family:var(--f-mono);font-size:10px;color:var(--smoke2);letter-spacing:0.02em;line-height:1.8;white-space:pre-wrap">${esc(data.insights)}</div></div>`;
+        content.innerHTML = `<div class="acard" style="padding:16px 18px;margin-bottom:12px"><div style="font-family:var(--f-mono);font-size:10px;color:var(--smoke2);letter-spacing:0.02em;line-height:1.8">${renderMarkdown(data.insights)}</div></div>`;
       }
       if (ts) ts.textContent = `Generated ${new Date(data.generatedAt).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})} · ${data.queryCount} queries analyzed`;
       if (btn) btn.textContent = 'Regenerate';
@@ -10798,7 +10798,7 @@ async function generateInsights() {
       content.style.display = 'block';
       content.innerHTML = `
         <div class="acard" style="padding:16px 18px;margin-bottom:12px">
-          <div style="font-family:var(--f-mono);font-size:10px;color:var(--smoke2);letter-spacing:0.02em;line-height:1.8;white-space:pre-wrap">${esc(data.insights)}</div>
+          <div style="font-family:var(--f-mono);font-size:10px;color:var(--smoke2);letter-spacing:0.02em;line-height:1.8">${renderMarkdown(data.insights)}</div>
         </div>`;
     }
     if (ts) ts.textContent = `Generated ${new Date(data.generatedAt).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})} · ${data.queryCount} queries analyzed`;
