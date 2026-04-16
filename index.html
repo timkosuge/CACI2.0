@@ -8685,7 +8685,14 @@ async function openFileViewer(id, name) {
     if (!d.ok) { content.textContent = 'Error: ' + (d.error || 'Failed to load'); return; }
 
     meta.textContent = `${(d.chunkCount||0)} chunks · ${(d.charCount||0).toLocaleString()} chars`;
-    content.textContent = d.text || '(No text content extracted)';
+    
+    // Show chunks with dividers if we have the raw chunk data, otherwise just text
+    if (d.text) {
+      // Split on double newlines to show logical sections
+      content.textContent = d.text;
+    } else {
+      content.textContent = '(No text content extracted)';
+    }
 
     // Download button
     dlBtn.onclick = () => {
