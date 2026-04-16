@@ -6083,6 +6083,29 @@ body::before {
 </div>
 
 <!-- Model Modal -->
+<div class="modal-bg" id="chpw-modal" style="display:none;">
+  <div class="modal-sheet" style="max-width:360px">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Change Password</div>
+    <div class="modal-sub">Enter your current password and choose a new one.</div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-top:16px">
+      <div>
+        <div style="font-family:var(--f-mono);font-size:8px;letter-spacing:0.14em;color:var(--smoke4);text-transform:uppercase;margin-bottom:5px">Current Password</div>
+        <input class="ainput" id="chpw-current" type="password" placeholder="current password" style="width:100%;box-sizing:border-box" autocomplete="current-password"/>
+      </div>
+      <div>
+        <div style="font-family:var(--f-mono);font-size:8px;letter-spacing:0.14em;color:var(--smoke4);text-transform:uppercase;margin-bottom:5px">New Password</div>
+        <input class="ainput" id="chpw-new" type="password" placeholder="min 6 characters" style="width:100%;box-sizing:border-box" autocomplete="new-password"/>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
+        <button class="asave" id="chpw-submit">Update Password</button>
+        <button class="lbtn" id="chpw-cancel" style="color:var(--smoke4);border-color:var(--line2)">Cancel</button>
+        <div class="afb" id="chpw-fb" style="flex:1"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal-bg" id="model-modal">
   <div class="modal-sheet">
     <div class="modal-handle"></div>
@@ -6530,7 +6553,11 @@ function applyIdentityUI() {
           <div style="font-family:var(--f-ui);font-size:11px;font-weight:300;color:var(--smoke2);letter-spacing:0.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(displayName)}</div>
           <div style="font-family:var(--f-mono);font-size:8px;letter-spacing:0.10em;color:rgba(212,168,50,0.40);text-transform:uppercase;margin-top:1px">${isAdmin ? 'Admin' : 'User'}</div>
         </div>
+        <button id="sb-chpw-btn" title="Change password" style="flex-shrink:0;background:none;border:1px solid rgba(212,168,50,0.18);border-radius:3px;padding:4px 5px;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0.55;transition:opacity 0.15s,border-color 0.15s;" onmouseover="this.style.opacity='1';this.style.borderColor='rgba(212,168,50,0.45)'" onmouseout="this.style.opacity='0.55';this.style.borderColor='rgba(212,168,50,0.18)'">
+          <svg width="11" height="12" viewBox="0 0 11 12" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="5" width="9" height="6.5" rx="1.2" stroke="rgba(212,168,50,0.8)" stroke-width="1.1"/><path d="M3 5V3.5a2.5 2.5 0 0 1 5 0V5" stroke="rgba(212,168,50,0.8)" stroke-width="1.1" stroke-linecap="round"/><circle cx="5.5" cy="8.2" r="0.9" fill="rgba(212,168,50,0.8)"/></svg>
+        </button>
       </div>`;
+    $("sb-chpw-btn")?.addEventListener("click", openChangePasswordModal);
   }
 
   // Show/hide admin-gated elements
@@ -9954,25 +9981,7 @@ async function loadUsersPanel() {
           </div>
         </div>
 
-        <!-- Change own password -->
-        <div class="acard" style="padding:16px 18px">
-          <div class="acard-title" style="font-size:14px;margin-bottom:2px">Change My Password</div>
-          <div class="acard-sub">Only available for named accounts — not legacy single-password sessions.</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-            <div>
-              <div style="font-family:var(--f-mono);font-size:8px;letter-spacing:0.14em;color:var(--smoke4);text-transform:uppercase;margin-bottom:5px">Current Password</div>
-              <input class="ainput" id="cp-current" type="password" placeholder="current password" style="width:100%" autocomplete="current-password"/>
-            </div>
-            <div>
-              <div style="font-family:var(--f-mono);font-size:8px;letter-spacing:0.14em;color:var(--smoke4);text-transform:uppercase;margin-bottom:5px">New Password</div>
-              <input class="ainput" id="cp-new" type="password" placeholder="min 6 characters" style="width:100%" autocomplete="new-password"/>
-            </div>
-          </div>
-          <div style="display:flex;align-items:center;gap:10px">
-            <button class="asave" id="cp-submit">Update Password</button>
-            <div class="afb" id="cp-fb"></div>
-          </div>
-        </div>
+
 
       </div>`;
 
@@ -10064,6 +10073,73 @@ async function changeOwnPassword() {
       if (fb) { fb.className='afb ok'; fb.textContent='\u2713 Password updated'; }
       if ($('cp-current')) $('cp-current').value = '';
       if ($('cp-new'))     $('cp-new').value     = '';
+    } else {
+      if (fb) { fb.className='afb err'; fb.textContent = data.error || 'Update failed'; }
+    }
+  } catch (e) {
+    if (fb) { fb.className='afb err'; fb.textContent = e.message; }
+  }
+  if (btn) { btn.disabled = false; btn.textContent = 'Update Password'; }
+}
+
+function openChangePasswordModal() {
+  const isLegacy = sessionStorage.getItem('caci_role') === 'admin' && !sessionStorage.getItem('caci_username');
+  const modal = $('chpw-modal');
+  if (!modal) return;
+  // Clear fields and feedback
+  if ($('chpw-current')) $('chpw-current').value = '';
+  if ($('chpw-new'))     $('chpw-new').value     = '';
+  const fb = $('chpw-fb');
+  if (fb) { fb.className = 'afb'; fb.textContent = ''; }
+
+  if (isLegacy) {
+    if (fb) { fb.className = 'afb err'; fb.textContent = 'Not available for legacy sessions'; }
+    modal.style.display = 'flex';
+    return;
+  }
+  modal.style.display = 'flex';
+  setTimeout(() => $('chpw-current')?.focus(), 80);
+
+  // Wire submit/cancel once
+  const submitBtn = $('chpw-submit');
+  const cancelBtn = $('chpw-cancel');
+  if (submitBtn && !submitBtn._chpwWired) {
+    submitBtn._chpwWired = true;
+    submitBtn.addEventListener('click', submitChangePasswordModal);
+  }
+  if (cancelBtn && !cancelBtn._chpwWired) {
+    cancelBtn._chpwWired = true;
+    cancelBtn.addEventListener('click', () => { $('chpw-modal').style.display = 'none'; });
+  }
+  // Click backdrop to close
+  modal._chpwClose = (e) => { if (e.target === modal) modal.style.display = 'none'; };
+  modal.addEventListener('click', modal._chpwClose);
+}
+
+async function submitChangePasswordModal() {
+  const current = ($('chpw-current')?.value || '').trim();
+  const newPw   = ($('chpw-new')?.value     || '').trim();
+  const fb      = $('chpw-fb');
+  const btn     = $('chpw-submit');
+
+  if (!current || !newPw) { if (fb) { fb.className='afb err'; fb.textContent='Both fields required'; } return; }
+  if (newPw.length < 6)   { if (fb) { fb.className='afb err'; fb.textContent='Min 6 characters'; } return; }
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Updating\u2026'; }
+  if (fb)  { fb.className = 'afb'; fb.textContent = ''; }
+
+  try {
+    const res  = await apiFetch('/users/me/password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ currentPassword: current, newPassword: newPw }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      if (fb) { fb.className='afb ok'; fb.textContent='\u2713 Password updated'; }
+      if ($('chpw-current')) $('chpw-current').value = '';
+      if ($('chpw-new'))     $('chpw-new').value     = '';
+      setTimeout(() => { $('chpw-modal').style.display = 'none'; }, 1200);
     } else {
       if (fb) { fb.className='afb err'; fb.textContent = data.error || 'Update failed'; }
     }
