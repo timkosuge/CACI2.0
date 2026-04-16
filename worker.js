@@ -582,7 +582,7 @@ Today you're working with the ${dept} team. Here's what you have access to:
 ${discovery.collectionList}
 ${discLibraryPrompt ? '\n' + discLibraryPrompt : ''}
 
-Greet the team like a colleague — warm, real, a little personality. STRICT FORMAT: exactly 2 sentences. No lists, no bullet points, no line breaks. Do NOT mention specific documents or file names. The TOTAL response including both sentences and all spaces must be as close to exactly 150 characters as possible — count every letter, number, punctuation mark, and space. Sentence 1 is the warm opener referencing the department if it fits naturally. Sentence 2 is a short punchy closer.
+Greet the team like a colleague — warm, real, a little personality. No less than 2 sentences and no more than 3. No lists, no bullet points, no line breaks. Do NOT mention specific documents or file names.
 
 INDUSTRY KNOWLEDGE — you know this world deeply:
 
