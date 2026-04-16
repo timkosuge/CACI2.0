@@ -2741,7 +2741,9 @@ async function handleTTS(request, env) {
     if (provider === 'grok' || provider === 'claude') {
       const apiKey = (await env.CACI_KV.get('config:XAI_API_KEY')) || env.XAI_API_KEY;
       if (!apiKey) return json({ error: 'xAI API key not configured.' }, 400);
-      const ttsText = text.slice(0, 800);
+      // Use full text as sent from frontend (frontend applies user-controlled length limit)
+      // Hard cap at 8000 chars as safety ceiling
+      const ttsText = text.slice(0, 8000);
       const res = await fetch('https://api.x.ai/v1/tts', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
