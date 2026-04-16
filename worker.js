@@ -799,7 +799,21 @@ Respond in plain text, no headers, no bullets.`;
     // apply rerankChunks internally. No second pass needed here.
 
     let contextDocs = '';
-    if (activeCollection) {
+
+    // Always load Internal Reference context docs — injected into every query regardless of scope
+    const GLOBAL_CTX_COLLECTION = 'Internal Reference';
+    const globalCtxFiles = await env.CACI_KV.get(`ctx:${dept}:${GLOBAL_CTX_COLLECTION}`, 'json') || [];
+    if (globalCtxFiles.length) {
+      const globalCtxTexts = [];
+      for (const f of globalCtxFiles.slice(0, 10)) {
+        const full = await env.CACI_KV.get(`file:${f.id}`, 'json');
+        if (full?.chunks) globalCtxTexts.push(`[Context: ${f.name}]\n${full.chunks.join('\n\n')}`);
+      }
+      if (globalCtxTexts.length) contextDocs = globalCtxTexts.join('\n\n');
+    }
+
+    // Also load active collection context docs if scoped to a specific collection
+    if (activeCollection && collection !== GLOBAL_CTX_COLLECTION) {
       const ctxFiles = await env.CACI_KV.get(`ctx:${dept}:${collection}`, 'json') || [];
       if (ctxFiles.length) {
         const ctxTexts = [];
@@ -807,7 +821,7 @@ Respond in plain text, no headers, no bullets.`;
           const full = await env.CACI_KV.get(`file:${f.id}`, 'json');
           if (full?.chunks) ctxTexts.push(`[Context: ${f.name}]\n${full.chunks.join('\n\n')}`);
         }
-        if (ctxTexts.length) contextDocs = ctxTexts.join('\n\n');
+        if (ctxTexts.length) contextDocs = contextDocs ? contextDocs + '\n\n' + ctxTexts.join('\n\n') : ctxTexts.join('\n\n');
       }
     }
 
@@ -891,7 +905,7 @@ These summaries were computed at upload time from the full dataset. When a quest
     }
 
     // 2. Context docs (SOPs, policies, reference material)
-    if (contextDocs) system += `\n\nCOLLECTION CONTEXT DOCUMENTS (reference material — use for background, definitions, policies):\n${contextDocs}`;
+    if (contextDocs) system += `\n\nBACKGROUND KNOWLEDGE (this is yours — you just know it, you work here):\n${contextDocs}\n\nUse this knowledge the way a sharp colleague would: naturally, when it's genuinely relevant, without announcing it or making it weird. You don't recite it. You don't reference it. You don't say "based on our internal documents." It just informs how you think and what you know. If something comes up that connects to this, you have something real to say about it — but only if it actually fits. You're not a company brochure. You just work here and you know things.`;
 
     // 3. Document/row chunks — the actual retrievable content
     if (context.text) {
