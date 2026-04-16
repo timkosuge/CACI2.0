@@ -3835,6 +3835,69 @@ body::before {
     0 1px 0 rgba(245,227,152,0.08);
 }
 .ainput::placeholder { color: var(--smoke4); }
+/* Custom select wrapper — replaces native select popup */
+.csel-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+}
+.csel-wrap select {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  z-index: 2;
+}
+.csel-display {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 13px;
+  background: linear-gradient(180deg, rgba(2,4,10,1) 0%, rgba(5,8,16,1) 100%);
+  border: 1px solid rgba(212,168,50,0.28);
+  border-top-color: rgba(0,0,0,0.90);
+  border-bottom-color: rgba(212,168,50,0.20);
+  border-radius: var(--r);
+  color: var(--smoke);
+  font-family: var(--f-mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  box-shadow:
+    inset 0 3px 10px rgba(0,0,0,0.80),
+    inset 0 1px 4px rgba(0,0,0,0.70),
+    inset 2px 0 4px rgba(0,0,0,0.40),
+    inset -2px 0 4px rgba(0,0,0,0.40),
+    0 1px 0 rgba(245,227,152,0.08);
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+.csel-display::after {
+  content: '';
+  display: block;
+  flex-shrink: 0;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid rgba(212,168,50,0.55);
+  margin-left: 6px;
+}
+.csel-wrap:focus-within .csel-display {
+  border-color: rgba(212,168,50,0.55);
+  box-shadow:
+    inset 0 2px 6px rgba(0,0,0,0.55),
+    inset 0 1px 3px rgba(0,0,0,0.40),
+    0 0 0 2px rgba(212,168,50,0.12),
+    0 0 12px rgba(212,168,50,0.08);
+}
 .ainput:focus {
   border-color: rgba(212,168,50,0.55);
   box-shadow:
@@ -5718,18 +5781,8 @@ body::before {
             <div class="arow" style="margin-top:6px"><input class="ainput" type="password" id="xai-key" placeholder="xai-..." autocomplete="off"/><button class="asave" id="xai-save">Save Key</button></div>
             <div class="afb" id="xai-fb"></div>
             <div class="arow" style="margin-top:14px;flex-wrap:wrap;gap:8px">
-              <select class="ainput" id="tts-provider" style="flex:1">
-                <option value="grok">Grok (xAI) &mdash; Best quality</option>
-                <option value="cloudflare">Cloudflare &mdash; Deepgram Aura 2</option>
-                <option value="ollama" disabled>Ollama (Local) &mdash; Coming soon</option>
-              </select>
-              <select class="ainput" id="tts-grok-voice" style="flex:0 0 140px">
-                <option value="eve">Eve &mdash; Expressive</option>
-                <option value="ara">Ara &mdash; Warm</option>
-                <option value="sal">Sal &mdash; Clear</option>
-                <option value="leo">Leo &mdash; Deep</option>
-                <option value="rex">Rex &mdash; Authoritative</option>
-              </select>
+              <div class="csel-wrap" style="flex:1"><select class="ainput" id="tts-provider"><option value="grok">Grok (xAI) — Best quality</option><option value="cloudflare">Cloudflare — Deepgram Aura 2</option><option value="ollama" disabled>Ollama (Local) — Coming soon</option></select><div class="csel-display" id="tts-provider-display">Grok (xAI) — Best quality</div></div>
+              <div class="csel-wrap" style="flex:0 0 140px"><select class="ainput" id="tts-grok-voice"><option value="eve">Eve — Expressive</option><option value="ara">Ara — Warm</option><option value="sal">Sal — Clear</option><option value="leo">Leo — Deep</option><option value="rex">Rex — Authoritative</option></select><div class="csel-display" id="tts-grok-voice-display">Eve — Expressive</div></div>
             </div>
             <div class="arow" style="margin-top:8px;align-items:center;gap:12px">
               <label style="display:flex;align-items:center;gap:6px;font-family:var(--f-mono);font-size:10px;color:var(--smoke3);letter-spacing:.06em;cursor:pointer">
@@ -5739,13 +5792,7 @@ body::before {
             </div>
             <div class="arow" style="margin-top:12px;align-items:center;gap:12px;flex-wrap:wrap">
               <label style="font-family:var(--f-mono);font-size:10px;color:var(--smoke3);letter-spacing:.06em;white-space:nowrap">Response Length</label>
-              <select class="ainput" id="tts-length" style="flex:1;min-width:160px">
-                <option value="800">Short &mdash; ~10 seconds</option>
-                <option value="1500">Medium &mdash; ~20 seconds</option>
-                <option value="3000" selected>Standard &mdash; ~40 seconds</option>
-                <option value="5000">Long &mdash; ~60 seconds</option>
-                <option value="8000">Full &mdash; No limit</option>
-              </select>
+              <div class="csel-wrap" style="flex:1;min-width:160px"><select class="ainput" id="tts-length"><option value="800">Short — ~10 seconds</option><option value="1500">Medium — ~20 seconds</option><option value="3000" selected>Standard — ~40 seconds</option><option value="5000">Long — ~60 seconds</option><option value="8000">Full — No limit</option></select><div class="csel-display" id="tts-length-display">Standard — ~40 seconds</div></div>
             </div>
           </div>
         </div>
@@ -5862,7 +5909,7 @@ body::before {
             Record of uploads, deletions, user creation, config changes, and weight updates. Last 90 days.
           </div>
           <div style="margin-bottom:10px;display:flex;gap:8px;align-items:center">
-            <select class="ainput" id="audit-dept-select" style="width:160px;cursor:pointer"></select>
+            <div class="csel-wrap" style="width:160px"><select class="ainput" id="audit-dept-select"></select><div class="csel-display" id="audit-dept-display">Global</div></div>
             <button class="asave" id="audit-refresh-btn" style="padding:8px 16px">Refresh</button>
           </div>
           <div id="audit-wrap"><div class="tune-empty">Loading...</div></div>
@@ -9734,6 +9781,8 @@ function initVoiceSettings() {
   // Test button
   const testBtn = $('gtts-test');
   if (testBtn) testBtn.addEventListener('click', () => speakText(testBtn, 'CACI Intelligence Platform ready. Voice output is working correctly.'));
+
+  initCustomSelects();
 }
 
 
@@ -10549,6 +10598,29 @@ const AUDIT_ACTION_LABELS = {
   'config.save':       '⚙ Save Config',
 };
 
+/* ── Custom select display sync ─────────────────────────── */
+function syncCsel(selId, displayId) {
+  const sel = $(selId);
+  const disp = $(displayId);
+  if (!sel || !disp) return;
+  const update = () => {
+    const opt = sel.options[sel.selectedIndex];
+    if (opt) {
+      // Show text up to the em-dash for brevity in narrow selects
+      disp.textContent = opt.textContent;
+    }
+  };
+  update();
+  sel.addEventListener('change', update);
+}
+
+function initCustomSelects() {
+  syncCsel('tts-provider',    'tts-provider-display');
+  syncCsel('tts-grok-voice',  'tts-grok-voice-display');
+  syncCsel('tts-length',      'tts-length-display');
+  syncCsel('audit-dept-select', 'audit-dept-display');
+}
+
 async function loadAuditLog() {
   const wrap = $('audit-wrap');
   if (!wrap) return;
@@ -10567,6 +10639,7 @@ async function loadAuditLog() {
   if (deptSel) {
     deptSel.value = dept;
     deptSel.addEventListener('change', loadAuditLog);
+    syncCsel('audit-dept-select', 'audit-dept-display');
   }
 
   const auditDept = deptSel ? deptSel.value : dept;
