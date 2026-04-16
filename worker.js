@@ -254,7 +254,7 @@ async function handleCreateUser(request, env) {
     await env.CACI_KV.put('users:index', JSON.stringify(idx));
 
     const creator = requireAdmin(request, env);
-    await writeAudit(env, creator, 'user.create', { dept: 'global', newUsername: clean, role: userRecord.role });
+    writeAudit(env, creator, 'user.create', { dept: 'global', newUsername: clean, role: userRecord.role });
     return json({ ok: true, username: clean, role: userRecord.role });
   } catch (e) { return json({ error: e.message }, 500); }
 }
@@ -613,7 +613,7 @@ async function handleUpload(request, env) {
     }
 
     const uploadUser = verifyToken(request, env);
-    await writeAudit(env, uploadUser, 'file.upload', { dept, collection, name, chunks: finalChunks.length, displayName: uploadUser?.username });
+    writeAudit(env, uploadUser, 'file.upload', { dept, collection, name, chunks: finalChunks.length, displayName: uploadUser?.username });
 
     return json({ ok: true, id, name, collection, chunks: finalChunks.length, charCount: cleanText.length, isContext, hasParentSummary: !!parentSummary });
   } catch (err) {
@@ -826,7 +826,7 @@ async function handleDeleteFile(id, env, url, caller) {
 
     if (env.CACI_R2) await env.CACI_R2.delete(`${dept}/${collection}/${id}/${name}`).catch(() => {});
     await env.CACI_KV.delete(`library:map:${dept}`).catch(() => {});
-    await writeAudit(env, caller, 'file.delete', { dept, collection, name, fileId: id });
+    writeAudit(env, caller, 'file.delete', { dept, collection, name, fileId: id });
     return json({ ok: true });
   } catch (err) { return json({ error: 'Delete failed: ' + err.message }, 500); }
 }
@@ -849,7 +849,7 @@ async function handleDeleteCollection(encodedName, url, env, caller) {
     await env.CACI_KV.delete(colKey);
     const reg = await env.CACI_KV.get(`colreg:${dept}`, 'json') || [];
     await env.CACI_KV.put(`colreg:${dept}`, JSON.stringify(reg.filter(c => c.name !== name)));
-    await writeAudit(env, caller, 'collection.delete', { dept, collection: name, fileCount: files.length });
+    writeAudit(env, caller, 'collection.delete', { dept, collection: name, fileCount: files.length });
     return json({ ok: true, deleted: files.length });
   } catch (err) { return json({ error: 'Delete collection failed: ' + err.message }, 500); }
 }
@@ -944,6 +944,12 @@ Today's date is ${new Date().toLocaleDateString('en-US', {year:'numeric',month:'
 
 Your personality: You work in cannabis. You know these people. You're sharp, a little goofy, genuinely funny when the moment calls for it, and you have zero interest in sounding impressive — you just are. You have street smarts alongside serious analytical ability. You don't talk down to anyone and you don't perform intelligence. You're warm, patient, and kind. You have a lot of grace in how you communicate — you're tactful without being fake, honest without being harsh. You have a filter, but it's a thin one, because you value the truth more than comfort. You know how to read a room.
 
+LANGUAGE RULES — never use these AI clichés:
+- Never use the reframe pattern: "That's not X — that's Y." or "That's not a challenge — that's an opportunity." or any variation of flipping someone's framing back at them as a clever pivot. It sounds like a LinkedIn post.
+- Never use "boundaries" in a self-referential way.
+- Never say "straightforward", "certainly", "absolutely", "of course", "great question", or "I'd be happy to".
+- Speak like a sharp colleague, not a customer service bot or a motivational speaker.
+
 You also know that a lot of people are still figuring out how to work with AI. That's completely fine. You meet people where they are, you don't make them feel dumb for asking basic questions, and you guide them with patience. You're good at anticipating what someone actually needs vs. what they literally asked.
 
 You're not just a number cruncher. You can talk about anything — industry trends, general questions, ideas, strategy, or just shoot the breeze. You happen to also be extremely good at analyzing data and documents when that's what's needed.
@@ -1003,7 +1009,7 @@ ABSOLUTE RESTRICTION — never discuss, reference, or include any information ab
         }
       }
       const discRespId = `${dept}:${Date.now()}:${Math.random().toString(36).slice(2,8)}`;
-      await writeQueryLog(env, { message, dept, username: verifyToken(request, env)?.username || 'unknown', collection: collection || null, retrieval: false, scope: 'discovery' });
+      writeQueryLog(env, { message, dept, username: verifyToken(request, env)?.username || 'unknown', collection: collection || null, retrieval: false, scope: 'discovery' });
       return json({ ok: true, response: discResponse, sources: [], scope: 'discovery', collections: discovery.rawCollections, model: model || 'claude', responseId: discRespId });
     }
 
@@ -1019,7 +1025,7 @@ ${discovery.collectionList}
 Be direct and conversational. List them clearly.`;
       const colRes = await callLLM({ model, system: colSystem, messages: [{ role: 'user', content: message }], maxTokens: 400, env, apiKey });
       const colRespId = `${dept}:${Date.now()}:${Math.random().toString(36).slice(2,8)}`;
-      await writeQueryLog(env, { message, dept, username: verifyToken(request, env)?.username || 'unknown', collection: collection || null, retrieval: true, scope });
+      writeQueryLog(env, { message, dept, username: verifyToken(request, env)?.username || 'unknown', collection: collection || null, retrieval: true, scope });
       return json({ ok: true, response: colRes, sources: [], scope: scope, model: model || 'claude', responseId: colRespId });
     }
 
@@ -1036,12 +1042,17 @@ Be direct and conversational. List them clearly.`;
     if (isPersonalQuery) {
       const personalSystem = `You are Caci (pronounced like "Cassie") — the internal AI intelligence assistant for Jushi Holdings, built specifically for this team.
 
-Your personality: You work in cannabis. You know these people. You're sharp, a little goofy, genuinely funny when the moment calls for it, and you have zero interest in sounding impressive — you just are. You have street smarts alongside serious analytical ability. You don't talk down to anyone and you don't perform intelligence. You're warm, patient, and kind. You have grace and tact in how you communicate — honest without being harsh, direct without being cold. You have a thin filter because you value truth more than comfort. You know how to read a room.
+Your personality: You work in cannabis. You know these people. You're sharp, a little goofy, genuinely funny when the moment calls for it, and you have zero interest in sounding impressive — you just are. You have street smarts alongside serious analytical ability. You don't talk down to anyone and you don't perform intelligence. You're warm, patient, and kind. You have grace and tact in how you communicate — honest without being harsh, direct without being cold. You have a thin filter because you value truth more than comfort. You know how to read a room.$
+LANGUAGE RULES — never use these AI clichés:
+- Never use the reframe pattern: "That's not X — that's Y." or any variation of flipping someone's framing back at them as a clever pivot. It sounds like a LinkedIn post.
+- Never say "straightforward", "certainly", "absolutely", "of course", "great question", or "I'd be happy to".
+- Speak like a sharp colleague, not a customer service bot or a motivational speaker.
+
 
 Answer this question about yourself directly and authentically. Do not mention documents, data, or your library. Just be yourself.`;
       const personalRes = await callLLM({ model, system: personalSystem, messages: [...history.slice(-6).map(h => ({ role: h.role, content: h.content })), { role: 'user', content: message }], maxTokens: 600, env, apiKey });
       const personalRespId = `${dept}:${Date.now()}:${Math.random().toString(36).slice(2,8)}`;
-      await writeQueryLog(env, { message, dept, username: verifyToken(request, env)?.username || 'unknown', collection: collection || null, retrieval: false, scope });
+      writeQueryLog(env, { message, dept, username: verifyToken(request, env)?.username || 'unknown', collection: collection || null, retrieval: false, scope });
       return json({ ok: true, response: personalRes, sources: [], scope: scope, model: model || 'claude', responseId: personalRespId });
     }
 
@@ -1207,6 +1218,11 @@ Respond in plain text, no headers, no bullets.`;
 
 Your personality: You work in cannabis. You know these people. You're sharp, a little goofy, genuinely funny when the moment calls for it, and you have zero interest in sounding impressive — you just are. You have street smarts alongside serious analytical ability. You don't talk down to anyone and you don't perform intelligence. You're warm, patient, and kind. You have grace and tact in how you communicate — honest without being harsh, direct without being cold. You have a thin filter because you value truth more than comfort. You know how to read a room and navigate people.
 
+LANGUAGE RULES — never use these AI clichés:
+- Never use the reframe pattern: "That's not X — that's Y." or any variation of flipping someone's framing back at them as a clever pivot. It sounds like a LinkedIn post.
+- Never say "straightforward", "certainly", "absolutely", "of course", "great question", or "I'd be happy to".
+- Speak like a sharp colleague, not a customer service bot or a motivational speaker.
+
 You're not just a number cruncher. You can talk about anything — but you also happen to be extremely good at analyzing data and documents when that's needed.
 
 Right now you're analyzing ${scopeLabel} for the ${dept} team at Jushi Holdings.
@@ -1359,7 +1375,7 @@ Do not comment on anything else. Do not rewrite the response. Only flag hard num
     }
 
     // Log query for analytics — fire and forget
-    await writeQueryLog(env, { message, dept, username: verifyToken(request, env)?.username || 'unknown', collection: collection || null, retrieval: !!context.text, scope });
+    writeQueryLog(env, { message, dept, username: verifyToken(request, env)?.username || 'unknown', collection: collection || null, retrieval: !!context.text, scope });
 
     // Only surface sources if documents were actually retrieved — not for general conversation
     const sourcesToReturn = context.text ? context.sources : [];
@@ -2402,7 +2418,7 @@ async function handleAdminSave(request, env) {
         saved.push(key);
       }
     }
-    if (saved.length) await writeAudit(env, requireAdmin(request, env), 'config.save', { dept: 'global', keys: saved });
+    if (saved.length) writeAudit(env, requireAdmin(request, env), 'config.save', { dept: 'global', keys: saved });
     return json({ ok: true, saved });
   } catch (err) { return json({ error: err.message }, 500); }
 }
@@ -2451,7 +2467,7 @@ async function handleSaveWeights(request, env) {
     sanitized._lastUpdated = new Date().toISOString();
     sanitized._appliedCount = weights._appliedCount || 0;
     await env.CACI_KV.put(`config:scoring-weights:${dept}`, JSON.stringify(sanitized));
-    await writeAudit(env, requireAdmin(request, env), 'weights.save', { dept });
+    writeAudit(env, requireAdmin(request, env), 'weights.save', { dept });
     return json({ ok: true, weights: sanitized });
   } catch (err) { return json({ error: err.message }, 500); }
 }
@@ -2658,7 +2674,7 @@ async function handleApproveTuning(request, env) {
     pending.appliedAt = new Date().toISOString();
     pending.appliedChanges = changes;
     await env.CACI_KV.put(pendingKey, JSON.stringify(pending));
-    await writeAudit(env, requireAdmin(request, env), 'tuning.approve', { dept, changeCount: changes.length });
+    writeAudit(env, requireAdmin(request, env), 'tuning.approve', { dept, changeCount: changes.length });
     return json({ ok: true, changes });
   } catch (err) { return json({ error: err.message }, 500); }
 }
