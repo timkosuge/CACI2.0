@@ -3110,6 +3110,9 @@ function hybridScore(keywordScore, semanticSim, keywordMax) {
 function chunkText(text, size = 1500) {
   if (!text || text.length === 0) return [];
 
+  // Short documents — store as single chunk, no splitting needed
+  if (text.length <= 2000) return [text.trim()];
+
   // Detect tabular format — preserve it as-is (already chunked by frontend)
   // These arrive with "---" separators between row batches
   if (text.includes('\n---\n') || text.includes('\nRow 1 —') || text.startsWith('FILE SUMMARY')) {
