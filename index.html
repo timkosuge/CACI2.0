@@ -448,56 +448,103 @@ body[data-theme="light"] #jushi-mark {
   filter: none;
 }
 
-/* AI response bubbles — the AI message bg was a dark panel. On light it
-   becomes a white card with a subtle border. */
+/* AI response bubbles — heather gray card with navy text and cyan accent.
+   Gives the chat its own visual language distinct from raw white cards:
+   the heather gray base feels grounded and warm, navy text is authoritative,
+   and the cyan left-edge accent signals "CACI" without shouting. */
 body[data-theme="light"] .msg.ai .msg-bubble {
-  background: #FFFFFF;
-  border: 1px solid rgba(30, 58, 95, 0.10);
+  background: linear-gradient(180deg, #D4D9E1 0%, #C7CEDA 100%);
+  border: 1px solid rgba(15, 23, 42, 0.14);
   color: #0F172A;
-  box-shadow: 0 1px 2px rgba(30, 58, 95, 0.04);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  position: relative;
 }
+/* Cyan left-edge accent — subtle vertical bar that marks this as an AI
+   response, echoing the gold accent in dark mode but in a color that
+   reads right on heather gray. */
 body[data-theme="light"] .msg.ai .msg-bubble::before {
-  /* The tiny gold accent marker at the top — becomes a steel blue */
-  background: linear-gradient(90deg, transparent, rgba(30, 58, 95, 0.25), transparent) !important;
+  background: linear-gradient(180deg,
+    transparent 0%,
+    rgba(8, 145, 178, 0.45) 20%,
+    rgba(6, 182, 212, 0.65) 50%,
+    rgba(8, 145, 178, 0.45) 80%,
+    transparent 100%
+  ) !important;
+  opacity: 1 !important;
+  width: 2px !important;
+  top: 12px !important;
+  bottom: 12px !important;
+  left: 0 !important;
+  right: auto !important;
+  height: auto !important;
 }
 body[data-theme="light"] .msg.ai .msg-bubble p,
 body[data-theme="light"] .msg.ai .msg-bubble li {
   color: #0F172A;
 }
 body[data-theme="light"] .msg.ai .msg-bubble h2,
-body[data-theme="light"] .msg.ai .msg-bubble h3,
+body[data-theme="light"] .msg.ai .msg-bubble h3 {
+  color: #1E3A5F !important;
+  font-weight: 500;
+}
 body[data-theme="light"] .msg.ai .msg-bubble strong {
   color: #0F172A !important;
+  font-weight: 600;
 }
 body[data-theme="light"] .msg.ai .msg-bubble em {
   color: #475569 !important;
 }
+/* Code inline — subtle darker heather with navy text */
 body[data-theme="light"] .msg.ai .msg-bubble code {
-  background: #F1F5F9;
-  color: #1E293B;
-  border: 1px solid rgba(30, 58, 95, 0.08);
+  background: rgba(15, 23, 42, 0.08);
+  color: #0F172A;
+  border: 1px solid rgba(15, 23, 42, 0.10);
 }
+/* Code blocks — slightly deeper than inline, with cyan-tinted border */
 body[data-theme="light"] .msg.ai .msg-bubble pre {
-  background: #F8FAFC;
-  border: 1px solid rgba(30, 58, 95, 0.10);
+  background: rgba(15, 23, 42, 0.06);
+  border: 1px solid rgba(8, 145, 178, 0.20);
 }
 body[data-theme="light"] .msg.ai .msg-bubble pre code {
   background: transparent;
-  color: #1E293B;
-}
-
-/* User message bubbles — gold accent becomes steel */
-body[data-theme="light"] .msg.user .msg-bubble {
-  background: rgba(30, 58, 95, 0.05);
-  border: 1px solid rgba(30, 58, 95, 0.14);
   color: #0F172A;
+  border: none;
+}
+/* Links inside messages — cyan for that "technical AI" feel */
+body[data-theme="light"] .msg.ai .msg-bubble a {
+  color: #0891B2;
+  text-decoration: underline;
+  text-decoration-color: rgba(8, 145, 178, 0.35);
+  text-underline-offset: 2px;
+}
+body[data-theme="light"] .msg.ai .msg-bubble a:hover {
+  color: #0E7490;
+  text-decoration-color: #0E7490;
 }
 
-/* Message avatars (YOU / CACI circles) */
+/* User message bubbles — deeper navy tint, visually distinct from the
+   heather gray AI bubble. Feels like "your side of the conversation." */
+body[data-theme="light"] .msg.user .msg-bubble {
+  background: linear-gradient(180deg, rgba(30, 58, 95, 0.12) 0%, rgba(30, 58, 95, 0.08) 100%);
+  border: 1px solid rgba(30, 58, 95, 0.18);
+  color: #0F172A;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+/* Message avatars (YOU / CACI circles) — heather gray base, navy text,
+   cyan ring accent on the CACI avatar to tie it to the AI bubble style. */
 body[data-theme="light"] .msg-av {
-  background: #FFFFFF;
-  border-color: rgba(30, 58, 95, 0.20);
+  background: linear-gradient(135deg, #D4D9E1 0%, #C7CEDA 100%);
+  border: 1px solid rgba(15, 23, 42, 0.18);
   color: #1E3A5F;
+}
+body[data-theme="light"] .msg.ai .msg-av {
+  border-color: rgba(8, 145, 178, 0.35);
+  box-shadow: 0 0 0 2px rgba(8, 145, 178, 0.08);
 }
 
 /* Scope/source small text under messages */
