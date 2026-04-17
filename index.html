@@ -11332,6 +11332,17 @@ const DemoMode = {
     // Reset all beats
     document.querySelectorAll('.demo-beat').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.demo-dot').forEach(d => { d.classList.remove('active'); d.classList.remove('done'); });
+    // Reset 3D beat objects
+    if (this.cinema && this.cinema.beatObjects) {
+      Object.values(this.cinema.beatObjects).forEach(entry => {
+        if (entry && entry.group) {
+          entry.group.visible = false;
+          entry._showStartTime = null;
+          entry._hideStartTime = null;
+        }
+      });
+    }
+    this._previousBeatId = undefined;
     this.stopParticles();
     this.stopPreshow();
     this.stopCinema();
@@ -11351,6 +11362,17 @@ const DemoMode = {
     // Reset beat state and progress dots
     document.querySelectorAll('.demo-beat').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.demo-dot').forEach(d => { d.classList.remove('active'); d.classList.remove('done'); });
+    // Reset 3D beat objects — hide all groups, clear tracker
+    if (this.cinema && this.cinema.beatObjects) {
+      Object.values(this.cinema.beatObjects).forEach(entry => {
+        if (entry && entry.group) {
+          entry.group.visible = false;
+          entry._showStartTime = null;
+          entry._hideStartTime = null;
+        }
+      });
+    }
+    this._previousBeatId = undefined;
     // Flip Beat 9's card back to front face for next show
     const flipper = document.getElementById('db9-card-flipper');
     if (flipper) flipper.classList.remove('flipped');
@@ -11436,6 +11458,28 @@ const DemoMode = {
     // No fade/reset — the eye follows the camera through the same space.
     if (this.cinema && this.cameraWaypoints[beat.id]) {
       this.setCameraTarget(beat.id, 0.025);
+    }
+
+    // ─── 3D beat-object reveal ───
+    // Hide the previous beat's 3D content; show this beat's.
+    // Also hide the DOM overlay for any beat that has a 3D replacement,
+    // so we don't show both at once.
+    const BEATS_WITH_3D = [1, 3, 4, 5, 7];
+    if (this.cinema) {
+      if (this._previousBeatId !== undefined && BEATS_WITH_3D.includes(this._previousBeatId)) {
+        this.hideBeatObjects(this._previousBeatId);
+      }
+      if (BEATS_WITH_3D.includes(beat.id)) {
+        this.showBeatObjects(beat.id);
+      }
+    }
+    // Track for next transition
+    this._previousBeatId = beat.id;
+
+    // If this beat has a 3D replacement, hide the DOM overlay for it
+    // (the 3D content IS the beat now)
+    if (beatEl && BEATS_WITH_3D.includes(beat.id) && this.cinema) {
+      beatEl.classList.remove('active');
     }
 
     // Prefetch the next TWO beats for zero-latency transitions
@@ -12048,12 +12092,12 @@ const DemoMode = {
     // beat id → { pos: [x,y,z], look: [x,y,z], fov: number }
     preshowStart: { pos: [0, 0, 8],    look: [0, 0, 0],    fov: 35 },  // zoomed in on core
     preshowEnd:   { pos: [0, 0, 320],  look: [0, 0, 0],    fov: 48 },  // full field
-    1: { pos: [-180, -40, 260],  look: [-20, -20, 0],   fov: 50 }, // angle down-left
-    3: { pos: [180, 60, 220],    look: [40, 20, 0],     fov: 50 }, // angle up-right
-    4: { pos: [0, 0, 140],       look: [0, 0, -60],     fov: 42 }, // diving in
-    5: { pos: [-40, 20, 40],     look: [40, 0, -40],    fov: 65 }, // INSIDE the cloud
+    1: { pos: [-180, -40, 260],  look: [-20, -20, 0],   fov: 50 }, // angle down-left — drifting docs in view
+    3: { pos: [0, 40, 280],      look: [0, 0, -10],     fov: 52 }, // pulled back — all 3 clusters visible
+    4: { pos: [60, 20, 180],     look: [0, 0, 40],      fov: 44 }, // diving toward Finance cluster
+    5: { pos: [-6, 4, 52],       look: [20, 0, 40],     fov: 68 }, // INSIDE the Finance cluster
     6: { pos: [160, -80, 280],   look: [0, -40, 0],     fov: 48 }, // pulled back low
-    7: { pos: [-120, 120, 260],  look: [0, 40, 0],      fov: 50 }, // high angle
+    7: { pos: [0, 0, 260],       look: [0, 0, 0],       fov: 50 }, // framing the 4 orbs
     8: { pos: [0, 0, 420],       look: [0, 0, 0],       fov: 38 }, // pulled way back — the grand view
     9: { pos: [0, 0, 180],       look: [0, 0, 0],       fov: 40 }, // settle center for the card reveal
   },
@@ -12195,9 +12239,343 @@ const DemoMode = {
     this.cinema = {
       THREE, scene, camera, renderer, points, material, camState,
       resize, running: false, raf: null, t0: performance.now(),
+      beatObjects: {},   // map of beatId → group of 3D objects for that beat
     };
     this.cinema.resizeHandler = resize;
+    this.buildBeatObjects();
     return this.cinema;
+  },
+
+  // ═══════════════════════════════════════════════════════════════
+  // BEAT OBJECTS — 3D content that lives inside the cinema scene.
+  // Replaces the old DOM overlay "slides." Each chorus beat gets a
+  // group of 3D objects that fade in/out as the camera/beat changes.
+  //
+  // All objects start with opacity 0 and are revealed when DemoMode.showBeatObjects(beatId)
+  // is called. Hidden again via hideBeatObjects(beatId).
+  //
+  // Coordinate system: particles live in an ellipsoid around origin,
+  // roughly ±240 units xy, ±300 z. Beat objects are placed within this volume.
+  // ═══════════════════════════════════════════════════════════════
+
+  buildBeatObjects() {
+    const C = this.cinema;
+    if (!C) return;
+    const THREE = C.THREE;
+
+    // ─── BEAT 1: Document silhouettes drifting through the volume ───
+    // ~36 thin rectangles at varying depths. Camera glides past them so they
+    // feel like documents scattered through space — the "answer is buried
+    // in thousands of pages" visualization.
+    const beat1Group = new THREE.Group();
+    beat1Group.visible = false;
+    const DOC_COUNT = 36;
+    const docGeom = new THREE.PlaneGeometry(26, 34, 1, 1);  // letter-ish aspect ratio
+    const docMaterial = new THREE.ShaderMaterial({
+      uniforms: { uOpacity: { value: 0 }, uTime: { value: 0 } },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying vec2 vUv;
+        uniform float uOpacity;
+        void main() {
+          // Soft page edges with faint horizontal "text lines"
+          float edge = smoothstep(0.0, 0.04, vUv.x) * smoothstep(1.0, 0.96, vUv.x)
+                     * smoothstep(0.0, 0.03, vUv.y) * smoothstep(1.0, 0.97, vUv.y);
+          // Six faint lines suggesting text
+          float lines = 0.0;
+          for (int i = 0; i < 6; i++) {
+            float y = 0.15 + float(i) * 0.14;
+            float band = smoothstep(0.008, 0.0, abs(vUv.y - y));
+            lines += band * smoothstep(0.12, 0.88, vUv.x) * 0.18;
+          }
+          vec3 paper = vec3(0.96, 0.86, 0.50) * 0.12;
+          vec3 ink = vec3(0.95, 0.82, 0.42);
+          vec3 col = paper + ink * lines;
+          gl_FragColor = vec4(col, uOpacity * edge * 0.7);
+        }
+      `,
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const beat1Docs = [];
+    for (let i = 0; i < DOC_COUNT; i++) {
+      const mesh = new THREE.Mesh(docGeom, docMaterial);
+      // Scatter through volume — biased forward (closer to camera) so some
+      // feel immediate and others recede into depth
+      mesh.position.x = (Math.random() - 0.5) * 380;
+      mesh.position.y = (Math.random() - 0.5) * 240;
+      mesh.position.z = (Math.random() - 0.5) * 400;
+      // Random rotation — documents floating at varying angles
+      mesh.rotation.x = (Math.random() - 0.5) * 0.6;
+      mesh.rotation.y = (Math.random() - 0.5) * 1.2;
+      mesh.rotation.z = (Math.random() - 0.5) * 0.4;
+      // Each doc gets a gentle drift velocity
+      mesh.userData.drift = {
+        vx: (Math.random() - 0.5) * 0.08,
+        vy: (Math.random() - 0.5) * 0.05,
+        vz: (Math.random() - 0.5) * 0.06,
+        rotSpeed: (Math.random() - 0.5) * 0.0008,
+      };
+      beat1Group.add(mesh);
+      beat1Docs.push(mesh);
+    }
+    C.scene.add(beat1Group);
+    C.beatObjects[1] = { group: beat1Group, docs: beat1Docs, material: docMaterial };
+
+    // ─── BEAT 3: Three orbital clusters (Compliance, Finance, Operations) ───
+    // Documents from beat 1 conceptually "get organized" — we show 3 rotating
+    // spherical clusters in distinct positions, each with a floating label.
+    const beat3Group = new THREE.Group();
+    beat3Group.visible = false;
+    const clusterPositions = [
+      { name: 'Compliance',  pos: [-160,  40, -40], color: [0.95, 0.82, 0.45] },
+      { name: 'Finance',     pos: [  0,   0,  40], color: [0.95, 0.78, 0.50] },
+      { name: 'Operations',  pos: [160, -30, -60], color: [0.90, 0.75, 0.40] },
+    ];
+    const clusters = [];
+    clusterPositions.forEach((cp) => {
+      const clusterGroup = new THREE.Group();
+      clusterGroup.position.set(...cp.pos);
+
+      // Each cluster = 24 small docs orbiting a central point
+      const CLUSTER_DOCS = 24;
+      const clusterDocs = [];
+      const cDocGeom = new THREE.PlaneGeometry(10, 14, 1, 1);
+      for (let i = 0; i < CLUSTER_DOCS; i++) {
+        const mesh = new THREE.Mesh(cDocGeom, docMaterial);
+        const r = 28 + Math.random() * 14;
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(2 * Math.random() - 1);
+        mesh.position.set(
+          r * Math.sin(phi) * Math.cos(theta),
+          r * Math.sin(phi) * Math.sin(theta),
+          r * Math.cos(phi)
+        );
+        mesh.rotation.set(
+          Math.random() * Math.PI,
+          Math.random() * Math.PI,
+          Math.random() * Math.PI * 0.3
+        );
+        mesh.userData.orbit = {
+          radius: r,
+          theta,
+          phi,
+          speed: 0.15 + Math.random() * 0.2,
+        };
+        clusterGroup.add(mesh);
+        clusterDocs.push(mesh);
+      }
+
+      // Floating label via canvas texture — real 3D plane with rendered text
+      const labelCanvas = document.createElement('canvas');
+      labelCanvas.width = 512; labelCanvas.height = 128;
+      const lctx = labelCanvas.getContext('2d');
+      lctx.fillStyle = 'rgba(0,0,0,0)';
+      lctx.fillRect(0, 0, 512, 128);
+      lctx.font = '300 56px "Cormorant Garamond", serif';
+      lctx.textAlign = 'center';
+      lctx.textBaseline = 'middle';
+      // Gold gradient fill
+      const grad = lctx.createLinearGradient(0, 0, 0, 128);
+      grad.addColorStop(0.0, '#fff4cc');
+      grad.addColorStop(0.4, '#f5e398');
+      grad.addColorStop(0.7, '#e8c84a');
+      grad.addColorStop(1.0, '#c9a832');
+      lctx.fillStyle = grad;
+      lctx.shadowColor = 'rgba(212,168,50,0.5)';
+      lctx.shadowBlur = 18;
+      lctx.fillText(cp.name.toUpperCase(), 256, 64);
+      lctx.shadowBlur = 0;
+      const labelTex = new THREE.CanvasTexture(labelCanvas);
+      labelTex.needsUpdate = true;
+      const labelMat = new THREE.MeshBasicMaterial({
+        map: labelTex,
+        transparent: true,
+        depthWrite: false,
+        opacity: 0,
+      });
+      const labelGeom = new THREE.PlaneGeometry(80, 20);
+      const label = new THREE.Mesh(labelGeom, labelMat);
+      label.position.set(0, 60, 0);  // above the cluster
+      // Label always faces camera — we'll update this in the render loop
+      label.userData.billboard = true;
+      clusterGroup.add(label);
+
+      beat3Group.add(clusterGroup);
+      clusters.push({ group: clusterGroup, docs: clusterDocs, label, labelMat, name: cp.name });
+    });
+    C.scene.add(beat3Group);
+    C.beatObjects[3] = { group: beat3Group, clusters };
+
+    // ─── BEAT 4: A light-trace line connecting documents in one cluster ───
+    // Highlights the "retrieval" — camera dives into a cluster and a glowing
+    // gold line traces from doc to doc to doc as if following an answer path.
+    const beat4Group = new THREE.Group();
+    beat4Group.visible = false;
+    // We'll build the line geometry dynamically when the beat starts,
+    // because we want it to originate in the Finance cluster center
+    C.beatObjects[4] = { group: beat4Group, line: null, traceStart: 0 };
+    C.scene.add(beat4Group);
+
+    // ─── BEAT 5: Connection threads within the cluster (visible from inside) ───
+    // Camera is INSIDE the cluster — thin threads connect nearby docs like
+    // a living web. Reuses geometry from beat 3's Finance cluster.
+    const beat5Group = new THREE.Group();
+    beat5Group.visible = false;
+    C.beatObjects[5] = { group: beat5Group, lines: [] };
+    C.scene.add(beat5Group);
+    // We'll build threads when beat 5 actually shows — they depend on beat 3's cluster positions
+
+    // ─── BEAT 7: Four guarantee orbs pulsing in sequence ───
+    // Four small bright orbs at cardinal points around origin — each pulses
+    // as she names a guarantee (sources, logging, infrastructure, no-training).
+    const beat7Group = new THREE.Group();
+    beat7Group.visible = false;
+    const orbPositions = [
+      { pos: [-120, 60, 0],  label: 'SOURCES' },
+      { pos: [ 120, 60, 0],  label: 'LOGGED' },
+      { pos: [-120, -60, 0], label: 'OURS' },
+      { pos: [ 120, -60, 0], label: 'NO TRAINING' },
+    ];
+    const orbs = [];
+    orbPositions.forEach((op) => {
+      const sphereGeom = new THREE.SphereGeometry(14, 24, 16);
+      const orbMat = new THREE.MeshBasicMaterial({
+        color: 0xf5e398,
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+      });
+      const orb = new THREE.Mesh(sphereGeom, orbMat);
+      orb.position.set(...op.pos);
+      orb.userData.pulsing = false;
+      beat7Group.add(orb);
+      orbs.push({ mesh: orb, material: orbMat, position: op.pos, label: op.label });
+    });
+    C.scene.add(beat7Group);
+    C.beatObjects[7] = { group: beat7Group, orbs, pulseSequenceStart: 0 };
+  },
+
+  // Fade in the 3D objects for a given beat. Tweens uOpacity (for shader
+  // materials) and material.opacity (for basic materials) from 0 to 1.
+  showBeatObjects(beatId) {
+    const C = this.cinema;
+    if (!C) return;
+    const entry = C.beatObjects[beatId];
+    if (!entry) return;
+    entry.group.visible = true;
+    entry._showStartTime = performance.now();
+
+    // Special setup per beat
+    if (beatId === 4) this._initBeat4Trace();
+    if (beatId === 5) this._initBeat5Threads();
+    if (beatId === 7) {
+      entry.pulseSequenceStart = performance.now();
+    }
+  },
+
+  hideBeatObjects(beatId) {
+    const C = this.cinema;
+    if (!C) return;
+    const entry = C.beatObjects[beatId];
+    if (!entry) return;
+    entry._hideStartTime = performance.now();
+    // Group stays visible until fade-out completes; updated in render loop
+  },
+
+  // Create the retrieval-trace line for Beat 4 — a light path through
+  // documents in one cluster, showing how she navigates to an answer
+  _initBeat4Trace() {
+    const C = this.cinema;
+    if (!C) return;
+    const entry4 = C.beatObjects[4];
+    const entry3 = C.beatObjects[3];
+    if (!entry4 || !entry3 || !entry3.clusters || entry3.clusters.length === 0) return;
+    // Remove previous line if any
+    if (entry4.line) {
+      entry4.group.remove(entry4.line);
+      entry4.line.geometry.dispose();
+      entry4.line = null;
+    }
+    // Pick the Finance cluster (center one) and build a path through 4 docs
+    const finance = entry3.clusters[1];  // center one
+    if (!finance || !finance.docs || finance.docs.length < 4) return;
+    const indices = [3, 9, 16, 21];  // deterministic picks so it doesn't change each replay
+    const points = indices.map(i => {
+      const d = finance.docs[i % finance.docs.length];
+      // Convert doc's local position to world
+      const worldPos = d.position.clone().add(finance.group.position);
+      return worldPos;
+    });
+    const THREE = C.THREE;
+    const lineGeom = new THREE.BufferGeometry().setFromPoints(points);
+    const lineMat = new THREE.LineBasicMaterial({
+      color: 0xffe996,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      linewidth: 2,  // note: most browsers ignore linewidth > 1 for WebGL lines
+    });
+    const line = new THREE.Line(lineGeom, lineMat);
+    entry4.line = line;
+    entry4.lineMat = lineMat;
+    entry4.traceStart = performance.now();
+    entry4.group.add(line);
+  },
+
+  // Create connection threads for Beat 5 — thin gold lines connecting nearby
+  // documents in the Finance cluster. Visible from inside the cluster.
+  _initBeat5Threads() {
+    const C = this.cinema;
+    if (!C) return;
+    const entry5 = C.beatObjects[5];
+    const entry3 = C.beatObjects[3];
+    if (!entry5 || !entry3 || !entry3.clusters) return;
+    // Clear previous threads
+    entry5.lines.forEach(l => { entry5.group.remove(l); l.geometry.dispose(); });
+    entry5.lines = [];
+    const THREE = C.THREE;
+    // For each doc in the Finance cluster, connect it to ~2 nearest neighbors
+    const finance = entry3.clusters[1];
+    if (!finance || !finance.docs) return;
+    const docs = finance.docs;
+    const clusterCenter = finance.group.position;
+    const added = new Set();
+    docs.forEach((doc, i) => {
+      const myPos = doc.position.clone().add(clusterCenter);
+      // Find 2 nearest
+      const sortedByDist = docs
+        .map((d, j) => {
+          if (i === j) return null;
+          const wp = d.position.clone().add(clusterCenter);
+          return { idx: j, dist: myPos.distanceTo(wp), pos: wp };
+        })
+        .filter(Boolean)
+        .sort((a, b) => a.dist - b.dist)
+        .slice(0, 2);
+      sortedByDist.forEach(n => {
+        const key = i < n.idx ? `${i}-${n.idx}` : `${n.idx}-${i}`;
+        if (added.has(key)) return;
+        added.add(key);
+        const geom = new THREE.BufferGeometry().setFromPoints([myPos, n.pos]);
+        const mat = new THREE.LineBasicMaterial({
+          color: 0xc9a832,
+          transparent: true,
+          opacity: 0,
+          blending: THREE.AdditiveBlending,
+        });
+        const line = new THREE.Line(geom, mat);
+        entry5.lines.push(line);
+        entry5.group.add(line);
+      });
+    });
   },
 
   startCinema() {
@@ -12246,6 +12624,9 @@ const DemoMode = {
       C.points.rotation.y = t * 0.012;
       C.points.rotation.x = Math.sin(t * 0.08) * 0.04;
 
+      // Update beat objects (fade in/out, animations, billboards, pulses)
+      this._updateBeatObjects(now, t);
+
       C.renderer.render(C.scene, C.camera);
       C.raf = requestAnimationFrame(frame);
     };
@@ -12283,6 +12664,138 @@ const DemoMode = {
     this._cinemaFadeOut = undefined;
   },
 
+  // Per-frame update of all beat objects — fade transitions, animations,
+  // billboards, pulse sequences. Called from the main render loop.
+  _updateBeatObjects(nowMs, tSec) {
+    const C = this.cinema;
+    if (!C || !C.beatObjects) return;
+    const FADE_DUR = 900;  // ms for fade-in/out
+
+    // Helper: compute current fade value [0..1] for a beat entry
+    const computeFade = (entry) => {
+      if (!entry._showStartTime) return 0;
+      const shown = nowMs - entry._showStartTime;
+      let fadeIn = Math.min(1, shown / FADE_DUR);
+      let fadeOut = 1;
+      if (entry._hideStartTime && entry._hideStartTime > entry._showStartTime) {
+        const hidden = nowMs - entry._hideStartTime;
+        fadeOut = Math.max(0, 1 - hidden / FADE_DUR);
+        if (fadeOut === 0) {
+          entry.group.visible = false;
+          return 0;
+        }
+      }
+      return fadeIn * fadeOut;
+    };
+
+    // ─── Beat 1: document drift ───
+    const b1 = C.beatObjects[1];
+    if (b1 && b1.group.visible) {
+      const fade = computeFade(b1);
+      if (b1.material && b1.material.uniforms) {
+        b1.material.uniforms.uOpacity.value = fade;
+        b1.material.uniforms.uTime.value = tSec;
+      }
+      // Drift each document slowly
+      b1.docs.forEach(doc => {
+        const d = doc.userData.drift;
+        doc.position.x += d.vx;
+        doc.position.y += d.vy;
+        doc.position.z += d.vz;
+        doc.rotation.z += d.rotSpeed;
+        // Wrap around the volume so documents never drift off forever
+        if (doc.position.x >  220) doc.position.x = -220;
+        if (doc.position.x < -220) doc.position.x =  220;
+        if (doc.position.y >  140) doc.position.y = -140;
+        if (doc.position.y < -140) doc.position.y =  140;
+        if (doc.position.z >  220) doc.position.z = -220;
+        if (doc.position.z < -220) doc.position.z =  220;
+      });
+    }
+
+    // ─── Beat 3: orbital clusters + billboarded labels ───
+    const b3 = C.beatObjects[3];
+    if (b3 && b3.group.visible) {
+      const fade = computeFade(b3);
+      b3.clusters.forEach((c, ci) => {
+        // Slow orbit of each doc around the cluster center
+        c.docs.forEach(doc => {
+          const o = doc.userData.orbit;
+          o.theta += o.speed * 0.003;
+          doc.position.x = o.radius * Math.sin(o.phi) * Math.cos(o.theta);
+          doc.position.y = o.radius * Math.sin(o.phi) * Math.sin(o.theta);
+          doc.position.z = o.radius * Math.cos(o.phi);
+        });
+        // Cluster itself spins lazily on Y
+        c.group.rotation.y = tSec * (0.08 + ci * 0.02);
+        // Billboard the label — always face the camera
+        if (c.label && c.labelMat) {
+          c.label.lookAt(C.camera.position);
+          c.labelMat.opacity = fade * 0.85;
+        }
+      });
+      // Fade the docs (reusing beat 1's shader material, so this is shared)
+      if (b3.clusters[0] && b3.clusters[0].docs[0]) {
+        const docMat = b3.clusters[0].docs[0].material;
+        // Only override if we're the dominant beat (don't stomp beat 1's fade)
+        if (b1 && !b1.group.visible) {
+          if (docMat.uniforms) docMat.uniforms.uOpacity.value = fade;
+        } else if (!b1.group.visible) {
+          if (docMat.uniforms) docMat.uniforms.uOpacity.value = fade;
+        } else {
+          // Both beat 1 and beat 3 visible — use max
+          if (docMat.uniforms) docMat.uniforms.uOpacity.value = Math.max(
+            docMat.uniforms.uOpacity.value || 0,
+            fade
+          );
+        }
+      }
+    }
+
+    // ─── Beat 4: retrieval trace line ───
+    const b4 = C.beatObjects[4];
+    if (b4 && b4.group.visible && b4.line && b4.lineMat) {
+      const fade = computeFade(b4);
+      // Pulse the line's brightness so it looks like energy moving through it
+      const pulse = 0.7 + 0.3 * Math.sin(tSec * 4);
+      b4.lineMat.opacity = fade * pulse * 0.9;
+    }
+
+    // ─── Beat 5: connection threads (live web visible from inside cluster) ───
+    const b5 = C.beatObjects[5];
+    if (b5 && b5.group.visible && b5.lines.length > 0) {
+      const fade = computeFade(b5);
+      // Staggered fade-in across lines — each thread appears slightly after the previous
+      b5.lines.forEach((line, i) => {
+        const stagger = i / b5.lines.length;
+        const lineTimeT = Math.max(0, (nowMs - (b5._showStartTime || nowMs)) / 1000 - stagger * 1.8);
+        const lineFade = Math.min(1, lineTimeT / 1.5);
+        line.material.opacity = fade * lineFade * 0.45;
+      });
+    }
+
+    // ─── Beat 7: pulsing guarantee orbs (one per guarantee, in sequence) ───
+    const b7 = C.beatObjects[7];
+    if (b7 && b7.group.visible) {
+      const fade = computeFade(b7);
+      const since = (nowMs - (b7.pulseSequenceStart || nowMs)) / 1000;
+      b7.orbs.forEach((orb, i) => {
+        // Each orb pulses sequentially — at its assigned time offset
+        const pulseOffset = i * 2.5;  // seconds apart
+        const timeIntoPulse = since - pulseOffset;
+        let pulse = 0.2;  // baseline glow
+        if (timeIntoPulse > 0 && timeIntoPulse < 2.5) {
+          // Smooth pulse envelope
+          const t01 = timeIntoPulse / 2.5;
+          pulse = 0.2 + Math.sin(t01 * Math.PI) * 0.8;
+        }
+        orb.material.opacity = fade * pulse;
+        // Scale the orb with the pulse for extra presence
+        const scale = 1 + pulse * 0.4;
+        orb.mesh.scale.set(scale, scale, scale);
+      });
+    }
+  },
 
 
 
