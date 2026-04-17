@@ -15753,19 +15753,34 @@ const UserTour = (() => {
     if (skipBtn && !skipBtn._wired) { skipBtn._wired = true; skipBtn.addEventListener('click', skip); }
 
     // Auto-run if user hasn't seen it. Wait a bit so the app fully loads first.
-    // If the demo is currently playing, wait for it to end.
+    // If the demo is currently playing, wait for it to end. Don't start until
+    // the user has actually logged in (login-screen removed/hidden).
     if (!hasSeenTour()) {
       const tryAutoStart = () => {
-        // Don't start while demo is playing
-        if (window.DemoMode && window.DemoMode.running) {
+        // 1) Don't start while the pre-login demo is playing.
+        //    Check DemoMode directly (it's module-scoped, not on window) and
+        //    also check the theatre overlay in case the reference is shadowed.
+        const demoRunning =
+          (typeof DemoMode !== 'undefined' && DemoMode && DemoMode.running) ||
+          (document.getElementById('demo-theatre') && document.getElementById('demo-theatre').classList.contains('active'));
+        if (demoRunning) {
           setTimeout(tryAutoStart, 1200);
           return;
         }
-        // Only start if the user is actually logged in (sees chat UI)
-        if (document.getElementById('chat-ta')) {
+        // 2) Don't start while the login screen is still showing.
+        //    (#chat-ta exists in the DOM even on the login card — it's just hidden
+        //    inside #app — so we check login-screen visibility instead.)
+        const loginScreen = document.getElementById('login-screen');
+        const isLoggedIn = !loginScreen || loginScreen.style.display === 'none' || loginScreen.offsetParent === null;
+        if (!isLoggedIn) {
+          setTimeout(tryAutoStart, 1500);
+          return;
+        }
+        // 3) Only start if the chat UI is actually rendered and visible
+        const chatTa = document.getElementById('chat-ta');
+        if (chatTa && chatTa.offsetParent !== null) {
           start();
         } else {
-          // Login screen still up — wait for login to complete
           setTimeout(tryAutoStart, 1500);
         }
       };
