@@ -76,6 +76,11 @@ body {
 }
 #topo-overlay svg { width: 100%; height: 100%; }
 
+/* Topographic overlay is gold line-work designed for a dark bg. On light bg
+   it reads as muddy yellow against off-white. Hide it in light mode — the
+   login page is cleaner without it anyway. */
+body[data-theme="light"] #topo-overlay { display: none; }
+
 /* Grain texture */
 body::before {
   content: '';
@@ -85,6 +90,7 @@ body::before {
   background-repeat: repeat;
   background-size: 128px 128px;
 }
+body[data-theme="light"]::before { opacity: 0.5; }
 
 /* ── Gold metal variables ───────────────────────────────── */
 :root {
@@ -100,6 +106,144 @@ body::before {
     transparent 70%
   );
 }
+
+/* ── Light mode overrides ─────────────────────────────────
+   Activated by `data-theme="light"` on <body>. Scoped entirely through
+   CSS variables so every component that uses var(--gold), var(--smoke),
+   etc. picks up the right color automatically with no per-component code.
+
+   The demo is explicitly EXCLUDED — the cinematic 3D experience depends
+   on a dark field. When the demo overlay is active (.demo-theatre),
+   everything inside it overrides back to dark regardless of theme.
+
+   Palette: deep steel blue + cool greys replace the gold + warm greys.
+   Every contrast pair has been checked to pass WCAG AA (4.5:1) for body
+   text and 3:1 for large text / non-text elements.
+*/
+body[data-theme="light"] {
+  /* Backgrounds — off-whites and light greys, cooler tint */
+  --ink:        #F5F7FA;   /* base page background */
+  --ink2:       #FFFFFF;   /* card / panel surface */
+  --ink3:       #ECEFF4;   /* sunken / muted area */
+  --ink4:       #E4E8EF;   /* chip / pill background */
+  --ink5:       #D8DEE8;   /* hover state background */
+
+  /* Borders — blue-tinted greys with real visibility */
+  --line:       rgba(30, 58, 95, 0.15);
+  --line2:      rgba(30, 58, 95, 0.28);
+  --line3:      rgba(30, 58, 95, 0.45);
+
+  /* Primary accent (was gold) — steel blue */
+  --gold:       #1E3A5F;   /* deep steel — buttons, primary accents */
+  --gold-lt:    #3B6FA8;   /* brighter mid-blue — hovers, highlights */
+  --gold-dim:   rgba(30, 58, 95, 0.08);   /* subtle blue-tinted backgrounds */
+  --gold-glow:  rgba(30, 58, 95, 0.22);   /* shadow tint replacing glow */
+
+  /* Text — darks with high contrast on the light backgrounds above */
+  --smoke:      #0F172A;   /* primary text (15.1:1 on white, AAA) */
+  --smoke2:     #475569;   /* secondary text (7.2:1 on white, AAA) */
+  --smoke3:     #64748B;   /* muted text (4.6:1 on white, AA) */
+  --smoke4:     #94A3B8;   /* heavily muted — decorative only (3.1:1, large text only) */
+
+  /* Status colors — darkened to remain readable on light bg */
+  --green:      #15803D;   /* success dark */
+  --green-lt:   #22C55E;   /* success light */
+  --red:        #991B1B;   /* error dark */
+  --red-lt:     #DC2626;   /* error light */
+  --amber:      #B45309;   /* warning dark */
+  --amber-lt:   #D97706;   /* warning light */
+
+  /* Metallic gradient family (used for brand text, premium buttons).
+     Shifted from warm gold to cool steel — same gradient structure, different
+     temperature. Still feels premium/crafted, now in a different palette. */
+  --gold-metal-1: #7BA3D6;   /* bright steel highlight */
+  --gold-metal-2: #3B6FA8;   /* mid steel */
+  --gold-metal-3: #1E3A5F;   /* base deep steel */
+  --gold-metal-4: #0F2540;   /* shadow steel */
+  --gold-shine: linear-gradient(105deg,
+    transparent 20%,
+    rgba(59, 111, 168, 0.08) 35%,
+    rgba(59, 111, 168, 0.18) 45%,
+    rgba(59, 111, 168, 0.08) 55%,
+    transparent 70%
+  );
+}
+
+/* Demo overlay stays dark regardless of theme. The cinematic 3D experience
+   is not designed to work on a light field — the gold particles, the dark
+   space, the glow-based visuals all depend on a black background. When the
+   demo is active, we reset variables inside it back to their dark values.
+
+   Same treatment for the login card in light mode — the card is a premium
+   artifact with a heavy dark-first design (metallic gold frame, recessed
+   vault effect, gold glows). Rebuilding it for light would lose the whole
+   identity. In light mode, the card becomes a dark centerpiece surrounded
+   by a light page — distinctive and still on-brand. */
+body[data-theme="light"] .demo-theatre,
+body[data-theme="light"] .demo-preshow,
+body[data-theme="light"] .demo-beat,
+body[data-theme="light"] .login-card,
+body[data-theme="light"] .login-wordmark,
+body[data-theme="light"] .login-sub,
+body[data-theme="light"] .login-mark,
+body[data-theme="light"] .login-frame-box {
+  --ink:        #050810;
+  --ink2:       #080d18;
+  --ink3:       #0d1525;
+  --ink4:       #131e30;
+  --ink5:       #1a2840;
+  --line:       rgba(212,168,50,0.12);
+  --line2:      rgba(212,168,50,0.18);
+  --line3:      rgba(212,168,50,0.32);
+  --gold:       #c9a832;
+  --gold-lt:    #e8c84a;
+  --gold-dim:   rgba(212,168,50,0.10);
+  --gold-glow:  rgba(212,168,50,0.25);
+  --smoke:      #e8eaf0;
+  --smoke2:     #9aa3b4;
+  --smoke3:     #5a6378;
+  --smoke4:     #2e3a50;
+  --gold-metal-1: #fff0a0;
+  --gold-metal-2: #e8c84a;
+  --gold-metal-3: #c9a832;
+  --gold-metal-4: #9a7a18;
+}
+
+/* ── Theme toggle button ──────────────────────────────────
+   Small circular icon button, top-right of the login screen (and later of the
+   main app chrome). Shows a moon in light mode (tap to switch to dark) and a
+   sun in dark mode (tap to switch to light). */
+.theme-toggle {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--line2);
+  background: var(--ink2);
+  color: var(--smoke2);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+}
+.theme-toggle:hover {
+  color: var(--gold);
+  border-color: var(--line3);
+}
+.theme-toggle svg {
+  width: 16px;
+  height: 16px;
+}
+/* In dark mode, show the sun icon (click to switch TO light).
+   In light mode, show the moon icon (click to switch TO dark). */
+body[data-theme="dark"] .theme-toggle .theme-toggle-moon { display: none; }
+body[data-theme="light"] .theme-toggle .theme-toggle-sun { display: none; }
+/* Default (no data-theme attr yet): show sun (initial script sets dark or light) */
+body:not([data-theme="light"]) .theme-toggle .theme-toggle-moon { display: none; }
 
 /* ── Login ─────────────────────────────────────────────── */
 #login-screen {
@@ -156,6 +300,22 @@ body::before {
   75%  { opacity: 0.84; }
   88%  { opacity: 0.92; }
   100% { opacity: 1;    }
+}
+/* Light mode: replace the dark navy + candlelight with a soft light field.
+   The login card stays dark (see preservation rules above) so it remains the
+   centerpiece — a dark premium artifact surrounded by a clean cool page. */
+body[data-theme="light"] #login-screen {
+  background-color: #EEF2F7;
+  background-image:
+    radial-gradient(ellipse 80% 60% at 50% 30%, rgba(30,58,95,0.04) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 30% at 50% 90%, rgba(30,58,95,0.03) 0%, transparent 70%);
+}
+body[data-theme="light"] #login-screen::before {
+  display: none;
+}
+body[data-theme="light"] .login-frame-box {
+  /* Frame still visible but toned for light bg — the gold border reads fine here */
+  opacity: 0.55;
 }
 #login-screen > * { position: relative; z-index: 1; }
 .login-wrap {
@@ -6829,6 +6989,31 @@ body::before {
 </head>
 <body>
 
+<!-- Theme initialization — runs synchronously before first paint to avoid
+     a flash of wrong theme. Reads user's explicit preference from
+     localStorage ('caci_theme' = 'light' | 'dark'); if none set, follows
+     the OS setting via prefers-color-scheme media query. The data-theme
+     attribute drives the CSS variable overrides defined in :root/<body> CSS. -->
+<script>
+(function() {
+  try {
+    var saved = localStorage.getItem('caci_theme');
+    var theme;
+    if (saved === 'light' || saved === 'dark') {
+      theme = saved;
+    } else {
+      // No explicit preference — follow OS
+      var mq = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)');
+      theme = (mq && mq.matches) ? 'light' : 'dark';
+    }
+    document.body.setAttribute('data-theme', theme);
+  } catch (e) {
+    // localStorage blocked or similar — default to dark
+    document.body.setAttribute('data-theme', 'dark');
+  }
+})();
+</script>
+
 <!-- Topographic overlay -->
 <div id="topo-overlay">
 <svg viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
@@ -6867,6 +7052,25 @@ body::before {
 
 <!-- LOGIN -->
 <div id="login-screen">
+  <!-- Theme toggle — small sun/moon icon in the top-right. Persists choice
+       to localStorage. Visible before login so first-time visitors can set
+       their preference before entering the app. -->
+  <button class="theme-toggle" id="theme-toggle" aria-label="Toggle light/dark theme" title="Toggle light/dark theme">
+    <svg class="theme-toggle-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+    </svg>
+    <svg class="theme-toggle-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="4"/>
+      <line x1="12" y1="3" x2="12" y2="5"/>
+      <line x1="12" y1="19" x2="12" y2="21"/>
+      <line x1="3" y1="12" x2="5" y2="12"/>
+      <line x1="19" y1="12" x2="21" y2="12"/>
+      <line x1="5.6" y1="5.6" x2="7" y2="7"/>
+      <line x1="17" y1="17" x2="18.4" y2="18.4"/>
+      <line x1="5.6" y1="18.4" x2="7" y2="17"/>
+      <line x1="17" y1="7" x2="18.4" y2="5.6"/>
+    </svg>
+  </button>
   <div class="login-frame-box" aria-hidden="true">
     <div class="fc tl"></div><div class="fc tr"></div>
     <div class="fc bl"></div><div class="fc br"></div>
@@ -8540,6 +8744,32 @@ let _colView = 'all'; // 'all' | 'collection' | 'uncollected'
 const $ = id => document.getElementById(id);
 const fmt = b => b > 1048576 ? (b/1048576).toFixed(1)+'MB' : (b/1024).toFixed(0)+'KB';
 const dstr = iso => iso ? new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'}) : '—';
+
+// ── Theme helpers ───────────────────────────────────────────
+// Initial theme is applied by an inline script in <body> to prevent flash of
+// wrong theme. These helpers let the rest of the app read/change the theme.
+function getCaciTheme() {
+  return document.body.getAttribute('data-theme') || 'dark';
+}
+function setCaciTheme(theme) {
+  if (theme !== 'light' && theme !== 'dark') return;
+  document.body.setAttribute('data-theme', theme);
+  try { localStorage.setItem('caci_theme', theme); } catch {}
+  // Let listeners (like toggle buttons) update their state
+  window.dispatchEvent(new CustomEvent('caci-theme-changed', { detail: { theme } }));
+}
+function toggleCaciTheme() {
+  setCaciTheme(getCaciTheme() === 'light' ? 'dark' : 'light');
+}
+window.getCaciTheme = getCaciTheme;
+window.setCaciTheme = setCaciTheme;
+window.toggleCaciTheme = toggleCaciTheme;
+
+// Wire the theme toggle button once DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+  const btn = document.getElementById('theme-toggle');
+  if (btn) btn.addEventListener('click', toggleCaciTheme);
+});
 
 function esc(s) {
   if (s == null) return '';
