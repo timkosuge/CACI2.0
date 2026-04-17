@@ -90,6 +90,9 @@ export default {
     if (!verifyToken(request, env)) return json({ error: 'Unauthorized' }, 401);
 
     // Demo script management (admin-auth required)
+    if (path === '/demo/generate-all'   && method === 'POST') return handleDemoGenerateAll(request, env);
+    if (path === '/demo/reset-all'      && method === 'POST') return handleDemoResetAll(request, env);
+    // Legacy (single-variant) endpoints — still available for back-compat:
     if (path === '/demo/generate-intro' && method === 'POST') return handleDemoGenerateIntro(request, env);
     if (path === '/demo/generate-beat'  && method === 'POST') return handleDemoGenerateBeat(request, env);
     if (path === '/demo/save-script'    && method === 'POST') return handleDemoSaveScript(request, env);
@@ -4088,15 +4091,35 @@ async function handleTTS(request, env) {
 // Valid beat IDs: 'intro' (Beat 2, CACI herself) + chorus beats 1,3,4,5,6,7,8
 const VALID_BEAT_IDS = ['intro', '1', '3', '4', '5', '6', '7', '8'];
 const kvKeyFor = (beatId) => beatId === 'intro' ? 'demo:intro' : `demo:beat:${beatId}`;
+const kvKeyForVariant = (beatId, variantIdx) => `${kvKeyFor(beatId)}:${variantIdx}`;
+const VARIANTS_PER_BEAT = 3;
 
 async function handleDemoGetScripts(env) {
   try {
-    // Read all beat scripts in parallel
-    const results = await Promise.all(VALID_BEAT_IDS.map(id => env.CACI_KV.get(kvKeyFor(id))));
+    // New model: each beat has up to VARIANTS_PER_BEAT variants stored at
+    //   demo:intro:0 / demo:intro:1 / demo:intro:2
+    //   demo:beat:1:0 / demo:beat:1:1 / demo:beat:1:2
+    //   etc.
+    // For back-compat, if no variant keys exist but a legacy single-string
+    // key exists (e.g. `demo:intro`), we wrap it as a single-element array.
     const scripts = {};
-    VALID_BEAT_IDS.forEach((id, i) => { if (results[i]) scripts[id] = results[i]; });
-    // Keep `intro` at top level for back-compat with earlier clients
-    return json({ intro: scripts.intro || null, scripts });
+    for (const id of VALID_BEAT_IDS) {
+      const variantReads = await Promise.all(
+        Array.from({ length: VARIANTS_PER_BEAT }, (_, i) => env.CACI_KV.get(kvKeyForVariant(id, i)))
+      );
+      const variants = variantReads.filter(v => v && typeof v === 'string' && v.trim().length > 10);
+      if (variants.length === 0) {
+        // Back-compat: check legacy single-string key
+        const legacy = await env.CACI_KV.get(kvKeyFor(id));
+        if (legacy && legacy.trim().length > 10) variants.push(legacy);
+      }
+      if (variants.length > 0) scripts[id] = variants;
+    }
+    // Legacy `intro` field at top level = first variant (for older clients)
+    return json({
+      intro: scripts.intro ? scripts.intro[0] : null,
+      scripts,  // new model: arrays of variants per beat
+    });
   } catch (e) { return json({ intro: null, scripts: {} }); }
 }
 
@@ -4419,6 +4442,81 @@ Same truth. Different voice on it.`;
   } catch (e) {
     return json({ error: e.message }, 500);
   }
+}
+
+// ── /demo/generate-all and /demo/reset-all ────────────────────
+// One-click rotation: generates 3 variants for every beat (intro + 7 chorus)
+// in parallel and saves them directly to KV under variant keys.
+// The demo controller randomly picks one variant per beat at show start.
+
+async function handleDemoGenerateAll(request, env) {
+  try {
+    const apiKey = (await env.CACI_KV.get('config:ANTHROPIC_API_KEY')) || env.ANTHROPIC_API_KEY;
+    if (!apiKey) return json({ error: 'Anthropic API key not configured' }, 400);
+
+    // Fire the existing per-beat generators in parallel. Each returns 3 variants.
+    // We then save each variant to its KV slot (demo:intro:0/1/2 etc.)
+    const CHORUS_IDS = ['1', '3', '4', '5', '6', '7', '8'];
+
+    // Build mock Request objects that the existing handlers expect
+    const makeReq = (body) => new Request('https://stub', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    // Kick off all generations in parallel
+    const introPromise = handleDemoGenerateIntro(makeReq({}), env);
+    const chorusPromises = CHORUS_IDS.map(id => handleDemoGenerateBeat(makeReq({ beatId: id }), env));
+    const responses = await Promise.all([introPromise, ...chorusPromises]);
+
+    // Parse responses and save each set's variants
+    const beatIds = ['intro', ...CHORUS_IDS];
+    const errors = [];
+    const savedCounts = {};
+    const saveOps = [];
+
+    for (let i = 0; i < responses.length; i++) {
+      const res = responses[i];
+      const id = beatIds[i];
+      let data;
+      try { data = await res.json(); } catch { data = {}; }
+      if (data.error || !data.variations || !Array.isArray(data.variations)) {
+        errors.push({ beat: id, error: data.error || 'no variations' });
+        continue;
+      }
+      // Save each variant to its own KV slot (up to VARIANTS_PER_BEAT)
+      const slots = data.variations.slice(0, VARIANTS_PER_BEAT);
+      for (let v = 0; v < slots.length; v++) {
+        saveOps.push(env.CACI_KV.put(kvKeyForVariant(id, v), slots[v].trim().slice(0, 4000)));
+      }
+      // Clean up any stale higher-indexed variants from a previous generation
+      for (let v = slots.length; v < VARIANTS_PER_BEAT; v++) {
+        saveOps.push(env.CACI_KV.delete(kvKeyForVariant(id, v)));
+      }
+      // Also delete the legacy single-string key so it can't shadow the new variants
+      saveOps.push(env.CACI_KV.delete(kvKeyFor(id)));
+      savedCounts[id] = slots.length;
+    }
+
+    await Promise.all(saveOps);
+    return json({ ok: true, savedCounts, errors: errors.length ? errors : undefined });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+async function handleDemoResetAll(request, env) {
+  try {
+    const ops = [];
+    for (const id of VALID_BEAT_IDS) {
+      // Clear all variant slots
+      for (let v = 0; v < VARIANTS_PER_BEAT; v++) {
+        ops.push(env.CACI_KV.delete(kvKeyForVariant(id, v)));
+      }
+      // Clear legacy single-string key
+      ops.push(env.CACI_KV.delete(kvKeyFor(id)));
+    }
+    await Promise.all(ops);
+    return json({ ok: true });
+  } catch (e) { return json({ error: e.message }, 500); }
 }
 
 // ══════════════════════════════════════════════════════════
