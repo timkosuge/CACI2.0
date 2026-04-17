@@ -1667,6 +1667,23 @@ body::before {
   z-index: 2;
 }
 
+/* Credentials line — appears below the divider, muted italic serif.
+   Tells viewers what sources underpin CACI's intelligence without drawing
+   attention from the tagline itself. */
+.db8-credentials {
+  font-family: var(--f-display);
+  font-style: italic;
+  font-weight: 300;
+  font-size: clamp(11px, 1.2vw, 15px);
+  color: rgba(200, 185, 150, 0.60);
+  letter-spacing: 0.04em;
+  text-align: center;
+  max-width: 680px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 2;
+}
+
 /* Elegant frame surrounding the quote — thin gold rule at top and bottom
    plus corner brackets. Draws in as the quote appears. */
 .db8-frame {
@@ -7107,6 +7124,9 @@ body::before {
         for cannabis operations.
       </div>
       <div class="db8-divider db-in d3"></div>
+      <div class="db8-credentials db-in d4" id="db8-credentials">
+        &mdash; trained on Jushi earnings, Illinois &amp; Ohio regulations, internal operations
+      </div>
       <div class="db8-accent-line db8-accent-top db-in d3"></div>
       <div class="db8-accent-line db8-accent-bottom db-in d3"></div>
     </div>
@@ -13143,6 +13163,33 @@ const DemoMode = {
   // value labels on top of each bar, category labels below. Returns a Group.
   // `chart` = { title, series: [{label, value, display}], unit, source, insight }
   // `opts`  = { width, height, scale, colorPair }
+  // Pick one fact per Beat 3 cluster based on theme keywords. Falls back to
+  // sensible defaults if no matching fact exists in the current statsBank.
+  _pickBeat3ClusterFacts() {
+    const singles = (this.statsBank && this.statsBank.singles) || [];
+    const matchByKeyword = (kws) => {
+      for (const kw of kws) {
+        const f = singles.find(s => {
+          const hay = (s.label + ' ' + (s.source || '')).toLowerCase();
+          return hay.includes(kw);
+        });
+        if (f) return f;
+      }
+      return null;
+    };
+    return {
+      Compliance: matchByKeyword(['ohio', 'compliance', 'testing', 'transfer', 'code', 'regulation'])
+                  || singles.find(s => (s.source || '').toLowerCase().includes('ohio'))
+                  || { display: 'OAC §3796', label: 'Ohio cannabis code', source: 'Ohio Administrative Code' },
+      Finance:    matchByKeyword(['revenue', 'ebitda', 'margin', 'earnings'])
+                  || singles[0]
+                  || { display: '$262.9M', label: 'FY 2025 Revenue', source: 'Jushi Q4 2025 Transcript' },
+      Operations: matchByKeyword(['store', 'employee', 'retail', 'dispensary', 'yield', 'wholesale'])
+                  || singles.find(s => /\b\d+\b/.test(s.display) && !s.display.includes('%') && !s.display.includes('$'))
+                  || { display: '42', label: 'Retail stores', source: 'Internal Operations Data' },
+    };
+  },
+
   _makeBarChart3D(chart, opts) {
     const C = this.cinema;
     if (!C || !chart || !chart.series || chart.series.length === 0) return null;
@@ -13353,8 +13400,68 @@ const DemoMode = {
       beat1Group.add(mesh);
       beat1Docs.push(mesh);
     }
+
+    // ─── Intel tags: real references attached to ~8 random drift docs ──
+    // Small canvas-texture labels that flash real content as the camera drifts
+    // past. Viewers catch glimpses of actual doc names and citations — supports
+    // the "buried in thousands of pages" narration with a whiff of specificity.
+    const INTEL_TAGS = [
+      'Jushi Q4 2025',
+      'OAC §3796',
+      'IL 2025 Annual',
+      'Ohio Compliance',
+      '§3796-8-03',
+      '$262.9M FY2025',
+      '19.1% EBITDA',
+      '42 retail stores',
+      'Illinois Regs',
+      'Q4 Earnings Call',
+      '92 g/sq ft yield',
+      '160 wholesale doors',
+    ];
+    const beat1Tags = [];
+    // Attach tags to ~8 of the 36 docs, chosen from the forward half of the volume
+    // (closer to camera so they're actually readable)
+    const tagCount = Math.min(INTEL_TAGS.length, 10);
+    const forwardDocs = beat1Docs.filter(d => d.position.z > -100);
+    const shuffled = forwardDocs.slice().sort(() => Math.random() - 0.5);
+    for (let i = 0; i < tagCount && i < shuffled.length; i++) {
+      const hostDoc = shuffled[i];
+      const text = INTEL_TAGS[i % INTEL_TAGS.length];
+      // Build canvas label — small, bright gold, readable at distance
+      const tCanvas = document.createElement('canvas');
+      tCanvas.width = 512; tCanvas.height = 96;
+      const tctx = tCanvas.getContext('2d');
+      tctx.font = '500 42px "Inter", sans-serif';
+      tctx.textAlign = 'center';
+      tctx.textBaseline = 'middle';
+      const tGrad = tctx.createLinearGradient(0, 20, 0, 76);
+      tGrad.addColorStop(0, '#fff8e0');
+      tGrad.addColorStop(1, '#e8c84a');
+      tctx.fillStyle = tGrad;
+      tctx.shadowColor = 'rgba(212,168,50,0.7)';
+      tctx.shadowBlur = 16;
+      tctx.fillText(text, 256, 48);
+      const tTex = new THREE.CanvasTexture(tCanvas);
+      tTex.needsUpdate = true;
+      const tMat = new THREE.MeshBasicMaterial({
+        map: tTex, transparent: true, depthWrite: false, opacity: 0,
+      });
+      const tMesh = new THREE.Mesh(new THREE.PlaneGeometry(24, 4.5), tMat);
+      // Position tag slightly offset from the host doc
+      tMesh.position.copy(hostDoc.position);
+      tMesh.position.y += 22;  // above the doc
+      tMesh.userData.intelTag = true;
+      tMesh.userData.tagMat = tMat;
+      tMesh.userData.host = hostDoc;
+      // Each tag has a phase offset so they don't all flicker together
+      tMesh.userData.phaseOffset = Math.random() * 6.28;
+      beat1Group.add(tMesh);
+      beat1Tags.push(tMesh);
+    }
+
     C.scene.add(beat1Group);
-    C.beatObjects[1] = { group: beat1Group, docs: beat1Docs, material: docMaterial };
+    C.beatObjects[1] = { group: beat1Group, docs: beat1Docs, material: docMaterial, intelTags: beat1Tags };
 
     // ─── BEAT 3: Three orbital clusters (Compliance, Finance, Operations) ───
     // Documents from beat 1 conceptually "get organized" — we show 3 rotating
@@ -13438,8 +13545,33 @@ const DemoMode = {
       beat3Group.add(clusterGroup);
       clusters.push({ group: clusterGroup, docs: clusterDocs, label, labelMat, name: cp.name });
     });
+
+    // ─── Cluster data holograms: one real fact per cluster ────────
+    // As clusters form and assemble, a relevant real stat hovers above each
+    // — compliance gets an Ohio code ref, finance gets the revenue number,
+    // operations gets the store count. The harvester's data flows in here
+    // via clusterFactPick(), which picks the best fact per theme.
+    const clusterFacts = this._pickBeat3ClusterFacts();
+    const clusterHolograms = [];
+    clusters.forEach((cluster, i) => {
+      const fact = clusterFacts[cluster.name];
+      if (!fact) return;
+      const holo = this._makeFloatingNumber3D(fact, { scale: 0.85 });
+      if (!holo) return;
+      // Position above the cluster's label (label is at y=60 on clusterGroup)
+      // Hologram sits above it at y=110, in cluster's local space.
+      holo.position.set(
+        cluster.group.position.x,
+        cluster.group.position.y + 95,
+        cluster.group.position.z
+      );
+      holo.userData.revealDelay = 1.8 + i * 0.7;  // staggered, appear as clusters form
+      beat3Group.add(holo);
+      clusterHolograms.push(holo);
+    });
+
     C.scene.add(beat3Group);
-    C.beatObjects[3] = { group: beat3Group, clusters };
+    C.beatObjects[3] = { group: beat3Group, clusters, clusterHolograms };
 
     // ─── BEAT 4: A light-trace line connecting documents in one cluster ───
     // Highlights the "retrieval" — camera dives into a cluster and a glowing
@@ -13654,7 +13786,27 @@ const DemoMode = {
       ]);
       const radialLine = new THREE.Line(radialGeom, radialMat);
       beat7Group.add(radialLine);
-      radialLines.push({ line: radialLine, mat: radialMat, orbIdx: i });
+
+      // Traveling pulse dot — a small bright sphere that flies from CACI to
+      // the icon during that icon's pulse. Reinforces "activity" — she's
+      // actively signaling each guarantee as she speaks it.
+      const pulseGeom = new THREE.SphereGeometry(1.5, 12, 10);
+      const pulseMat = new THREE.MeshBasicMaterial({
+        color: 0xfff4cc,
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+      });
+      const pulseDot = new THREE.Mesh(pulseGeom, pulseMat);
+      beat7Group.add(pulseDot);
+
+      radialLines.push({
+        line: radialLine, mat: radialMat,
+        pulseDot, pulseMat,
+        orbPos: new THREE.Vector3(orb.position[0], orb.position[1], orb.position[2]),
+        origin: new THREE.Vector3(0, 0, 0),
+        orbIdx: i,
+      });
     });
 
     C.scene.add(beat7Group);
@@ -14217,6 +14369,29 @@ const DemoMode = {
         if (doc.position.z >  220) doc.position.z = -220;
         if (doc.position.z < -220) doc.position.z =  220;
       });
+      // Intel tags — follow their host doc, billboard, flicker in/out.
+      // Flicker creates a sense of intelligence-scanning: CACI noticing specific
+      // references as they drift past.
+      if (b1.intelTags) {
+        b1.intelTags.forEach(tag => {
+          const host = tag.userData.host;
+          if (host) {
+            tag.position.x = host.position.x;
+            tag.position.y = host.position.y + 22;
+            tag.position.z = host.position.z;
+          }
+          tag.lookAt(C.camera.position);
+          // Flicker: each tag is visible ~40% of the time with a soft fade,
+          // staggered by phaseOffset so they appear/disappear independently
+          const flickerPhase = (tSec * 0.4 + tag.userData.phaseOffset) % 4;  // 4s cycle
+          let flickerVisibility = 0;
+          if (flickerPhase < 0.4)       flickerVisibility = flickerPhase / 0.4;         // fade in
+          else if (flickerPhase < 1.4)  flickerVisibility = 1;                            // hold
+          else if (flickerPhase < 1.8)  flickerVisibility = 1 - (flickerPhase - 1.4) / 0.4; // fade out
+          else                          flickerVisibility = 0;                            // off (allows re-arrival)
+          tag.userData.tagMat.opacity = fade * flickerVisibility * 0.82;
+        });
+      }
     }
 
     // ─── Beat 3: orbital clusters + billboarded labels ───
@@ -14255,6 +14430,37 @@ const DemoMode = {
             fade
           );
         }
+      }
+
+      // Animate cluster holograms — each appears above its cluster as they form
+      if (b3.clusterHolograms && b3.clusterHolograms.length > 0) {
+        const since = (nowMs - (b3._showStartTime || nowMs)) / 1000;
+        b3.clusterHolograms.forEach(holo => {
+          const delay = holo.userData.revealDelay || 0;
+          const timeAfter = since - delay;
+          let hFade = 0;
+          if (timeAfter > 0) {
+            hFade = Math.min(1, timeAfter / 1.2);
+            hFade = hFade * hFade * (3 - 2 * hFade);
+          }
+          const eff = fade * hFade;
+          const ud = holo.userData;
+          if (ud.bgMat)    ud.bgMat.opacity    = eff * 0.78;
+          if (ud.frameMat) ud.frameMat.opacity = eff * 0.90;
+          if (ud.cyanMat)  ud.cyanMat.opacity  = eff * 0.75;
+          if (ud.numMat)   ud.numMat.opacity   = eff * 1.00;
+          if (ud.labelMat) ud.labelMat.opacity = eff * 0.82;
+          if (ud.srcMat)   ud.srcMat.opacity   = eff * 0.55;
+          if (ud.scanMesh && ud.scanMat && ud.panelH) {
+            const sweepPhase = ((tSec + delay * 1.5) / 4) % 1;
+            ud.scanMesh.position.y = ud.panelH / 2 + (-ud.panelH) * sweepPhase;
+            ud.scanMat.opacity = eff * Math.sin(sweepPhase * Math.PI) * 0.50;
+          }
+          if (ud.liveMat) {
+            ud.liveMat.opacity = eff * (0.45 + 0.45 * Math.sin(tSec * 5 + delay));
+          }
+          if (ud.billboard) holo.lookAt(C.camera.position);
+        });
       }
     }
 
@@ -14589,10 +14795,30 @@ const DemoMode = {
 
       // Radial lines: each line brightens when its icon pulses.
       // Baseline dim glow keeps all 4 lines visible throughout the beat.
+      // Pulse dots travel from CACI to the icon in sync with the pulse.
       if (b7.radialLines) {
         b7.radialLines.forEach(rl => {
           const p = pulseValues[rl.orbIdx] || 0;
           rl.mat.opacity = fade * (0.12 + p * 0.58);
+          // Pulse dot: travels from origin to orb position during the pulse.
+          // pulseValues[i] is 0..1..0 over 2.5s — we remap to linear travel 0→1.
+          // Use since-based phase so the dot follows the leading edge of the pulse.
+          if (rl.pulseDot && rl.orbPos) {
+            const pulseOffset = rl.orbIdx * 2.5;
+            const timeInto = since - pulseOffset;
+            let travel = -1;  // -1 = hidden
+            if (timeInto > 0 && timeInto < 2.0) {
+              travel = Math.min(1, timeInto / 1.6);  // travel phase
+            }
+            if (travel >= 0) {
+              rl.pulseDot.position.lerpVectors(rl.origin, rl.orbPos, travel);
+              // Bright at the middle of travel, fades at endpoints
+              const visEnvelope = Math.sin(travel * Math.PI);
+              rl.pulseMat.opacity = fade * visEnvelope * 0.95;
+            } else {
+              rl.pulseMat.opacity = 0;
+            }
+          }
         });
       }
     }
