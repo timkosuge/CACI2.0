@@ -266,6 +266,18 @@ body[data-theme="light"] #sidebar {
 body[data-theme="light"] #sidebar::after {
   display: none !important;
 }
+/* Force all sidebar inner regions to transparent so they inherit the
+   sidebar's light bg, instead of accidentally pulling any dark treatment. */
+body[data-theme="light"] .sb-nav,
+body[data-theme="light"] .sb-depts,
+body[data-theme="light"] .sb-footer {
+  background: transparent !important;
+}
+/* And explicitly clear any backgrounds on the inner nav/dept areas */
+body[data-theme="light"] #sb-nav,
+body[data-theme="light"] #sb-depts {
+  background: transparent !important;
+}
 body[data-theme="light"] #sidebar::before {
   /* Kill the gold glimmering right edge — too loud on a light bg */
   background: linear-gradient(180deg,
@@ -382,15 +394,21 @@ body[data-theme="light"] #main-circuit {
    replace the dark ink wash with a light one so text stays readable. */
 body[data-theme="light"] .chat-bg-overlay::before {
   background: url('JUSHILIGHT.webp') center center / cover no-repeat !important;
-  opacity: 0.35 !important;
-  filter: contrast(0.95) brightness(1.08) !important;
+  opacity: 0.75 !important;
+  filter: contrast(1.0) brightness(1.02) !important;
 }
 body[data-theme="light"] .chat-bg-overlay::after {
-  /* Flip the center-heavy dark wash to a center-heavy LIGHT wash so the
-     chat text in the middle still has contrast against a busy bg. */
+  /* Very subtle center wash — just enough to keep text readable against
+     busy cloud pattern. Previous version was too heavy (opacity .55) and
+     killed the sky. Now dialed way down so the image breathes. */
   background:
-    radial-gradient(ellipse 60% 50% at 50% 50%, rgba(245, 247, 250, 0.55) 0%, rgba(245, 247, 250, 0.15) 100%),
-    linear-gradient(180deg, rgba(245, 247, 250, 0.20) 0%, rgba(245, 247, 250, 0.45) 100%) !important;
+    radial-gradient(ellipse 40% 35% at 50% 50%, rgba(245, 247, 250, 0.18) 0%, rgba(245, 247, 250, 0.03) 100%),
+    linear-gradient(180deg, rgba(245, 247, 250, 0.04) 0%, rgba(245, 247, 250, 0.10) 100%) !important;
+}
+/* SVG circuit lines on top of the image — these are gold-stroked and read as
+   muddy yellow on light. Hide them. */
+body[data-theme="light"] .chat-bg-overlay svg {
+  display: none !important;
 }
 /* SVG circuit lines on top of the image — these are gold-stroked and read as
    muddy yellow on light. Hide them. */
@@ -833,11 +851,35 @@ body[data-theme="light"] #tb-user-chip,
 body[data-theme="light"] .topbar-dept,
 body[data-theme="light"] .topbar-status,
 body[data-theme="light"] .topbar-user,
-body[data-theme="light"] .tb-pill {
+body[data-theme="light"] .tb-pill,
+body[data-theme="light"] .dept-chip,
+body[data-theme="light"] .tb-status,
+body[data-theme="light"] .tb-model-chip {
   background: #FFFFFF !important;
   color: #1E3A5F !important;
   border: 1px solid rgba(30, 58, 95, 0.22) !important;
   box-shadow: 0 1px 2px rgba(30, 58, 95, 0.05) !important;
+}
+/* Inner elements of dept chip — the text and caret */
+body[data-theme="light"] .dept-chip .dc-name,
+body[data-theme="light"] .dept-chip .dc-caret,
+body[data-theme="light"] .tb-status .tb-status-text,
+body[data-theme="light"] .tb-model-chip .tmc-name {
+  color: #1E3A5F !important;
+}
+/* TIM KOSUGE user chip has massive inline styles — need deep overrides */
+body[data-theme="light"] #tb-user-chip {
+  background: #FFFFFF !important;
+  border-color: rgba(30, 58, 95, 0.22) !important;
+}
+body[data-theme="light"] #tb-user-chip svg {
+  color: rgba(30, 58, 95, 0.60) !important;
+}
+body[data-theme="light"] #tb-user-name {
+  color: #1E3A5F !important;
+}
+body[data-theme="light"] #tb-user-role {
+  color: rgba(30, 58, 95, 0.55) !important;
 }
 
 /* Green status dot ("ONLINE" indicator) — stays green */
