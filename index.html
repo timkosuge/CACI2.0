@@ -10373,23 +10373,24 @@ const DemoMode = {
   // Intro line — plays during the 900ms stage-expand, so the opening isn't silent
   intro: "Before you sign in, let me show you what I am — and why I'm different.",
 
-  // Timeline — 9 beats, ~62s total. Each has a narration line tuned to fit duration.
+  // Timeline — durations tuned to narration length + ~1.5s tail buffer.
+  // Total ~1:47. Each beat gives Caci room to finish her line before transition.
   beats: [
-    { id: 1, dur: 6500,  setup: null,
+    { id: 1, dur: 11500, setup: null,
       narr: "Your answers live in thousands of documents. Earnings. Regulations. Policies. Scattered across departments, different formats, hours to find." },
-    { id: 2, dur: 5500,  setup: null,
-      narr: "I'm Caci. I turn all of it into one memory you can actually talk to." },
-    { id: 3, dur: 8500,  setup: 'setupDepts',
-      narr: "Every document you give me gets analyzed seven ways — what it is, when it's from, where it applies, what it contains — and filed by department, period, and jurisdiction. So when you ask about Nevada inventory in Q3, I already know where to look." },
-    { id: 4, dur: 10000, setup: 'setupQuery',
-      narr: "When you ask me something, I don't hunt for keywords. I run your question through four stages — I figure out what you're really asking, pick the right places to look, weigh every passage by how directly it answers you, and check the sources before I hand it back." },
-    { id: 5, dur: 8500,  setup: 'setupNetwork',
+    { id: 2, dur: 17500, setup: null,
+      narr: "I'm Cassie. I'm the one who reads everything. Earnings calls at midnight, regulatory filings at 6am, SOPs nobody else has time for — that's me. I'm a little obsessive, I cite my sources, and I don't forget. Nice to meet you." },
+    { id: 3, dur: 16000, setup: 'setupDepts',
+      narr: "Every document you give me gets analyzed seven ways — what it is, when it's from, where it applies, what it contains — then filed by department, period, and jurisdiction. I already know where to look." },
+    { id: 4, dur: 17000, setup: 'setupQuery',
+      narr: "When you ask me something, I don't hunt for keywords. I figure out what you're really asking, pick the right places to look, weigh every passage by how directly it answers, and I won't tell you something I can't back up." },
+    { id: 5, dur: 14000, setup: 'setupNetwork',
       narr: "The more you give me, the more I see. A new regulation changes what a policy means. A new earnings report reframes an old trend. I notice — even when you don't think to ask." },
-    { id: 6, dur: 8500,  setup: 'setupScenario',
+    { id: 6, dur: 14500, setup: 'setupScenario',
       narr: "And when a decision is in front of you — a price change, a new market, a regulatory shift — I'll model it against your actual data and show you where it works, and where it breaks." },
-    { id: 7, dur: 6500,  setup: 'setupStats',
+    { id: 7, dur: 12000, setup: 'setupStats',
       narr: "Every answer cites its sources. Every upload is logged. Your data lives in your own walls — yours, not mine, and it never trains anyone else's model." },
-    { id: 8, dur: 7000,  setup: null,
+    { id: 8, dur: 14000, setup: null,
       narr: "I'm not a chatbot with your files attached. I'm a system built for the way your business actually thinks — department by department, document by document, decision by decision." },
     { id: 9, dur: 999999, setup: null,
       narr: "When you're ready." }
