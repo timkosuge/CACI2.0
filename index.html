@@ -10916,8 +10916,17 @@ const DemoMode = {
       if (res.ok) {
         const d = await res.json();
         if (d.intro && typeof d.intro === 'string' && d.intro.trim().length > 20) {
-          // beats[0] is the preshow (id:2) — Cassie's intro
-          this.beats[0].narr = d.intro.trim();
+          // beats[0] is the preshow (id:2) — CACI's intro
+          const introText = d.intro.trim();
+          this.beats[0].narr = introText;
+          // Dynamic timing: TTS speaks at ~14 chars/sec. Compute beat durations
+          // from actual text length so short intros don't leave dead silence
+          // and long ones don't get clipped by the ceiling.
+          const estMs = Math.round((introText.length / 14) * 1000);
+          this.beats[0].minDur = Math.max(12000, Math.round(estMs * 0.85));
+          this.beats[0].maxDur = Math.max(30000, Math.round(estMs * 2.0));
+          // Preshow visual timeline scales to the same expected duration
+          this._preshowExpected = estMs;
         }
       }
     } catch {}
@@ -11511,7 +11520,7 @@ const DemoMode = {
     };
 
     // Expected narration length
-    const EXPECTED = 68000;  // Cassie's intro is ~68s
+    const EXPECTED = this._preshowExpected || 68000;  // Dynamic; defaults to ~68s for hardcoded intro
 
     // Painted the background on first frame so trails fade from that color
     let firstFrame = true;
