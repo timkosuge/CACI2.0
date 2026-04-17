@@ -10454,22 +10454,54 @@ async function loadSemanticIndex() {
   wrap.innerHTML = '<div class="tune-empty">Checking index status...</div>';
 
   try {
-    const res  = await apiFetch(`/embed-status?dept=${encodeURIComponent(dept)}`);
+    // Race the fetch against a 20s timeout so we never hang on "Checking..."
+    const fetchPromise = apiFetch(`/embed-status?dept=${encodeURIComponent(dept)}`);
+    const timeoutPromise = new Promise((_, rej) =>
+      setTimeout(() => rej(new Error('Status check timed out after 20s')), 20000)
+    );
+    const res = await Promise.race([fetchPromise, timeoutPromise]);
+
+    // Surface HTTP errors clearly instead of crashing on res.json()
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '');
+      wrap.innerHTML = `<div class="tune-empty" style="color:rgba(220,90,90,0.85)">
+        Status check failed (HTTP ${res.status})<br>
+        <span style="color:var(--smoke4);font-family:var(--f-mono);font-size:10px">${esc(txt.slice(0, 200))}</span>
+      </div>`;
+      return;
+    }
     const data = await res.json();
 
-    if (!data.ok) { wrap.innerHTML = `<div class="tune-empty">Error: ${data.error}</div>`; return; }
+    if (!data.ok) {
+      wrap.innerHTML = `<div class="tune-empty" style="color:rgba(220,90,90,0.85)">
+        Error: ${esc(data.error || 'unknown')}<br>
+        ${data.stack ? `<span style="color:var(--smoke4);font-family:var(--f-mono);font-size:9px">${esc(data.stack)}</span>` : ''}
+      </div>`;
+      return;
+    }
 
     if (!data.aiAvailable) {
       wrap.innerHTML = `<div class="tune-empty" style="color:rgba(220,170,60,0.8)">
-        ⚠ Cloudflare AI binding not available — semantic retrieval disabled.<br>
+        \u26A0 Cloudflare AI binding not available \u2014 semantic retrieval disabled.<br>
         <span style="color:var(--smoke4)">Keyword retrieval is still fully active. To enable hybrid search, ensure the <code>[ai]</code> binding is present in wrangler.toml and the worker is redeployed.</span>
       </div>`;
       return;
     }
 
-    const { totalFiles, indexedFiles, coveragePct, model, alpha } = data;
+    const { totalFiles, indexedFiles, partiallyIndexedFiles, coveragePct, fileCoveragePct, model, alpha, partialFiles, totalKeysInKV } = data;
     const allIndexed = coveragePct >= 95;
     const barColor   = allIndexed ? 'var(--green-lt)' : coveragePct > 50 ? 'rgba(220,170,60,0.8)' : 'rgba(220,90,90,0.8)';
+
+    // Render the top few problem files if any — gives admin a hint what's missing
+    const problemsHtml = (!allIndexed && partialFiles && partialFiles.length > 0)
+      ? `<div style="font-family:var(--f-mono);font-size:10px;color:var(--smoke4);line-height:1.7;max-height:160px;overflow-y:auto;padding:8px;background:rgba(255,255,255,0.02);border:1px solid rgba(220,170,60,0.15);border-radius:3px">
+          <div style="color:rgba(220,170,60,0.85);margin-bottom:6px">Files with incomplete indexing:</div>
+          ${partialFiles.slice(0, 12).map(pf =>
+            `<div>&middot; ${esc(pf.name)} &mdash; <span style="color:${pf.indexed === 0 ? 'rgba(220,90,90,0.85)' : 'rgba(220,170,60,0.7)'}">${pf.indexed}/${pf.total} chunks</span></div>`
+          ).join('')}
+          ${partialFiles.length > 12 ? `<div style="margin-top:6px;opacity:0.6">\u2026 and ${partialFiles.length - 12} more</div>` : ''}
+        </div>`
+      : '';
 
     wrap.innerHTML = `
       <div style="display:flex;flex-direction:column;gap:14px">
@@ -10478,17 +10510,17 @@ async function loadSemanticIndex() {
           <div class="scard ok">
             <div class="scard-label">Coverage</div>
             <div class="scard-val" style="color:${barColor}">${coveragePct}%</div>
-            <div class="srow"><div class="srow-text">${indexedFiles} of ${totalFiles} files indexed</div></div>
+            <div class="srow"><div class="srow-text">${indexedFiles} of ${totalFiles} files fully indexed</div></div>
           </div>
           <div class="scard">
             <div class="scard-label">Model</div>
             <div class="scard-val" style="font-size:11px;letter-spacing:0.02em">bge-base-en</div>
-            <div class="srow"><div class="srow-text">768-dim · Cloudflare AI</div></div>
+            <div class="srow"><div class="srow-text">768-dim &middot; Cloudflare AI</div></div>
           </div>
           <div class="scard">
-            <div class="scard-label">Blend (α)</div>
+            <div class="scard-label">Blend (&alpha;)</div>
             <div class="scard-val">${alpha}</div>
-            <div class="srow"><div class="srow-text">${Math.round(alpha*100)}% semantic · ${Math.round((1-alpha)*100)}% keyword</div></div>
+            <div class="srow"><div class="srow-text">${Math.round(alpha*100)}% semantic &middot; ${Math.round((1-alpha)*100)}% keyword</div></div>
           </div>
         </div>
 
@@ -10500,11 +10532,13 @@ async function loadSemanticIndex() {
         <div style="font-family:var(--f-mono);font-size:10px;color:var(--smoke3);letter-spacing:0.04em;line-height:1.7">
           ${indexedFiles === 0
             ? 'No files have been indexed yet. New uploads are indexed automatically. Use the button below to index existing files.'
-            : `${totalFiles - indexedFiles} file${totalFiles - indexedFiles !== 1 ? 's' : ''} not yet indexed. Run backfill to enable hybrid retrieval for all files.`}
+            : `${partiallyIndexedFiles || 0} file${(partiallyIndexedFiles || 0) !== 1 ? 's have' : ' has'} partial or missing embeddings. Run backfill to index all chunks for hybrid retrieval.`}
         </div>` : `
         <div style="font-family:var(--f-mono);font-size:10px;color:rgba(100,220,130,0.8);letter-spacing:0.04em">
-          ✓ All files indexed — hybrid retrieval fully active
+          \u2713 All files indexed &mdash; hybrid retrieval fully active
         </div>`}
+
+        ${problemsHtml}
 
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
           <button class="lbtn" id="semidx-backfill-btn" ${allIndexed ? 'disabled' : ''}>
