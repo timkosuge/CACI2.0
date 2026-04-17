@@ -10724,21 +10724,21 @@ const DemoMode = {
   //   maxDur: ceiling — forced advance (safety against stuck audio)
   //   The actual transition fires on audio.onended + a short breath (gap).
   beats: [
-    { id: 2, minDur: 62000, maxDur: 95000, setup: 'setupPreshow', voice: 'eve',
+    { id: 2, minDur: 62000, maxDur: 120000, setup: 'setupPreshow', voice: 'eve',
       narr: "Hi, I'm Cassie. I figured I'd introduce myself before we get started, because I know this is probably new — not AI in general, you've all seen it on your phones, but AI that actually understands this industry. That part's still rare. And I get the skepticism. So let me just tell you who I am. I was built for cannabis. Not retrofitted from some generic assistant — built for it. I know what 280E does to your margins. I know METRC isn't optional. I know compliance is stressed, retail is tired, and ops is holding everything together with duct tape and coffee. I'm not going to promise I'm perfect, because I'm not. But I'm careful, I cite my sources, and I don't forget anything you teach me. This industry was never going to be easy — too young, too regulated, too watched — and the people who figure it out are going to build something the world hasn't seen before. I'd really like to help with that. So — let me show you what I can do." },
-    { id: 1, minDur: 8000, maxDur: 16000, setup: null, voice: 'leo',
+    { id: 1, minDur: 8000, maxDur: 25000, setup: null, voice: 'leo',
       narr: "Here's what she was made for. Somewhere in all those earnings reports, regulations, and filings — the answer is already there. But finding it takes hours you don't have, and by the time you get to it, you've already moved on." },
-    { id: 3, minDur: 12000, maxDur: 22000, setup: 'setupDepts', voice: 'ara',
+    { id: 3, minDur: 12000, maxDur: 35000, setup: 'setupDepts', voice: 'ara',
       narr: "Every document you give her, she actually reads — not just the filename and metadata, the whole thing. Then she analyzes it seven ways: what it is, when it's from, where it applies, what it contains. Files it by department, period, and jurisdiction. By the time a question comes, she already knows where to look." },
-    { id: 4, minDur: 10000, maxDur: 20000, setup: 'setupQuery', voice: 'rex',
+    { id: 4, minDur: 10000, maxDur: 30000, setup: 'setupQuery', voice: 'rex',
       narr: "She doesn't search, she answers. Before pulling anything, she figures out what you're actually asking — then picks the right places to look, weighs every passage by how directly it answers, and won't tell you something she can't back up with a source." },
-    { id: 5, minDur: 9000, maxDur: 18000, setup: 'setupNetwork', voice: 'ara',
+    { id: 5, minDur: 9000, maxDur: 28000, setup: 'setupNetwork', voice: 'ara',
       narr: "The more she reads, the more she sees. A new regulation changes what a policy means. A new earnings report reframes an old trend. She notices things nobody thinks to ask about." },
-    { id: 6, minDur: 20000, maxDur: 35000, setup: 'setupScenario', voice: 'leo',
+    { id: 6, minDur: 20000, maxDur: 50000, setup: 'setupScenario', voice: 'leo',
       narr: "Now — to be clear, she's a prototype. About a week old. What she knows right now is a starting point: Jushi's earnings history, Ohio's regulatory code, Illinois regulations and their 2025 annual report. It's not everything she'll know. But it's enough to prove the point. Give her more, and her answers get sharper. This is what day one looks like." },
-    { id: 7, minDur: 8000, maxDur: 16000, setup: 'setupStats', voice: 'ara',
+    { id: 7, minDur: 8000, maxDur: 26000, setup: 'setupStats', voice: 'ara',
       narr: "Every answer cites its sources. Every upload is logged. Her memory lives in your walls — yours, not anyone else's, and it never trains another model." },
-    { id: 8, minDur: 9000, maxDur: 18000, setup: null, voice: 'rex',
+    { id: 8, minDur: 9000, maxDur: 28000, setup: null, voice: 'rex',
       narr: "She isn't a chatbot with your files attached. She's a system that learns how your business actually thinks — department by department, document by document, one question at a time." },
     { id: 9, minDur: 999999, maxDur: 999999, setup: null, voice: 'eve',
       narr: "So — let's get to work." }
@@ -10916,27 +10916,50 @@ const DemoMode = {
     const maxDur = beat.maxDur || 30000;
     const BREATH = 700;  // natural pause between beats after audio ends
     let advanced = false;
+    let ceilingTimer = null;
+    let audioStartedAt = null;  // timestamp when audio playback actually began
 
-    const advance = () => {
+    const advance = (reason) => {
       if (advanced || !this.running || this.currentBeat !== idx) return;
       advanced = true;
       if (this.timer) { clearTimeout(this.timer); this.timer = null; }
+      if (ceilingTimer) { clearTimeout(ceilingTimer); ceilingTimer = null; }
       this.playBeat(idx + 1);
     };
 
-    // Hard ceiling — if something goes wrong (audio never fires onended),
-    // force-advance at maxDur so the demo can't hang
-    const ceilingTimer = setTimeout(advance, maxDur);
+    // The ceiling timer only starts when audio actually begins playing.
+    // maxDur measures from audio-start, not beat-start — audio fetch time
+    // doesn't eat into the safety window.
+    const armCeiling = () => {
+      if (ceilingTimer) return;
+      audioStartedAt = performance.now();
+      ceilingTimer = setTimeout(() => advance('ceiling'), maxDur);
+    };
+
+    // If audio never starts (no TTS, all fetches fail), fall back to a
+    // conservative beat-start ceiling — twice the maxDur so we can't hang.
+    const fallbackCeiling = setTimeout(() => advance('fallback'), maxDur * 2);
+
+    // Poll for audio start; when it begins, arm the real audio-based ceiling
+    const armPoller = setInterval(() => {
+      if (!this.running || advanced) { clearInterval(armPoller); return; }
+      if (this.currentAudio && !this.currentAudio.paused && audioStartedAt === null) {
+        clearInterval(armPoller);
+        clearTimeout(fallbackCeiling);
+        armCeiling();
+      }
+    }, 80);
 
     // Play narration. When audio finishes, honor minDur floor then advance
     // after a short breath. This makes beats follow speech pace, not a timer.
     this.speakBeat(idx, () => {
+      clearInterval(armPoller);
+      clearTimeout(fallbackCeiling);
       // Audio ended (or failed). Wait for minDur floor, then breath, then advance.
       const elapsed = performance.now() - beatStartTime;
       const wait = Math.max(BREATH, minDur - elapsed + BREATH);
       this.timer = setTimeout(() => {
-        clearTimeout(ceilingTimer);
-        advance();
+        advance('onended');
       }, wait);
     });
     // Safety: if TTS is unavailable entirely and onended never fires,
