@@ -372,10 +372,29 @@ body[data-theme="light"] .composer-wrap {
 /* Main content area backgrounds — the circuit-board pattern was gold-tinted
    and reads muddy on light. Hide it in light mode. Actual class is
    chat-bg-overlay (confirmed via grep of DOM). */
-body[data-theme="light"] .chat-bg-overlay,
 body[data-theme="light"] #circuit-overlay,
 body[data-theme="light"] .circuit-bg,
 body[data-theme="light"] #main-circuit {
+  display: none !important;
+}
+
+/* Light mode: swap the JUSHI background image for the light variant, and
+   replace the dark ink wash with a light one so text stays readable. */
+body[data-theme="light"] .chat-bg-overlay::before {
+  background: url('JUSHILIGHT.webp') center center / cover no-repeat !important;
+  opacity: 0.35 !important;
+  filter: contrast(0.95) brightness(1.08) !important;
+}
+body[data-theme="light"] .chat-bg-overlay::after {
+  /* Flip the center-heavy dark wash to a center-heavy LIGHT wash so the
+     chat text in the middle still has contrast against a busy bg. */
+  background:
+    radial-gradient(ellipse 60% 50% at 50% 50%, rgba(245, 247, 250, 0.55) 0%, rgba(245, 247, 250, 0.15) 100%),
+    linear-gradient(180deg, rgba(245, 247, 250, 0.20) 0%, rgba(245, 247, 250, 0.45) 100%) !important;
+}
+/* SVG circuit lines on top of the image — these are gold-stroked and read as
+   muddy yellow on light. Hide them. */
+body[data-theme="light"] .chat-bg-overlay svg {
   display: none !important;
 }
 
