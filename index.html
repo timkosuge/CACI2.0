@@ -7705,6 +7705,65 @@ html body[data-theme="light"] aside#sidebar::after {
   display: none !important;
 }
 
+/* The tambour shutter — a hand-designed rolling metal-slat decoration that
+   covers the sidebar nav when closed. Beautiful in dark mode, but its
+   hardcoded dark brown gradients and gold highlights look completely wrong
+   on a light sidebar. Hide entirely in light mode. */
+html body[data-theme="light"] .tambour,
+html body[data-theme="light"] #tambour,
+html body[data-theme="light"] .tambour-slats,
+html body[data-theme="light"] #tambour-slats,
+html body[data-theme="light"] .tambour-slat,
+html body[data-theme="light"] .tambour-handle,
+html body[data-theme="light"] #tambour-handle {
+  display: none !important;
+}
+
+/* App Launcher panel (Microsoft 365 floating popup from the top-right
+   grid icon). Currently dark with gold border. Make light. */
+html body[data-theme="light"] .app-launcher-panel {
+  background: #FFFFFF !important;
+  border: 1px solid rgba(30, 58, 95, 0.20) !important;
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.22) !important;
+}
+html body[data-theme="light"] .alp-header {
+  border-bottom: 1px solid rgba(30, 58, 95, 0.12) !important;
+}
+html body[data-theme="light"] .alp-title {
+  color: #1E3A5F !important;
+}
+html body[data-theme="light"] .alp-close {
+  color: rgba(30, 58, 95, 0.65) !important;
+}
+html body[data-theme="light"] .alp-close:hover {
+  color: #1E3A5F !important;
+  background: rgba(30, 58, 95, 0.06) !important;
+}
+html body[data-theme="light"] .alp-app {
+  background: #F5F7FA !important;
+  border: 1px solid rgba(30, 58, 95, 0.10) !important;
+}
+html body[data-theme="light"] .alp-app:hover {
+  background: #FFFFFF !important;
+  border-color: rgba(30, 58, 95, 0.25) !important;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08) !important;
+}
+html body[data-theme="light"] .alp-name {
+  color: #1E3A5F !important;
+}
+html body[data-theme="light"] .alp-status {
+  color: rgba(30, 58, 95, 0.55) !important;
+}
+/* "MANAGE CONNECTIONS" button at the bottom of the launcher */
+html body[data-theme="light"] .app-launcher-panel button,
+html body[data-theme="light"] .app-launcher-panel .manage-connections-btn,
+html body[data-theme="light"] .app-launcher-panel a[href*="settings"],
+html body[data-theme="light"] .app-launcher-panel a[href*="integration"] {
+  background: #FFFFFF !important;
+  color: #1E3A5F !important;
+  border: 1px solid rgba(30, 58, 95, 0.25) !important;
+}
+
 /* Welcome greeting text — "Hey Tim, I'm Caci..." — was gold gradient,
    unreadable on light sky. Replace with solid dark text. */
 html body[data-theme="light"] #discovery-greeting-strip .dgs-text {
