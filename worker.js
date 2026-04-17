@@ -74,6 +74,13 @@ export default {
     const method = request.method;
 
     if (method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
+    
+    // Serve static files BEFORE auth check
+    if (path === '/JUSHI.webp' && method === 'GET') {
+      const img = await env.CACI_R2.get('JUSHI.webp');
+      if (img) return new Response(img.body, { headers: { 'Content-Type': 'image/webp', 'Cache-Control': 'public, max-age=86400' } });
+    }
+    
     if (path === '/auth/login' && method === 'POST') return handleLogin(request, env);
     if (path === '/health') return json({ ok: true, version: '6.1.0' });
 
