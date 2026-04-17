@@ -4732,39 +4732,64 @@ Return ONLY the JSON object. No preamble, no markdown, no explanation.`;
   }
 }
 
-// Lightweight retrieval helper for harvesting: scans document chunks in KV
-// for the query's keywords and returns the top-matching text. This is a
-// simpler, synchronous version of the main retrieval pipeline — sufficient
-// for the harvester because we don't need semantic scoring, just "give me
-// chunks that mention these words."
+// Lightweight retrieval helper for harvesting: iterates file records across
+// all departments, scans each file's embedded `chunks` array for keyword hits,
+// returns the top-matching chunks with their source document names.
+//
+// This matches the real storage layout: chunks live INSIDE `file:{id}` records
+// as an embedded array, keyed by department via `index:{dept}`.
 async function harvestRetrieveContext(env, query) {
   try {
     const keywords = query.toLowerCase().split(/\s+/).filter(w => w.length > 3);
-    // List all chunk keys across all collections
-    const list = await env.CACI_KV.list({ prefix: 'chunk:' });
-    if (!list.keys || list.keys.length === 0) return '';
-    // Score chunks by keyword hits
-    const scored = [];
-    const MAX_KEYS_TO_SCAN = 200;  // cap for performance
-    const sample = list.keys.slice(0, MAX_KEYS_TO_SCAN);
-    for (const k of sample) {
-      const raw = await env.CACI_KV.get(k.name);
-      if (!raw) continue;
-      let chunk;
-      try { chunk = JSON.parse(raw); } catch { continue; }
-      const text = (chunk.text || chunk.content || '').toLowerCase();
-      if (!text) continue;
-      let score = 0;
-      for (const kw of keywords) {
-        const hits = (text.match(new RegExp(kw, 'g')) || []).length;
-        score += hits;
+    if (keywords.length === 0) return '';
+
+    // Known departments the app uses. If you add more departments later, list them here.
+    const DEPTS = ['retail', 'compliance', 'finance', 'operations', 'general'];
+    // Collect all file IDs across departments, with their metadata
+    const allFiles = [];
+    for (const dept of DEPTS) {
+      const idx = await env.CACI_KV.get(`index:${dept}`, 'json');
+      if (!Array.isArray(idx)) continue;
+      for (const rec of idx) {
+        if (rec && rec.id) allFiles.push({ id: rec.id, dept, name: rec.name || rec.filename || rec.id });
       }
-      if (score > 0) {
-        scored.push({ score, text: chunk.text || chunk.content, source: chunk.source || chunk.docName || 'unknown' });
+    }
+    if (allFiles.length === 0) return '';
+
+    // Cap files scanned per harvest — performance guard. 20 files covers the
+    // current library; if it grows much larger we'd paginate.
+    const MAX_FILES_TO_SCAN = 20;
+    const sampleFiles = allFiles.slice(0, MAX_FILES_TO_SCAN);
+
+    const scored = [];
+    for (const f of sampleFiles) {
+      const fileRec = await env.CACI_KV.get(`file:${f.id}`, 'json');
+      if (!fileRec) continue;
+      const chunks = Array.isArray(fileRec.chunks) ? fileRec.chunks : [];
+      for (const chunk of chunks) {
+        const text = (chunk.text || chunk.content || '').toLowerCase();
+        if (!text) continue;
+        let score = 0;
+        for (const kw of keywords) {
+          const hits = (text.match(new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length;
+          score += hits;
+        }
+        // Boost chunks with dense numeric content (harvesting numbers!)
+        const numCount = (text.match(/[\$\d]+[\d,.]+[%MBK]?/g) || []).length;
+        if (numCount >= 3) score += Math.min(numCount, 10);
+        if (score > 0) {
+          scored.push({
+            score,
+            text: chunk.text || chunk.content,
+            source: f.name,
+          });
+        }
       }
     }
     scored.sort((a, b) => b.score - a.score);
-    const top = scored.slice(0, 6);
+    // Return top 8 chunks — enough context for Claude to extract facts,
+    // bounded so we don't blow up the prompt size
+    const top = scored.slice(0, 8);
     return top.map(t => `[${t.source}]\n${t.text}`).join('\n\n---\n\n');
   } catch (e) {
     return '';
