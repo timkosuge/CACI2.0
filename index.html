@@ -11496,7 +11496,6 @@ const DemoMode = {
     nameEl.className = 'preshow-name-v2';
     nameEl.innerHTML = [
       '<div class="preshow-brand">CACI</div>',
-      '<div class="preshow-cassie">Cassie</div>',
       '<div class="preshow-name-line"><div class="preshow-name-line-fill"></div></div>',
     ].join('');
     preshow.appendChild(nameEl);
@@ -11518,7 +11517,7 @@ const DemoMode = {
     let firstFrame = true;
 
     // Flag for Cassie reveal
-    let cassieRevealed = false;
+    let cassieRevealed = false; // deprecated: CACI/Cassie reveal removed (name is CACI)
 
     let raf = null;
     const frame = () => {
@@ -11552,13 +11551,6 @@ const DemoMode = {
       const fadeOutStart = EXPECTED - 3500;
       const globalFadeOut = t > fadeOutStart ? Math.max(0, 1 - (t - fadeOutStart) / 3500) : 1;
       const globalA = globalFadeIn * globalFadeOut;
-
-      // Reveal "Cassie" around 3s in (she says "I'm Cassie" at about that timestamp)
-      if (!cassieRevealed && tsec > 2.8) {
-        cassieRevealed = true;
-        const cassieEl = nameEl && nameEl.querySelector('.preshow-cassie');
-        if (cassieEl) cassieEl.classList.add('revealed');
-      }
 
       // Update and draw points — velocity, brightness, size all audio-reactive
       const speedMult = 1 + treble * 1.8;      // sharp consonants push particles
