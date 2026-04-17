@@ -12685,16 +12685,45 @@ const DemoMode = {
       }
       if (nameEl) nameEl.style.opacity = String(globalFadeOut);
 
-      // Audio-reactive glow on the CACI brand — bass drives a warm gold halo
-      // behind the typography. Feels like her voice IS the light.
+      // Audio-reactive glow on the CACI brand — her voice IS the light.
+      // Multiple layered effects: drop-shadow halo (outside letters), text-shadow
+      // glow (around each letter including inner edges), brightness boost, and
+      // a subtle breathing scale. Together these make the text visibly pulse
+      // with the narration rather than sitting static during the intro.
       const brandEl = nameEl && nameEl.querySelector('.preshow-brand');
       if (brandEl) {
-        const glowRadius = 32 + bass * 60 + energy * 20;
-        const glowOpacity = (0.28 + bass * 0.45).toFixed(2);
+        // Combine bass and overall energy — bass gives the warm body, energy
+        // gives sharp peaks on emphasis. Weight bass slightly higher since
+        // vowels carry the "her voice is alive" feeling.
+        const voicePower = bass * 0.7 + energy * 0.55;  // 0..1+, can exceed 1 on peaks
+
+        // Outer halo — widens dramatically on loud moments (32px → 180px)
+        const haloRadius = 32 + voicePower * 140;
+        const haloOpacity = (0.25 + voicePower * 0.55).toFixed(2);
+
+        // Inner text-shadow — glows around the letter edges themselves.
+        // Two layers for depth: a tight bright inner glow + a wider warm spread.
+        const innerGlowR = 6 + voicePower * 18;
+        const innerGlowOpacity = (0.35 + voicePower * 0.50).toFixed(2);
+        const spreadGlowR = 18 + voicePower * 42;
+        const spreadGlowOpacity = (0.20 + voicePower * 0.45).toFixed(2);
+
         brandEl.style.filter =
           `drop-shadow(0 1px 0px rgba(0,0,0,1)) ` +
           `drop-shadow(0 2px 6px rgba(0,0,0,0.75)) ` +
-          `drop-shadow(0 0 ${glowRadius}px rgba(212,168,50,${glowOpacity}))`;
+          `drop-shadow(0 0 ${haloRadius.toFixed(0)}px rgba(255, 228, 140, ${haloOpacity}))`;
+        brandEl.style.textShadow =
+          `0 0 ${innerGlowR.toFixed(0)}px rgba(255, 244, 200, ${innerGlowOpacity}), ` +
+          `0 0 ${spreadGlowR.toFixed(0)}px rgba(245, 210, 100, ${spreadGlowOpacity})`;
+
+        // Subtle scale breathing — barely perceptible but adds life.
+        // ~0.6% at rest, up to ~2.5% on peaks.
+        const scale = 1 + voicePower * 0.025;
+        brandEl.style.transform = `scale(${scale.toFixed(4)})`;
+        // Very slight brightness boost on peaks — makes the gold feel warmer
+        // when she speaks loudly
+        const brightness = 1 + voicePower * 0.12;
+        brandEl.style.webkitFilter = brandEl.style.filter;  // safari fallback
       }
 
       raf = requestAnimationFrame(frame);
