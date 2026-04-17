@@ -12042,6 +12042,9 @@ const DemoMode = {
     this.stopParticles();
     this.stopPreshow();
     this.stopCinema();
+    this._disposeCinema();   // full WebGL memory release — prevents the slowdown
+                             // users hit when they log into CACI in the same tab
+                             // after watching the demo
     this._disposeAnalyser();
   },
 
@@ -14446,13 +14449,86 @@ const DemoMode = {
     C.running = false;
     if (C.raf) { cancelAnimationFrame(C.raf); C.raf = null; }
     if (C.resizeHandler) window.removeEventListener('resize', C.resizeHandler);
-    // Clear the canvas to black — cheap, no need to dispose on every stop
-    try {
-      C.renderer.clear();
-    } catch {}
+    // Clear the canvas to black
+    try { C.renderer.clear(); } catch {}
     const preshow = document.getElementById('demo-preshow');
     if (preshow) preshow.classList.remove('cinema-active');
     this._cinemaFadeOut = undefined;
+  },
+
+  // Fully release WebGL memory — called when the demo OVERLAY closes, not
+  // between beats or on replay. Without this, the 3D scene (900 particles,
+  // shader programs, geometries, and dozens of canvas textures for floating
+  // numbers and charts) stays pinned in GPU memory indefinitely. Subsequent
+  // browser work (chat scrolling, CSS animations, DOM repaints) competes
+  // with that pinned scene for GPU resources and feels sluggish.
+  //
+  // After disposal, `this.cinema` is null. If the user opens the demo again
+  // in the same session, setupCinema() rebuilds everything from scratch.
+  _disposeCinema() {
+    if (!this.cinema) return;
+    const C = this.cinema;
+
+    // Walk the scene graph and dispose every geometry, material, and texture.
+    // Three.js does NOT free these automatically when an object is removed
+    // from the scene — they have to be explicitly disposed.
+    const disposeMaterial = (m) => {
+      if (!m) return;
+      // Materials have map textures that also need disposing
+      if (m.map && typeof m.map.dispose === 'function') m.map.dispose();
+      if (m.uniforms) {
+        for (const k in m.uniforms) {
+          const v = m.uniforms[k] && m.uniforms[k].value;
+          if (v && typeof v.dispose === 'function') v.dispose();
+        }
+      }
+      if (typeof m.dispose === 'function') m.dispose();
+    };
+
+    try {
+      if (C.scene) {
+        C.scene.traverse(obj => {
+          if (obj.geometry && typeof obj.geometry.dispose === 'function') {
+            try { obj.geometry.dispose(); } catch {}
+          }
+          if (obj.material) {
+            if (Array.isArray(obj.material)) obj.material.forEach(disposeMaterial);
+            else disposeMaterial(obj.material);
+          }
+        });
+        // Clear scene children — remove all top-level objects
+        while (C.scene.children.length > 0) {
+          C.scene.remove(C.scene.children[0]);
+        }
+      }
+    } catch {}
+
+    // Dispose the particle system's shader material and geometry explicitly —
+    // it's referenced at C.material and C.geometry for audio-reactive updates
+    try { if (C.material && C.material.dispose) C.material.dispose(); } catch {}
+    try { if (C.geometry && C.geometry.dispose) C.geometry.dispose(); } catch {}
+
+    // Dispose render targets and internal WebGL resources
+    try { if (C.renderer && C.renderer.renderLists) C.renderer.renderLists.dispose(); } catch {}
+    try { if (C.renderer && C.renderer.info && C.renderer.info.programs) {
+      C.renderer.info.programs.length = 0;
+    }} catch {}
+    try {
+      if (C.renderer && C.renderer.dispose) C.renderer.dispose();
+      // Explicitly lose the WebGL context to release GPU memory NOW rather
+      // than at browser GC whenever
+      if (C.renderer && C.renderer.forceContextLoss) C.renderer.forceContextLoss();
+    } catch {}
+
+    // Clear beat objects map — our references to geometry/material wrappers
+    C.beatObjects = {};
+    C.scene = null;
+    C.camera = null;
+    C.renderer = null;
+    C.material = null;
+    C.geometry = null;
+
+    this.cinema = null;
   },
 
   // Per-frame update of all beat objects — fade transitions, animations,
