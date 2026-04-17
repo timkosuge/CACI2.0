@@ -9913,16 +9913,10 @@ async function sendChat() {
             const b = getBubble(); if (b) b.innerHTML = renderMarkdown(fullText);
             msgEl.scrollIntoView({block:'end', behavior:'smooth'});
 
-            // Fire TTS on first complete sentence if auto-speak on
-            if (voiceAutoSpeak && !ttsFired) {
-              const sentenceEnd = ttsBuffer.search(/[.!?]\s/);
-              if (sentenceEnd > 40) {
-                ttsFired = true;
-                const firstSentence = ttsBuffer.slice(0, sentenceEnd + 1).trim();
-                ttsBuffer = ttsBuffer.slice(sentenceEnd + 2);
-                speakTextQueued(null, firstSentence);
-              }
-            }
+            // (Early first-sentence TTS fire was removed — it caused a pause
+            // after the first sentence because the rest of the blobs hadn't
+            // finished fetching yet. Now we wait for full response, then speak
+            // it all at once with parallel fetches — smoother playback.)
           }
 
           if (evt.done) {
@@ -9932,20 +9926,12 @@ async function sendChat() {
             msgEl.remove();
             appendMsg('ai', fullText, evt.sources || [], evt.scope || body.scope, evt.model || 'claude', evt.responseId || '');
 
-            // Queue remaining TTS text
-            // Critical: if the first sentence is already playing, APPEND the rest
-            // to the active queue instead of cancelling and starting over. That
-            // avoids the audible cut-then-restart between the first sentence and
-            // the remainder.
+            // Auto-speak: now that streaming is complete, speak the full response
+            // in one go. All sentences fetch in parallel and play sequentially —
+            // no pause, no cut-restart. Costs a small latency (until streaming
+            // finishes) before voice starts, but the playback is smooth.
             if (voiceAutoSpeak) {
-              if (!ttsFired) {
-                // First sentence never fired (response was all one short sentence or
-                // came back too fast). Speak the whole thing fresh.
-                speakTextQueued(null, fullText);
-              } else if (ttsBuffer.trim()) {
-                // First sentence was fired; append the remainder to the live queue.
-                appendToTtsQueue(ttsBuffer.trim());
-              }
+              speakTextQueued(null, fullText);
             }
 
             chatHistory.push({role:'assistant', content:fullText});
