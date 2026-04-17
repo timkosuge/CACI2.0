@@ -4669,22 +4669,22 @@ async function handleDemoHarvestStats(request, env) {
     const topicQueries = [
       {
         topic: 'revenue',
-        query: 'quarterly revenue earnings total sales cannabis operations financial performance',
+        query: 'FY2025 2025 2024 quarterly revenue earnings total sales cannabis operations financial performance full year',
         scope: 'Illinois 2025 annual report, Jushi quarterly earnings',
       },
       {
         topic: 'licensing',
-        query: 'dispensary license count operators active medical adult-use',
+        query: '2025 current dispensary license count operators active medical adult-use',
         scope: 'Illinois 2025 annual report',
       },
       {
         topic: 'regulatory',
-        query: 'compliance requirements testing regulation sections chapters rules',
+        query: '2025 2024 compliance requirements testing regulation sections chapters rules',
         scope: 'Ohio regulatory code, Illinois regulations',
       },
       {
         topic: 'collections',
-        query: 'tax collections monthly remittance fund transfers community services',
+        query: 'FY2025 FY2024 tax collections monthly remittance fund transfers community services',
         scope: 'Illinois 2025 annual report',
       },
     ];
@@ -4735,10 +4735,12 @@ Return a JSON object with two arrays: "singles" and "charts".
 
 Rules:
 1. Only include facts that are directly stated in the excerpts. If you're guessing, omit.
-2. Prefer numbers that will look good as charts: multi-year trends, by-state breakdowns, categorical counts.
-3. Aim for 6-10 singles and 2-4 charts total. Quality over quantity.
-4. Numbers must be plain numbers (no currency symbols in "value"). Use "displayValue" for formatting.
-5. If a sweep returned no useful facts, don't force it.
+2. STRONGLY PREFER THE MOST RECENT DATA. If the excerpts contain both a 2022 figure and a 2024 or 2025 figure for the same metric, use the newer one. Skip older data entirely unless it's part of a multi-year trend chart showing growth over time. For single-value stats, use the latest available period (prefer FY 2025, Q4 2025, or 2024 over anything from 2022 or 2023). This demo reflects the CURRENT state of the business, not historical snapshots.
+3. Prefer numbers that will look good as charts: multi-year trends, by-state breakdowns, categorical counts.
+4. Aim for 6-10 singles and 2-4 charts total. Quality over quantity.
+5. Numbers must be plain numbers (no currency symbols in "value"). Use "displayValue" for formatting.
+6. For every stat, include the period in the label or as a separate "period" field so viewers know WHEN it's from.
+7. If a sweep returned no useful facts, don't force it.
 
 Return ONLY the JSON object. No preamble, no markdown, no explanation.`;
 
@@ -4827,12 +4829,28 @@ async function harvestRetrieveContext(env, query) {
     const scored = [];
     let chunksScanned = 0;
     let filesWithChunks = 0;
+    // Recency boost: filenames and text mentioning recent years rank higher.
+    // This pushes 2024/2025 data to the top of the extraction context, so
+    // Claude sees recent facts first. 2022/2023 aren't excluded — just deprioritized.
+    const RECENCY_BOOSTS = {
+      '2025': 18, '2024': 12, '2023': 4, '2022': 0, '2021': -2, '2020': -4, '2019': -6,
+    };
     for (const fkey of sampleFiles) {
       const fileRec = await env.CACI_KV.get(fkey.name, 'json');
       if (!fileRec) continue;
       const chunks = Array.isArray(fileRec.chunks) ? fileRec.chunks : [];
       if (chunks.length > 0) filesWithChunks++;
       const fileName = fileRec.name || fileRec.filename || fileRec.id || fkey.name;
+      const fileNameLower = fileName.toLowerCase();
+      // File-level recency boost: if the filename mentions a year, apply that boost
+      // to every chunk from this file. This pushes docs like "Jushi 2025 Q4" ahead
+      // of "Jushi 2022 Q4" even if the 2022 doc has more numeric density.
+      let fileRecencyBoost = 0;
+      for (const [year, boost] of Object.entries(RECENCY_BOOSTS)) {
+        if (fileNameLower.includes(year)) {
+          fileRecencyBoost = Math.max(fileRecencyBoost, boost);
+        }
+      }
       for (const chunk of chunks) {
         chunksScanned++;
         // Chunks are stored as plain strings by handleUpload (worker.js line ~583).
@@ -4852,6 +4870,15 @@ async function harvestRetrieveContext(env, query) {
         // Boost chunks with dense numeric content (we're harvesting numbers!)
         const numCount = (text.match(/[\$\d]+[\d,.]+[%MBK]?/g) || []).length;
         if (numCount >= 3) score += Math.min(numCount, 10);
+        // Chunk-level recency boost: if chunk text mentions a recent year, bump score.
+        // This catches cases where the filename is generic but the chunk content is recent.
+        for (const [year, boost] of Object.entries(RECENCY_BOOSTS)) {
+          if (text.includes(year)) {
+            score += boost * 0.4;  // softer than filename boost
+          }
+        }
+        // Apply file-level recency boost
+        score += fileRecencyBoost;
         if (score > 0) {
           scored.push({
             score,
