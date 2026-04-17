@@ -801,11 +801,13 @@ body::before {
   position: absolute;
   inset: 0;
   display: none;
-  z-index: 2;
+  z-index: 1;   /* Behind .demo-beat content (which sits at z-index 2+) */
   overflow: hidden;
   background: radial-gradient(ellipse at center, rgba(8,12,22,0.4) 0%, rgba(4,6,12,0.85) 70%, rgba(2,3,8,1) 100%);
 }
 .demo-preshow.active { display: block; }
+/* When cinema is running, the preshow container stays visible behind beats */
+.demo-preshow.cinema-active { display: block; }
 
 .demo-preshow-canvas {
   position: absolute;
@@ -814,6 +816,19 @@ body::before {
   height: 100%;
   pointer-events: none;
 }
+
+/* Cinema WebGL canvas — renders 3D scene; hidden until cinema mode engages */
+.demo-cinema-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  display: none;
+  background: #02040a;
+}
+.demo-preshow.cinema-active .demo-cinema-canvas { display: block; }
+.demo-preshow.cinema-active .demo-preshow-canvas { display: none; }
 
 .demo-preshow-svg {
   position: absolute;
@@ -1008,6 +1023,7 @@ body::before {
   pointer-events: none;
   transition: opacity 0.7s cubic-bezier(0.4,0.0,0.2,1);
   padding: 40px 60px;
+  z-index: 3;  /* Above cinema backdrop (z-index 1) and controls */
 }
 .demo-beat.active {
   opacity: 1;
@@ -6425,6 +6441,8 @@ body::before {
     <!-- PRESHOW: Cassie's intro — 3D constellation → network → handoff -->
     <div class="demo-preshow" id="demo-preshow">
       <canvas class="demo-preshow-canvas" id="demo-preshow-canvas"></canvas>
+      <!-- Cinema WebGL canvas — replaces the 2D canvas when Three.js loads -->
+      <canvas class="demo-cinema-canvas" id="demo-cinema-canvas"></canvas>
       <svg class="demo-preshow-svg" id="demo-preshow-svg" preserveAspectRatio="xMidYMid slice">
         <defs>
           <radialGradient id="preshowCoreGrad" cx="50%" cy="50%" r="50%">
@@ -10810,6 +10828,21 @@ const DemoMode = {
     const preshow = document.getElementById('demo-preshow');
     if (preshow) preshow.classList.add('active');
 
+    // Load Three.js and initialize the cinema scene in parallel with audio prefetch.
+    // If it succeeds, initCinema will populate this.cinema. Otherwise we fall back
+    // to the 2D preshow. Fire-and-forget — don't block start on this.
+    this.initCinema().then((c) => {
+      if (c && this.running) {
+        this.startCinema();
+        this.setCameraTarget('preshowStart');
+        // After 400ms, begin the slow camera pull-back to preshowEnd over the
+        // length of Cassie's intro. lerpSpeed 0.004 ≈ very gentle drift.
+        setTimeout(() => {
+          if (this.running) this.setCameraTarget('preshowEnd', 0.004);
+        }, 400);
+      }
+    }).catch(() => {});
+
     // Prefetch Beat 2 (Cassie's intro, plays first) AND Beat 1 (the next one).
     // When Beat 2's blob arrives, fire playBeat(0) — visual and audio start together.
     const sess = this.audioSession;
@@ -10852,6 +10885,7 @@ const DemoMode = {
     document.querySelectorAll('.demo-dot').forEach(d => { d.classList.remove('active'); d.classList.remove('done'); });
     this.stopParticles();
     this.stopPreshow();
+    this.stopCinema();
     this._disposeAnalyser();
   },
 
@@ -10901,6 +10935,12 @@ const DemoMode = {
 
     // If this beat isn't the preshow, make sure preshow is torn down
     if (beat.id !== 2) this.stopPreshow();
+
+    // Match-cut: move the cinema camera to this beat's waypoint.
+    // No fade/reset — the eye follows the camera through the same space.
+    if (this.cinema && this.cameraWaypoints[beat.id]) {
+      this.setCameraTarget(beat.id, 0.025);
+    }
 
     // Prefetch the next TWO beats for zero-latency transitions
     if (idx + 1 < this.beats.length) this.prefetchBeatAudio(idx + 1);
@@ -11470,6 +11510,292 @@ const DemoMode = {
     const core = preshow && preshow.querySelector('.preshow-core');
     if (core) core.remove();
   },
+
+  // ══════════════════════════════════════════════════════════════════
+  // CINEMA — one continuous Three.js scene used across all beats
+  //
+  // A volumetric space of ~900 gold points at real 3D depth. A real camera
+  // moves through it. Each beat has a target camera position + lookAt which
+  // we interpolate to on transitions — NO fade to a new slide. The eye
+  // follows the camera through the same living space.
+  //
+  // Audio-reactive: point emission intensity + camera dolly speed both
+  // respond to DemoMode.audio.* metrics (energy/bass/treble) set by the
+  // AnalyserNode pipeline in playAudioBlob().
+  //
+  // Graceful fallback: if WebGL is unavailable or Three.js fails to load,
+  // we stay on the 2D preshow canvas — the demo still works, just less cinema.
+  // ══════════════════════════════════════════════════════════════════
+
+  cinema: null,   // Will hold { scene, camera, renderer, points, targets, ... }
+
+  async ensureThreeLoaded() {
+    if (window.THREE) return true;
+    if (this._threeLoadPromise) return this._threeLoadPromise;
+    this._threeLoadPromise = new Promise((resolve) => {
+      // Probe for WebGL support before loading Three
+      try {
+        const testCanvas = document.createElement('canvas');
+        const gl = testCanvas.getContext('webgl') || testCanvas.getContext('experimental-webgl');
+        if (!gl) { resolve(false); return; }
+      } catch { resolve(false); return; }
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+      script.async = true;
+      script.onload = () => resolve(!!window.THREE);
+      script.onerror = () => resolve(false);
+      document.head.appendChild(script);
+    });
+    return this._threeLoadPromise;
+  },
+
+  // Camera waypoints per beat. Each waypoint: camera position + lookAt target.
+  // Positions are in world units. The camera starts centered, pulls back
+  // during the intro, then drifts through the point cloud per beat.
+  //
+  // The point cloud is centered at origin, spans roughly ±180 units in xy and
+  // ±300 in z. Camera stays outside the cloud for most beats, dips inside for
+  // the "network" beat to feel immersive.
+  cameraWaypoints: {
+    // beat id → { pos: [x,y,z], look: [x,y,z], fov: number }
+    preshowStart: { pos: [0, 0, 8],    look: [0, 0, 0],    fov: 35 },  // zoomed in on core
+    preshowEnd:   { pos: [0, 0, 320],  look: [0, 0, 0],    fov: 48 },  // full field
+    1: { pos: [-180, -40, 260],  look: [-20, -20, 0],   fov: 50 }, // angle down-left
+    3: { pos: [180, 60, 220],    look: [40, 20, 0],     fov: 50 }, // angle up-right
+    4: { pos: [0, 0, 140],       look: [0, 0, -60],     fov: 42 }, // diving in
+    5: { pos: [-40, 20, 40],     look: [40, 0, -40],    fov: 65 }, // INSIDE the cloud
+    6: { pos: [160, -80, 280],   look: [0, -40, 0],     fov: 48 }, // pulled back low
+    7: { pos: [-120, 120, 260],  look: [0, 40, 0],      fov: 50 }, // high angle
+    8: { pos: [0, 0, 420],       look: [0, 0, 0],       fov: 38 }, // pulled way back — the grand view
+    9: { pos: [0, 0, 180],       look: [0, 0, 0],       fov: 40 }, // settle center for the card reveal
+  },
+
+  async initCinema() {
+    if (this.cinema) return this.cinema;
+    const loaded = await this.ensureThreeLoaded();
+    if (!loaded) return null;
+    const THREE = window.THREE;
+
+    const canvas = document.getElementById('demo-cinema-canvas');
+    if (!canvas) return null;
+    const preshow = document.getElementById('demo-preshow');
+
+    // Renderer
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setClearColor(0x02040a, 1);
+
+    const resize = () => {
+      const rect = preshow.getBoundingClientRect();
+      renderer.setSize(rect.width, rect.height, false);
+      if (this.cinema && this.cinema.camera) {
+        this.cinema.camera.aspect = rect.width / rect.height;
+        this.cinema.camera.updateProjectionMatrix();
+      }
+    };
+    resize();
+    window.addEventListener('resize', resize);
+
+    // Scene + camera
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x02040a, 0.0025);  // volumetric depth fade
+
+    const rect = preshow.getBoundingClientRect();
+    const camera = new THREE.PerspectiveCamera(35, rect.width / rect.height, 0.5, 2000);
+    const startW = this.cameraWaypoints.preshowStart;
+    camera.position.set(...startW.pos);
+    camera.lookAt(...startW.look);
+
+    // Point cloud — a volumetric cluster around origin
+    const POINT_COUNT = 900;
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(POINT_COUNT * 3);
+    const colors    = new Float32Array(POINT_COUNT * 3);
+    const sizes     = new Float32Array(POINT_COUNT);
+    const phases    = new Float32Array(POINT_COUNT);
+
+    for (let i = 0; i < POINT_COUNT; i++) {
+      // Ellipsoidal distribution, biased slightly outward so the center isn't mush
+      const r = 60 + Math.pow(Math.random(), 0.7) * 240;
+      const theta = Math.random() * Math.PI * 2;
+      const phi   = Math.acos(2 * Math.random() - 1);
+      positions[i*3  ] = r * Math.sin(phi) * Math.cos(theta);
+      positions[i*3+1] = r * Math.sin(phi) * Math.sin(theta) * 0.75;   // flatter y
+      positions[i*3+2] = r * Math.cos(phi) * 1.15;                     // slight z stretch
+
+      // Warm gold palette with slight variation
+      const warm = 0.8 + Math.random() * 0.2;
+      colors[i*3  ] = 0.96 * warm;                    // R
+      colors[i*3+1] = 0.83 * warm + Math.random()*0.05;  // G
+      colors[i*3+2] = 0.38 * warm;                    // B
+
+      sizes[i]  = 0.8 + Math.random() * 2.4;
+      phases[i] = Math.random() * Math.PI * 2;
+    }
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('color',    new THREE.BufferAttribute(colors, 3));
+    geometry.setAttribute('aSize',    new THREE.BufferAttribute(sizes, 1));
+    geometry.setAttribute('aPhase',   new THREE.BufferAttribute(phases, 1));
+
+    // Shader material — soft circular points with glow, audio-reactive
+    const material = new THREE.ShaderMaterial({
+      uniforms: {
+        uTime:   { value: 0 },
+        uEnergy: { value: 0 },
+        uBass:   { value: 0 },
+        uTreble: { value: 0 },
+        uOpacity: { value: 0 },
+      },
+      vertexShader: `
+        attribute float aSize;
+        attribute float aPhase;
+        varying vec3 vColor;
+        varying float vAlpha;
+        uniform float uTime;
+        uniform float uEnergy;
+        uniform float uBass;
+        void main() {
+          vColor = color;
+          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+          float twinkle = 0.75 + 0.25 * sin(uTime * 1.2 + aPhase);
+          float audioPulse = 1.0 + uBass * 0.85;
+          gl_PointSize = aSize * (340.0 / -mvPosition.z) * twinkle * audioPulse;
+          vAlpha = twinkle * (0.7 + uEnergy * 0.3);
+          gl_Position = projectionMatrix * mvPosition;
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vColor;
+        varying float vAlpha;
+        uniform float uOpacity;
+        uniform float uEnergy;
+        void main() {
+          // Soft circular falloff — the point is a glowing orb, not a square
+          vec2 uv = gl_PointCoord - 0.5;
+          float d = length(uv);
+          if (d > 0.5) discard;
+          float core = smoothstep(0.5, 0.0, d);
+          float glow = pow(core, 2.2) * (1.0 + uEnergy * 1.2);
+          vec3 tinted = vColor * glow;
+          gl_FragColor = vec4(tinted, glow * vAlpha * uOpacity);
+        }
+      `,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      vertexColors: true,
+    });
+
+    const points = new THREE.Points(geometry, material);
+    scene.add(points);
+
+    // Camera state for interpolation
+    const camState = {
+      current: {
+        pos: new THREE.Vector3(...startW.pos),
+        look: new THREE.Vector3(...startW.look),
+        fov: startW.fov,
+      },
+      target: {
+        pos: new THREE.Vector3(...startW.pos),
+        look: new THREE.Vector3(...startW.look),
+        fov: startW.fov,
+      },
+      lerpSpeed: 0.018,  // how fast camera eases to target each frame
+    };
+
+    this.cinema = {
+      THREE, scene, camera, renderer, points, material, camState,
+      resize, running: false, raf: null, t0: performance.now(),
+    };
+    this.cinema.resizeHandler = resize;
+    return this.cinema;
+  },
+
+  startCinema() {
+    if (!this.cinema) return;
+    const C = this.cinema;
+    if (C.running) return;
+    C.running = true;
+    C.t0 = performance.now();
+    const preshow = document.getElementById('demo-preshow');
+    if (preshow) preshow.classList.add('cinema-active');
+
+    const frame = () => {
+      if (!C.running) { C.raf = null; return; }
+      const now = performance.now();
+      const t = (now - C.t0) / 1000;
+
+      // Uniforms — audio-reactive
+      C.material.uniforms.uTime.value   = t;
+      C.material.uniforms.uEnergy.value = this.audio.energy;
+      C.material.uniforms.uBass.value   = this.audio.bass;
+      C.material.uniforms.uTreble.value = this.audio.treble;
+
+      // Gentle fade-in over first 2 seconds, fade out whenever we flag it
+      const fadeIn = Math.min(1, t / 2);
+      const fadeOut = (this._cinemaFadeOut !== undefined) ?
+        Math.max(0, 1 - (now - this._cinemaFadeOut) / 1500) : 1;
+      C.material.uniforms.uOpacity.value = fadeIn * fadeOut;
+
+      // Camera interpolation — ease current toward target
+      const { current, target, lerpSpeed } = C.camState;
+      current.pos.lerp(target.pos, lerpSpeed);
+      current.look.lerp(target.look, lerpSpeed);
+      current.fov = current.fov + (target.fov - current.fov) * lerpSpeed;
+      C.camera.position.copy(current.pos);
+      C.camera.lookAt(current.look);
+      C.camera.fov = current.fov;
+      C.camera.updateProjectionMatrix();
+
+      // Small organic camera drift driven by treble — consonants "shake" the lens
+      // Very subtle — ±1 unit perpendicular to view direction
+      const drift = this.audio.treble * 0.8;
+      C.camera.position.x += Math.sin(t * 1.3) * drift;
+      C.camera.position.y += Math.cos(t * 1.1) * drift;
+
+      // Slow auto-rotation of point cloud for life
+      C.points.rotation.y = t * 0.012;
+      C.points.rotation.x = Math.sin(t * 0.08) * 0.04;
+
+      C.renderer.render(C.scene, C.camera);
+      C.raf = requestAnimationFrame(frame);
+    };
+    frame();
+  },
+
+  setCameraTarget(waypointKey, lerpSpeedOverride) {
+    if (!this.cinema) return;
+    const wp = this.cameraWaypoints[waypointKey];
+    if (!wp) return;
+    const C = this.cinema;
+    C.camState.target.pos.set(...wp.pos);
+    C.camState.target.look.set(...wp.look);
+    C.camState.target.fov = wp.fov;
+    if (lerpSpeedOverride) C.camState.lerpSpeed = lerpSpeedOverride;
+    else                   C.camState.lerpSpeed = 0.018;
+  },
+
+  fadeOutCinema() {
+    this._cinemaFadeOut = performance.now();
+  },
+
+  stopCinema() {
+    if (!this.cinema) return;
+    const C = this.cinema;
+    C.running = false;
+    if (C.raf) { cancelAnimationFrame(C.raf); C.raf = null; }
+    if (C.resizeHandler) window.removeEventListener('resize', C.resizeHandler);
+    // Clear the canvas to black — cheap, no need to dispose on every stop
+    try {
+      C.renderer.clear();
+    } catch {}
+    const preshow = document.getElementById('demo-preshow');
+    if (preshow) preshow.classList.remove('cinema-active');
+    this._cinemaFadeOut = undefined;
+  },
+
+
 
 
 
