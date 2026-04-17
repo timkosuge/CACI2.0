@@ -9933,11 +9933,18 @@ async function sendChat() {
             appendMsg('ai', fullText, evt.sources || [], evt.scope || body.scope, evt.model || 'claude', evt.responseId || '');
 
             // Queue remaining TTS text
+            // Critical: if the first sentence is already playing, APPEND the rest
+            // to the active queue instead of cancelling and starting over. That
+            // avoids the audible cut-then-restart between the first sentence and
+            // the remainder.
             if (voiceAutoSpeak) {
               if (!ttsFired) {
+                // First sentence never fired (response was all one short sentence or
+                // came back too fast). Speak the whole thing fresh.
                 speakTextQueued(null, fullText);
               } else if (ttsBuffer.trim()) {
-                speakTextQueued(null, ttsBuffer.trim());
+                // First sentence was fired; append the remainder to the live queue.
+                appendToTtsQueue(ttsBuffer.trim());
               }
             }
 
@@ -15998,6 +16005,13 @@ function _ttsPlayNext(sessionId) {
   _ttsPlaying = true;
   const url = URL.createObjectURL(item.blob);
   const audio = new Audio(url);
+  // Volume normalization between chat and demo.
+  // The demo pipes TTS through AudioContext + analyser (for particle reactivity),
+  // which renders slightly quieter than a plain <audio> element at the same source level.
+  // We bring the chat audio down to match. Adjustable via localStorage if a user
+  // wants chat louder or quieter than the default.
+  const chatGain = parseFloat(localStorage.getItem('caci_tts_chat_gain') || '0.82');
+  audio.volume = Math.min(1, Math.max(0, isNaN(chatGain) ? 0.82 : chatGain));
   _currentAudio = audio;
   setVoiceStatus('Speaking…', true);
   audio.onended = () => {
@@ -16064,6 +16078,52 @@ async function speakTextQueued(btn, text) {
     }
   });
 
+  await Promise.allSettled(fetches);
+}
+
+// Append sentences to the CURRENT TTS session without cancelling. Used by
+// the streaming-chat auto-speak path so the first sentence (fired early for
+// perceived responsiveness) continues seamlessly into the remainder of the
+// response when streaming completes. Without this, the second speakTextQueued
+// call would cancel the in-flight audio and start over — causing the "starts,
+// cuts, restarts farther in" symptom.
+async function appendToTtsQueue(text) {
+  if (!text || !text.trim()) return;
+  // If no session is live, start a fresh one.
+  if (!_ttsPlaying && _ttsQueue.length === 0) {
+    return speakTextQueued(null, text);
+  }
+  const sessionId = _ttsSessionId;
+
+  const clean = text
+    .replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1')
+    .replace(/#{1,6}\s/g, '').replace(/`{1,3}[^`]*`{1,3}/g, '')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/\n+/g, ' ').trim();
+  const ttsMaxLen = parseInt(localStorage.getItem('caci_tts_length') || '3000', 10);
+  const capped = clean.length > ttsMaxLen ? clean.slice(0, ttsMaxLen) : clean;
+  const newSentences = _splitSentences(capped);
+  if (newSentences.length === 0) return;
+
+  // Add new entries to the queue — playback will continue into them naturally
+  // because _ttsPlayNext picks the next un-played item whenever an audio ends.
+  const newItems = newSentences.map(s => ({ text: s, blob: null, played: false, done: false }));
+  _ttsQueue.push(...newItems);
+
+  // Fetch blobs for the new items in parallel.
+  const fetches = newItems.map(async (item) => {
+    try {
+      item.blob = await _fetchTTSBlob(item.text);
+      item.done = true;
+      if (sessionId !== _ttsSessionId) return;
+      if (!_ttsPlaying) _ttsPlayNext(sessionId);
+    } catch {
+      item.done = true;
+      item.blob = null;
+      if (sessionId !== _ttsSessionId) return;
+      if (!_ttsPlaying) _ttsPlayNext(sessionId);
+    }
+  });
   await Promise.allSettled(fetches);
 }
 
