@@ -850,50 +850,70 @@ body::before {
   animation: preshowCoreAppear 1.8s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
-/* ─── Preshow name (minimal v2) — serif type with drawing underline ─── */
+/* ─── Preshow v2 — centered CACI reveal, Cassie fades in beneath ─── */
 .preshow-name-v2 {
   position: absolute;
-  left: 7%;
-  bottom: 18%;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
   pointer-events: none;
-  opacity: 0;
-  animation: preshowNameAppear 2.4s cubic-bezier(0.2, 0.7, 0.2, 1) 0.8s forwards;
-  transition: opacity 0.6s ease;
-  max-width: 55%;
+  text-align: center;
+  z-index: 3;
 }
-@keyframes preshowNameAppear {
-  0%   { opacity: 0; transform: translateY(8px); letter-spacing: 0.06em; }
-  60%  { opacity: 1; letter-spacing: 0.14em; }
-  100% { opacity: 1; transform: translateY(0);  letter-spacing: 0.18em; }
-}
-.preshow-name-text {
+.preshow-brand {
   font-family: var(--f-display, 'Cormorant Garamond', serif);
+  font-size: clamp(72px, 11vw, 168px);
   font-weight: 300;
-  font-size: clamp(48px, 8vw, 120px);
+  letter-spacing: 0.30em;
   line-height: 1;
-  letter-spacing: 0.18em;
-  color: rgba(245, 227, 152, 0.96);
-  /* Subtle metallic gradient on the letters */
-  background: linear-gradient(180deg,
-    #fff4cc 0%,
-    #f5e398 28%,
-    #e8c84a 55%,
-    #c9a832 78%,
-    #a58820 100%);
+  background: linear-gradient(160deg,
+    #fffae8 0%, #fff0a0 12%, var(--gold-metal-2, #e8c84a) 32%,
+    #8a6418 48%, #6b4e10 54%, var(--gold-metal-3, #c9a832) 65%,
+    #f5e398 80%, #fffae8 92%, var(--gold-metal-2, #e8c84a) 100%
+  );
   -webkit-background-clip: text;
-  background-clip: text;
   -webkit-text-fill-color: transparent;
-  text-shadow: 0 0 24px rgba(212, 168, 50, 0.18);
+  background-clip: text;
+  filter:
+    drop-shadow(0 1px 0px rgba(0,0,0,1))
+    drop-shadow(0 2px 6px rgba(0,0,0,0.75))
+    drop-shadow(0 0 32px rgba(212,168,50,0.28));
+  opacity: 0;
+  animation: preshowBrandAppear 2.6s cubic-bezier(0.2, 0.7, 0.2, 1) 0.6s forwards;
   user-select: none;
-  font-variant: small-caps;
 }
+@keyframes preshowBrandAppear {
+  0%   { opacity: 0; transform: translateY(6px); letter-spacing: 0.24em; }
+  55%  { opacity: 1; }
+  100% { opacity: 1; transform: translateY(0);  letter-spacing: 0.30em; }
+}
+
+/* The "Cassie" reveal — smaller italic serif beneath the brand */
+.preshow-cassie {
+  margin-top: 22px;
+  font-family: var(--f-display, 'Cormorant Garamond', serif);
+  font-style: italic;
+  font-size: clamp(18px, 2.4vw, 34px);
+  font-weight: 300;
+  letter-spacing: 0.08em;
+  color: rgba(245, 227, 152, 0.72);
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 1.6s cubic-bezier(0.2, 0.7, 0.2, 1), transform 1.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.preshow-cassie.revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 .preshow-name-line {
   position: relative;
-  width: 100%;
-  max-width: 520px;
+  width: 70%;
+  max-width: 360px;
   height: 1px;
-  margin-top: 18px;
+  margin: 26px auto 0;
   overflow: hidden;
+  opacity: 0.9;
 }
 .preshow-name-line-fill {
   position: absolute;
@@ -903,14 +923,13 @@ body::before {
   height: 100%;
   background: linear-gradient(90deg,
     rgba(212, 168, 50, 0) 0%,
-    rgba(212, 168, 50, 0.85) 10%,
+    rgba(212, 168, 50, 0.7) 12%,
     rgba(245, 227, 152, 1) 50%,
-    rgba(212, 168, 50, 0.85) 90%,
+    rgba(212, 168, 50, 0.7) 88%,
     rgba(212, 168, 50, 0) 100%);
   transform-origin: left center;
   transform: scaleX(0);
-  /* JS sets the transform directly each frame for audio-sync progress */
-  box-shadow: 0 0 6px rgba(245, 227, 152, 0.4);
+  box-shadow: 0 0 6px rgba(245, 227, 152, 0.45);
 }
 
 /* The cinematic stage — 16:9, grows from the card's position */
@@ -1577,6 +1596,103 @@ body::before {
 }
 
 /* ── BEAT 9: INVITATION ── */
+
+/* Flip card — mirrors the real login card with CACI front, tagline back */
+.db9-card-scene {
+  perspective: 1400px;
+  width: clamp(260px, 28vw, 400px);
+  margin: 0 auto 18px;
+}
+.db9-card-flipper {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1.05;
+  transform-style: preserve-3d;
+  transition: transform 1.1s cubic-bezier(0.4, 0.05, 0.2, 1);
+}
+.db9-card-flipper.flipped {
+  transform: rotateY(180deg);
+}
+.db9-card {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  background: linear-gradient(160deg, rgba(10,15,28,0.99) 0%, rgba(6,9,18,1) 100%);
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 1px rgba(212,168,50,0.50),
+    0 0 0 2px rgba(212,168,50,0.14),
+    inset 0 2px 8px rgba(0,0,0,0.70),
+    inset 2px 0 6px rgba(0,0,0,0.40),
+    inset 0 -1px 0 rgba(245,227,152,0.06),
+    inset 0 0 0 1px rgba(245,227,152,0.10),
+    inset 0 0 40px rgba(212,168,50,0.06),
+    0 40px 100px rgba(0,0,0,0.85),
+    0 4px 8px rgba(0,0,0,0.6);
+  overflow: hidden;
+}
+.db9-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent, rgba(212,168,50,0.3) 20%,
+    rgba(245,227,152,0.85) 45%,
+    rgba(255,240,170,1) 50%,
+    rgba(245,227,152,0.85) 55%,
+    rgba(212,168,50,0.3) 80%, transparent);
+}
+.db9-card .corner {
+  position: absolute;
+  width: 14px; height: 14px;
+  pointer-events: none;
+}
+.db9-card .corner::before,
+.db9-card .corner::after {
+  content: '';
+  position: absolute;
+  background: linear-gradient(135deg, rgba(255,240,170,0.92), rgba(212,168,50,0.55));
+}
+.db9-card .corner::before { width: 1px; height: 100%; }
+.db9-card .corner::after  { width: 100%; height: 1px; }
+.db9-card .corner.tl { top: 0; left: 0; }
+.db9-card .corner.tr { top: 0; right: 0; transform: scaleX(-1); }
+.db9-card .corner.bl { bottom: 0; left: 0; transform: scaleY(-1); }
+.db9-card .corner.br { bottom: 0; right: 0; transform: scale(-1); }
+
+.db9-card-back {
+  transform: rotateY(180deg);
+}
+.db9-card-inner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 36px 30px;
+}
+.db9-card-tagline {
+  font-family: var(--f-display, 'Cormorant Garamond', serif);
+  font-weight: 300;
+  font-style: italic;
+  font-size: clamp(24px, 3.2vw, 40px);
+  line-height: 1.2;
+  letter-spacing: 0.04em;
+  text-align: center;
+  background: linear-gradient(160deg,
+    #fffae8 0%, #fff0a0 20%, #e8c84a 45%,
+    #c9a832 65%, #f5e398 85%, #fffae8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter:
+    drop-shadow(0 1px 0px rgba(0,0,0,1))
+    drop-shadow(0 2px 3px rgba(0,0,0,0.75))
+    drop-shadow(0 0 14px rgba(212,168,50,0.22));
+}
+
 .db9-cta {
   margin-top: 30px;
   padding: 14px 42px;
@@ -6483,17 +6599,29 @@ body::before {
 
     <!-- BEAT 9: Invitation -->
     <div class="demo-beat" data-beat="9">
-      <div class="db2-shield-wrap db-in d1" style="margin-bottom:16px">
-        <svg class="db2-shield" viewBox="0 0 100 110" xmlns="http://www.w3.org/2000/svg" style="animation:none;opacity:1;transform:none">
-          <path d="M 50 4 L 92 20 L 92 56 Q 92 84 50 104 Q 8 84 8 56 L 8 20 Z"
-                fill="none" stroke="url(#dbShieldGrad)" stroke-width="1.6"/>
-          <path d="M 50 18 L 78 29 L 78 56 Q 78 74 50 88 Q 22 74 22 56 L 22 29 Z"
-                fill="rgba(212,168,50,0.08)" stroke="url(#dbShieldGrad)" stroke-width="0.8"/>
-          <text x="50" y="62" text-anchor="middle" font-family="Cormorant Garamond, serif"
-                font-size="22" font-weight="300" fill="url(#dbShieldGrad)" letter-spacing="2">C</text>
-        </svg>
+      <!-- Flip card: front shows CACI (matches the real login card), back reveals the tagline -->
+      <div class="db9-card-scene db-in d1">
+        <div class="db9-card-flipper" id="db9-card-flipper">
+          <!-- FRONT: CACI -->
+          <div class="db9-card db9-card-front">
+            <div class="corner tl"></div><div class="corner tr"></div>
+            <div class="corner bl"></div><div class="corner br"></div>
+            <div class="db9-card-inner">
+              <div class="lcard-front-wordmark">CACI</div>
+              <div class="lcard-front-sub">Operational Intelligence</div>
+              <div class="lcard-front-rule"></div>
+            </div>
+          </div>
+          <!-- BACK: tagline -->
+          <div class="db9-card db9-card-back">
+            <div class="corner tl"></div><div class="corner tr"></div>
+            <div class="corner bl"></div><div class="corner br"></div>
+            <div class="db9-card-inner">
+              <div class="db9-card-tagline">The future<br>of cannabis</div>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="db-headline db-in d2" style="font-size:clamp(22px,3vw,38px)">The future of cannabis</div>
       <button class="db9-cta db-in d3" id="db9-cta">Enter CACI &rarr;</button>
     </div>
 
@@ -10596,7 +10724,7 @@ const DemoMode = {
   //   maxDur: ceiling — forced advance (safety against stuck audio)
   //   The actual transition fires on audio.onended + a short breath (gap).
   beats: [
-    { id: 2, minDur: 55000, maxDur: 80000, setup: 'setupPreshow', voice: 'eve',
+    { id: 2, minDur: 62000, maxDur: 95000, setup: 'setupPreshow', voice: 'eve',
       narr: "Hi, I'm Cassie. I figured I'd introduce myself before we get started, because I know this is probably new — not AI in general, you've all seen it on your phones, but AI that actually understands this industry. That part's still rare. And I get the skepticism. So let me just tell you who I am. I was built for cannabis. Not retrofitted from some generic assistant — built for it. I know what 280E does to your margins. I know METRC isn't optional. I know compliance is stressed, retail is tired, and ops is holding everything together with duct tape and coffee. I'm not going to promise I'm perfect, because I'm not. But I'm careful, I cite my sources, and I don't forget anything you teach me. This industry was never going to be easy — too young, too regulated, too watched — and the people who figure it out are going to build something the world hasn't seen before. I'd really like to help with that. So — let me show you what I can do." },
     { id: 1, minDur: 8000, maxDur: 16000, setup: null, voice: 'leo',
       narr: "Here's what she was made for. Somewhere in all those earnings reports, regulations, and filings — the answer is already there. But finding it takes hours you don't have, and by the time you get to it, you've already moved on." },
@@ -10606,8 +10734,8 @@ const DemoMode = {
       narr: "She doesn't search, she answers. Before pulling anything, she figures out what you're actually asking — then picks the right places to look, weighs every passage by how directly it answers, and won't tell you something she can't back up with a source." },
     { id: 5, minDur: 9000, maxDur: 18000, setup: 'setupNetwork', voice: 'ara',
       narr: "The more she reads, the more she sees. A new regulation changes what a policy means. A new earnings report reframes an old trend. She notices things nobody thinks to ask about." },
-    { id: 6, minDur: 14000, maxDur: 28000, setup: 'setupScenario', voice: 'leo',
-      narr: "Here's what she's actually read. Every Jushi earnings report since 2019. The full Ohio regulatory code — her strongest collection. Illinois regulations. The Illinois 2025 annual report. Ask her about margin trends across seven years of earnings, or what changed in Ohio between revisions — she'll show you the passage, cite the page, and tell you what it means." },
+    { id: 6, minDur: 20000, maxDur: 35000, setup: 'setupScenario', voice: 'leo',
+      narr: "Now — to be clear, she's a prototype. About a week old. What she knows right now is a starting point: Jushi's earnings history, Ohio's regulatory code, Illinois regulations and their 2025 annual report. It's not everything she'll know. But it's enough to prove the point. Give her more, and her answers get sharper. This is what day one looks like." },
     { id: 7, minDur: 8000, maxDur: 16000, setup: 'setupStats', voice: 'ara',
       narr: "Every answer cites its sources. Every upload is logged. Her memory lives in your walls — yours, not anyone else's, and it never trains another model." },
     { id: 8, minDur: 9000, maxDur: 18000, setup: null, voice: 'rex',
@@ -10673,20 +10801,40 @@ const DemoMode = {
     theatre.classList.add('active');
     document.body.style.overflow = 'hidden';
 
-    // Start particle field
+    // Start ambient particle field (stays through whole demo)
     this.startParticles();
 
-    // Intro narration: fires on user click (satisfies autoplay policy),
-    // plays during the 900ms stage-expand so the opening isn't silent.
-    this.speakIntro();
+    // Show the preshow container immediately so the visual fade-in begins,
+    // but DON'T start the beat timeline yet — wait for audio to be ready.
+    // This fixes the "stars animate for 8 seconds before Eve starts talking" issue.
+    const preshow = document.getElementById('demo-preshow');
+    if (preshow) preshow.classList.add('active');
 
-    // Prefetch the first two beats in parallel while intro plays + stage expands.
-    // By Beat 1 start, Beat 1's audio is already cached and Beat 2's is fetching.
-    this.prefetchBeatAudio(0);
+    // Prefetch Beat 2 (Cassie's intro, plays first) AND Beat 1 (the next one).
+    // When Beat 2's blob arrives, fire playBeat(0) — visual and audio start together.
+    const sess = this.audioSession;
+    let started = false;
+    const tryStart = () => {
+      if (started || !this.running || sess !== this.audioSession) return;
+      started = true;
+      this.playBeat(0);
+    };
+
+    // Safety: if audio fetch fails or takes too long, start anyway after 7s
+    // (but by then the visual has had a few seconds of entry to cover the gap)
+    this._startFallbackTimer = setTimeout(() => {
+      if (sess !== this.audioSession) return;
+      tryStart();
+    }, 7000);
+
+    // Fire prefetches. The first (beat 2, idx 0) resolves → tryStart.
+    this.prefetchBeatAudio(0).then(() => {
+      clearTimeout(this._startFallbackTimer);
+      // Small delay (~200ms) so the canvas has a moment to first-paint
+      setTimeout(tryStart, 200);
+    });
+    // Prefetch beat 1 (next after preshow) in parallel so its audio is ready too
     this.prefetchBeatAudio(1);
-
-    // Wait for stage expand animation, then begin first beat
-    setTimeout(() => this.playBeat(0), 900);
   },
 
   stop() {
@@ -10735,6 +10883,19 @@ const DemoMode = {
 
       // Special handling: Beat 1 triggers chaos docs
       if (beat.id === 1) this.setupChaos(beatEl);
+
+      // Special handling: Beat 9 — flip card from CACI to tagline after showing
+      // the CACI face briefly, then reveal tagline in sync with Eve saying it
+      if (beat.id === 9) {
+        const flipper = beatEl.querySelector('#db9-card-flipper');
+        if (flipper) {
+          flipper.classList.remove('flipped');
+          // Flip shortly after Eve's "So —" pause, before "let's get to work"
+          setTimeout(() => {
+            if (this.running && flipper) flipper.classList.add('flipped');
+          }, 1600);
+        }
+      }
     }
 
     // If this beat isn't the preshow, make sure preshow is torn down
@@ -11049,133 +11210,176 @@ const DemoMode = {
     window.addEventListener('resize', resize);
     this._preshowResize = resize;
 
-    // Build sparse star field — positions in 0..1 normalized space
-    // Avoid the lower-left quadrant where "Cassie" sits, and give name some breathing room
-    const N = 28;
-    const stars = [];
-    for (let i = 0; i < N; i++) {
-      let sx, sy;
-      let tries = 0;
-      do {
-        sx = Math.random();
-        sy = Math.random();
-        tries++;
-      } while (tries < 10 && (sx < 0.55 && sy > 0.55 && sy < 0.85));  // keep clear of name area
-      stars.push({
-        nx: sx, ny: sy,
-        brightness: 0.35 + Math.random() * 0.5,
-        breatheSpeed: 0.4 + Math.random() * 0.8,
-        breathePhase: Math.random() * Math.PI * 2,
-        size: 0.8 + Math.random() * 1.3,  // small variance in size
-        appearAt: Math.random() * 3.0,     // seconds — staggered fade-in over first few
-      });
+    // ─────────────────────────────────────────────────────────
+    // Point field — drifting points at multiple Z depths, leaving trails.
+    // We DON'T clearRect; instead we paint a low-alpha dark overlay each frame
+    // which fades the existing pixels. The result: motion blur "streaks" behind
+    // every moving point, looking like particles through a volume.
+    //
+    // Depth layers (3):  back (tiny, slow)
+    //                    mid  (medium, medium speed, brightest)
+    //                    fore (larger, fastest, longest trails)
+    // ─────────────────────────────────────────────────────────
+    const layers = [
+      { count: 48, zFactor: 0.35, sizeMin: 0.4, sizeMax: 0.9, speedMin: 0.015, speedMax: 0.04,  brightMin: 0.25, brightMax: 0.45 },
+      { count: 36, zFactor: 0.65, sizeMin: 0.8, sizeMax: 1.6, speedMin: 0.03,  speedMax: 0.07,  brightMin: 0.50, brightMax: 0.80 },
+      { count: 14, zFactor: 1.00, sizeMin: 1.4, sizeMax: 2.5, speedMin: 0.06,  speedMax: 0.13,  brightMin: 0.70, brightMax: 1.00 },
+    ];
+    const points = [];
+    for (const L of layers) {
+      for (let i = 0; i < L.count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = L.speedMin + Math.random() * (L.speedMax - L.speedMin);
+        points.push({
+          nx: Math.random(),
+          ny: Math.random(),
+          vx: Math.cos(angle) * speed * 0.001,  // normalized-space velocity per ms
+          vy: Math.sin(angle) * speed * 0.001,
+          size: L.sizeMin + Math.random() * (L.sizeMax - L.sizeMin),
+          brightness: L.brightMin + Math.random() * (L.brightMax - L.brightMin),
+          zFactor: L.zFactor,
+          twinkleSpeed: 0.3 + Math.random() * 0.9,
+          twinklePhase: Math.random() * Math.PI * 2,
+          appearAt: Math.random() * 4.0,
+        });
+      }
     }
 
-    // Pre-compute nearest-neighbor threads for the late phase.
-    // Each star links to 0-2 nearest neighbors within a distance threshold.
+    // Nearest-neighbor threads for late phase (only among the mid/fore layers
+    // so the connection graph isn't cluttered)
+    const connectable = points.filter(p => p.zFactor >= 0.6);
     const threads = [];
-    for (let i = 0; i < N; i++) {
+    for (let i = 0; i < connectable.length; i++) {
       const neighbors = [];
-      for (let j = 0; j < N; j++) {
+      for (let j = 0; j < connectable.length; j++) {
         if (i === j) continue;
-        const dx = stars[i].nx - stars[j].nx;
-        const dy = stars[i].ny - stars[j].ny;
+        const dx = connectable[i].nx - connectable[j].nx;
+        const dy = connectable[i].ny - connectable[j].ny;
         neighbors.push({ j, d: Math.sqrt(dx*dx + dy*dy) });
       }
       neighbors.sort((a,b) => a.d - b.d);
-      const take = Math.random() < 0.6 ? 1 : (Math.random() < 0.4 ? 2 : 0);
+      const take = Math.random() < 0.55 ? 1 : (Math.random() < 0.3 ? 2 : 0);
       for (let k = 0; k < take; k++) {
         const n = neighbors[k];
-        if (n && n.d < 0.35) {
+        if (n && n.d < 0.30) {
           const a = Math.min(i, n.j), b = Math.max(i, n.j);
           if (!threads.some(t => t.a === a && t.b === b)) {
-            threads.push({ a, b, d: n.d });
+            threads.push({ a, b, d: n.d, pointA: connectable[a], pointB: connectable[b] });
           }
         }
       }
     }
-    // Give each thread a weave order (spread them across the late phase)
     threads.sort((a,b) => a.d - b.d);
 
-    // Create the name element — absolutely positioned, offset to lower-left third
-    // (CSS in document should handle style; if not present, inline styles here)
+    // Build the centered CACI / Cassie / underline DOM
     let nameEl = preshow.querySelector('.preshow-name-v2');
     if (nameEl) nameEl.remove();
     nameEl = document.createElement('div');
     nameEl.className = 'preshow-name-v2';
-    nameEl.innerHTML = '<div class="preshow-name-text">Cassie</div><div class="preshow-name-line"><div class="preshow-name-line-fill"></div></div>';
+    nameEl.innerHTML = [
+      '<div class="preshow-brand">CACI</div>',
+      '<div class="preshow-cassie">Cassie</div>',
+      '<div class="preshow-name-line"><div class="preshow-name-line-fill"></div></div>',
+    ].join('');
     preshow.appendChild(nameEl);
 
-    // Timeline — based on audio elapsed time, not beat start time.
-    // We'll update a phase variable from audio.currentTime when available;
-    // fall back to performance.now() if no audio.
+    // Time source: audio.currentTime when available (stays in sync), else wall clock
     const t0 = performance.now();
+    let lastT = 0;
     const getT = () => {
-      // Prefer audio currentTime for sync
       if (this.currentAudio && !this.currentAudio.paused && !isNaN(this.currentAudio.currentTime)) {
         return this.currentAudio.currentTime * 1000;
       }
       return performance.now() - t0;
     };
 
-    // Expected narration length (from minDur). Visual phases reference this.
-    const EXPECTED = 65000;
+    // Expected narration length
+    const EXPECTED = 68000;  // Cassie's intro is ~68s
+
+    // Painted the background on first frame so trails fade from that color
+    let firstFrame = true;
+
+    // Flag for Cassie reveal
+    let cassieRevealed = false;
 
     let raf = null;
     const frame = () => {
       if (!this.running) { cancelAnimationFrame(raf); return; }
       const t = getT();
+      const dt = t - lastT;
+      lastT = t;
       const w = canvas.width, h = canvas.height;
 
-      ctx.clearRect(0, 0, w, h);
+      // First frame: fill with dark so trails fade toward it
+      if (firstFrame) {
+        ctx.fillStyle = 'rgba(4, 7, 14, 1)';
+        ctx.fillRect(0, 0, w, h);
+        firstFrame = false;
+      }
 
-      // STARS — breathe in, breathe always, fade out at end
+      // Motion-blur fade: paint a low-alpha dark rect on top, fading existing pixels.
+      // Lower alpha = longer trails. 0.12 = short-to-medium trails.
+      ctx.fillStyle = 'rgba(4, 7, 14, 0.12)';
+      ctx.fillRect(0, 0, w, h);
+
       const tsec = t / 1000;
-      // Global fade-in of the whole field (reaches full by 4s)
-      const globalFadeIn = Math.min(1, tsec / 4);
-      // Global fade-out when audio nears end (last 2s of EXPECTED window)
-      const fadeOutStart = (EXPECTED - 2500);
-      const globalFadeOut = t > fadeOutStart ? Math.max(0, 1 - (t - fadeOutStart) / 2500) : 1;
+
+      // Global fades
+      const globalFadeIn = Math.min(1, tsec / 5);
+      const fadeOutStart = EXPECTED - 3500;
+      const globalFadeOut = t > fadeOutStart ? Math.max(0, 1 - (t - fadeOutStart) / 3500) : 1;
       const globalA = globalFadeIn * globalFadeOut;
 
-      for (const s of stars) {
-        // Individual appear time
-        const appearT = Math.max(0, tsec - s.appearAt);
-        const appearA = Math.min(1, appearT / 1.2);
+      // Reveal "Cassie" around 3s in (she says "I'm Cassie" at about that timestamp)
+      if (!cassieRevealed && tsec > 2.8) {
+        cassieRevealed = true;
+        const cassieEl = nameEl && nameEl.querySelector('.preshow-cassie');
+        if (cassieEl) cassieEl.classList.add('revealed');
+      }
+
+      // Update and draw points
+      for (const p of points) {
+        p.nx += p.vx * dt;
+        p.ny += p.vy * dt;
+        // Wrap at edges (with margin)
+        if (p.nx < -0.05) p.nx = 1.05;
+        if (p.nx > 1.05)  p.nx = -0.05;
+        if (p.ny < -0.05) p.ny = 1.05;
+        if (p.ny > 1.05)  p.ny = -0.05;
+
+        const appearT = Math.max(0, tsec - p.appearAt);
+        const appearA = Math.min(1, appearT / 1.5);
         if (appearA <= 0) continue;
-        // Breathing
-        const breathe = 0.75 + 0.25 * Math.sin(tsec * s.breatheSpeed + s.breathePhase);
-        const alpha = globalA * appearA * breathe * s.brightness;
-        const x = s.nx * w;
-        const y = s.ny * h;
-        const r = s.size * dpr;
+
+        const twinkle = 0.75 + 0.25 * Math.sin(tsec * p.twinkleSpeed + p.twinklePhase);
+        const alpha = globalA * appearA * twinkle * p.brightness;
+        const x = p.nx * w;
+        const y = p.ny * h;
+        const r = p.size * dpr;
 
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(245, 213, 122, ${alpha})`;
-        ctx.shadowColor = 'rgba(212, 168, 50, 0.6)';
-        ctx.shadowBlur = 4 * dpr;
+        ctx.shadowColor = 'rgba(212, 168, 50, 0.7)';
+        ctx.shadowBlur = 5 * dpr * p.zFactor;
         ctx.fill();
       }
       ctx.shadowBlur = 0;
 
-      // THREADS — begin weaving at 55% through EXPECTED duration
-      const WEAVE_START = EXPECTED * 0.55;
-      const WEAVE_END   = EXPECTED * 0.97;
+      // Threads — build in late phase. But positions of endpoints are live
+      // (they move with the points), so lines follow the drifting points.
+      const WEAVE_START = EXPECTED * 0.52;
+      const WEAVE_END   = EXPECTED * 0.95;
       if (t > WEAVE_START && threads.length > 0) {
         const weaveT = Math.min(1, (t - WEAVE_START) / (WEAVE_END - WEAVE_START));
-        const numToShow = Math.floor(threads.length * weaveT);
-        for (let i = 0; i < numToShow; i++) {
+        for (let i = 0; i < threads.length; i++) {
           const th = threads[i];
-          const pa = stars[th.a];
-          const pb = stars[th.b];
-          const ax = pa.nx * w, ay = pa.ny * h;
-          const bx = pb.nx * w, by = pb.ny * h;
-          // Fade in per-thread: each takes ~0.8s to fully appear
           const threadStart = i / threads.length;
-          const localT = Math.max(0, (weaveT - threadStart) * (threads.length * 0.9));
-          const threadA = Math.min(1, localT) * 0.22 * globalA;
+          const localT = Math.max(0, (weaveT - threadStart) * (threads.length * 0.85));
+          const threadA = Math.min(1, localT) * 0.20 * globalA;
           if (threadA <= 0) continue;
+          const ax = th.pointA.nx * w, ay = th.pointA.ny * h;
+          const bx = th.pointB.nx * w, by = th.pointB.ny * h;
           ctx.strokeStyle = `rgba(232, 200, 74, ${threadA})`;
           ctx.lineWidth = 0.5 * dpr;
           ctx.beginPath();
@@ -11185,14 +11389,16 @@ const DemoMode = {
         }
       }
 
-      // NAME — fade the underline fill based on audio progress
+      // Underline draw — starts AFTER Cassie reveals. Draws over ~9 seconds.
       const nameLineFill = nameEl && nameEl.querySelector('.preshow-name-line-fill');
       if (nameLineFill) {
-        // Underline draws over the first ~12 seconds
-        const lineProgress = Math.min(1, tsec / 12);
-        nameLineFill.style.transform = `scaleX(${lineProgress})`;
+        if (tsec < 2.8) {
+          nameLineFill.style.transform = 'scaleX(0)';
+        } else {
+          const lineProgress = Math.min(1, (tsec - 2.8) / 9);
+          nameLineFill.style.transform = `scaleX(${lineProgress})`;
+        }
       }
-      // Fade whole name during last 2.5s
       if (nameEl) nameEl.style.opacity = String(globalFadeOut);
 
       raf = requestAnimationFrame(frame);
@@ -11280,21 +11486,23 @@ const DemoMode = {
     if (sess !== this.audioSession) return;        // stale
     if (!blob) {
       if (this.ttsAvailable === null) this.ttsAvailable = false;
-      // If this beat is currently playing and it was waiting for audio,
-      // fire its pending onEnd so the demo advances (no audio = treat as ended)
-      if (this.running && this.currentBeat === idx && this._pendingSpeakEnd) {
+      // Pending speakBeat is waiting on this audio — fire onEnd so beat advances
+      if (this.running && this.currentBeat === idx && this._waitingForBeatAudio) {
         const cb = this._pendingSpeakEnd;
         this._pendingSpeakEnd = null;
-        try { cb(); } catch {}
+        this._waitingForBeatAudio = false;
+        if (cb) try { cb(); } catch {}
       }
       return;
     }
     this.ttsAvailable = true;
     this.audioCache[beat.id] = blob;
-    // If this beat is currently playing and no audio has started, play now
-    if (this.running && this.currentBeat === idx && !this.currentAudio && !this.muted) {
+    // Only autoplay if a speakBeat call is actively waiting for this audio
+    // (prevents prefetch during start() from playing before visual is ready)
+    if (this.running && this.currentBeat === idx && !this.currentAudio && !this.muted && this._waitingForBeatAudio) {
       const onEnd = this._pendingSpeakEnd;
       this._pendingSpeakEnd = null;
+      this._waitingForBeatAudio = false;
       this.playAudioBlob(blob, sess, onEnd);
     }
   },
@@ -11319,9 +11527,9 @@ const DemoMode = {
     // TTS known unavailable? Fire onEnd so beat can advance on its timer floor
     if (this.ttsAvailable === false) { if (onEnd) setTimeout(onEnd, 0); return; }
 
-    // Not cached — register the callback so prefetchBeatAudio can fire it
-    // when the audio arrives (or fails)
+    // Not cached yet — register callback and flag so prefetch can autoplay
     this._pendingSpeakEnd = onEnd || null;
+    this._waitingForBeatAudio = true;
     this.prefetchBeatAudio(idx);
   },
 
