@@ -12455,34 +12455,103 @@ const DemoMode = {
     C.scene.add(beat5Group);
     // We'll build threads when beat 5 actually shows — they depend on beat 3's cluster positions
 
-    // ─── BEAT 7: Four guarantee orbs pulsing in sequence ───
-    // Four small bright orbs at cardinal points around origin — each pulses
-    // as she names a guarantee (sources, logging, infrastructure, no-training).
+    // ─── BEAT 7: Four guarantee 3D icons, pulsing in sequence ───
+    // Each icon is a composite of primitive meshes representing a guarantee:
+    //   SOURCES     → open book (two angled pages + spine)
+    //   LOGGED      → clipboard with checkmark
+    //   OURS        → shield with crest stripe and crossbar
+    //   NO TRAINING → ring with a diagonal slash through it
     const beat7Group = new THREE.Group();
     beat7Group.visible = false;
+    const iconGold = 0xf5e398;
+    const iconMat = new THREE.MeshBasicMaterial({
+      color: iconGold,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+    });
+
+    // Composite-geometry builders — each returns a THREE.Group
+    const buildBook = () => {
+      const g = new THREE.Group();
+      const pageGeom = new THREE.PlaneGeometry(20, 26);
+      const pageL = new THREE.Mesh(pageGeom, iconMat);
+      pageL.position.set(-10, 0, 0);
+      pageL.rotation.y = Math.PI / 6;
+      const pageR = new THREE.Mesh(pageGeom, iconMat);
+      pageR.position.set(10, 0, 0);
+      pageR.rotation.y = -Math.PI / 6;
+      const spineGeom = new THREE.BoxGeometry(1.2, 28, 1.2);
+      const spine = new THREE.Mesh(spineGeom, iconMat);
+      g.add(pageL, pageR, spine);
+      return g;
+    };
+    const buildClipboard = () => {
+      const g = new THREE.Group();
+      const page = new THREE.Mesh(new THREE.PlaneGeometry(24, 30), iconMat);
+      const clip = new THREE.Mesh(new THREE.BoxGeometry(8, 3, 2), iconMat);
+      clip.position.set(0, 16, 1.2);
+      const leg1 = new THREE.Mesh(new THREE.BoxGeometry(8, 1.6, 1.6), iconMat);
+      leg1.position.set(-3, -1, 1.4);
+      leg1.rotation.z = Math.PI / 4;
+      const leg2 = new THREE.Mesh(new THREE.BoxGeometry(14, 1.6, 1.6), iconMat);
+      leg2.position.set(3, 2.5, 1.4);
+      leg2.rotation.z = -Math.PI / 6;
+      g.add(page, clip, leg1, leg2);
+      return g;
+    };
+    const buildShield = () => {
+      const g = new THREE.Group();
+      const outer = new THREE.Mesh(new THREE.CircleGeometry(16, 5, Math.PI / 2), iconMat);
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(2, 22, 0.5), iconMat);
+      stripe.position.set(0, -1, 1);
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(14, 2, 0.5), iconMat);
+      bar.position.set(0, 5, 1);
+      g.add(outer, stripe, bar);
+      return g;
+    };
+    const buildNoTraining = () => {
+      const g = new THREE.Group();
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(12, 1.6, 10, 36), iconMat);
+      const slash = new THREE.Mesh(new THREE.BoxGeometry(28, 2.2, 2.2), iconMat);
+      slash.rotation.z = -Math.PI / 4;
+      g.add(ring, slash);
+      return g;
+    };
+
     const orbPositions = [
-      { pos: [-120, 60, 0],  label: 'SOURCES' },
-      { pos: [ 120, 60, 0],  label: 'LOGGED' },
-      { pos: [-120, -60, 0], label: 'OURS' },
-      { pos: [ 120, -60, 0], label: 'NO TRAINING' },
+      { pos: [-140,  70, 0],  label: 'SOURCES',      builder: buildBook       },
+      { pos: [ 140,  70, 0],  label: 'LOGGED',       builder: buildClipboard  },
+      { pos: [-140, -70, 0],  label: 'OURS',         builder: buildShield     },
+      { pos: [ 140, -70, 0],  label: 'NO TRAINING',  builder: buildNoTraining },
     ];
     const orbs = [];
     orbPositions.forEach((op) => {
-      const sphereGeom = new THREE.SphereGeometry(14, 24, 16);
-      const orbMat = new THREE.MeshBasicMaterial({
-        color: 0xf5e398,
+      const iconGroup = op.builder();
+      iconGroup.position.set(...op.pos);
+      // Soft halo sphere behind each icon for presence
+      const haloMat = new THREE.MeshBasicMaterial({
+        color: iconGold,
         transparent: true,
         opacity: 0,
         blending: THREE.AdditiveBlending,
       });
-      const orb = new THREE.Mesh(sphereGeom, orbMat);
-      orb.position.set(...op.pos);
-      orb.userData.pulsing = false;
-      beat7Group.add(orb);
-      orbs.push({ mesh: orb, material: orbMat, position: op.pos, label: op.label });
+      const halo = new THREE.Mesh(new THREE.SphereGeometry(22, 16, 12), haloMat);
+      halo.position.set(...op.pos);
+      beat7Group.add(halo);
+      beat7Group.add(iconGroup);
+      orbs.push({
+        mesh: iconGroup,
+        halo,
+        haloMat,
+        iconMat,
+        position: op.pos,
+        label: op.label,
+      });
     });
     C.scene.add(beat7Group);
-    C.beatObjects[7] = { group: beat7Group, orbs, pulseSequenceStart: 0 };
+    C.beatObjects[7] = { group: beat7Group, orbs, pulseSequenceStart: 0, iconMat };
 
     // ─── BEAT 6: Her actual library — 4 document stacks ───────────────
     // Honest visualization of what CACI has read. Each stack is a cluster
@@ -12600,59 +12669,120 @@ const DemoMode = {
     const entry4 = C.beatObjects[4];
     const entry3 = C.beatObjects[3];
     if (!entry4 || !entry3 || !entry3.clusters || entry3.clusters.length === 0) return;
-    // Remove previous line if any
+    const THREE = C.THREE;
+    // Clean up from previous run
     if (entry4.line) {
       entry4.group.remove(entry4.line);
       entry4.line.geometry.dispose();
       entry4.line = null;
     }
+    if (entry4.queryOrb) {
+      entry4.group.remove(entry4.queryOrb);
+      entry4.queryOrb.geometry.dispose();
+      entry4.queryOrb = null;
+    }
+    if (entry4.highlights) {
+      entry4.highlights.forEach(h => {
+        entry4.group.remove(h);
+        h.geometry.dispose();
+      });
+      entry4.highlights = null;
+    }
     // Pick the Finance cluster (center one) and build a path through 4 docs
-    const finance = entry3.clusters[1];  // center one
+    const finance = entry3.clusters[1];
     if (!finance || !finance.docs || finance.docs.length < 4) return;
-    const indices = [3, 9, 16, 21];  // deterministic picks so it doesn't change each replay
+    const indices = [3, 9, 16, 21];
     const points = indices.map(i => {
       const d = finance.docs[i % finance.docs.length];
-      // Convert doc's local position to world
-      const worldPos = d.position.clone().add(finance.group.position);
-      return worldPos;
+      return d.position.clone().add(finance.group.position);
     });
-    const THREE = C.THREE;
+    // Base line through all 4 documents
     const lineGeom = new THREE.BufferGeometry().setFromPoints(points);
     const lineMat = new THREE.LineBasicMaterial({
       color: 0xffe996,
       transparent: true,
       opacity: 0,
       blending: THREE.AdditiveBlending,
-      linewidth: 2,  // note: most browsers ignore linewidth > 1 for WebGL lines
     });
     const line = new THREE.Line(lineGeom, lineMat);
     entry4.line = line;
     entry4.lineMat = lineMat;
-    entry4.traceStart = performance.now();
+    entry4.tracePoints = points;
     entry4.group.add(line);
+
+    // Query orb — small bright sphere that travels the path
+    const orbGeom = new THREE.SphereGeometry(5, 20, 16);
+    const orbMat = new THREE.MeshBasicMaterial({
+      color: 0xffffcc,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+    });
+    const queryOrb = new THREE.Mesh(orbGeom, orbMat);
+    // Start off-screen (toward camera, above the cluster) so it looks like
+    // it enters the scene as a query
+    const startPos = points[0].clone();
+    startPos.y += 120;
+    startPos.z += 80;
+    queryOrb.position.copy(startPos);
+    entry4.queryOrb = queryOrb;
+    entry4.queryOrbMat = orbMat;
+    entry4.queryOrbStartPos = startPos;
+    entry4.group.add(queryOrb);
+
+    // Highlight rings — one per document in the trace. Fade in as orb reaches them.
+    const highlights = [];
+    const highlightTimes = [];
+    points.forEach((p, i) => {
+      const ringGeom = new THREE.RingGeometry(10, 14, 24);
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: 0xfff4cc,
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide,
+      });
+      const ring = new THREE.Mesh(ringGeom, ringMat);
+      ring.position.copy(p);
+      highlights.push(ring);
+      // Each highlight activates at a staggered time (seconds into beat)
+      highlightTimes.push(1.2 + i * 1.4);
+      entry4.group.add(ring);
+    });
+    entry4.highlights = highlights;
+    entry4.highlightTimes = highlightTimes;
+    entry4.traceStart = performance.now();
   },
 
   // Create connection threads for Beat 5 — thin gold lines connecting nearby
-  // documents in the Finance cluster. Visible from inside the cluster.
+  // documents in the Finance cluster, plus a few cross-cluster reaches showing
+  // that connections exist beyond any one department.
   _initBeat5Threads() {
     const C = this.cinema;
     if (!C) return;
     const entry5 = C.beatObjects[5];
     const entry3 = C.beatObjects[3];
     if (!entry5 || !entry3 || !entry3.clusters) return;
-    // Clear previous threads
+    // Clear previous threads and pulses
     entry5.lines.forEach(l => { entry5.group.remove(l); l.geometry.dispose(); });
     entry5.lines = [];
+    if (entry5.pulses) {
+      entry5.pulses.forEach(p => {
+        entry5.group.remove(p.mesh);
+        p.mesh.geometry.dispose();
+      });
+    }
+    entry5.pulses = [];
     const THREE = C.THREE;
-    // For each doc in the Finance cluster, connect it to ~2 nearest neighbors
+    // Threads within the Finance cluster
     const finance = entry3.clusters[1];
     if (!finance || !finance.docs) return;
     const docs = finance.docs;
     const clusterCenter = finance.group.position;
     const added = new Set();
+    const threadData = [];  // remember endpoints for pulse traversal
     docs.forEach((doc, i) => {
       const myPos = doc.position.clone().add(clusterCenter);
-      // Find 2 nearest
       const sortedByDist = docs
         .map((d, j) => {
           if (i === j) return null;
@@ -12676,8 +12806,61 @@ const DemoMode = {
         const line = new THREE.Line(geom, mat);
         entry5.lines.push(line);
         entry5.group.add(line);
+        threadData.push({ a: myPos.clone(), b: n.pos.clone(), crossCluster: false });
       });
     });
+    // Cross-cluster reaches — a few threads from Finance out to Compliance and Operations
+    // showing that connections span departments (multi-collection reasoning)
+    const otherClusters = [entry3.clusters[0], entry3.clusters[2]];  // Compliance, Operations
+    otherClusters.forEach((other) => {
+      if (!other || !other.docs) return;
+      // Pick 2 documents from each "other" cluster and connect them to nearby Finance docs
+      for (let k = 0; k < 2; k++) {
+        const otherDoc = other.docs[Math.floor((k + 1) * other.docs.length / 4)];
+        const otherWp = otherDoc.position.clone().add(other.group.position);
+        // Find nearest Finance doc
+        const nearestFinance = docs
+          .map(d => ({ doc: d, pos: d.position.clone().add(clusterCenter) }))
+          .map(o => ({ ...o, dist: otherWp.distanceTo(o.pos) }))
+          .sort((a, b) => a.dist - b.dist)[0];
+        if (!nearestFinance) continue;
+        const geom = new THREE.BufferGeometry().setFromPoints([nearestFinance.pos, otherWp]);
+        const mat = new THREE.LineBasicMaterial({
+          color: 0xc9a832,
+          transparent: true,
+          opacity: 0,
+          blending: THREE.AdditiveBlending,
+        });
+        const line = new THREE.Line(geom, mat);
+        entry5.lines.push(line);
+        entry5.group.add(line);
+        threadData.push({ a: nearestFinance.pos.clone(), b: otherWp.clone(), crossCluster: true });
+      }
+    });
+    entry5.threadData = threadData;
+
+    // Create a handful of small bright pulses that travel along random threads.
+    // These give the threads a "data flowing" feel.
+    const PULSE_COUNT = 6;
+    for (let p = 0; p < PULSE_COUNT; p++) {
+      const pulseGeom = new THREE.SphereGeometry(1.6, 10, 8);
+      const pulseMat = new THREE.MeshBasicMaterial({
+        color: 0xfff4cc,
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+      });
+      const pulseMesh = new THREE.Mesh(pulseGeom, pulseMat);
+      entry5.group.add(pulseMesh);
+      entry5.pulses.push({
+        mesh: pulseMesh,
+        material: pulseMat,
+        threadIdx: Math.floor(Math.random() * threadData.length),
+        progress: Math.random(),   // current t along thread [0..1]
+        speed: 0.15 + Math.random() * 0.25,  // units per second
+        startDelay: p * 0.3,
+      });
+    }
   },
 
   startCinema() {
@@ -12854,26 +13037,119 @@ const DemoMode = {
       }
     }
 
-    // ─── Beat 4: retrieval trace line ───
+    // ─── Beat 4: retrieval trace — query orb travels path, docs flash ───
     const b4 = C.beatObjects[4];
     if (b4 && b4.group.visible && b4.line && b4.lineMat) {
       const fade = computeFade(b4);
-      // Pulse the line's brightness so it looks like energy moving through it
-      const pulse = 0.7 + 0.3 * Math.sin(tSec * 4);
-      b4.lineMat.opacity = fade * pulse * 0.9;
+      const since = (nowMs - (b4.traceStart || nowMs)) / 1000;
+      // Line: fade in over first 800ms, then hold with gentle pulse
+      const lineIn = Math.min(1, since / 0.8);
+      const linePulse = 0.7 + 0.3 * Math.sin(since * 3);
+      b4.lineMat.opacity = fade * lineIn * linePulse * 0.75;
+
+      // Query orb: travels from start position through the trace points
+      if (b4.queryOrb && b4.queryOrbMat && b4.tracePoints) {
+        // Total journey: 0.8s travel from start → first point, then 1.4s per hop between points
+        const travelStart = 0.4;  // small delay before orb appears
+        const toFirst = 0.8;
+        const hopDur = 1.4;
+        const t = since - travelStart;
+        if (t < 0) {
+          b4.queryOrbMat.opacity = 0;
+        } else if (t < toFirst) {
+          // Entry phase: startPos → points[0]
+          const k = t / toFirst;
+          const easeK = 1 - Math.pow(1 - k, 2);  // ease-out
+          b4.queryOrb.position.lerpVectors(b4.queryOrbStartPos, b4.tracePoints[0], easeK);
+          b4.queryOrbMat.opacity = fade * k * 0.95;
+        } else {
+          // Between trace points: which segment are we on?
+          const afterEntry = t - toFirst;
+          const segIdx = Math.floor(afterEntry / hopDur);
+          const segT = (afterEntry % hopDur) / hopDur;
+          const easeK = segT * segT * (3 - 2 * segT);  // smoothstep
+          const pts = b4.tracePoints;
+          if (segIdx < pts.length - 1) {
+            b4.queryOrb.position.lerpVectors(pts[segIdx], pts[segIdx + 1], easeK);
+            b4.queryOrbMat.opacity = fade * 0.95;
+          } else {
+            // Reached the end — gentle fade as it settles at last point
+            b4.queryOrb.position.copy(pts[pts.length - 1]);
+            const linger = Math.max(0, 1 - (afterEntry - (pts.length - 1) * hopDur) / 0.8);
+            b4.queryOrbMat.opacity = fade * linger * 0.95;
+          }
+          // Scale the orb with a little pulse so it feels alive
+          const orbPulse = 1 + 0.15 * Math.sin(since * 8);
+          b4.queryOrb.scale.set(orbPulse, orbPulse, orbPulse);
+        }
+      }
+
+      // Highlight rings: each fades in briefly when the orb arrives at its doc
+      if (b4.highlights && b4.highlightTimes) {
+        b4.highlights.forEach((ring, i) => {
+          const activateAt = b4.highlightTimes[i];
+          const timeSinceActivate = since - activateAt;
+          let ringOpacity = 0;
+          if (timeSinceActivate > 0 && timeSinceActivate < 1.6) {
+            // Fast rise, slow decay
+            const t01 = timeSinceActivate / 1.6;
+            ringOpacity = Math.sin(t01 * Math.PI) * 0.9;
+          } else if (timeSinceActivate >= 1.6) {
+            // Settled baseline glow so the path stays visible
+            ringOpacity = 0.22;
+          }
+          ring.material.opacity = fade * ringOpacity;
+          // Ring always faces camera for a clean ring-on-document look
+          ring.lookAt(C.camera.position);
+          // Scale pulse when active
+          if (timeSinceActivate > 0 && timeSinceActivate < 1.6) {
+            const scalePulse = 1 + Math.sin(timeSinceActivate * 6) * 0.12;
+            ring.scale.set(scalePulse, scalePulse, scalePulse);
+          }
+        });
+      }
     }
 
-    // ─── Beat 5: connection threads (live web visible from inside cluster) ───
+    // ─── Beat 5: connection threads + traveling pulses ───
     const b5 = C.beatObjects[5];
     if (b5 && b5.group.visible && b5.lines.length > 0) {
       const fade = computeFade(b5);
-      // Staggered fade-in across lines — each thread appears slightly after the previous
+      const since = (nowMs - (b5._showStartTime || nowMs)) / 1000;
+      // Staggered fade-in across lines — cross-cluster threads come in later
+      // (they represent multi-collection reasoning, so they should feel like
+      // a reveal of scope after the in-cluster threads are already present)
       b5.lines.forEach((line, i) => {
-        const stagger = i / b5.lines.length;
-        const lineTimeT = Math.max(0, (nowMs - (b5._showStartTime || nowMs)) / 1000 - stagger * 1.8);
+        const isCross = b5.threadData && b5.threadData[i] && b5.threadData[i].crossCluster;
+        const stagger = isCross ? 2.2 + (i / b5.lines.length) * 1.5 : (i / b5.lines.length) * 1.8;
+        const lineTimeT = Math.max(0, since - stagger);
         const lineFade = Math.min(1, lineTimeT / 1.5);
-        line.material.opacity = fade * lineFade * 0.45;
+        const targetOpacity = isCross ? 0.55 : 0.45;  // cross-cluster slightly brighter
+        line.material.opacity = fade * lineFade * targetOpacity;
       });
+
+      // Travel pulses along threads
+      if (b5.pulses && b5.threadData) {
+        const dt = 1 / 60;  // assume ~60fps for pulse progression
+        b5.pulses.forEach(p => {
+          if (since < p.startDelay) {
+            p.material.opacity = 0;
+            return;
+          }
+          // Advance progress. When it reaches 1, jump to a new random thread.
+          p.progress += p.speed * dt;
+          if (p.progress >= 1) {
+            p.progress = 0;
+            p.threadIdx = Math.floor(Math.random() * b5.threadData.length);
+          }
+          const thread = b5.threadData[p.threadIdx];
+          if (!thread) return;
+          // Lerp position along thread
+          p.mesh.position.lerpVectors(thread.a, thread.b, p.progress);
+          // Pulse fades in at start, out at end of traversal for a shooting-star feel
+          const envelope = Math.sin(p.progress * Math.PI);  // peaks at midpoint
+          p.material.opacity = fade * envelope * 0.85;
+        });
+      }
     }
 
     // ─── Beat 6: her actual library — stacks of real documents ───
@@ -12910,26 +13186,37 @@ const DemoMode = {
       }
     }
 
-    // ─── Beat 7: pulsing guarantee orbs (one per guarantee, in sequence) ───
+    // ─── Beat 7: pulsing guarantee icons (3D geometry, sequential pulses) ───
     const b7 = C.beatObjects[7];
     if (b7 && b7.group.visible) {
       const fade = computeFade(b7);
       const since = (nowMs - (b7.pulseSequenceStart || nowMs)) / 1000;
-      b7.orbs.forEach((orb, i) => {
-        // Each orb pulses sequentially — at its assigned time offset
-        const pulseOffset = i * 2.5;  // seconds apart
-        const timeIntoPulse = since - pulseOffset;
-        let pulse = 0.2;  // baseline glow
-        if (timeIntoPulse > 0 && timeIntoPulse < 2.5) {
-          // Smooth pulse envelope
-          const t01 = timeIntoPulse / 2.5;
-          pulse = 0.2 + Math.sin(t01 * Math.PI) * 0.8;
-        }
-        orb.material.opacity = fade * pulse;
-        // Scale the orb with the pulse for extra presence
-        const scale = 1 + pulse * 0.4;
-        orb.mesh.scale.set(scale, scale, scale);
+      // Slow rotation for all icons so they feel alive
+      b7.orbs.forEach(orb => {
+        orb.mesh.rotation.y = Math.sin(tSec * 0.6) * 0.25;
+        orb.mesh.rotation.x = Math.sin(tSec * 0.4) * 0.1;
       });
+      // iconMat is shared across all icons, so manage its opacity as the max of fades
+      // Each icon pulses sequentially — at its assigned offset
+      let maxIconOpacity = 0.4 * fade;  // baseline glow so icons are always visible when beat active
+      b7.orbs.forEach((orb, i) => {
+        const pulseOffset = i * 2.5;
+        const timeIntoPulse = since - pulseOffset;
+        let pulse = 0;
+        if (timeIntoPulse > 0 && timeIntoPulse < 2.5) {
+          const t01 = timeIntoPulse / 2.5;
+          pulse = Math.sin(t01 * Math.PI);  // 0..1..0
+        }
+        // Halo pulses distinctly from the icon — bright burst
+        orb.haloMat.opacity = fade * (0.08 + pulse * 0.4);
+        // Scale pulse on the icon itself
+        const scale = 1 + pulse * 0.25;
+        orb.mesh.scale.set(scale, scale, scale);
+        // Track max for shared iconMat
+        const iconPulse = 0.55 + pulse * 0.45;
+        maxIconOpacity = Math.max(maxIconOpacity, fade * iconPulse);
+      });
+      if (b7.iconMat) b7.iconMat.opacity = maxIconOpacity;
     }
   },
 
