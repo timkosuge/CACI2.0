@@ -10852,6 +10852,7 @@ const DemoMode = {
     document.querySelectorAll('.demo-dot').forEach(d => { d.classList.remove('active'); d.classList.remove('done'); });
     this.stopParticles();
     this.stopPreshow();
+    this._disposeAnalyser();
   },
 
   playBeat(idx) {
@@ -11149,18 +11150,22 @@ const DemoMode = {
     const frame = () => {
       if (!this.running) { cancelAnimationFrame(raf); return; }
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // Audio metrics — ambient field surges subtly with the voice
+      const energy = this.audio.energy;
+      const bass   = this.audio.bass;
+      const speedMult = 1 + energy * 1.4;
       for (const p of parts) {
-        p.x += p.vx;
-        p.y += p.vy;
+        p.x += p.vx * speedMult;
+        p.y += p.vy * speedMult;
         if (p.x < -10) p.x = canvas.width + 10;
         if (p.x > canvas.width + 10) p.x = -10;
         if (p.y < -10) p.y = canvas.height + 10;
         if (p.y > canvas.height + 10) p.y = -10;
         ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(245, 227, 152, ${p.a})`;
-        ctx.shadowColor = 'rgba(212, 168, 50, 0.8)';
-        ctx.shadowBlur = 8;
+        ctx.arc(p.x, p.y, p.r * (1 + bass * 0.8), 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(245, 227, 152, ${p.a * (1 + energy * 0.6)})`;
+        ctx.shadowColor = 'rgba(212, 168, 50, 0.9)';
+        ctx.shadowBlur = 8 + energy * 16;
         ctx.fill();
       }
       raf = requestAnimationFrame(frame);
@@ -11324,6 +11329,11 @@ const DemoMode = {
 
       const tsec = t / 1000;
 
+      // Live audio energy — drives particle surge, trail length, glow
+      const energy = this.audio.energy;   // 0..1 overall voice loudness
+      const bass   = this.audio.bass;     // 0..1 low-frequency (vowels, voice body)
+      const treble = this.audio.treble;   // 0..1 high-frequency (consonants, emphasis)
+
       // Global fades
       const globalFadeIn = Math.min(1, tsec / 5);
       const fadeOutStart = EXPECTED - 3500;
@@ -11337,10 +11347,12 @@ const DemoMode = {
         if (cassieEl) cassieEl.classList.add('revealed');
       }
 
-      // Update and draw points
+      // Update and draw points — velocity, brightness, size all audio-reactive
+      const speedMult = 1 + treble * 1.8;      // sharp consonants push particles
+      const brightMult = 1 + energy * 0.6;     // loudness pumps glow
       for (const p of points) {
-        p.nx += p.vx * dt;
-        p.ny += p.vy * dt;
+        p.nx += p.vx * dt * speedMult;
+        p.ny += p.vy * dt * speedMult;
         // Wrap at edges (with margin)
         if (p.nx < -0.05) p.nx = 1.05;
         if (p.nx > 1.05)  p.nx = -0.05;
@@ -11352,16 +11364,17 @@ const DemoMode = {
         if (appearA <= 0) continue;
 
         const twinkle = 0.75 + 0.25 * Math.sin(tsec * p.twinkleSpeed + p.twinklePhase);
-        const alpha = globalA * appearA * twinkle * p.brightness;
+        const alpha = globalA * appearA * twinkle * p.brightness * brightMult;
         const x = p.nx * w;
         const y = p.ny * h;
-        const r = p.size * dpr;
+        // Size also pulses with bass — the low voice body makes particles swell
+        const r = p.size * dpr * (1 + bass * 0.5 * p.zFactor);
 
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(245, 213, 122, ${alpha})`;
-        ctx.shadowColor = 'rgba(212, 168, 50, 0.7)';
-        ctx.shadowBlur = 5 * dpr * p.zFactor;
+        ctx.shadowColor = 'rgba(212, 168, 50, 0.8)';
+        ctx.shadowBlur = (5 + energy * 14) * dpr * p.zFactor;
         ctx.fill();
       }
       ctx.shadowBlur = 0;
@@ -11400,6 +11413,18 @@ const DemoMode = {
         }
       }
       if (nameEl) nameEl.style.opacity = String(globalFadeOut);
+
+      // Audio-reactive glow on the CACI brand — bass drives a warm gold halo
+      // behind the typography. Feels like her voice IS the light.
+      const brandEl = nameEl && nameEl.querySelector('.preshow-brand');
+      if (brandEl) {
+        const glowRadius = 32 + bass * 60 + energy * 20;
+        const glowOpacity = (0.28 + bass * 0.45).toFixed(2);
+        brandEl.style.filter =
+          `drop-shadow(0 1px 0px rgba(0,0,0,1)) ` +
+          `drop-shadow(0 2px 6px rgba(0,0,0,0.75)) ` +
+          `drop-shadow(0 0 ${glowRadius}px rgba(212,168,50,${glowOpacity}))`;
+      }
 
       raf = requestAnimationFrame(frame);
     };
@@ -11533,17 +11558,98 @@ const DemoMode = {
     this.prefetchBeatAudio(idx);
   },
 
+  // Audio metrics — live energy levels driven by AnalyserNode during playback.
+  // Any visual can read DemoMode.audio.energy / .bass / .treble (0..1 values,
+  // smoothed). They naturally decay to 0 when no audio is playing.
+  audio: { energy: 0, bass: 0, treble: 0 },
+
+  // Shared AudioContext + analyser — created lazily on first play so the
+  // user gesture from "Show Me" satisfies autoplay policy
+  _audioCtx: null,
+  _analyser: null,
+  _analyserData: null,
+  _audioRAF: null,
+
+  _ensureAnalyser() {
+    if (this._audioCtx) return;
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      this._audioCtx = new Ctx();
+      this._analyser = this._audioCtx.createAnalyser();
+      this._analyser.fftSize = 256;
+      this._analyser.smoothingTimeConstant = 0.72;
+      this._analyser.connect(this._audioCtx.destination);
+      this._analyserData = new Uint8Array(this._analyser.frequencyBinCount);
+      // Start the sampling loop — runs forever while demo is open
+      const sample = () => {
+        if (!this._analyser || !this._analyserData) return;
+        this._analyser.getByteFrequencyData(this._analyserData);
+        const N = this._analyserData.length;
+        let bassSum = 0, trebleSum = 0, totalSum = 0;
+        const bassEnd = Math.floor(N * 0.15);
+        const trebleStart = Math.floor(N * 0.55);
+        for (let i = 0; i < N; i++) {
+          const v = this._analyserData[i];
+          totalSum += v;
+          if (i < bassEnd) bassSum += v;
+          else if (i >= trebleStart) trebleSum += v;
+        }
+        // Normalize to 0..1 with slight boost so soft speech isn't invisible
+        const energy = Math.min(1, (totalSum / N / 255) * 1.6);
+        const bass   = Math.min(1, (bassSum / bassEnd / 255) * 1.4);
+        const treble = Math.min(1, (trebleSum / (N - trebleStart) / 255) * 1.8);
+        // Smooth by blending with previous reading
+        this.audio.energy = this.audio.energy * 0.55 + energy * 0.45;
+        this.audio.bass   = this.audio.bass   * 0.6  + bass   * 0.4;
+        this.audio.treble = this.audio.treble * 0.45 + treble * 0.55;
+        // Natural decay when no audio is active
+        if (!this.currentAudio) {
+          this.audio.energy *= 0.92;
+          this.audio.bass   *= 0.92;
+          this.audio.treble *= 0.92;
+        }
+        this._audioRAF = requestAnimationFrame(sample);
+      };
+      this._audioRAF = requestAnimationFrame(sample);
+    } catch (e) { /* AudioContext blocked — non-fatal */ }
+  },
+
+  _disposeAnalyser() {
+    if (this._audioRAF) { cancelAnimationFrame(this._audioRAF); this._audioRAF = null; }
+    if (this._audioCtx) { try { this._audioCtx.close(); } catch {} }
+    this._audioCtx = null;
+    this._analyser = null;
+    this._analyserData = null;
+    this.audio = { energy: 0, bass: 0, treble: 0 };
+  },
+
   playAudioBlob(blob, sess, onEnd) {
     if (sess !== this.audioSession) { if (onEnd) setTimeout(onEnd, 0); return; }
     if (this.muted || !this.running) { if (onEnd) setTimeout(onEnd, 0); return; }
     this.stopAudio();
+    this._ensureAnalyser();
     const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
+    audio.crossOrigin = 'anonymous';
     this.currentAudio = audio;
     let fired = false;
+    let sourceNode = null;
+    // Wire into analyser so visuals can react to this audio
+    if (this._audioCtx && this._analyser) {
+      try {
+        sourceNode = this._audioCtx.createMediaElementSource(audio);
+        sourceNode.connect(this._analyser);
+      } catch (e) { /* already connected or unsupported */ }
+      // Safari/iOS may need explicit resume on a user gesture
+      if (this._audioCtx.state === 'suspended') {
+        this._audioCtx.resume().catch(() => {});
+      }
+    }
     const fire = () => {
       if (fired) return;
       fired = true;
+      if (sourceNode) try { sourceNode.disconnect(); } catch {}
       URL.revokeObjectURL(url);
       if (this.currentAudio === audio) this.currentAudio = null;
       if (onEnd) { try { onEnd(); } catch {} }
