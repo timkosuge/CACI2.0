@@ -98,6 +98,7 @@ export default {
     if (path === '/demo/harvest-stats'  && method === 'POST') return handleDemoHarvestStats(request, env);
     if (path === '/demo/save-stats'     && method === 'POST') return handleDemoSaveStats(request, env);
     if (path === '/demo/reset-stats'    && method === 'POST') return handleDemoResetStats(request, env);
+    if (path === '/demo/kv-diagnostic'   && method === 'GET')  return handleDemoKvDiagnostic(env);
     // Legacy (single-variant) endpoints — still available for back-compat:
     if (path === '/demo/generate-intro' && method === 'POST') return handleDemoGenerateIntro(request, env);
     if (path === '/demo/generate-beat'  && method === 'POST') return handleDemoGenerateBeat(request, env);
@@ -4576,6 +4577,73 @@ async function handleDemoResetStats(request, env) {
   } catch (e) { return json({ error: e.message }, 500); }
 }
 
+// Diagnostic: dump an overview of what's actually stored in KV so we can see
+// what prefix patterns, value shapes, etc. exist for the library. Used to
+// diagnose why the harvester isn't finding chunks. Admin-auth required.
+async function handleDemoKvDiagnostic(env) {
+  try {
+    const result = {};
+
+    // Enumerate ALL keys (bounded) to see the prefix landscape
+    const all = await env.CACI_KV.list({ limit: 500 });
+    const keys = (all.keys || []).map(k => k.name);
+    result.totalKeys = keys.length;
+    result.listComplete = all.list_complete !== false;
+
+    // Bucket keys by their first colon-separated prefix
+    const prefixCounts = {};
+    for (const k of keys) {
+      const prefix = k.split(':')[0] || '(none)';
+      prefixCounts[prefix] = (prefixCounts[prefix] || 0) + 1;
+    }
+    result.prefixCounts = prefixCounts;
+
+    // Sample: grab one value from each prefix bucket to see what shape it is
+    const samples = {};
+    const seenPrefixes = new Set();
+    for (const k of keys) {
+      const prefix = k.split(':')[0] || '(none)';
+      if (seenPrefixes.has(prefix)) continue;
+      seenPrefixes.add(prefix);
+      const raw = await env.CACI_KV.get(k);
+      if (raw === null) { samples[prefix] = { key: k, value: null }; continue; }
+      let parsed = null;
+      try { parsed = JSON.parse(raw); } catch {}
+      if (parsed && typeof parsed === 'object') {
+        // Report the top-level keys + array length if applicable + a tiny preview
+        const preview = {
+          key: k,
+          topLevelKeys: Object.keys(parsed).slice(0, 20),
+          chunksLen: Array.isArray(parsed.chunks) ? parsed.chunks.length : undefined,
+          firstChunkTextLen: Array.isArray(parsed.chunks) && parsed.chunks[0]
+            ? (parsed.chunks[0].text || parsed.chunks[0].content || '').length
+            : undefined,
+        };
+        // Sample chunk text so we know the field name
+        if (Array.isArray(parsed.chunks) && parsed.chunks[0]) {
+          preview.firstChunkKeys = Object.keys(parsed.chunks[0]);
+          const txt = parsed.chunks[0].text || parsed.chunks[0].content || '';
+          preview.firstChunkTextSnippet = txt.slice(0, 200);
+        }
+        samples[prefix] = preview;
+      } else {
+        samples[prefix] = {
+          key: k,
+          rawSnippet: raw.slice(0, 200),
+          rawType: typeof parsed,
+        };
+      }
+    }
+    result.samples = samples;
+
+    // Also explicitly list first 15 file: keys if any, since we care about those
+    const fileList = await env.CACI_KV.list({ prefix: 'file:', limit: 15 });
+    result.fileKeysSample = (fileList.keys || []).map(k => k.name);
+
+    return json(result);
+  } catch (e) { return json({ error: e.message, stack: e.stack }, 500); }
+}
+
 // Harvest stats: CACI sweeps her library and extracts real numeric facts.
 // This is the heavy endpoint — it uses Claude to read retrieved chunks from
 // the library and pull out concrete numbers with source citations.
@@ -4767,8 +4835,14 @@ async function harvestRetrieveContext(env, query) {
       const fileName = fileRec.name || fileRec.filename || fileRec.id || fkey.name;
       for (const chunk of chunks) {
         chunksScanned++;
-        const text = (chunk.text || chunk.content || '').toLowerCase();
-        if (!text) continue;
+        // Chunks are stored as plain strings by handleUpload (worker.js line ~583).
+        // Handle both the string case AND an object-with-.text form in case any
+        // legacy/future chunks are stored differently.
+        const chunkText = typeof chunk === 'string'
+          ? chunk
+          : (chunk && (chunk.text || chunk.content)) || '';
+        if (!chunkText) continue;
+        const text = chunkText.toLowerCase();
         let score = 0;
         for (const kw of keywords) {
           const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -4781,7 +4855,7 @@ async function harvestRetrieveContext(env, query) {
         if (score > 0) {
           scored.push({
             score,
-            text: chunk.text || chunk.content,
+            text: chunkText,
             source: fileName,
           });
         }
