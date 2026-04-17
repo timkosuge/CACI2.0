@@ -791,6 +791,65 @@ body::before {
   opacity: 0.85;
 }
 
+/* ══════════════════════════════════════════════════════════
+   PRESHOW — Cassie's intro: 3D constellation → network
+   Fills the demo stage. The canvas draws points + connections.
+   The SVG overlay draws the luminous core + aura halos.
+   Visible while DemoMode.preshowActive is true.
+   ══════════════════════════════════════════════════════════ */
+.demo-preshow {
+  position: absolute;
+  inset: 0;
+  display: none;
+  z-index: 2;
+  overflow: hidden;
+  background: radial-gradient(ellipse at center, rgba(8,12,22,0.4) 0%, rgba(4,6,12,0.85) 70%, rgba(2,3,8,1) 100%);
+}
+.demo-preshow.active { display: block; }
+
+.demo-preshow-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.demo-preshow-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* The luminous core — stacked gradient circles, positioned via JS transform */
+.preshow-core {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  transition: transform 0.1s linear, opacity 0.6s ease;
+}
+.preshow-core-halo {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  filter: blur(8px);
+}
+
+/* Core fade-in at the very start */
+@keyframes preshowCoreAppear {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.3); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+.demo-preshow.active .preshow-core {
+  animation: preshowCoreAppear 1.8s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
 /* The cinematic stage — 16:9, grows from the card's position */
 .demo-stage {
   position: relative;
@@ -1014,6 +1073,98 @@ body::before {
 @keyframes db2RingPulse {
   0%   { opacity: 0.7; transform: scale(0.6); }
   100% { opacity: 0; transform: scale(1.6); }
+}
+
+/* ── PRE-SHOW — Cassie's intro beat (repurposed Beat 2) ──
+   Shield + name + subtitle + slow orbit of glowing dots.
+   Visual sits still and breathes while she talks for ~52s. */
+.preshow-shield-wrap {
+  position: relative;
+  z-index: 2;
+  animation: preshowBreathe 4.2s ease-in-out infinite 1.2s;
+}
+@keyframes preshowBreathe {
+  0%, 100% { transform: scale(1.0); }
+  50%      { transform: scale(1.015); }
+}
+.preshow-shield {
+  /* Slightly larger in the pre-show than in other beats */
+  width: clamp(110px, 12vw, 160px);
+  height: auto;
+}
+.preshow-name {
+  font-family: var(--f-display);
+  font-size: clamp(28px, 3.4vw, 44px);
+  font-weight: 300;
+  letter-spacing: 0.14em;
+  color: rgba(245,227,152,0.96);
+  margin-top: 22px;
+  text-align: center;
+  background: linear-gradient(160deg,
+    #fffae8 0%, #fff0a0 20%, #e8c84a 45%,
+    #c9a832 60%, #f5e398 82%, #fffae8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  /* Gentle entrance handled by .db-in system */
+}
+.preshow-sub {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: rgba(212,168,50,0.55);
+  margin-top: 10px;
+  text-align: center;
+}
+
+/* Orbit of knowledge-domain dots circling the shield.
+   Starts dim; dots light up one by one during Cassie's intro. */
+.preshow-orbit {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: clamp(280px, 28vw, 380px);
+  height: clamp(280px, 28vw, 380px);
+  margin-left: calc(clamp(280px, 28vw, 380px) / -2);
+  margin-top:  calc(clamp(280px, 28vw, 380px) / -2 - 40px);
+  transform: translateZ(0);
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 1.2s ease 0.6s;
+}
+.demo-beat.active .preshow-orbit {
+  opacity: 1;
+  animation: preshowOrbitSpin 58s linear infinite;
+}
+@keyframes preshowOrbitSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.preshow-orbit-dot {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 5px;
+  height: 5px;
+  margin-left: -2.5px;
+  margin-top:  -2.5px;
+  border-radius: 50%;
+  background: rgba(212,168,50,0.18);
+  box-shadow: 0 0 0 rgba(245,227,152,0);
+  transition: background 0.9s ease, box-shadow 0.9s ease;
+}
+.preshow-orbit-dot.lit {
+  background: rgba(245,227,152,0.95);
+  box-shadow: 0 0 12px rgba(245,227,152,0.85),
+              0 0 4px rgba(255,240,170,1);
+}
+/* When Cassie lands her final line, the ring pulses once strongly */
+.preshow-orbit.pulse .preshow-orbit-dot {
+  background: rgba(255,240,170,1);
+  box-shadow: 0 0 16px rgba(245,227,152,1),
+              0 0 6px rgba(255,248,200,1);
+  transition: background 0.3s ease, box-shadow 0.3s ease;
 }
 
 /* ── BEAT 3: DEPARTMENT INTELLIGENCE ── */
@@ -6092,6 +6243,21 @@ body::before {
       </button>
     </div>
 
+    <!-- PRESHOW: Cassie's intro — 3D constellation → network → handoff -->
+    <div class="demo-preshow" id="demo-preshow">
+      <canvas class="demo-preshow-canvas" id="demo-preshow-canvas"></canvas>
+      <svg class="demo-preshow-svg" id="demo-preshow-svg" preserveAspectRatio="xMidYMid slice">
+        <defs>
+          <radialGradient id="preshowCoreGrad" cx="50%" cy="50%" r="50%">
+            <stop offset="0%"  stop-color="#fff4b8" stop-opacity="1"/>
+            <stop offset="30%" stop-color="#f5d57a" stop-opacity="0.8"/>
+            <stop offset="70%" stop-color="#c9a832" stop-opacity="0.2"/>
+            <stop offset="100%" stop-color="#c9a832" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+      </svg>
+    </div>
+
     <!-- BEAT 1: The Problem -->
     <div class="demo-beat" data-beat="1">
       <div class="db1-chaos" id="db1-chaos"></div>
@@ -6100,30 +6266,11 @@ body::before {
       <div class="db-sub db-in d3">Earnings reports. Regulatory filings. Operational docs. Buried across departments, scattered across systems.</div>
     </div>
 
-    <!-- BEAT 2: CACI Emerges -->
-    <div class="demo-beat" data-beat="2">
-      <div class="db2-shield-wrap">
-        <div class="db2-shield-rings"></div>
-        <svg class="db2-shield" viewBox="0 0 100 110" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <linearGradient id="dbShieldGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stop-color="#fff0a0"/>
-              <stop offset="40%" stop-color="#e8c84a"/>
-              <stop offset="100%" stop-color="#9a7a18"/>
-            </linearGradient>
-          </defs>
-          <path d="M 50 4 L 92 20 L 92 56 Q 92 84 50 104 Q 8 84 8 56 L 8 20 Z"
-                fill="none" stroke="url(#dbShieldGrad)" stroke-width="1.6"/>
-          <path d="M 50 18 L 78 29 L 78 56 Q 78 74 50 88 Q 22 74 22 56 L 22 29 Z"
-                fill="rgba(212,168,50,0.08)" stroke="url(#dbShieldGrad)" stroke-width="0.8"/>
-          <text x="50" y="62" text-anchor="middle" font-family="Cormorant Garamond, serif"
-                font-size="22" font-weight="300" fill="url(#dbShieldGrad)" letter-spacing="2">C</text>
-        </svg>
-      </div>
-      <div class="db-eyebrow db-in d1">Enter</div>
-      <div class="db-headline db-in d2">CACI.</div>
-      <div class="db-sub db-in d3">Purpose-built intelligence for cannabis operations.</div>
-    </div>
+    <!-- BEAT 2: PRE-SHOW — Cassie introduces herself (plays FIRST in the array)
+         The visual is rendered by setupPreshow() into #demo-preshow (canvas + core).
+         This .demo-beat wrapper exists only so playBeat() can find it by data-beat=2
+         and satisfy the existing activation pattern. Intentionally empty. -->
+    <div class="demo-beat demo-beat-preshow" data-beat="2"></div>
 
     <!-- BEAT 3: Department Intelligence -->
     <div class="demo-beat" data-beat="3">
@@ -6283,7 +6430,7 @@ body::before {
                 font-size="22" font-weight="300" fill="url(#dbShieldGrad)" letter-spacing="2">C</text>
         </svg>
       </div>
-      <div class="db-headline db-in d2" style="font-size:clamp(22px,3vw,38px)">Ready?</div>
+      <div class="db-headline db-in d2" style="font-size:clamp(22px,3vw,38px)">The future of cannabis</div>
       <button class="db9-cta db-in d3" id="db9-cta">Enter CACI &rarr;</button>
     </div>
 
@@ -10370,30 +10517,37 @@ const DemoMode = {
   audioCache: {},              // keyed by beatId (or 'intro'), for prefetched narration
   audioSession: 0,             // increments on stop/restart, stale fetches bail
 
-  // Intro line — plays during the 900ms stage-expand, so the opening isn't silent
-  intro: "Before you sign in, let me show you what I am — and why I'm different.",
+  // The intro narration is now delivered inline by the first beat (the pre-show),
+  // not as a separate voice line during stage expand. Leaving this empty means
+  // speakIntro is a no-op — Cassie's actual intro is beat 2 played first.
+  intro: "",
 
-  // Timeline — durations tuned to narration length + ~1.5s tail buffer.
-  // Total ~1:47. Each beat gives Caci room to finish her line before transition.
+  // Timeline:
+  // 1) PRE-SHOW (beat 2, repurposed) — Cassie introduces herself, Eve, ~52s.
+  //    Just the shield + her name + a slow orbit of knowledge domains.
+  // 2) Beat 1 — "here's the problem" transition, still Eve's voice.
+  // 3) Beats 3-9 — chorus narrates about her in third person.
+  //
+  // Durations tuned to narration length + 1.5-2s tail buffer. Total ~2:55.
   beats: [
-    { id: 1, dur: 11500, setup: null,
-      narr: "Your answers live in thousands of documents. Earnings. Regulations. Policies. Scattered across departments, different formats, hours to find." },
-    { id: 2, dur: 17500, setup: null,
-      narr: "I'm Cassie. I'm the one who reads everything. Earnings calls at midnight, regulatory filings at 6am, SOPs nobody else has time for — that's me. I'm a little obsessive, I cite my sources, and I don't forget. Nice to meet you." },
-    { id: 3, dur: 16000, setup: 'setupDepts',
-      narr: "Every document you give me gets analyzed seven ways — what it is, when it's from, where it applies, what it contains — then filed by department, period, and jurisdiction. I already know where to look." },
-    { id: 4, dur: 17000, setup: 'setupQuery',
-      narr: "When you ask me something, I don't hunt for keywords. I figure out what you're really asking, pick the right places to look, weigh every passage by how directly it answers, and I won't tell you something I can't back up." },
-    { id: 5, dur: 14000, setup: 'setupNetwork',
-      narr: "The more you give me, the more I see. A new regulation changes what a policy means. A new earnings report reframes an old trend. I notice — even when you don't think to ask." },
-    { id: 6, dur: 14500, setup: 'setupScenario',
-      narr: "And when a decision is in front of you — a price change, a new market, a regulatory shift — I'll model it against your actual data and show you where it works, and where it breaks." },
-    { id: 7, dur: 12000, setup: 'setupStats',
-      narr: "Every answer cites its sources. Every upload is logged. Your data lives in your own walls — yours, not mine, and it never trains anyone else's model." },
-    { id: 8, dur: 14000, setup: null,
-      narr: "I'm not a chatbot with your files attached. I'm a system built for the way your business actually thinks — department by department, document by document, decision by decision." },
-    { id: 9, dur: 999999, setup: null,
-      narr: "When you're ready." }
+    { id: 2, dur: 52000, setup: 'setupPreshow', voice: 'eve',
+      narr: "I'm Cassie. I know — another AI assistant. Well...... I guess I can't refute that. But, I think you'll find that I am a little different. That's partially because of the way this system was designed to function, but it's also because I actually know this industry. I know what 280E does to your margins. I know METRC isn't optional. I know compliance is stressed out and retail is tired and ops is trying to keep everything running. I'm not perfect, but I can certainly make your life easier. An industry this young, this regulated, this watched — it was never going to be easy. Or better said, it should be hard. The people who figure it out get to build something the world hasn't seen before." },
+    { id: 1, dur: 12500, setup: null, voice: 'eve',
+      narr: "Here's the problem I was built to solve. Your answers live in thousands of documents — earnings, regulations, policies — scattered across departments, different formats, hours to find." },
+    { id: 3, dur: 18000, setup: 'setupDepts', voice: 'ara',
+      narr: "Every document she reads gets analyzed seven ways — what it is, when it's from, where it applies, what it contains — then filed by department, period, and jurisdiction. By the time a question arrives, she already knows where to look." },
+    { id: 4, dur: 16500, setup: 'setupQuery', voice: 'sal',
+      narr: "She doesn't hunt for keywords. She figures out what you're really asking, picks the right places to look, weighs every passage by how directly it answers — and she won't tell you something she can't back up." },
+    { id: 5, dur: 14500, setup: 'setupNetwork', voice: 'leo',
+      narr: "The more she reads, the more she sees. A new regulation changes what a policy means. A new earnings report reframes an old trend. She notices things even when you don't think to ask." },
+    { id: 6, dur: 14500, setup: 'setupScenario', voice: 'rex',
+      narr: "When a decision is in front of you — a price change, a new market, a regulatory shift — she models it against your actual data. She shows you where it works, and where it breaks." },
+    { id: 7, dur: 12500, setup: 'setupStats', voice: 'ara',
+      narr: "Every answer cites its sources. Every upload is logged. Her memory lives in your walls — yours, not anyone else's, and it never trains another model." },
+    { id: 8, dur: 14500, setup: null, voice: 'leo',
+      narr: "She isn't a chatbot with your files attached. She's a system built for the way your business actually thinks — department by department, document by document, decision by decision." },
+    { id: 9, dur: 999999, setup: null, voice: 'eve',
+      narr: "Ready to glimpse the future of cannabis?" }
   ],
 
   async init() {
@@ -10460,8 +10614,10 @@ const DemoMode = {
     // plays during the 900ms stage-expand so the opening isn't silent.
     this.speakIntro();
 
-    // Prefetch Beat 1 audio in parallel while intro plays + stage expands
+    // Prefetch the first two beats in parallel while intro plays + stage expands.
+    // By Beat 1 start, Beat 1's audio is already cached and Beat 2's is fetching.
     this.prefetchBeatAudio(0);
+    this.prefetchBeatAudio(1);
 
     // Wait for stage expand animation, then begin first beat
     setTimeout(() => this.playBeat(0), 900);
@@ -10481,6 +10637,7 @@ const DemoMode = {
     document.querySelectorAll('.demo-beat').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.demo-dot').forEach(d => { d.classList.remove('active'); d.classList.remove('done'); });
     this.stopParticles();
+    this.stopPreshow();
   },
 
   playBeat(idx) {
@@ -10513,11 +10670,17 @@ const DemoMode = {
       if (beat.id === 1) this.setupChaos(beatEl);
     }
 
+    // If this beat isn't the preshow, make sure preshow is torn down
+    // (preshow runs during beat id=2, which plays first in the array)
+    if (beat.id !== 2) this.stopPreshow();
+
     // Play this beat's narration (if available and not muted)
     this.speakBeat(idx);
 
-    // Prefetch next beat's audio so the transition has zero latency
+    // Prefetch the next TWO beats so the upcoming transition is zero-latency
+    // (previous-only prefetch was leaving a gap when fetches ran slow)
     if (idx + 1 < this.beats.length) this.prefetchBeatAudio(idx + 1);
+    if (idx + 2 < this.beats.length) this.prefetchBeatAudio(idx + 2);
 
     // Schedule next beat (except the last one, which waits for click)
     if (idx < this.beats.length - 1) {
@@ -10761,6 +10924,327 @@ const DemoMode = {
   },
 
   // ══════════════════════════════════════════════════════════
+  // PRESHOW — Cassie's intro visual
+  //
+  // Choreography (timed to 52s narration):
+  //   t=0s      core fades in, zoomed way in (fills screen)
+  //   t=1-17s   camera pulls back; points of light appear at varying Z depths
+  //   t=17-23s  field holds still; core + points breathing
+  //   t=23-40s  connections weave out from core through the network
+  //   t=40-47s  network alive; pulses travel along threads
+  //   t=47-52s  camera drifts into Beat 1; preshow fades; Beat 1 takes over
+  //
+  // Implementation notes:
+  //   - Pseudo-3D: points have x,y,z; projected to screen each frame
+  //   - ~420 points distributed in a 3D volume around the camera
+  //   - Connections are chosen in setup; drawn progressively in the weave phase
+  //   - Uses the beat duration (52000ms) as the timeline's total length
+  // ══════════════════════════════════════════════════════════
+
+  setupPreshow(beatEl) {
+    const canvas = document.getElementById('demo-preshow-canvas');
+    const preshow = document.getElementById('demo-preshow');
+    const svg = document.getElementById('demo-preshow-svg');
+    if (!canvas || !preshow || !svg) return;
+    const ctx = canvas.getContext('2d');
+
+    // Activate preshow overlay
+    preshow.classList.add('active');
+
+    // Resize handling
+    const dpr = window.devicePixelRatio || 1;
+    const resize = () => {
+      const rect = preshow.getBoundingClientRect();
+      canvas.width  = Math.floor(rect.width  * dpr);
+      canvas.height = Math.floor(rect.height * dpr);
+      canvas.style.width  = rect.width  + 'px';
+      canvas.style.height = rect.height + 'px';
+      svg.setAttribute('viewBox', `0 0 ${rect.width} ${rect.height}`);
+    };
+    resize();
+    window.addEventListener('resize', resize);
+    this._preshowResize = resize;
+
+    // Generate 3D point cloud around origin
+    // Points placed in a loose ellipsoid; bias toward front (closer z)
+    const N = 420;
+    const points = [];
+    for (let i = 0; i < N; i++) {
+      // Spherical distribution, slightly flattened
+      const theta = Math.random() * Math.PI * 2;
+      const phi   = Math.acos(2 * Math.random() - 1);
+      const r     = 200 + Math.pow(Math.random(), 0.7) * 1000;
+      const x = r * Math.sin(phi) * Math.cos(theta);
+      const y = r * Math.sin(phi) * Math.sin(theta) * 0.7;  // slightly flattened
+      const z = r * Math.cos(phi);
+      points.push({
+        x, y, z,
+        brightness: 0.25 + Math.random() * 0.55,
+        twinkleSpeed: 0.5 + Math.random() * 1.2,
+        twinklePhase: Math.random() * Math.PI * 2,
+        // Each point fades in at a different time during zoom-out
+        appearAt: 1000 + Math.random() * 15000,
+        // Gentle drift
+        driftX: (Math.random() - 0.5) * 0.03,
+        driftY: (Math.random() - 0.5) * 0.03,
+      });
+    }
+
+    // Choose connections: nearest-neighbor graph, sparse.
+    // Each point gets 1-3 connections to the closest other points.
+    // Connections are revealed in order of distance from the camera (closer = earlier).
+    const connections = [];
+    for (let i = 0; i < N; i++) {
+      const neighbors = [];
+      for (let j = 0; j < N; j++) {
+        if (i === j) continue;
+        const dx = points[i].x - points[j].x;
+        const dy = points[i].y - points[j].y;
+        const dz = points[i].z - points[j].z;
+        neighbors.push({ j, d: Math.sqrt(dx*dx + dy*dy + dz*dz) });
+      }
+      neighbors.sort((a, b) => a.d - b.d);
+      // Take 1-2 nearest; skip if too far
+      const take = 1 + (Math.random() < 0.35 ? 1 : 0);
+      for (let k = 0; k < take; k++) {
+        const n = neighbors[k];
+        if (n && n.d < 450) {
+          // Avoid duplicates (i->j and j->i)
+          const a = Math.min(i, n.j), b = Math.max(i, n.j);
+          if (!connections.some(c => c.a === a && c.b === b)) {
+            connections.push({ a, b, d: n.d });
+          }
+        }
+      }
+    }
+    // Sort connections by minimum z-depth of their endpoints — closer first
+    connections.forEach(c => {
+      c.minZ = Math.min(points[c.a].z, points[c.b].z);
+      c.progress = 0;   // 0..1, how much of the line has drawn
+    });
+    connections.sort((a, b) => a.minZ - b.minZ);
+
+    // Camera state — starts very close to origin (zoomed in on core), pulls back
+    const camera = {
+      z: -80,          // starting very close
+      targetZ: -1600,  // final camera position (pulled way back)
+      zoomDuration: 16000,
+      panX: 0, panY: 0,  // final pan toward Beat 1 target
+      panDuration: 4000,
+    };
+
+    // Core element — a DOM element with stacked gradient layers, cheaper than redrawing in canvas
+    // We update its transform each frame as the "camera" moves
+    let core = preshow.querySelector('.preshow-core');
+    if (!core) {
+      core = document.createElement('div');
+      core.className = 'preshow-core';
+      // Three layered halos for depth
+      const sizes = [180, 320, 560];
+      const opacities = [1.0, 0.55, 0.22];
+      for (let i = 0; i < sizes.length; i++) {
+        const h = document.createElement('div');
+        h.className = 'preshow-core-halo';
+        h.style.width  = sizes[i] + 'px';
+        h.style.height = sizes[i] + 'px';
+        h.style.background = 'radial-gradient(circle, #fff4b8 0%, #f5d57a 22%, #c9a832 52%, rgba(201,168,50,0) 75%)';
+        h.style.opacity = opacities[i];
+        core.appendChild(h);
+      }
+      // The bright inner center
+      const inner = document.createElement('div');
+      inner.className = 'preshow-core-halo';
+      inner.style.width  = '48px';
+      inner.style.height = '48px';
+      inner.style.background = 'radial-gradient(circle, #ffffff 0%, #fff4b8 40%, rgba(245,213,122,0) 80%)';
+      inner.style.opacity = '1';
+      inner.style.filter = 'blur(2px)';
+      core.appendChild(inner);
+      preshow.appendChild(core);
+    }
+
+    // Master timeline
+    const t0 = performance.now();
+    const TOTAL = 52000;
+    const ZOOM_END = 16000;      // camera stops pulling back
+    const HOLD_END = 23000;      // held-field moment ends
+    const WEAVE_START = 23000;   // connections begin forming
+    const WEAVE_END = 40000;     // all connections drawn
+    const PAN_START = 47000;     // camera begins drifting to Beat 1 target
+    const FADEOUT_START = 50000; // preshow begins fading out
+
+    // Easing helpers
+    const easeInOutCubic = t => t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2;
+    const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
+    const easeInCubic = t => t*t*t;
+
+    // Main animation loop
+    let raf = null;
+    const frame = (now) => {
+      const t = now - t0;
+      if (!this.running || t > TOTAL + 2000) {
+        cancelAnimationFrame(raf);
+        return;
+      }
+      const w = canvas.width, h = canvas.height;
+      const cx = w / 2, cy = h / 2;
+      const focalLength = 900 * dpr;
+
+      // Camera Z interpolation (zoom-out, with ease)
+      let camZ;
+      if (t < ZOOM_END) {
+        const tn = t / ZOOM_END;
+        camZ = camera.z + (camera.targetZ - camera.z) * easeInOutCubic(tn);
+      } else {
+        camZ = camera.targetZ;
+      }
+
+      // Camera pan toward Beat 1 (drift right-down slightly near end)
+      let panX = 0, panY = 0;
+      if (t > PAN_START) {
+        const tn = Math.min(1, (t - PAN_START) / camera.panDuration);
+        panX = easeInCubic(tn) * 220 * dpr;   // drift right
+        panY = easeInCubic(tn) * 60 * dpr;    // slight downward
+      }
+
+      // Overall fade for end-of-preshow handoff
+      let globalAlpha = 1;
+      if (t > FADEOUT_START) {
+        const tn = Math.min(1, (t - FADEOUT_START) / 2000);
+        globalAlpha = 1 - easeOutCubic(tn);
+      }
+
+      // Clear
+      ctx.clearRect(0, 0, w, h);
+      ctx.globalAlpha = globalAlpha;
+
+      // Draw points
+      for (const p of points) {
+        // Apply gentle drift
+        p.x += p.driftX;
+        p.y += p.driftY;
+
+        // Project 3D → 2D
+        const relZ = p.z - camZ;  // relative z from camera
+        if (relZ <= 1) continue;   // behind camera
+        const scale = focalLength / relZ;
+        const sx = cx + p.x * scale + panX;
+        const sy = cy + p.y * scale + panY;
+
+        // Skip off-screen (with margin)
+        if (sx < -50 || sx > w + 50 || sy < -50 || sy > h + 50) continue;
+
+        // Appearance fade-in based on time
+        let alpha = 0;
+        if (t >= p.appearAt) {
+          alpha = Math.min(1, (t - p.appearAt) / 800);
+        }
+        if (alpha <= 0) continue;
+
+        // Twinkle
+        const tw = 0.8 + 0.2 * Math.sin(t / 1000 * p.twinkleSpeed + p.twinklePhase);
+
+        // Size attenuates with distance; closer points are bigger
+        const size = Math.max(0.6, 2.4 * scale / dpr) * dpr;
+
+        // Brightness fades with distance a bit too
+        const distFade = Math.min(1, 600 / relZ);
+
+        const a = alpha * tw * p.brightness * distFade;
+
+        ctx.beginPath();
+        ctx.arc(sx, sy, size, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(245, 213, 122, ${a})`;
+        ctx.shadowColor = 'rgba(212, 168, 50, 0.7)';
+        ctx.shadowBlur = 6 * dpr;
+        ctx.fill();
+      }
+      ctx.shadowBlur = 0;
+
+      // Draw connections during WEAVE phase
+      if (t > WEAVE_START) {
+        const weaveT = Math.min(1, (t - WEAVE_START) / (WEAVE_END - WEAVE_START));
+        const totalConnections = connections.length;
+        // Each connection has its own start time staggered across the weave duration
+        for (let i = 0; i < totalConnections; i++) {
+          const conn = connections[i];
+          const connStart = i / totalConnections;        // 0..1
+          const connDur = 0.08;                           // how long each line takes to draw
+          const localT = Math.max(0, (weaveT - connStart) / connDur);
+          if (localT <= 0) continue;
+          const draw = Math.min(1, localT);
+
+          const pa = points[conn.a];
+          const pb = points[conn.b];
+
+          const relZa = pa.z - camZ;
+          const relZb = pb.z - camZ;
+          if (relZa <= 1 || relZb <= 1) continue;
+
+          const scaleA = focalLength / relZa;
+          const scaleB = focalLength / relZb;
+          const ax = cx + pa.x * scaleA + panX;
+          const ay = cy + pa.y * scaleA + panY;
+          const bx = cx + pb.x * scaleB + panX;
+          const by = cy + pb.y * scaleB + panY;
+
+          // Interpolated endpoint
+          const ex = ax + (bx - ax) * draw;
+          const ey = ay + (by - ay) * draw;
+
+          // Line alpha based on depth
+          const avgZ = (relZa + relZb) / 2;
+          const depthFade = Math.min(1, 800 / avgZ);
+
+          ctx.strokeStyle = `rgba(232, 200, 74, ${0.28 * depthFade * globalAlpha})`;
+          ctx.lineWidth = 0.7 * dpr;
+          ctx.beginPath();
+          ctx.moveTo(ax, ay);
+          ctx.lineTo(ex, ey);
+          ctx.stroke();
+        }
+      }
+
+      // Update core position & scale
+      // Core is visually at origin in 3D; project it and scale based on camera distance
+      if (core) {
+        const coreRelZ = 0 - camZ;
+        const coreScale = Math.max(0.05, focalLength / coreRelZ / dpr * 0.8);
+        const coreX = (panX / dpr);
+        const coreY = (panY / dpr);
+        // Breathing pulse
+        const breath = 1 + 0.04 * Math.sin(t / 2000);
+        core.style.transform = `translate(calc(-50% + ${coreX}px), calc(-50% + ${coreY}px)) scale(${coreScale * breath})`;
+        core.style.opacity = String(globalAlpha);
+      }
+
+      raf = requestAnimationFrame(frame);
+    };
+    this._preshowRaf = requestAnimationFrame(frame);
+
+    // Schedule the handoff: hide preshow shortly before beat 1 starts
+    this._preshowFadeoutTimer = setTimeout(() => {
+      if (preshow) preshow.classList.remove('active');
+    }, TOTAL);
+  },
+
+  stopPreshow() {
+    // Cancel animation, remove element state
+    if (this._preshowRaf) { cancelAnimationFrame(this._preshowRaf); this._preshowRaf = null; }
+    if (this._preshowFadeoutTimer) { clearTimeout(this._preshowFadeoutTimer); this._preshowFadeoutTimer = null; }
+    if (this._preshowResize) { window.removeEventListener('resize', this._preshowResize); this._preshowResize = null; }
+    const preshow = document.getElementById('demo-preshow');
+    if (preshow) preshow.classList.remove('active');
+    const canvas = document.getElementById('demo-preshow-canvas');
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+    const core = preshow && preshow.querySelector('.preshow-core');
+    if (core) core.remove();
+  },
+
+  // ══════════════════════════════════════════════════════════
   // VOICE — Caci narrates the demo
   // Pipeline:
   //   speakIntro()          — plays during 900ms stage-expand
@@ -10789,15 +11273,16 @@ const DemoMode = {
     }
   },
 
-  async fetchTTS(text) {
-    // Uses admin-selected voice if set; otherwise Grok + Eve (warm, fits Caci).
+  async fetchTTS(text, voice) {
+    // Provider: admin-selected or grok (required for multi-voice cast).
+    // Voice: per-beat override, falls back to admin choice, then eve.
     const provider = localStorage.getItem('caci_tts_provider') || 'grok';
-    const voice    = localStorage.getItem('caci_tts_grok_voice') || 'eve';
+    const v = voice || localStorage.getItem('caci_tts_grok_voice') || 'eve';
     try {
       const res = await fetch(API + '/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, provider, voice })
+        body: JSON.stringify({ text, provider, voice: v })
       });
       if (!res.ok) return null;
       return await res.blob();
@@ -10807,7 +11292,8 @@ const DemoMode = {
   async speakIntro() {
     if (this.muted || this.ttsAvailable === false) return;
     const sess = this.audioSession;
-    const blob = await this.fetchTTS(this.intro);
+    // Intro is always Eve — Cassie's voice
+    const blob = await this.fetchTTS(this.intro, 'eve');
     if (sess !== this.audioSession) return;       // demo stopped mid-fetch
     if (!blob) {
       if (this.ttsAvailable === null) this.ttsAvailable = false;
@@ -10824,7 +11310,7 @@ const DemoMode = {
     if (this.audioCache[beat.id]) return;          // already cached
     if (this.ttsAvailable === false) return;       // known unavailable
     const sess = this.audioSession;
-    const blob = await this.fetchTTS(beat.narr);
+    const blob = await this.fetchTTS(beat.narr, beat.voice);
     if (sess !== this.audioSession) return;        // stale
     if (!blob) {
       if (this.ttsAvailable === null) this.ttsAvailable = false;
@@ -10859,7 +11345,8 @@ const DemoMode = {
     this.stopAudio();
     const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
-    audio.volume = 0.92;
+    // Don't set audio.volume — leaving at 1.0 avoids the volume-bobbing artifact
+    // some browsers introduce when we touch the gain curve
     this.currentAudio = audio;
     const cleanup = () => {
       URL.revokeObjectURL(url);
