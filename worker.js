@@ -147,6 +147,11 @@ export default {
     if (path === '/feedback/approve' && method === 'POST') return handleApproveTuning(request, env);
     if (path === '/feedback/pending' && method === 'GET')  return handleGetPendingTuning(env);
     if (path === '/feedback/log'     && method === 'GET')  return handleGetFeedbackLog(url, env);
+
+    // ── Scenario Mode routes ────────────────────────────────
+    if (path === '/scenario/evaluate' && method === 'POST') return handleScenarioEvaluate(request, env);
+    if (path === '/scenario/save'     && method === 'POST') return handleScenarioSave(request, env);
+    if (path === '/scenario/list'     && method === 'GET')  return handleScenarioList(url, env);
     if (path === '/report'    && method === 'POST')   return handleReport(request, env);
     if (path === '/ai-classify'         && method === 'POST') return handleAiClassify(request, env);
     if (path === '/collection-analyze'  && method === 'POST') return handleCollectionAnalyze(request, env);
@@ -4026,4 +4031,166 @@ async function handleTTS(request, env) {
     }
     return json({ error: 'Unknown TTS provider' }, 400);
   } catch (err) { return json({ error: 'TTS error: ' + err.message }, 500); }
+}
+
+// ══════════════════════════════════════════════════════════
+// SCENARIO MODE — Worker handlers
+// ══════════════════════════════════════════════════════════
+
+/* KV schema:
+   scenario:{dept}:{scenarioId}  →  full scenario record (1yr TTL)
+   scenario:index:{dept}         →  lightweight index array (ids + labels)
+*/
+
+// ── POST /scenario/evaluate ─────────────────────────────────
+// Receives the finished conversation transcript, asks Claude to score
+// quality, and saves to KV if score is high enough.
+async function handleScenarioEvaluate(request, env) {
+  try {
+    const { dept, scenarioId, scenario, transcript } = await request.json();
+    if (!dept || !scenarioId || !scenario || !transcript) {
+      return json({ error: 'Missing required fields' }, 400);
+    }
+
+    const apiKey = (await env.CACI_KV.get('config:ANTHROPIC_API_KEY')) || env.ANTHROPIC_API_KEY;
+    if (!apiKey) return json({ saved: false, reason: 'No API key' });
+
+    // Ask Claude Haiku to evaluate quality
+    const evalPrompt = `You are evaluating a compliance scenario conversation from an internal cannabis company AI platform (Jushi Holdings). Your job is to decide whether this conversation is worth saving to the Scenario Library for future reference.
+
+SCENARIO TYPE: ${scenario.label}
+CATEGORY: ${scenario.category}
+SITUATION: ${scenario.situation || 'not specified'}
+CONTEXT FLAGS: ${(scenario.context || []).join(', ') || 'none'}
+STATE: ${scenario.state || 'not specified'}
+LICENSE TYPE: ${scenario.license || 'not specified'}
+
+CONVERSATION TRANSCRIPT:
+${transcript.slice(0, 6000)}
+
+Evaluate this conversation on these dimensions and return ONLY valid JSON:
+
+{
+  "qualityScore": <integer 0-100>,
+  "shouldSave": <true if qualityScore >= 65, else false>,
+  "summary": "<2 sentence summary of the scenario and key compliance takeaways, max 180 chars>",
+  "strengths": ["<what made this conversation valuable>"],
+  "reason": "<one sentence explaining the score>"
+}
+
+Score high (80-100) if: CACI gave thorough multi-angle analysis, cited specific rules, identified gray areas, the user was engaged (asked follow-ups, showed appreciation, or explored the topic deeply).
+Score medium (65-79) if: decent compliance coverage but missing some dimensions or limited engagement.
+Score low (<65) if: superficial, no rule citations, user disengaged quickly, or the conversation was off-topic.
+
+Return ONLY the JSON object. No markdown, no explanation.`;
+
+    const evalResp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 400,
+        messages: [{ role: 'user', content: evalPrompt }],
+      }),
+    });
+
+    if (!evalResp.ok) return json({ saved: false, reason: 'Eval API error' });
+
+    const evalData = await evalResp.json();
+    const rawText = evalData.content?.[0]?.text || '{}';
+
+    let evaluation;
+    try {
+      evaluation = JSON.parse(rawText.replace(/```json|```/g, '').trim());
+    } catch {
+      return json({ saved: false, reason: 'Could not parse evaluation' });
+    }
+
+    if (!evaluation.shouldSave) {
+      return json({ saved: false, qualityScore: evaluation.qualityScore, reason: evaluation.reason });
+    }
+
+    // Save the scenario record
+    const record = {
+      scenarioId,
+      dept,
+      scenario,
+      qualityScore: evaluation.qualityScore,
+      summary: evaluation.summary || '',
+      strengths: evaluation.strengths || [],
+      savedAt: new Date().toISOString(),
+      transcriptLength: transcript.length,
+    };
+
+    const ttl = 365 * 24 * 60 * 60; // 1 year
+    await env.CACI_KV.put(`scenario:${dept}:${scenarioId}`, JSON.stringify(record), { expirationTtl: ttl });
+
+    // Update index
+    const indexKey = `scenario:index:${dept}`;
+    const index = await env.CACI_KV.get(indexKey, 'json') || [];
+    // Remove if already exists (re-save), then prepend
+    const filtered = index.filter(i => i.scenarioId !== scenarioId);
+    filtered.unshift({ scenarioId, label: scenario.label, category: scenario.category, qualityScore: evaluation.qualityScore, savedAt: record.savedAt });
+    // Keep last 200 in index
+    const trimmed = filtered.slice(0, 200);
+    await env.CACI_KV.put(indexKey, JSON.stringify(trimmed), { expirationTtl: ttl });
+
+    return json({ saved: true, qualityScore: evaluation.qualityScore, summary: evaluation.summary, totalCount: trimmed.length });
+
+  } catch (err) {
+    return json({ error: err.message }, 500);
+  }
+}
+
+// ── POST /scenario/save ─────────────────────────────────────
+// Manual save (bypass evaluation — admin/direct use)
+async function handleScenarioSave(request, env) {
+  try {
+    const { dept, scenarioId, scenario, qualityScore = 75, summary = '' } = await request.json();
+    if (!dept || !scenarioId || !scenario) return json({ error: 'Missing fields' }, 400);
+
+    const record = {
+      scenarioId, dept, scenario,
+      qualityScore, summary,
+      savedAt: new Date().toISOString(),
+      manualSave: true,
+    };
+
+    const ttl = 365 * 24 * 60 * 60;
+    await env.CACI_KV.put(`scenario:${dept}:${scenarioId}`, JSON.stringify(record), { expirationTtl: ttl });
+
+    const indexKey = `scenario:index:${dept}`;
+    const index = await env.CACI_KV.get(indexKey, 'json') || [];
+    const filtered = index.filter(i => i.scenarioId !== scenarioId);
+    filtered.unshift({ scenarioId, label: scenario.label, category: scenario.category, qualityScore, savedAt: record.savedAt });
+    await env.CACI_KV.put(indexKey, JSON.stringify(filtered.slice(0, 200)), { expirationTtl: ttl });
+
+    return json({ ok: true, totalCount: filtered.length + 1 });
+  } catch (err) {
+    return json({ error: err.message }, 500);
+  }
+}
+
+// ── GET /scenario/list?dept=xxx ─────────────────────────────
+// Returns all saved scenarios for a department, full records.
+async function handleScenarioList(url, env) {
+  try {
+    const dept = url.searchParams.get('dept') || 'compliance';
+    const limit = Math.min(parseInt(url.searchParams.get('limit') || '50'), 200);
+
+    // Get index first (lightweight)
+    const index = await env.CACI_KV.get(`scenario:index:${dept}`, 'json') || [];
+    const slice = index.slice(0, limit);
+
+    // Hydrate full records
+    const records = await Promise.all(
+      slice.map(i => env.CACI_KV.get(`scenario:${dept}:${i.scenarioId}`, 'json').catch(() => null))
+    );
+
+    const valid = records.filter(Boolean).sort((a, b) => (b.qualityScore || 0) - (a.qualityScore || 0));
+
+    return json({ ok: true, items: valid, total: index.length });
+  } catch (err) {
+    return json({ error: err.message }, 500);
+  }
 }
