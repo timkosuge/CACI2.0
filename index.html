@@ -7637,6 +7637,63 @@ body[data-theme="light"] .login-frame-box {
 .sas-end { font-size:9px;color:var(--smoke4);cursor:pointer;padding:2px 6px;border-radius:3px;border:1px solid transparent;transition:all 0.15s;font-family:var(--f-ui);letter-spacing:0.05em; }
 .sas-end:hover { color:var(--smoke2);border-color:var(--line2);background:var(--gold-dim); }
 
+/* ─────────────────────────────────────────────────────────
+   LIGHT MODE: FINAL PASS OVERRIDES
+   ─────────────────────────────────────────────────────────
+   These rules sit at the end of the stylesheet and use extra-specific
+   selectors to beat any stubborn earlier rules. They target the issues
+   observed in screenshots: sidebar not going light, greeting text
+   unreadable, eyebrow text missing.
+
+   Chained body[data-theme="light"] selectors with multiple compound
+   parts give specificity (0,3,1) — plenty to beat any single-id rule
+   even without !important, but we use !important anyway for safety. */
+
+html body[data-theme="light"] aside#sidebar {
+  background: #EEF2F7 !important;
+  background-image: none !important;
+}
+html body[data-theme="light"] aside#sidebar::after {
+  background: transparent !important;
+  display: none !important;
+}
+
+/* Welcome greeting text — "Hey Tim, I'm Caci..." — was gold gradient,
+   unreadable on light sky. Replace with solid dark text. */
+html body[data-theme="light"] #discovery-greeting-strip .dgs-text {
+  background: none !important;
+  -webkit-text-fill-color: #0F172A !important;
+  color: #0F172A !important;
+  -webkit-background-clip: unset !important;
+  background-clip: unset !important;
+  filter: drop-shadow(0 1px 2px rgba(255, 255, 255, 0.8)) !important;
+  font-weight: 400 !important;
+}
+
+/* "Operational Intelligence" eyebrow text — was gold at 0.50 opacity,
+   barely visible. Boost to readable steel blue. */
+html body[data-theme="light"] .dg-eyebrow {
+  color: #1E3A5F !important;
+  opacity: 0.75 !important;
+  filter: drop-shadow(0 1px 2px rgba(255, 255, 255, 0.7)) !important;
+}
+
+/* The "CACI" centerpiece wordmark below Jushi — was gold-metal gradient,
+   in light mode it SHOULD be the steel-blue gradient (remapped palette).
+   Add a text shadow so it pops against the cloud image. */
+html body[data-theme="light"] .dg-name {
+  filter: drop-shadow(0 2px 8px rgba(255, 255, 255, 0.6)) !important;
+}
+
+/* Ensure any inline-styled greeting spans inside dgs-text override. */
+html body[data-theme="light"] #discovery-greeting-strip .dgs-text span,
+html body[data-theme="light"] #discovery-greeting-strip .dgs-text b,
+html body[data-theme="light"] #discovery-greeting-strip .dgs-text strong {
+  color: #1E3A5F !important;
+  -webkit-text-fill-color: #1E3A5F !important;
+  background: none !important;
+}
+
 </style>
 </head>
 <body>
