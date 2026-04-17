@@ -77,6 +77,14 @@ export default {
     if (path === '/auth/login' && method === 'POST') return handleLogin(request, env);
     if (path === '/health') return json({ ok: true, version: '6.1.0' });
 
+    // Public endpoints for the pre-login demo mode:
+    // - GET /admin/config: controller needs to know if demo mode is enabled
+    // - POST /tts: controller needs to fetch narration audio
+    // Both reveal no sensitive data (/admin/config GET returns only booleans
+    // about which keys are configured, never the keys themselves).
+    if (path === '/admin/config' && method === 'GET') return handleAdminGet(env);
+    if (path === '/tts' && method === 'POST') return handleTTS(request, env);
+
     if (!verifyToken(request, env)) return json({ error: 'Unauthorized' }, 401);
 
     // ── User management (admin only) ──────────────────────────
