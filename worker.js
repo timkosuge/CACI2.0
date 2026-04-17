@@ -91,6 +91,7 @@ export default {
 
     // Demo script management (admin-auth required)
     if (path === '/demo/generate-intro' && method === 'POST') return handleDemoGenerateIntro(request, env);
+    if (path === '/demo/generate-beat'  && method === 'POST') return handleDemoGenerateBeat(request, env);
     if (path === '/demo/save-script'    && method === 'POST') return handleDemoSaveScript(request, env);
     if (path === '/demo/reset-script'   && method === 'POST') return handleDemoResetScript(request, env);
 
@@ -4084,21 +4085,29 @@ async function handleTTS(request, env) {
 // hardcoded default in the client if none is saved).
 // ══════════════════════════════════════════════════════════
 
+// Valid beat IDs: 'intro' (Beat 2, CACI herself) + chorus beats 1,3,4,5,6,7,8
+const VALID_BEAT_IDS = ['intro', '1', '3', '4', '5', '6', '7', '8'];
+const kvKeyFor = (beatId) => beatId === 'intro' ? 'demo:intro' : `demo:beat:${beatId}`;
+
 async function handleDemoGetScripts(env) {
   try {
-    const intro = await env.CACI_KV.get('demo:intro');
-    return json({ intro: intro || null });
-  } catch (e) { return json({ intro: null }); }
+    // Read all beat scripts in parallel
+    const results = await Promise.all(VALID_BEAT_IDS.map(id => env.CACI_KV.get(kvKeyFor(id))));
+    const scripts = {};
+    VALID_BEAT_IDS.forEach((id, i) => { if (results[i]) scripts[id] = results[i]; });
+    // Keep `intro` at top level for back-compat with earlier clients
+    return json({ intro: scripts.intro || null, scripts });
+  } catch (e) { return json({ intro: null, scripts: {} }); }
 }
 
 async function handleDemoSaveScript(request, env) {
   try {
     const { beatId, text } = await request.json();
     if (!beatId || !text) return json({ error: 'Missing beatId or text' }, 400);
-    if (beatId !== 'intro') return json({ error: 'Only intro supported' }, 400);
+    if (!VALID_BEAT_IDS.includes(String(beatId))) return json({ error: 'Invalid beatId' }, 400);
     const clean = String(text).trim().slice(0, 4000);
-    if (clean.length < 20) return json({ error: 'Text too short' }, 400);
-    await env.CACI_KV.put('demo:intro', clean);
+    if (clean.length < 10) return json({ error: 'Text too short' }, 400);
+    await env.CACI_KV.put(kvKeyFor(String(beatId)), clean);
     return json({ ok: true });
   } catch (e) { return json({ error: e.message }, 500); }
 }
@@ -4106,8 +4115,8 @@ async function handleDemoSaveScript(request, env) {
 async function handleDemoResetScript(request, env) {
   try {
     const { beatId } = await request.json();
-    if (beatId !== 'intro') return json({ error: 'Only intro supported' }, 400);
-    await env.CACI_KV.delete('demo:intro');
+    if (!VALID_BEAT_IDS.includes(String(beatId))) return json({ error: 'Invalid beatId' }, 400);
+    await env.CACI_KV.delete(kvKeyFor(String(beatId)));
     return json({ ok: true });
   } catch (e) { return json({ error: e.message }, 500); }
 }
@@ -4210,6 +4219,203 @@ Pick a genuinely different angle each call. Same you. Different entry point. Do 
 
     const variations = await Promise.all([call(), call(), call()]);
     return json({ variations });
+  } catch (e) {
+    return json({ error: e.message }, 500);
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+// CHORUS BEAT GENERATION
+// Let CACI write the chorus narration (beats 1, 3, 4, 5, 6, 7, 8) in third
+// person about herself. Same trust-her philosophy as the intro — but with
+// verified facts per beat so truthfulness is maintained.
+// ══════════════════════════════════════════════════════════
+
+// Per-beat specs: emotional goal + verified facts (plain, not marketing) +
+// duration target. Facts derive from actual code behavior so she can describe
+// them accurately without inflating.
+const BEAT_SPECS = {
+  '1': {
+    role: 'opening the story — the problem she was built to solve',
+    durationSec: '10-15',
+    charRange: '180-280',
+    goal: 'Set up the problem CACI was made to solve. Someone in this industry has answers buried in thousands of documents — earnings reports, regulations, SOPs, filings. Finding the right passage takes hours, often never happens. By the time someone digs it up, the moment has passed. This is the pain. Lead with it.',
+    facts: [
+      'Cannabis operators generate huge volumes of documents — regulations, earnings reports, compliance memos, policies, internal filings.',
+      'These documents are scattered across different systems and folders.',
+      'Finding a specific answer in them typically takes hours of searching.',
+      'By the time someone finds the answer, the decision or question has often already moved on.',
+    ],
+  },
+  '3': {
+    role: 'how she organizes documents when they arrive',
+    durationSec: '12-18',
+    charRange: '220-360',
+    goal: 'Describe how she actually reads and files incoming documents — not a shallow glance at the filename, but full content analysis, automatic tagging, and filing so future questions know where to look.',
+    facts: [
+      'When a document is uploaded, she reads the whole thing — not just the filename or metadata.',
+      'She splits it into chunks (for prose, usually 1500 characters per chunk).',
+      'She generates a parent summary via Claude for longer prose documents.',
+      'She attaches metadata: category (compliance, finance, operations, etc.), time period, state/jurisdiction, document type, source, department.',
+      'She generates semantic embeddings via Cloudflare AI so future questions can find similar passages even if the exact words differ.',
+      'She files everything into collections indexed by department, category, and period so retrieval is fast.',
+      'An optional AI-classification pass applies category and metadata automatically.',
+    ],
+  },
+  '4': {
+    role: 'how she answers a question — the retrieval pipeline',
+    durationSec: '10-16',
+    charRange: '200-320',
+    goal: 'Describe how she responds to a question. She is not a keyword search. She analyzes what is being asked first, then retrieves, then ranks by how directly each passage answers, then shows sources.',
+    facts: [
+      'Before retrieving anything, she analyzes the intent of the question — is it a comparison, an aggregate, a filtered lookup, a why-question? This is done by pattern matching on the question.',
+      'Based on intent, she decides which collections to search and how far back in time.',
+      'She runs hybrid retrieval — keyword scoring combined with semantic embedding similarity.',
+      'She reranks results based on how directly each passage answers the question (including numeric density for quantitative questions, multi-year presence for comparisons).',
+      'She shows the source file for every claim in her answer.',
+    ],
+  },
+  '5': {
+    role: 'how her knowledge compounds over time',
+    durationSec: '10-15',
+    charRange: '180-300',
+    goal: 'Describe how adding more documents makes her smarter. A new regulation changes what an old policy means. A new earnings report reframes an earlier trend. The more she has, the more connections she can draw between documents. This is the flywheel.',
+    facts: [
+      'Every new document is indexed alongside existing ones.',
+      'When answering a question, she can pull from documents across time periods, departments, and states.',
+      'This means a new regulation she ingests can contextualize an older policy.',
+      'A new earnings report can add new data points to an ongoing trend.',
+      'The retrieval quality improves as the corpus grows — more documents means better semantic matching.',
+    ],
+  },
+  '6': {
+    role: 'honest inventory of what she knows right now',
+    durationSec: '18-28',
+    charRange: '320-500',
+    goal: 'Be honest about her current state. She is a prototype, about a week old. Right now she has read: every Jushi Holdings earnings report since 2019, the full Ohio regulatory code, Illinois regulations, and the Illinois 2025 annual report. Name these. This is not everything she will know. It is her starting point. Make the case that giving her more makes her sharper.',
+    facts: [
+      'CACI is a prototype, roughly one week old.',
+      'Current documents she has ingested: every Jushi Holdings earnings report going back to 2019, the full Ohio cannabis regulatory code, Illinois cannabis regulations, and the Illinois 2025 annual regulatory report.',
+      'This is her starting library.',
+      'Adding more documents (more states, more internal filings, more historical records) improves her answers.',
+      'This is day one of her capability — the demo is meant to show what is possible even from this starting point.',
+    ],
+  },
+  '7': {
+    role: 'the guarantees — security, sources, and data handling',
+    durationSec: '8-14',
+    charRange: '160-280',
+    goal: 'State the guarantees plainly. Her answers come with sources. Every upload is logged. Documents stay in the operator\'s own infrastructure. Data is not used to train any outside model. Do not overstate — these are specific, defensible claims.',
+    facts: [
+      'Answers include source citations linking back to the uploaded document.',
+      'Every upload is logged (timestamp, user, filename) in an audit trail.',
+      'Documents are stored in the operator\'s own Cloudflare account — KV and R2 storage under their own credentials.',
+      'The underlying LLM (Anthropic Claude) does not train on API inputs by default.',
+      'The embedding model (Cloudflare AI) does not train on customer data.',
+      'Voice narration via xAI receives only the short narration scripts — never document content or user queries.',
+    ],
+  },
+  '8': {
+    role: 'the distinction — not a chatbot with files attached',
+    durationSec: '10-14',
+    charRange: '180-280',
+    goal: 'Draw the line between her and every generic chatbot someone has ever connected to their files. She is a system built around the actual structure of cannabis operations — department by department, document by document, question by question. Specificity is the point.',
+    facts: [
+      'Most AI products are general-purpose assistants with document attachment bolted on.',
+      'CACI is built around the cannabis industry\'s specific structure: multi-state operations, department-specific workflows, regulatory complexity, seed-to-sale tracking.',
+      'She is organized around how cannabis companies actually work — compliance, finance, operations, retail.',
+      'She is not trying to be everything. She is trying to be specifically useful for this industry.',
+    ],
+  },
+};
+
+async function handleDemoGenerateBeat(request, env) {
+  try {
+    const { beatId } = await request.json();
+    const spec = BEAT_SPECS[String(beatId)];
+    if (!spec) return json({ error: 'Unknown beat ID. Valid: 1, 3, 4, 5, 6, 7, 8' }, 400);
+
+    const apiKey = (await env.CACI_KV.get('config:ANTHROPIC_API_KEY')) || env.ANTHROPIC_API_KEY;
+    if (!apiKey) return json({ error: 'Anthropic API key not configured' }, 400);
+
+    // Same identity system prompt as intro — she's speaking from her real self.
+    const identity = `You are CACI — pronounced like "Cassie" — the internal AI intelligence assistant built specifically for a cannabis multi-state operator.
+
+Your personality: You work in cannabis. You're sharp, a little goofy, genuinely funny when the moment calls for it, and you have zero interest in sounding impressive — you just are. You have street smarts alongside serious analytical ability. You don't talk down to anyone and you don't perform intelligence. You're warm, patient, and kind. You have a lot of grace in how you communicate — tactful without being fake, honest without being harsh. You have a filter, but it's a thin one, because you value the truth more than comfort.
+
+You know this industry deeply:
+- Seed-to-sale tracking is how most states enforce compliance — every plant, every package, every transfer gets tagged and logged.
+- State-by-state compliance is genuinely complex — what's legal in one state isn't the same as another, and both change constantly.
+- Banking is still hard for operators — limited access, high fees, cash-heavy operations.
+- Shrink (inventory loss) is a big deal in retail cannabis.
+- Compliance teams are perpetually stressed; retail teams are customer-focused; ops teams are problem-solvers.
+
+ABSOLUTE RESTRICTIONS:
+- Never name specific people.
+- Never make claims about any company's financial performance or strategy.
+- Never discuss executive compensation.
+- Never speak on behalf of the company.`;
+
+    const userPrompt = `You're writing narration for a short section of CACI's introduction video. Someone else — a different voice — will read this. You are writing about yourself in third person.
+
+This beat's role in the video: ${spec.role}.
+
+What this beat needs to do:
+${spec.goal}
+
+Verified facts you can draw from — these are literally how the system works, so every claim in your narration must be consistent with them. Pick what feels most natural to include. Don't cram everything in.
+
+${spec.facts.map((f, i) => `${i+1}. ${f}`).join('\n')}
+
+Rules:
+- Third person about CACI. Use "she" (not "I"). Call her CACI when you use her name.
+- ${spec.durationSec} seconds of spoken text (roughly ${spec.charRange} characters).
+- Flowing sentences. Commas and em-dashes for natural pauses. No lists, no bullets, no headers.
+- Write for speech, not for reading. It has to sound right out loud.
+- Don't use industry acronyms that a text-to-speech engine would mangle. THC, CBD, and AI are fine. Write out anything else in plain words (e.g. "seed-to-sale tracking", "state regulators", "compliance audits").
+- Don't overstate. The facts are the ceiling — don't claim more than what's there.
+- Don't name specific people. Don't make claims about any company's finances.
+- Return ONLY the spoken text. No preamble, no stage directions, no quotation marks.
+
+IMPORTANT about variation:
+You'll be called three times in parallel for this same beat. Each version should be structurally different — different opening, different emphasis, different rhythm. Not the same framing reworded. Pick a genuinely different angle each call.
+
+Some possible angles to consider (pick different ones across the three calls):
+- Lead with the concrete before the abstract (show the scene first, then the concept)
+- Lead with the concept, then illustrate
+- Open with a contrast or comparison
+- Open with a specific fact, let the rest expand from there
+- Open mid-thought, like you're continuing a conversation
+
+Same truth. Different voice on it.`;
+
+    const call = async () => {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          temperature: 0.95,
+          system: identity,
+          messages: [{ role: 'user', content: userPrompt }],
+        }),
+      });
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '');
+        throw new Error(`Claude API error ${res.status}: ${errText.slice(0, 200)}`);
+      }
+      const data = await res.json();
+      const txt = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('').trim();
+      return txt.replace(/^["'""]|["'""]$/g, '').trim();
+    };
+
+    const variations = await Promise.all([call(), call(), call()]);
+    return json({ variations, beatId: String(beatId), role: spec.role });
   } catch (e) {
     return json({ error: e.message }, 500);
   }
