@@ -4628,8 +4628,8 @@ async function handleDemoHarvestStats(request, env) {
     // Performance: 4 sequential Claude calls, ~5-10s total.
     const retrievedPerTopic = [];
     for (const { topic, query, scope } of topicQueries) {
-      const context = await harvestRetrieveContext(env, query);
-      retrievedPerTopic.push({ topic, query, scope, context });
+      const { text, diag } = await harvestRetrieveContext(env, query);
+      retrievedPerTopic.push({ topic, query, scope, context: text, diag });
     }
 
     // Ask Claude to extract structured stats from all retrieved contexts at once
@@ -4725,6 +4725,7 @@ Return ONLY the JSON object. No preamble, no markdown, no explanation.`;
       retrievedContexts: retrievedPerTopic.map(r => ({
         topic: r.topic,
         contextLength: (r.context || '').length,
+        diag: r.diag,
       })),
     });
   } catch (e) {
@@ -4732,67 +4733,75 @@ Return ONLY the JSON object. No preamble, no markdown, no explanation.`;
   }
 }
 
-// Lightweight retrieval helper for harvesting: iterates file records across
-// all departments, scans each file's embedded `chunks` array for keyword hits,
-// returns the top-matching chunks with their source document names.
+// Lightweight retrieval helper for harvesting: discovers all file records in
+// the library and scans their embedded `chunks` arrays for keyword hits.
 //
-// This matches the real storage layout: chunks live INSIDE `file:{id}` records
-// as an embedded array, keyed by department via `index:{dept}`.
+// Self-healing — rather than hardcoding department names (which will drift),
+// it uses `env.CACI_KV.list({prefix: 'file:'})` to find every file record
+// directly. This works regardless of which departments exist or what they're
+// named, and surfaces a diagnostic path even if the department index is stale.
 async function harvestRetrieveContext(env, query) {
   try {
     const keywords = query.toLowerCase().split(/\s+/).filter(w => w.length > 3);
-    if (keywords.length === 0) return '';
+    if (keywords.length === 0) return { text: '', diag: { reason: 'no-keywords' } };
 
-    // Known departments the app uses. If you add more departments later, list them here.
-    const DEPTS = ['retail', 'compliance', 'finance', 'operations', 'general'];
-    // Collect all file IDs across departments, with their metadata
-    const allFiles = [];
-    for (const dept of DEPTS) {
-      const idx = await env.CACI_KV.get(`index:${dept}`, 'json');
-      if (!Array.isArray(idx)) continue;
-      for (const rec of idx) {
-        if (rec && rec.id) allFiles.push({ id: rec.id, dept, name: rec.name || rec.filename || rec.id });
-      }
+    // Enumerate all file: records directly. This is the most reliable source
+    // of truth — if a file record exists, we scan it.
+    const fileList = await env.CACI_KV.list({ prefix: 'file:' });
+    const fileKeys = (fileList && fileList.keys) ? fileList.keys : [];
+    if (fileKeys.length === 0) {
+      return { text: '', diag: { reason: 'no-file-records', filesFound: 0 } };
     }
-    if (allFiles.length === 0) return '';
 
-    // Cap files scanned per harvest — performance guard. 20 files covers the
-    // current library; if it grows much larger we'd paginate.
-    const MAX_FILES_TO_SCAN = 20;
-    const sampleFiles = allFiles.slice(0, MAX_FILES_TO_SCAN);
+    const MAX_FILES_TO_SCAN = 30;
+    const sampleFiles = fileKeys.slice(0, MAX_FILES_TO_SCAN);
 
     const scored = [];
-    for (const f of sampleFiles) {
-      const fileRec = await env.CACI_KV.get(`file:${f.id}`, 'json');
+    let chunksScanned = 0;
+    let filesWithChunks = 0;
+    for (const fkey of sampleFiles) {
+      const fileRec = await env.CACI_KV.get(fkey.name, 'json');
       if (!fileRec) continue;
       const chunks = Array.isArray(fileRec.chunks) ? fileRec.chunks : [];
+      if (chunks.length > 0) filesWithChunks++;
+      const fileName = fileRec.name || fileRec.filename || fileRec.id || fkey.name;
       for (const chunk of chunks) {
+        chunksScanned++;
         const text = (chunk.text || chunk.content || '').toLowerCase();
         if (!text) continue;
         let score = 0;
         for (const kw of keywords) {
-          const hits = (text.match(new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length;
+          const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const hits = (text.match(new RegExp(escaped, 'g')) || []).length;
           score += hits;
         }
-        // Boost chunks with dense numeric content (harvesting numbers!)
+        // Boost chunks with dense numeric content (we're harvesting numbers!)
         const numCount = (text.match(/[\$\d]+[\d,.]+[%MBK]?/g) || []).length;
         if (numCount >= 3) score += Math.min(numCount, 10);
         if (score > 0) {
           scored.push({
             score,
             text: chunk.text || chunk.content,
-            source: f.name,
+            source: fileName,
           });
         }
       }
     }
     scored.sort((a, b) => b.score - a.score);
-    // Return top 8 chunks — enough context for Claude to extract facts,
-    // bounded so we don't blow up the prompt size
     const top = scored.slice(0, 8);
-    return top.map(t => `[${t.source}]\n${t.text}`).join('\n\n---\n\n');
+    const contextText = top.map(t => `[${t.source}]\n${t.text}`).join('\n\n---\n\n');
+    return {
+      text: contextText,
+      diag: {
+        filesFound: fileKeys.length,
+        filesScanned: sampleFiles.length,
+        filesWithChunks,
+        chunksScanned,
+        matchedChunks: scored.length,
+      },
+    };
   } catch (e) {
-    return '';
+    return { text: '', diag: { reason: 'exception', error: e.message } };
   }
 }
 
