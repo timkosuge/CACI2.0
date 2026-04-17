@@ -8061,8 +8061,10 @@ body::before {
               <button class="asave" id="demo-stats-harvest">Harvest Stats from Library</button>
               <button class="asave" id="demo-stats-save" style="background:transparent;border:1px solid rgba(212,168,50,0.5);color:rgba(245,227,152,0.92);display:none">Save to Demo</button>
               <button class="asave" id="demo-stats-reset" style="background:transparent;border:1px solid rgba(220,90,90,0.5);color:rgba(240,160,160,0.95)">Reset</button>
+              <button class="asave" id="demo-stats-diag" style="background:transparent;border:1px solid rgba(150,150,180,0.35);color:rgba(200,200,230,0.85)" title="Show what's actually in KV">KV Diagnostic</button>
               <span id="demo-stats-status" style="font-family:var(--f-mono);font-size:10px;color:var(--smoke3);letter-spacing:.06em"></span>
             </div>
+            <pre id="demo-stats-diag-out" style="margin-top:12px;display:none;padding:10px 12px;background:rgba(2,4,10,0.55);border:1px solid rgba(150,150,180,0.20);border-radius:3px;font-family:var(--f-mono);font-size:10px;color:rgba(220,220,240,0.82);white-space:pre-wrap;max-height:420px;overflow-y:auto"></pre>
             <div id="demo-stats-review" style="margin-top:14px;display:none">
               <div style="font-family:var(--f-mono);font-size:10px;color:var(--smoke3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px">Review &mdash; uncheck to exclude, click value to edit</div>
               <div id="demo-stats-singles-wrap" style="margin-bottom:14px"></div>
@@ -11612,6 +11614,66 @@ const DemoMode = {
   timer: null,
   particles: null,
 
+  // ─── REAL DATA for 3D holographic charts ────────────────────────────
+  // These numbers were extracted from Jushi's actual earnings transcripts
+  // and internal operations data via CACI. Each fact has a source.
+  // Visible in the demo as floating 3D numbers and bar charts.
+  statsBank: {
+    singles: [
+      { display: '$262.9M',  label: 'FY 2025 Revenue',              source: 'Jushi Q4 2025 Transcript' },
+      { display: '19.1%',    label: 'Adjusted EBITDA Margin',       source: 'Jushi Q4 2025 Transcript' },
+      { display: '84 g/ft\u00B2', label: 'Cultivation yield',       source: 'Internal Operations Data' },
+      { display: '42',       label: 'Retail stores operating',      source: 'Internal Operations Data' },
+      { display: '1,288',    label: 'Total employees',              source: 'Internal Operations Data' },
+      { display: '160',      label: 'Active Ohio wholesale doors',  source: 'Internal Operations Data' },
+      { display: '+330 bps', label: 'Gross Profit Margin YoY',      source: 'Jushi Q4 2025 Transcript' },
+      { display: '3.2\u00D7',     label: 'Virginia adult-use multiplier', source: 'Jushi Intelligence Layer' },
+    ],
+    charts: [
+      {
+        id: 'revenue_growth',
+        title: 'Revenue Growth',
+        unit: 'currency',
+        series: [
+          { label: 'Q4 2024', value: 65.8, display: '$65.8M' },
+          { label: 'Q4 2025', value: 68.3, display: '$68.3M' },
+        ],
+        source: 'Jushi Q4 2025 Transcript',
+      },
+      {
+        id: 'gross_margin',
+        title: 'Gross Profit Margin',
+        unit: 'percentage',
+        series: [
+          { label: 'Q4 2024', value: 38.6, display: '38.6%' },
+          { label: 'Q4 2025', value: 41.9, display: '41.9%' },
+        ],
+        source: 'Jushi Q4 2025 Transcript',
+      },
+      {
+        id: 'ebitda_margin',
+        title: 'EBITDA Margin',
+        unit: 'percentage',
+        series: [
+          { label: 'FY 2024', value: 17.9, display: '17.9%' },
+          { label: 'FY 2025', value: 19.1, display: '19.1%' },
+        ],
+        source: 'Jushi Q4 2025 Transcript',
+      },
+      {
+        id: 'operational_leverage',
+        title: 'Stores vs. Headcount',
+        unit: 'percentage',
+        series: [
+          { label: 'Stores',    value: 11, display: '+11%' },
+          { label: 'Employees', value: 4,  display: '+4%'  },
+        ],
+        source: 'Internal Operations Data',
+        insight: '2.75\u00D7 productivity per employee',
+      },
+    ],
+  },
+
   // Voice state
   muted: false,
   ttsAvailable: null,          // null = untested, true/false = tested
@@ -12802,6 +12864,257 @@ const DemoMode = {
   // roughly ±240 units xy, ±300 z. Beat objects are placed within this volume.
   // ═══════════════════════════════════════════════════════════════
 
+  // ═══════════════════════════════════════════════════════════════
+  // 3D CHART UTILITIES
+  // Builders that return THREE.Group objects representing real data.
+  // All use canvas-texture labels for legibility and additive-blended
+  // geometry for the Tony Stark holographic feel.
+  // ═══════════════════════════════════════════════════════════════
+
+  // Build a single floating-number 3D element: big number, small label,
+  // tiny source line. Returns a Group billboarded to always face the camera.
+  // `fact` = { display, label, source }
+  // `opts` = { scale, labelScale, numberColor }
+  _makeFloatingNumber3D(fact, opts) {
+    const C = this.cinema;
+    if (!C || !fact) return null;
+    const THREE = C.THREE;
+    opts = opts || {};
+    const scale = opts.scale || 1;
+
+    const group = new THREE.Group();
+
+    // Big number
+    const numCanvas = document.createElement('canvas');
+    numCanvas.width = 1024; numCanvas.height = 256;
+    const nctx = numCanvas.getContext('2d');
+    nctx.font = '300 160px "Cormorant Garamond", serif';
+    nctx.textAlign = 'center';
+    nctx.textBaseline = 'middle';
+    const numGrad = nctx.createLinearGradient(0, 30, 0, 220);
+    numGrad.addColorStop(0.0, '#fff8e0');
+    numGrad.addColorStop(0.35, '#ffeea0');
+    numGrad.addColorStop(0.65, '#e8c84a');
+    numGrad.addColorStop(1.0, '#b8962a');
+    nctx.fillStyle = numGrad;
+    nctx.shadowColor = 'rgba(212,168,50,0.6)';
+    nctx.shadowBlur = 24;
+    nctx.fillText(fact.display, 512, 128);
+    const numTex = new THREE.CanvasTexture(numCanvas);
+    numTex.needsUpdate = true;
+    const numMat = new THREE.MeshBasicMaterial({
+      map: numTex, transparent: true, depthWrite: false, opacity: 0,
+    });
+    const numMesh = new THREE.Mesh(new THREE.PlaneGeometry(80 * scale, 20 * scale), numMat);
+    numMesh.position.y = 6 * scale;
+    group.add(numMesh);
+
+    // Small label
+    if (fact.label) {
+      const lblCanvas = document.createElement('canvas');
+      lblCanvas.width = 1024; lblCanvas.height = 96;
+      const lctx = lblCanvas.getContext('2d');
+      lctx.font = '400 44px "Inter", sans-serif';
+      lctx.textAlign = 'center';
+      lctx.textBaseline = 'middle';
+      lctx.fillStyle = 'rgba(230,220,200,0.88)';
+      lctx.shadowColor = 'rgba(0,0,0,0.8)';
+      lctx.shadowBlur = 6;
+      // Letter-spacing simulation
+      const txt = fact.label.toUpperCase();
+      const tracking = 8;
+      const metrics = lctx.measureText(txt);
+      const totalW = metrics.width + tracking * (txt.length - 1);
+      let x = 512 - totalW / 2;
+      lctx.textAlign = 'left';
+      for (const ch of txt) {
+        lctx.fillText(ch, x, 48);
+        x += lctx.measureText(ch).width + tracking;
+      }
+      const lblTex = new THREE.CanvasTexture(lblCanvas);
+      lblTex.needsUpdate = true;
+      const lblMat = new THREE.MeshBasicMaterial({
+        map: lblTex, transparent: true, depthWrite: false, opacity: 0,
+      });
+      const lblMesh = new THREE.Mesh(new THREE.PlaneGeometry(80 * scale, 7.5 * scale), lblMat);
+      lblMesh.position.y = -6 * scale;
+      group.add(lblMesh);
+      group.userData.labelMat = lblMat;
+    }
+
+    // Source line (tiny, italic, very muted)
+    if (fact.source) {
+      const srcCanvas = document.createElement('canvas');
+      srcCanvas.width = 1024; srcCanvas.height = 64;
+      const sctx = srcCanvas.getContext('2d');
+      sctx.font = '300 italic 28px "Cormorant Garamond", serif';
+      sctx.textAlign = 'center';
+      sctx.textBaseline = 'middle';
+      sctx.fillStyle = 'rgba(200,185,150,0.50)';
+      sctx.fillText(fact.source, 512, 32);
+      const srcTex = new THREE.CanvasTexture(srcCanvas);
+      srcTex.needsUpdate = true;
+      const srcMat = new THREE.MeshBasicMaterial({
+        map: srcTex, transparent: true, depthWrite: false, opacity: 0,
+      });
+      const srcMesh = new THREE.Mesh(new THREE.PlaneGeometry(80 * scale, 5 * scale), srcMat);
+      srcMesh.position.y = -11 * scale;
+      group.add(srcMesh);
+      group.userData.srcMat = srcMat;
+    }
+
+    group.userData.numMat = numMat;
+    group.userData.billboard = true;  // flagged for the update loop to billboard
+    group.userData.isFloatingNumber = true;
+    return group;
+  },
+
+  // Build a horizontal 3D bar chart: title above, bars rising from a baseline,
+  // value labels on top of each bar, category labels below. Returns a Group.
+  // `chart` = { title, series: [{label, value, display}], unit, source, insight }
+  // `opts`  = { width, height, scale, colorPair }
+  _makeBarChart3D(chart, opts) {
+    const C = this.cinema;
+    if (!C || !chart || !chart.series || chart.series.length === 0) return null;
+    const THREE = C.THREE;
+    opts = opts || {};
+    const W = opts.width  || 100;
+    const H = opts.height || 60;
+    const barColor = 0xe8c84a;
+
+    const group = new THREE.Group();
+
+    // Normalize values to [0..1] for bar height
+    const maxVal = Math.max(...chart.series.map(s => Math.abs(s.value || 0)));
+    const barCount = chart.series.length;
+    const gap = W / (barCount + 1);
+    const barWidth = gap * 0.5;
+
+    // Shared bar material (additive glow)
+    const barMat = new THREE.MeshBasicMaterial({
+      color: barColor,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+    });
+
+    const bars = [];
+    chart.series.forEach((pt, i) => {
+      const barH = (Math.abs(pt.value || 0) / (maxVal || 1)) * H;
+      // A bar made of a stack of thin boxes gives a pixelated/data-grid feel
+      const barGeom = new THREE.BoxGeometry(barWidth, barH, barWidth * 0.6);
+      const bar = new THREE.Mesh(barGeom, barMat);
+      const xPos = -W / 2 + gap * (i + 1);
+      // Bars rise from the baseline (y = -H/2 is the floor)
+      bar.position.set(xPos, -H / 2 + barH / 2, 0);
+      bar.userData.targetHeight = barH;
+      bar.userData.animOffset = i * 0.15;  // stagger rise-in
+      group.add(bar);
+      bars.push(bar);
+
+      // Value label on top of each bar
+      const vCanvas = document.createElement('canvas');
+      vCanvas.width = 512; vCanvas.height = 128;
+      const vctx = vCanvas.getContext('2d');
+      vctx.font = '500 64px "Cormorant Garamond", serif';
+      vctx.textAlign = 'center';
+      vctx.textBaseline = 'middle';
+      const vGrad = vctx.createLinearGradient(0, 20, 0, 108);
+      vGrad.addColorStop(0, '#fff4cc');
+      vGrad.addColorStop(1, '#e8c84a');
+      vctx.fillStyle = vGrad;
+      vctx.shadowColor = 'rgba(212,168,50,0.5)';
+      vctx.shadowBlur = 12;
+      vctx.fillText(pt.display || String(pt.value), 256, 64);
+      const vTex = new THREE.CanvasTexture(vCanvas);
+      vTex.needsUpdate = true;
+      const vMat = new THREE.MeshBasicMaterial({
+        map: vTex, transparent: true, depthWrite: false, opacity: 0,
+      });
+      const vMesh = new THREE.Mesh(new THREE.PlaneGeometry(barWidth * 2.5, barWidth * 0.8), vMat);
+      vMesh.position.set(xPos, -H / 2 + barH + barWidth * 0.55, 0);
+      vMesh.userData.valMat = vMat;
+      group.add(vMesh);
+
+      // Category label below the baseline
+      const cCanvas = document.createElement('canvas');
+      cCanvas.width = 512; cCanvas.height = 96;
+      const cctx = cCanvas.getContext('2d');
+      cctx.font = '400 40px "Inter", sans-serif';
+      cctx.textAlign = 'center';
+      cctx.textBaseline = 'middle';
+      cctx.fillStyle = 'rgba(200,185,150,0.75)';
+      const ltxt = (pt.label || '').toUpperCase();
+      const lTracking = 4;
+      cctx.textAlign = 'left';
+      const lMetrics = cctx.measureText(ltxt);
+      const lTotalW = lMetrics.width + lTracking * (ltxt.length - 1);
+      let lx = 256 - lTotalW / 2;
+      for (const ch of ltxt) {
+        cctx.fillText(ch, lx, 48);
+        lx += cctx.measureText(ch).width + lTracking;
+      }
+      const cTex = new THREE.CanvasTexture(cCanvas);
+      cTex.needsUpdate = true;
+      const cMat = new THREE.MeshBasicMaterial({
+        map: cTex, transparent: true, depthWrite: false, opacity: 0,
+      });
+      const cMesh = new THREE.Mesh(new THREE.PlaneGeometry(barWidth * 3, barWidth * 0.7), cMat);
+      cMesh.position.set(xPos, -H / 2 - barWidth * 0.6, 0);
+      cMesh.userData.catMat = cMat;
+      group.add(cMesh);
+    });
+
+    // Title above the chart
+    if (chart.title) {
+      const tCanvas = document.createElement('canvas');
+      tCanvas.width = 1024; tCanvas.height = 128;
+      const tctx = tCanvas.getContext('2d');
+      tctx.font = '300 italic 56px "Cormorant Garamond", serif';
+      tctx.textAlign = 'center';
+      tctx.textBaseline = 'middle';
+      const tGrad = tctx.createLinearGradient(0, 20, 0, 108);
+      tGrad.addColorStop(0, '#fff4cc');
+      tGrad.addColorStop(0.7, '#f5e398');
+      tGrad.addColorStop(1, '#c9a832');
+      tctx.fillStyle = tGrad;
+      tctx.shadowColor = 'rgba(212,168,50,0.5)';
+      tctx.shadowBlur = 14;
+      tctx.fillText(chart.title, 512, 64);
+      const tTex = new THREE.CanvasTexture(tCanvas);
+      tTex.needsUpdate = true;
+      const tMat = new THREE.MeshBasicMaterial({
+        map: tTex, transparent: true, depthWrite: false, opacity: 0,
+      });
+      const tMesh = new THREE.Mesh(new THREE.PlaneGeometry(W * 0.9, W * 0.11), tMat);
+      tMesh.position.set(0, H / 2 + W * 0.08, 0);
+      tMesh.userData.titleMat = tMat;
+      group.add(tMesh);
+    }
+
+    // Baseline: thin gold line along the bottom of the bars
+    const baselineGeom = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-W / 2, -H / 2, 0),
+      new THREE.Vector3( W / 2, -H / 2, 0),
+    ]);
+    const baselineMat = new THREE.LineBasicMaterial({
+      color: 0xc9a832,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+    });
+    const baseline = new THREE.Line(baselineGeom, baselineMat);
+    group.add(baseline);
+
+    group.userData.barMat = barMat;
+    group.userData.baselineMat = baselineMat;
+    group.userData.bars = bars;
+    group.userData.billboard = true;
+    group.userData.isBarChart = true;
+    return group;
+  },
+
+
   buildBeatObjects() {
     const C = this.cinema;
     if (!C) return;
@@ -13197,8 +13510,32 @@ const DemoMode = {
       beat6Group.add(stackGroup);
       libraryStacks.push({ group: stackGroup, docs: stackDocs, label, labelMat, name: item.name });
     });
+
+    // ─── Real data bar charts floating next to library stacks ───
+    // Pull from statsBank.charts — each chart sits as a 3D holographic bar
+    // visualization near its associated document stack. Real Jushi numbers.
+    const libraryCharts = [];
+    if (this.statsBank && Array.isArray(this.statsBank.charts)) {
+      // Chart placements keyed by chartId → position and the stack it supplements
+      const chartPlacements = [
+        { chartId: 'revenue_growth',  pos: [-130,  -10,  40], scale: 0.85 },   // next to JUSHI EARNINGS stack
+        { chartId: 'ebitda_margin',   pos: [ 150,   -5,  70], scale: 0.85 },   // next to ILLINOIS 2025 stack
+      ];
+      chartPlacements.forEach((placement, i) => {
+        const chart = this.statsBank.charts.find(c => c.id === placement.chartId);
+        if (!chart) return;
+        const chartMesh = this._makeBarChart3D(chart, { width: 70, height: 45 });
+        if (!chartMesh) return;
+        chartMesh.position.set(...placement.pos);
+        chartMesh.scale.setScalar(placement.scale);
+        chartMesh.userData.revealDelay = 1.2 + i * 0.8;
+        beat6Group.add(chartMesh);
+        libraryCharts.push(chartMesh);
+      });
+    }
+
     C.scene.add(beat6Group);
-    C.beatObjects[6] = { group: beat6Group, stacks: libraryStacks };
+    C.beatObjects[6] = { group: beat6Group, stacks: libraryStacks, charts: libraryCharts };
   },
 
   // Fade in the 3D objects for a given beat. Tweens uOpacity (for shader
@@ -13451,6 +13788,36 @@ const DemoMode = {
         startDelay: p * 0.3,
       });
     }
+
+    // ─── Data nodes: real floating numbers at strategic positions ───
+    // Clear previous data nodes
+    if (entry5.dataNodes) {
+      entry5.dataNodes.forEach(n => entry5.group.remove(n));
+    }
+    entry5.dataNodes = [];
+    // Pick the first 5 facts from the stats bank. Distribute them around the
+    // camera's interior view of the Finance cluster — some near, some far,
+    // offset so they don't overlap threads.
+    const pickedStats = (this.statsBank && this.statsBank.singles || []).slice(0, 5);
+    // Positions relative to the Finance cluster center (which is at (0,0,40)).
+    // Camera is at roughly (-6, 4, 52) looking toward (20, 0, 40), so nodes
+    // should be placed in a rough arc in that direction.
+    const NODE_POSITIONS = [
+      [ 35,  22,   20],   // upper right, a bit back
+      [-10, -18,   58],   // lower left, close
+      [ 45,  -5,   65],   // right middle, closer
+      [  5,  30,   75],   // top center, close
+      [-25,  10,   15],   // left, far back
+    ];
+    pickedStats.forEach((fact, i) => {
+      if (i >= NODE_POSITIONS.length) return;
+      const node = this._makeFloatingNumber3D(fact, { scale: 0.8 });
+      if (!node) return;
+      node.position.set(...NODE_POSITIONS[i]);
+      node.userData.revealDelay = 0.5 + i * 0.6;  // staggered fade-in
+      entry5.group.add(node);
+      entry5.dataNodes.push(node);
+    });
   },
 
   startCinema() {
@@ -13700,7 +14067,7 @@ const DemoMode = {
       }
     }
 
-    // ─── Beat 5: connection threads + traveling pulses ───
+    // ─── Beat 5: connection threads + traveling pulses + real data nodes ───
     const b5 = C.beatObjects[5];
     if (b5 && b5.group.visible && b5.lines.length > 0) {
       const fade = computeFade(b5);
@@ -13740,6 +14107,32 @@ const DemoMode = {
           p.material.opacity = fade * envelope * 0.85;
         });
       }
+
+      // Floating number data nodes — staggered reveal, billboard to camera
+      if (b5.dataNodes && b5.dataNodes.length > 0) {
+        b5.dataNodes.forEach(node => {
+          const delay = node.userData.revealDelay || 0;
+          const timeAfter = since - delay;
+          let nodeFade = 0;
+          if (timeAfter > 0) {
+            // Quick ease-in over 1.2 seconds
+            nodeFade = Math.min(1, timeAfter / 1.2);
+            nodeFade = nodeFade * nodeFade * (3 - 2 * nodeFade);  // smoothstep
+          }
+          const effective = fade * nodeFade;
+          // Apply to the node's sub-materials. Different strengths for number vs label vs source.
+          if (node.userData.numMat)   node.userData.numMat.opacity   = effective * 0.98;
+          if (node.userData.labelMat) node.userData.labelMat.opacity = effective * 0.80;
+          if (node.userData.srcMat)   node.userData.srcMat.opacity   = effective * 0.55;
+          // Billboard the node's parent group toward the camera
+          if (node.userData.billboard) {
+            node.lookAt(C.camera.position);
+          }
+          // Gentle breathing scale so numbers feel alive, not pasted
+          const breathe = 1 + Math.sin((tSec + (node.userData.revealDelay || 0) * 0.7) * 0.6) * 0.02;
+          node.scale.set(breathe, breathe, breathe);
+        });
+      }
     }
 
     // ─── Beat 6: her actual library — stacks of real documents ───
@@ -13773,6 +14166,49 @@ const DemoMode = {
             fade
           );
         }
+      }
+
+      // Animate bar charts — staggered reveal, billboarded, bars rise from baseline
+      if (b6.charts && b6.charts.length > 0) {
+        const since = (nowMs - (b6._showStartTime || nowMs)) / 1000;
+        b6.charts.forEach(chartMesh => {
+          const delay = chartMesh.userData.revealDelay || 0;
+          const timeAfter = since - delay;
+          let chartFade = 0;
+          if (timeAfter > 0) {
+            chartFade = Math.min(1, timeAfter / 1.6);
+            chartFade = chartFade * chartFade * (3 - 2 * chartFade);
+          }
+          const effective = fade * chartFade;
+          // Billboard the whole chart
+          if (chartMesh.userData.billboard) {
+            chartMesh.lookAt(C.camera.position);
+          }
+          // Fade all sub-materials
+          if (chartMesh.userData.barMat)      chartMesh.userData.barMat.opacity      = effective * 0.85;
+          if (chartMesh.userData.baselineMat) chartMesh.userData.baselineMat.opacity = effective * 0.65;
+          chartMesh.traverse(obj => {
+            if (obj.userData) {
+              if (obj.userData.valMat)   obj.userData.valMat.opacity   = effective * 0.95;
+              if (obj.userData.catMat)   obj.userData.catMat.opacity   = effective * 0.75;
+              if (obj.userData.titleMat) obj.userData.titleMat.opacity = effective * 0.95;
+            }
+          });
+          // Bar rise animation: each bar scales from 0 height to targetHeight
+          // with its own animOffset stagger. We do this by scaling the bar's Y.
+          if (chartMesh.userData.bars) {
+            chartMesh.userData.bars.forEach(bar => {
+              const barOffset = bar.userData.animOffset || 0;
+              const barTime = timeAfter - barOffset;
+              let barScale = 0;
+              if (barTime > 0) {
+                barScale = Math.min(1, barTime / 0.9);
+                barScale = barScale * barScale * (3 - 2 * barScale);
+              }
+              bar.scale.y = barScale;
+            });
+          }
+        });
       }
     }
 
