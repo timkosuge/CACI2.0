@@ -252,12 +252,19 @@ body:not([data-theme="light"]) .theme-toggle .theme-toggle-moon { display: none;
    Each rule below replaces a dark-mode literal with a light-mode
    equivalent that preserves the design intent. */
 
-/* Sidebar — dark sidebar becomes a subtle cool-grey panel */
+/* Sidebar — dark sidebar becomes a subtle cool-grey panel.
+   Uses !important on background because the original #sidebar rule sets
+   heavy inset dark shadows that compete visually. */
 body[data-theme="light"] #sidebar {
-  background: #EEF2F7;
+  background: #EEF2F7 !important;
   box-shadow:
-    inset -1px 0 0 rgba(30, 58, 95, 0.10),
-    2px 0 8px rgba(30, 58, 95, 0.06);
+    inset -1px 0 0 rgba(30, 58, 95, 0.12),
+    2px 0 8px rgba(30, 58, 95, 0.06) !important;
+}
+/* Kill the scanline overlay in light mode — it's invisible on dark,
+   but on light bg it creates unwanted striping */
+body[data-theme="light"] #sidebar::after {
+  display: none !important;
 }
 body[data-theme="light"] #sidebar::before {
   /* Kill the gold glimmering right edge — too loud on a light bg */
@@ -363,11 +370,13 @@ body[data-theme="light"] .composer-wrap {
 }
 
 /* Main content area backgrounds — the circuit-board pattern was gold-tinted
-   and reads muddy on light. Hide it in light mode. */
+   and reads muddy on light. Hide it in light mode. Actual class is
+   chat-bg-overlay (confirmed via grep of DOM). */
+body[data-theme="light"] .chat-bg-overlay,
 body[data-theme="light"] #circuit-overlay,
 body[data-theme="light"] .circuit-bg,
 body[data-theme="light"] #main-circuit {
-  display: none;
+  display: none !important;
 }
 
 /* Chat messages area base */
@@ -630,7 +639,202 @@ body[data-theme="light"] .popover {
   color: #FFFFFF;
 }
 
-/* ── End light mode overrides ────────────────────────────── */
+/* ── Second wave of overrides — targets the components still showing dark
+   after the first wave based on screenshot feedback. ────────────────── */
+
+/* Send button (paper-plane in bottom-right of composer) — was dark-gradient
+   metallic. In light mode: clean white with steel-blue accent. */
+body[data-theme="light"] .send-btn {
+  background: linear-gradient(160deg, #FFFFFF 0%, #F5F7FA 100%) !important;
+  border: 1px solid rgba(30, 58, 95, 0.22) !important;
+  border-top-color: rgba(30, 58, 95, 0.12) !important;
+  border-bottom-color: rgba(30, 58, 95, 0.28) !important;
+  color: #1E3A5F !important;
+  box-shadow:
+    0 1px 2px rgba(30, 58, 95, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
+}
+body[data-theme="light"] .send-btn:hover {
+  color: #3B6FA8 !important;
+  border-color: rgba(30, 58, 95, 0.40) !important;
+  background: linear-gradient(160deg, rgba(30, 58, 95, 0.04) 0%, rgba(30, 58, 95, 0.06) 100%) !important;
+  box-shadow:
+    0 2px 6px rgba(30, 58, 95, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+}
+body[data-theme="light"] .send-btn::before {
+  background: none !important;
+}
+
+/* Microphone button (voice input toggle in composer) */
+body[data-theme="light"] .mic-btn {
+  background: #FFFFFF !important;
+  border: 1px solid rgba(30, 58, 95, 0.22) !important;
+  color: #1E3A5F !important;
+  box-shadow:
+    0 1px 2px rgba(30, 58, 95, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
+}
+body[data-theme="light"] .mic-btn:hover {
+  border-color: rgba(30, 58, 95, 0.40) !important;
+  color: #3B6FA8 !important;
+  background: rgba(30, 58, 95, 0.04) !important;
+  box-shadow: 0 2px 4px rgba(30, 58, 95, 0.10) !important;
+}
+
+/* Image attach button (paperclip in composer) */
+body[data-theme="light"] .img-attach-btn {
+  background: #FFFFFF !important;
+  border: 1px solid rgba(30, 58, 95, 0.22) !important;
+  color: rgba(30, 58, 95, 0.70) !important;
+}
+body[data-theme="light"] .img-attach-btn:hover {
+  border-color: rgba(30, 58, 95, 0.40) !important;
+  color: #1E3A5F !important;
+  background: rgba(30, 58, 95, 0.04) !important;
+}
+body[data-theme="light"] .img-attach-btn.has-image {
+  border-color: #3B6FA8 !important;
+  color: #1E3A5F !important;
+  background: rgba(59, 111, 168, 0.08) !important;
+}
+
+/* Feedback send button ("Send" in fb-comment-input) */
+body[data-theme="light"] .fb-send-btn {
+  background: #FFFFFF;
+  color: #1E3A5F;
+  border-color: rgba(30, 58, 95, 0.22);
+}
+body[data-theme="light"] .fb-send-btn:hover {
+  border-color: #3B6FA8;
+  color: #1E3A5F;
+  background: rgba(30, 58, 95, 0.06);
+}
+
+/* Sidebar footer user card block — has inline styles with hardcoded gold
+   colors (built by JavaScript in appendMsg-adjacent code). We override
+   each known selector pattern with !important to force the light treatment
+   despite the inline styles. */
+body[data-theme="light"] #sb-user-block > div {
+  border-top: 1px solid rgba(30, 58, 95, 0.12) !important;
+}
+body[data-theme="light"] #sb-user-block > div > div:first-child {
+  /* Avatar square — was gold-tinted */
+  background: linear-gradient(135deg, rgba(30, 58, 95, 0.10), rgba(30, 58, 95, 0.05)) !important;
+  border: 1px solid rgba(30, 58, 95, 0.25) !important;
+}
+body[data-theme="light"] #sb-user-block > div > div:first-child span {
+  color: #1E3A5F !important;
+}
+body[data-theme="light"] #sb-user-block > div > div:nth-child(2) > div:first-child {
+  /* User display name */
+  color: #1E3A5F !important;
+}
+body[data-theme="light"] #sb-user-block > div > div:nth-child(2) > div:nth-child(2) {
+  /* ADMIN / USER role label */
+  color: rgba(30, 58, 95, 0.55) !important;
+}
+body[data-theme="light"] #sb-user-block button {
+  border-color: rgba(30, 58, 95, 0.22) !important;
+}
+body[data-theme="light"] #sb-user-block button:hover {
+  border-color: rgba(30, 58, 95, 0.50) !important;
+}
+body[data-theme="light"] #sb-user-block button svg * {
+  stroke: rgba(30, 58, 95, 0.75) !important;
+  fill: rgba(30, 58, 95, 0.75) !important;
+}
+/* But preserve some SVG strokes that shouldn't fill */
+body[data-theme="light"] #sb-user-block button svg rect,
+body[data-theme="light"] #sb-user-block button svg path,
+body[data-theme="light"] #sb-user-block button svg circle {
+  fill: none !important;
+  stroke: rgba(30, 58, 95, 0.75) !important;
+}
+body[data-theme="light"] #sb-user-block button svg circle[fill] {
+  fill: rgba(30, 58, 95, 0.75) !important;
+}
+
+/* Model pill (Claude Sonnet / Grok / etc. at bottom of sidebar) — was dark
+   gradient with gold border. Becomes clean white with steel accent. */
+body[data-theme="light"] .model-pill {
+  background: linear-gradient(160deg, #FFFFFF 0%, #F5F7FA 100%) !important;
+  border: 1px solid rgba(30, 58, 95, 0.22) !important;
+  border-top-color: rgba(30, 58, 95, 0.10) !important;
+  border-bottom-color: rgba(30, 58, 95, 0.30) !important;
+  color: #1E3A5F !important;
+  box-shadow:
+    0 1px 3px rgba(30, 58, 95, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7) !important;
+}
+body[data-theme="light"] .model-pill:hover {
+  border-color: rgba(30, 58, 95, 0.40) !important;
+  background: linear-gradient(160deg, #F8FAFC 0%, #F1F5F9 100%) !important;
+  box-shadow:
+    0 2px 6px rgba(30, 58, 95, 0.10),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
+}
+
+/* Welcome / intro text in empty chat — expanded selectors */
+body[data-theme="light"] .chat-welcome,
+body[data-theme="light"] .chat-intro,
+body[data-theme="light"] .empty-chat-text,
+body[data-theme="light"] #chat-welcome,
+body[data-theme="light"] #chat-intro,
+body[data-theme="light"] .chat-empty-msg,
+body[data-theme="light"] .welcome-message {
+  color: rgba(30, 58, 95, 0.78) !important;
+}
+
+/* JUSHI watermark — tone way down */
+body[data-theme="light"] .jushi-watermark,
+body[data-theme="light"] #jushi-mark,
+body[data-theme="light"] .jushi-mark,
+body[data-theme="light"] #jushi-wm,
+body[data-theme="light"] .jushi-wm {
+  opacity: 0.10 !important;
+  filter: none !important;
+}
+
+/* Switch collection button (upper left, below topbar) */
+body[data-theme="light"] #switch-collection-btn,
+body[data-theme="light"] .switch-collection-btn,
+body[data-theme="light"] #sw-col-btn,
+body[data-theme="light"] .sw-col-btn {
+  background: #FFFFFF !important;
+  color: #1E3A5F !important;
+  border: 1px solid rgba(30, 58, 95, 0.22) !important;
+}
+
+/* Top-bar components — broader selector set */
+body[data-theme="light"] #tb-dept,
+body[data-theme="light"] #tb-status,
+body[data-theme="light"] #tb-user,
+body[data-theme="light"] #tb-user-chip,
+body[data-theme="light"] .topbar-dept,
+body[data-theme="light"] .topbar-status,
+body[data-theme="light"] .topbar-user,
+body[data-theme="light"] .tb-pill {
+  background: #FFFFFF !important;
+  color: #1E3A5F !important;
+  border: 1px solid rgba(30, 58, 95, 0.22) !important;
+  box-shadow: 0 1px 2px rgba(30, 58, 95, 0.05) !important;
+}
+
+/* Green status dot ("ONLINE" indicator) — stays green */
+body[data-theme="light"] .status-dot.online,
+body[data-theme="light"] .online-dot {
+  background: #22C55E !important;
+}
+
+/* Any remaining dark panels that might still be black */
+body[data-theme="light"] .bg-panel,
+body[data-theme="light"] .panel-dark,
+body[data-theme="light"] .dark-panel {
+  background: #FFFFFF !important;
+  color: #0F172A !important;
+  border-color: rgba(30, 58, 95, 0.15) !important;
+}
 
 /* ── Login ─────────────────────────────────────────────── */
 #login-screen {
