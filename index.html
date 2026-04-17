@@ -1710,7 +1710,6 @@ body::before {
 }
 
 .db9-cta {
-  margin-top: 30px;
   padding: 14px 42px;
   background: linear-gradient(180deg, rgba(30,22,8,0.9) 0%, rgba(18,12,4,0.98) 100%);
   border: 1px solid rgba(212,168,50,0.55);
@@ -1738,6 +1737,28 @@ body::before {
     inset 0 1px 0 rgba(245,227,152,0.32),
     0 4px 14px rgba(0,0,0,0.8),
     0 0 36px rgba(212,168,50,0.4);
+}
+.db9-cta-row { margin-top: 30px; }
+/* Replay button — secondary action next to the primary CTA */
+.db9-replay {
+  padding: 12px 26px;
+  background: transparent;
+  border: 1px solid rgba(212,168,50,0.30);
+  border-radius: 2px;
+  color: rgba(245,227,152,0.78);
+  font-family: var(--f-ui);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.30em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.35s var(--ease);
+  -webkit-appearance: none;
+}
+.db9-replay:hover {
+  border-color: rgba(212,168,50,0.65);
+  color: rgba(245,227,152,0.95);
+  letter-spacing: 0.36em;
 }
 
 /* ── THEATRE CONTROLS ── */
@@ -6640,7 +6661,10 @@ body::before {
           </div>
         </div>
       </div>
-      <button class="db9-cta db-in d3" id="db9-cta">Enter CACI &rarr;</button>
+      <div class="db9-cta-row db-in d3" style="display:flex;gap:14px;align-items:center;justify-content:center;flex-wrap:wrap">
+        <button class="db9-cta" id="db9-cta">Enter CACI &rarr;</button>
+        <button class="db9-replay" id="db9-replay" title="Play again">&#8634; Replay</button>
+      </div>
     </div>
 
     <div class="demo-progress" id="demo-progress"></div>
@@ -7463,25 +7487,18 @@ body::before {
             </div>
           </div>
 
-          <div class="acard admin-only" id="caci-intro-card">
-            <div class="acard-title">CACI's Intro</div>
-            <div class="acard-sub">Let CACI write her own intro in her voice. Generates 3 variations using her system prompt. Pick one, edit if needed, save. If unsaved, the demo plays the hardcoded default script.</div>
-            <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;align-items:center">
-              <button class="asave" id="caci-intro-generate" style="white-space:nowrap">Generate 3 Variations</button>
-              <button class="asave" id="caci-intro-reset" style="background:transparent;border:1px solid rgba(220,90,90,0.5);color:rgba(240,160,160,0.95)">Reset to Default</button>
-              <span id="caci-intro-status" style="font-family:var(--f-mono);font-size:10px;color:var(--smoke3);letter-spacing:.06em"></span>
+          <div class="acard admin-only" id="demo-scripts-card">
+            <div class="acard-title">Demo Scripts</div>
+            <div class="acard-sub">CACI writes all narration for the demo herself. One click generates 3 variants for every beat (intro + 7 chorus beats = 24 scripts). Each show randomly picks one variant per beat, so repeat viewings aren't identical. To refresh everything, generate again — this replaces all stored variants.</div>
+            <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;align-items:center">
+              <button class="asave" id="demo-gen-all" style="white-space:nowrap">Generate Full Demo (24 scripts)</button>
+              <button class="asave" id="demo-reset-all" style="background:transparent;border:1px solid rgba(220,90,90,0.5);color:rgba(240,160,160,0.95)">Reset All</button>
+              <span id="demo-gen-status" style="font-family:var(--f-mono);font-size:10px;color:var(--smoke3);letter-spacing:.06em"></span>
             </div>
-            <div id="caci-intro-current" style="margin-top:14px;display:none">
-              <div style="font-family:var(--f-mono);font-size:10px;color:var(--smoke3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px">Currently saved:</div>
-              <div id="caci-intro-current-text" style="padding:10px 12px;background:rgba(212,168,50,0.05);border:1px solid rgba(212,168,50,0.25);border-radius:4px;font-size:13px;line-height:1.55;color:rgba(240,230,200,0.92);font-style:italic;max-height:140px;overflow-y:auto"></div>
+            <div id="demo-gen-summary" style="margin-top:14px;display:none">
+              <div style="font-family:var(--f-mono);font-size:10px;color:var(--smoke3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px">Currently stored:</div>
+              <div id="demo-gen-summary-body" style="padding:10px 12px;background:rgba(212,168,50,0.05);border:1px solid rgba(212,168,50,0.25);border-radius:4px;font-size:12px;line-height:1.7;color:rgba(240,230,200,0.88);font-family:var(--f-mono)"></div>
             </div>
-            <div id="caci-intro-variations" style="margin-top:14px;display:none"></div>
-          </div>
-
-          <div class="acard admin-only" id="caci-chorus-card">
-            <div class="acard-title">Chorus Scripts (Beats 1, 3&mdash;8)</div>
-            <div class="acard-sub">Let CACI write the narration for each chorus beat in third person about herself. Each beat has a clear role in the arc. Verified facts are passed to her so the content stays truthful. Generate per-beat; pick, edit, and save independently.</div>
-            <div id="caci-chorus-beats" style="margin-top:14px"></div>
           </div>
         </div>
 
@@ -8694,20 +8711,19 @@ function bootApp() {
     demoTog.addEventListener('change', () => saveDemoMode(demoTog.checked));
   }
 
-  // Wire CACI intro admin buttons
-  const introGen = $('caci-intro-generate');
-  if (introGen && !introGen._wired) {
-    introGen._wired = true;
-    introGen.addEventListener('click', () => generateCaciIntro());
+  // Wire Demo Scripts admin card (single-button rotation model)
+  const demoGenBtn = $('demo-gen-all');
+  if (demoGenBtn && !demoGenBtn._wired) {
+    demoGenBtn._wired = true;
+    demoGenBtn.addEventListener('click', () => generateAllDemoScripts());
   }
-  const introRst = $('caci-intro-reset');
-  if (introRst && !introRst._wired) {
-    introRst._wired = true;
-    introRst.addEventListener('click', () => resetCaciIntro());
+  const demoResetBtn = $('demo-reset-all');
+  if (demoResetBtn && !demoResetBtn._wired) {
+    demoResetBtn._wired = true;
+    demoResetBtn.addEventListener('click', () => resetAllDemoScripts());
   }
-  // Load whatever's currently saved so admin sees it
-  loadSavedCaciIntro();
-  renderChorusBeatsUI();
+  // Load what's currently stored (for the summary display)
+  loadDemoScriptsSummary();
 
   // ── Recurring gold glimmer sweep — fires every 60s ──────────
   function triggerAppGlimmer() {
@@ -10722,277 +10738,95 @@ async function saveDemoMode(enabled) {
   }
 }
 
-// ── CACI Intro (script generation) ────────────────────────
-async function loadSavedCaciIntro() {
+// ── Demo Scripts (rotation model — 24 variants, one-click) ────
+// Generates 3 variants for every beat (intro + 7 chorus) in one shot.
+// The demo controller randomly picks one variant per beat at show time,
+// so repeat viewings aren't identical.
+
+async function loadDemoScriptsSummary() {
+  const summaryWrap = $('demo-gen-summary');
+  const summaryBody = $('demo-gen-summary-body');
+  if (!summaryWrap || !summaryBody) return;
   try {
     const res = await apiFetch('/demo/scripts');
-    if (!res.ok) return;
+    if (!res.ok) { summaryWrap.style.display = 'none'; return; }
     const d = await res.json();
-    const wrap = $('caci-intro-current');
-    const textEl = $('caci-intro-current-text');
-    if (d.intro && d.intro.trim().length > 20) {
-      if (textEl) textEl.textContent = d.intro.trim();
-      if (wrap) wrap.style.display = 'block';
-    } else {
-      if (wrap) wrap.style.display = 'none';
-    }
-  } catch {}
+    const scripts = d.scripts || {};
+    const beatOrder = ['intro', '1', '3', '4', '5', '6', '7', '8'];
+    const labels = {
+      'intro': "CACI's intro",
+      '1': 'Beat 1 — Problem setup',
+      '3': 'Beat 3 — Organization',
+      '4': 'Beat 4 — Query',
+      '5': 'Beat 5 — Compounding',
+      '6': 'Beat 6 — Prototype honesty',
+      '7': 'Beat 7 — Guarantees',
+      '8': 'Beat 8 — Distinction',
+    };
+    let anyStored = false;
+    const lines = beatOrder.map(id => {
+      const arr = scripts[id];
+      const n = Array.isArray(arr) ? arr.length : (arr ? 1 : 0);
+      if (n > 0) anyStored = true;
+      const status = n === 3 ? '\u2713 3 variants (rotating)' :
+                     n > 0  ? `\u26a0 ${n} variant${n===1?'':'s'} (no rotation)` :
+                              '\u2014 using hardcoded default';
+      return `${labels[id]}: ${status}`;
+    });
+    summaryBody.textContent = lines.join('\n');
+    summaryBody.style.whiteSpace = 'pre-line';
+    summaryWrap.style.display = anyStored ? 'block' : 'block';  // always show for clarity
+  } catch { summaryWrap.style.display = 'none'; }
 }
 
-async function generateCaciIntro() {
-  const btn = $('caci-intro-generate');
-  const status = $('caci-intro-status');
-  const wrap = $('caci-intro-variations');
-  if (btn) { btn.disabled = true; btn.textContent = 'Generating\u2026 (this takes 15-30 sec)'; }
-  if (status) status.textContent = '';
-  if (wrap) wrap.innerHTML = '';
+async function generateAllDemoScripts() {
+  const btn = $('demo-gen-all');
+  const resetBtn = $('demo-reset-all');
+  const status = $('demo-gen-status');
+  if (!confirm('Generate 3 variants for all 8 beats (24 scripts total)?\nThis replaces everything currently stored.\nTakes about 30-60 seconds.')) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Generating all 24 scripts\u2026'; }
+  if (resetBtn) resetBtn.disabled = true;
+  if (status) status.textContent = 'Calling Claude in parallel (this can take a minute)\u2026';
 
   try {
-    const res = await apiFetch('/demo/generate-intro', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    const res = await apiFetch('/demo/generate-all', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
     const d = await res.json();
     if (!res.ok || d.error) throw new Error(d.error || 'Generation failed');
-    if (!d.variations || !Array.isArray(d.variations) || d.variations.length === 0) {
-      throw new Error('No variations returned');
-    }
-    renderCaciVariations(d.variations);
-    if (status) status.textContent = '\u2713 Generated ' + d.variations.length + ' variations';
+    // Summarize results
+    const counts = d.savedCounts || {};
+    const total = Object.values(counts).reduce((a, b) => a + b, 0);
+    const errMsg = d.errors && d.errors.length ? ` (${d.errors.length} beat${d.errors.length===1?'':'s'} failed)` : '';
+    if (status) status.textContent = `\u2713 ${total} variants saved` + errMsg;
+    loadDemoScriptsSummary();
   } catch (e) {
-    if (status) status.textContent = '\u2717 ' + e.message;
+    if (status) status.textContent = '\u2717 ' + (e.message || 'Generation failed');
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Generate 3 Variations'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Generate Full Demo (24 scripts)'; }
+    if (resetBtn) resetBtn.disabled = false;
   }
 }
 
-function renderCaciVariations(variations) {
-  const wrap = $('caci-intro-variations');
-  if (!wrap) return;
-  wrap.style.display = 'block';
-  wrap.innerHTML = '<div style="font-family:var(--f-mono);font-size:10px;color:var(--smoke3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px">Variations</div>';
-  variations.forEach((text, idx) => {
-    const card = document.createElement('div');
-    card.style.cssText = 'margin-bottom:12px;padding:14px;background:rgba(8,12,22,0.5);border:1px solid rgba(212,168,50,0.25);border-radius:6px';
-    const label = document.createElement('div');
-    label.style.cssText = 'font-family:var(--f-mono);font-size:10px;color:rgba(212,168,50,0.75);letter-spacing:.12em;text-transform:uppercase;margin-bottom:8px';
-    label.textContent = 'Variation ' + (idx + 1) + ' — ' + text.length + ' chars';
-    card.appendChild(label);
-
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-    textarea.style.cssText = 'width:100%;min-height:120px;padding:10px 12px;background:rgba(4,6,12,0.55);border:1px solid rgba(212,168,50,0.18);border-radius:4px;font-family:var(--f-body);font-size:13px;line-height:1.55;color:rgba(240,230,200,0.95);resize:vertical;box-sizing:border-box';
-    card.appendChild(textarea);
-
-    const btnRow = document.createElement('div');
-    btnRow.style.cssText = 'display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap';
-    const useBtn = document.createElement('button');
-    useBtn.className = 'asave';
-    useBtn.textContent = 'Use This';
-    useBtn.style.cssText = 'padding:6px 16px;font-size:10px';
-    const msg = document.createElement('span');
-    msg.style.cssText = 'font-family:var(--f-mono);font-size:10px;color:var(--smoke3);letter-spacing:.06em';
-    useBtn.addEventListener('click', async () => {
-      useBtn.disabled = true; useBtn.textContent = 'Saving\u2026';
-      msg.textContent = '';
-      try {
-        const res = await apiFetch('/demo/save-script', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ beatId: 'intro', text: textarea.value }) });
-        const d = await res.json();
-        if (!res.ok || d.error) throw new Error(d.error || 'Save failed');
-        useBtn.textContent = '\u2713 Saved';
-        msg.textContent = 'CACI\u2019s intro updated';
-        loadSavedCaciIntro();
-      } catch (e) {
-        useBtn.textContent = 'Use This';
-        useBtn.disabled = false;
-        msg.textContent = '\u2717 ' + e.message;
-      }
-    });
-    btnRow.appendChild(useBtn);
-    btnRow.appendChild(msg);
-    card.appendChild(btnRow);
-    wrap.appendChild(card);
-  });
-}
-
-async function resetCaciIntro() {
-  if (!confirm('Delete the saved intro and fall back to the hardcoded default?')) return;
-  const status = $('caci-intro-status');
+async function resetAllDemoScripts() {
+  if (!confirm('Delete all stored demo script variants?\nThe demo will fall back to hardcoded defaults until you regenerate.')) return;
+  const status = $('demo-gen-status');
   if (status) status.textContent = 'Resetting\u2026';
   try {
-    const res = await apiFetch('/demo/reset-script', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ beatId: 'intro' }) });
+    const res = await apiFetch('/demo/reset-all', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
     const d = await res.json();
     if (!res.ok || d.error) throw new Error(d.error || 'Reset failed');
-    if (status) status.textContent = '\u2713 Reset to default';
-    loadSavedCaciIntro();
-    const wrap = $('caci-intro-variations');
-    if (wrap) { wrap.style.display = 'none'; wrap.innerHTML = ''; }
+    if (status) status.textContent = '\u2713 All cleared \u2014 using defaults';
+    loadDemoScriptsSummary();
   } catch (e) {
-    if (status) status.textContent = '\u2717 ' + e.message;
+    if (status) status.textContent = '\u2717 ' + (e.message || 'Reset failed');
   }
-}
-
-// ── Chorus Beats admin (Beats 1, 3, 4, 5, 6, 7, 8) ────────────
-const CHORUS_BEATS = [
-  { id: '1', label: 'Beat 1 — The problem she was built to solve', voice: 'Leo (M)' },
-  { id: '3', label: 'Beat 3 — How she organizes documents',       voice: 'Ara (F)' },
-  { id: '4', label: 'Beat 4 — How she answers questions',         voice: 'Rex (M)' },
-  { id: '5', label: 'Beat 5 — How her knowledge compounds',       voice: 'Ara (F)' },
-  { id: '6', label: 'Beat 6 — Honest inventory (prototype)',      voice: 'Leo (M)' },
-  { id: '7', label: 'Beat 7 — The guarantees',                    voice: 'Ara (F)' },
-  { id: '8', label: 'Beat 8 — Not a chatbot with files attached', voice: 'Rex (M)' },
-];
-
-async function loadSavedChorusBeats() {
-  try {
-    const res = await apiFetch('/demo/scripts');
-    if (!res.ok) return {};
-    const d = await res.json();
-    return d.scripts || {};
-  } catch { return {}; }
-}
-
-async function renderChorusBeatsUI() {
-  const wrap = $('caci-chorus-beats');
-  if (!wrap) return;
-  const saved = await loadSavedChorusBeats();
-
-  wrap.innerHTML = '';
-  CHORUS_BEATS.forEach((beat) => {
-    const row = document.createElement('div');
-    row.style.cssText = 'padding:14px;margin-bottom:10px;background:rgba(8,12,22,0.40);border:1px solid rgba(212,168,50,0.22);border-radius:6px';
-
-    const header = document.createElement('div');
-    header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px';
-    const titleBox = document.createElement('div');
-    titleBox.innerHTML =
-      '<div style="font-family:var(--f-display);font-size:14px;color:rgba(245,227,152,0.95);letter-spacing:.04em">' + beat.label + '</div>' +
-      '<div style="font-family:var(--f-mono);font-size:10px;color:var(--smoke3);letter-spacing:.08em;margin-top:2px">Voice: ' + beat.voice + '</div>';
-    header.appendChild(titleBox);
-
-    const btnRow = document.createElement('div');
-    btnRow.style.cssText = 'display:flex;gap:8px;align-items:center';
-    const genBtn = document.createElement('button');
-    genBtn.className = 'asave'; genBtn.textContent = 'Generate 3';
-    genBtn.style.cssText = 'padding:6px 14px;font-size:10px;white-space:nowrap';
-    const resetBtn = document.createElement('button');
-    resetBtn.className = 'asave'; resetBtn.textContent = 'Reset';
-    resetBtn.style.cssText = 'padding:6px 14px;font-size:10px;background:transparent;border:1px solid rgba(220,90,90,0.5);color:rgba(240,160,160,0.95)';
-    const status = document.createElement('span');
-    status.style.cssText = 'font-family:var(--f-mono);font-size:10px;color:var(--smoke3);letter-spacing:.06em;min-width:0';
-    btnRow.appendChild(genBtn); btnRow.appendChild(resetBtn); btnRow.appendChild(status);
-    header.appendChild(btnRow);
-    row.appendChild(header);
-
-    // Currently saved preview (if any)
-    const savedWrap = document.createElement('div');
-    savedWrap.style.cssText = 'margin-top:6px' + (saved[beat.id] ? '' : ';display:none');
-    savedWrap.innerHTML =
-      '<div style="font-family:var(--f-mono);font-size:10px;color:var(--smoke3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">Currently saved:</div>';
-    const savedText = document.createElement('div');
-    savedText.style.cssText = 'padding:8px 10px;background:rgba(212,168,50,0.05);border:1px solid rgba(212,168,50,0.2);border-radius:4px;font-size:12px;line-height:1.55;color:rgba(240,230,200,0.9);font-style:italic;max-height:110px;overflow-y:auto';
-    savedText.textContent = saved[beat.id] || '';
-    savedWrap.appendChild(savedText);
-    row.appendChild(savedWrap);
-
-    const variationsWrap = document.createElement('div');
-    variationsWrap.style.cssText = 'margin-top:10px;display:none';
-    row.appendChild(variationsWrap);
-
-    genBtn.addEventListener('click', async () => {
-      genBtn.disabled = true; genBtn.textContent = 'Generating\u2026';
-      status.textContent = '';
-      variationsWrap.style.display = 'none';
-      variationsWrap.innerHTML = '';
-      try {
-        const res = await apiFetch('/demo/generate-beat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ beatId: beat.id }),
-        });
-        const d = await res.json();
-        if (!res.ok || d.error) throw new Error(d.error || 'Generation failed');
-        if (!d.variations || !d.variations.length) throw new Error('No variations returned');
-        renderBeatVariations(variationsWrap, beat.id, d.variations, savedWrap, savedText);
-        status.textContent = '\u2713 ' + d.variations.length + ' variations';
-      } catch (e) {
-        status.textContent = '\u2717 ' + e.message;
-      } finally {
-        genBtn.disabled = false; genBtn.textContent = 'Generate 3';
-      }
-    });
-
-    resetBtn.addEventListener('click', async () => {
-      if (!confirm('Delete the saved script for ' + beat.label + '?')) return;
-      status.textContent = 'Resetting\u2026';
-      try {
-        const res = await apiFetch('/demo/reset-script', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ beatId: beat.id }),
-        });
-        const d = await res.json();
-        if (!res.ok || d.error) throw new Error(d.error || 'Reset failed');
-        status.textContent = '\u2713 Reset';
-        savedText.textContent = '';
-        savedWrap.style.display = 'none';
-        variationsWrap.style.display = 'none';
-        variationsWrap.innerHTML = '';
-      } catch (e) { status.textContent = '\u2717 ' + e.message; }
-    });
-
-    wrap.appendChild(row);
-  });
-}
-
-function renderBeatVariations(container, beatId, variations, savedWrap, savedText) {
-  container.style.display = 'block';
-  container.innerHTML = '<div style="font-family:var(--f-mono);font-size:10px;color:var(--smoke3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px">Variations (edit, then Use This)</div>';
-
-  variations.forEach((text, idx) => {
-    const card = document.createElement('div');
-    card.style.cssText = 'margin-bottom:10px;padding:12px;background:rgba(4,6,12,0.55);border:1px solid rgba(212,168,50,0.18);border-radius:4px';
-
-    const label = document.createElement('div');
-    label.style.cssText = 'font-family:var(--f-mono);font-size:10px;color:rgba(212,168,50,0.7);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px';
-    label.textContent = 'Variation ' + (idx+1) + ' — ' + text.length + ' chars (~' + Math.round(text.length/14) + 's)';
-    card.appendChild(label);
-
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-    textarea.style.cssText = 'width:100%;min-height:90px;padding:8px 10px;background:rgba(2,4,10,0.6);border:1px solid rgba(212,168,50,0.14);border-radius:3px;font-family:var(--f-body);font-size:12px;line-height:1.55;color:rgba(240,230,200,0.95);resize:vertical;box-sizing:border-box';
-    card.appendChild(textarea);
-
-    const row = document.createElement('div');
-    row.style.cssText = 'display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap';
-    const useBtn = document.createElement('button');
-    useBtn.className = 'asave';
-    useBtn.textContent = 'Use This';
-    useBtn.style.cssText = 'padding:5px 14px;font-size:10px';
-    const msg = document.createElement('span');
-    msg.style.cssText = 'font-family:var(--f-mono);font-size:10px;color:var(--smoke3);letter-spacing:.06em';
-
-    useBtn.addEventListener('click', async () => {
-      useBtn.disabled = true; useBtn.textContent = 'Saving\u2026'; msg.textContent = '';
-      try {
-        const res = await apiFetch('/demo/save-script', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ beatId, text: textarea.value }),
-        });
-        const d = await res.json();
-        if (!res.ok || d.error) throw new Error(d.error || 'Save failed');
-        useBtn.textContent = '\u2713 Saved';
-        msg.textContent = 'Beat ' + beatId + ' updated';
-        savedText.textContent = textarea.value.trim();
-        savedWrap.style.display = 'block';
-      } catch (e) {
-        useBtn.textContent = 'Use This';
-        useBtn.disabled = false;
-        msg.textContent = '\u2717 ' + e.message;
-      }
-    });
-    row.appendChild(useBtn); row.appendChild(msg);
-    card.appendChild(row);
-    container.appendChild(card);
-  });
 }
 
 async function checkHealth() {
@@ -11082,32 +10916,29 @@ const DemoMode = {
       }
     } catch {}
 
-    // Load admin-saved scripts (intro + chorus beats 1,3,4,5,6,7,8).
-    // For any beat with saved text, swap the narration and recompute timing
-    // based on actual text length (~14 chars/sec TTS speech rate).
+    // Load admin-saved script variants (intro + chorus beats 1,3,4,5,6,7,8).
+    // New model: each beat has an array of up to 3 variants. We store the
+    // arrays now; at demo start() time we randomly pick one variant per beat
+    // so repeat viewings aren't the same.
+    // Back-compat: legacy single-string scripts get wrapped as a 1-element array.
+    this._scriptVariants = {};  // { intro: [...], '1': [...], '3': [...] }
     try {
       const res = await apiFetch('/demo/scripts');
       if (res.ok) {
         const d = await res.json();
-        const scripts = d.scripts || (d.intro ? { intro: d.intro } : {});
-        // Map beat IDs → their index in this.beats array
-        // (Beat ID 2 is intro and lives at index 0; others at their own indices)
-        const idToIndex = {};
-        this.beats.forEach((b, i) => { idToIndex[b.id === 2 ? 'intro' : String(b.id)] = i; });
-
-        Object.entries(scripts).forEach(([beatKey, text]) => {
-          if (!text || typeof text !== 'string' || text.trim().length < 10) return;
-          const idx = idToIndex[beatKey];
-          if (idx === undefined) return;
-          const clean = text.trim();
-          this.beats[idx].narr = clean;
-          // Dynamic timing from char count
-          const estMs = Math.round((clean.length / 14) * 1000);
-          this.beats[idx].minDur = Math.max(6000, Math.round(estMs * 0.85));
-          this.beats[idx].maxDur = Math.max(18000, Math.round(estMs * 2.0));
-          // For the intro (beat 2), also feed the preshow visual its expected length
-          if (beatKey === 'intro') this._preshowExpected = estMs;
+        const rawScripts = d.scripts || {};
+        Object.entries(rawScripts).forEach(([beatKey, val]) => {
+          // `val` could be an array (new model) or a string (legacy)
+          const arr = Array.isArray(val) ? val : [val];
+          const cleaned = arr
+            .filter(s => typeof s === 'string' && s.trim().length > 10)
+            .map(s => s.trim());
+          if (cleaned.length > 0) this._scriptVariants[beatKey] = cleaned;
         });
+        // Legacy top-level `intro` field — treat as 1-variant if no scripts.intro
+        if (!this._scriptVariants.intro && d.intro && typeof d.intro === 'string' && d.intro.trim().length > 10) {
+          this._scriptVariants.intro = [d.intro.trim()];
+        }
       }
     } catch {}
 
@@ -11128,6 +10959,8 @@ const DemoMode = {
     if (skipBtn) skipBtn.addEventListener('click', () => this.stop());
     const ctaBtn = document.getElementById('db9-cta');
     if (ctaBtn) ctaBtn.addEventListener('click', () => this.stop());
+    const replayBtn = document.getElementById('db9-replay');
+    if (replayBtn) replayBtn.addEventListener('click', () => this.replay());
     const muteBtn = document.getElementById('demo-mute');
     if (muteBtn) muteBtn.addEventListener('click', () => this.toggleMute());
 
@@ -11147,8 +10980,41 @@ const DemoMode = {
     }
   },
 
+  // Randomly pick one variant per beat from the loaded arrays and apply them
+  // to this.beats (narration + dynamic timing). Called each time the demo
+  // starts so repeat viewings aren't the same show.
+  pickVariantsForThisShow() {
+    if (!this._scriptVariants) return;
+    const picks = {};
+    // Map beat IDs → index in this.beats (beat.id === 2 is the intro)
+    const idToIndex = {};
+    this.beats.forEach((b, i) => { idToIndex[b.id === 2 ? 'intro' : String(b.id)] = i; });
+
+    Object.entries(this._scriptVariants).forEach(([beatKey, variants]) => {
+      if (!Array.isArray(variants) || variants.length === 0) return;
+      const idx = idToIndex[beatKey];
+      if (idx === undefined) return;
+      const pickIdx = Math.floor(Math.random() * variants.length);
+      const chosen = variants[pickIdx];
+      picks[beatKey] = { variant: pickIdx + 1, of: variants.length, len: chosen.length };
+      this.beats[idx].narr = chosen;
+      // Recompute timing for this specific variant's length
+      const estMs = Math.round((chosen.length / 14) * 1000);
+      this.beats[idx].minDur = Math.max(6000, Math.round(estMs * 0.85));
+      this.beats[idx].maxDur = Math.max(18000, Math.round(estMs * 2.0));
+      if (beatKey === 'intro') this._preshowExpected = estMs;
+    });
+    // Small debug log — useful for figuring out which variant played if you
+    // heard something weird. Never shown to the viewer.
+    if (Object.keys(picks).length > 0) {
+      try { console.log('[CACI Demo] Variants picked:', picks); } catch {}
+    }
+  },
+
   start() {
     if (this.running) return;
+    // Pick a fresh random variant per beat for this show
+    this.pickVariantsForThisShow();
     this.running = true;
     this.currentBeat = 0;
     this.audioSession++;
@@ -11226,6 +11092,53 @@ const DemoMode = {
     this.stopPreshow();
     this.stopCinema();
     this._disposeAnalyser();
+  },
+
+  // Replay: kick the demo back to the beginning WITHOUT tearing down the
+  // theatre overlay. Picks fresh random variants so the replay is a new show,
+  // not a repeat of the one just watched.
+  replay() {
+    // Kill current audio and invalidate in-flight fetches
+    if (this.timer) { clearTimeout(this.timer); this.timer = null; }
+    if (this._startFallbackTimer) { clearTimeout(this._startFallbackTimer); this._startFallbackTimer = null; }
+    this.audioSession++;
+    this.stopAudio();
+    this.audioCache = {};
+    // Reset beat state and progress dots
+    document.querySelectorAll('.demo-beat').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.demo-dot').forEach(d => { d.classList.remove('active'); d.classList.remove('done'); });
+    // Flip Beat 9's card back to front face for next show
+    const flipper = document.getElementById('db9-card-flipper');
+    if (flipper) flipper.classList.remove('flipped');
+    // Reset camera state so cinema smoothly returns to preshow
+    if (this.cinema && this.cinema.camState) {
+      this.setCameraTarget('preshowStart', 0.06);
+    }
+    // Pick fresh variants for this replay and restart from Beat 0 (the intro)
+    this.pickVariantsForThisShow();
+    this.currentBeat = 0;
+    // Small delay so the camera reset and audio cleanup settle before we kick off
+    const sess = this.audioSession;
+    let started = false;
+    const tryStart = () => {
+      if (started || sess !== this.audioSession) return;
+      started = true;
+      this.running = true;  // re-enable running flag after audio session bump
+      // After preshow camera resets, begin the slow drift back to preshowEnd
+      setTimeout(() => {
+        if (this.running) this.setCameraTarget('preshowEnd', 0.004);
+      }, 400);
+      this.playBeat(0);
+    };
+    // Fallback safety if audio prefetch stalls
+    this._startFallbackTimer = setTimeout(() => { tryStart(); }, 7000);
+    // Prefetch the intro's audio, then kick off
+    this.running = true;
+    this.prefetchBeatAudio(0).then(() => {
+      clearTimeout(this._startFallbackTimer);
+      setTimeout(tryStart, 200);
+    });
+    if (this.beats.length > 1) this.prefetchBeatAudio(1);
   },
 
   playBeat(idx) {
