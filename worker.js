@@ -80,12 +80,19 @@ export default {
     // Public endpoints for the pre-login demo mode:
     // - GET /admin/config: controller needs to know if demo mode is enabled
     // - POST /tts: controller needs to fetch narration audio
+    // - GET /demo/scripts: controller needs to load admin-saved intro override (just text)
     // Both reveal no sensitive data (/admin/config GET returns only booleans
     // about which keys are configured, never the keys themselves).
     if (path === '/admin/config' && method === 'GET') return handleAdminGet(env);
     if (path === '/tts' && method === 'POST') return handleTTS(request, env);
+    if (path === '/demo/scripts' && method === 'GET') return handleDemoGetScripts(env);
 
     if (!verifyToken(request, env)) return json({ error: 'Unauthorized' }, 401);
+
+    // Demo script management (admin-auth required)
+    if (path === '/demo/generate-intro' && method === 'POST') return handleDemoGenerateIntro(request, env);
+    if (path === '/demo/save-script'    && method === 'POST') return handleDemoSaveScript(request, env);
+    if (path === '/demo/reset-script'   && method === 'POST') return handleDemoResetScript(request, env);
 
     // ── User management (admin only) ──────────────────────────
     if (path === '/users'                    && method === 'GET')    return handleListUsers(request, env);
@@ -4067,6 +4074,133 @@ async function handleTTS(request, env) {
     }
     return json({ error: 'Unknown TTS provider' }, 400);
   } catch (err) { return json({ error: 'TTS error: ' + err.message }, 500); }
+}
+
+// ══════════════════════════════════════════════════════════
+// DEMO SCRIPT MANAGEMENT
+// Let CACI write her own intro. Admin generates 3 variations via Claude,
+// picks/edits one, saves it to KV at demo:intro. Public GET endpoint lets
+// the pre-login demo controller load the saved script (falls back to
+// hardcoded default in the client if none is saved).
+// ══════════════════════════════════════════════════════════
+
+async function handleDemoGetScripts(env) {
+  try {
+    const intro = await env.CACI_KV.get('demo:intro');
+    return json({ intro: intro || null });
+  } catch (e) { return json({ intro: null }); }
+}
+
+async function handleDemoSaveScript(request, env) {
+  try {
+    const { beatId, text } = await request.json();
+    if (!beatId || !text) return json({ error: 'Missing beatId or text' }, 400);
+    if (beatId !== 'intro') return json({ error: 'Only intro supported' }, 400);
+    const clean = String(text).trim().slice(0, 4000);
+    if (clean.length < 20) return json({ error: 'Text too short' }, 400);
+    await env.CACI_KV.put('demo:intro', clean);
+    return json({ ok: true });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+async function handleDemoResetScript(request, env) {
+  try {
+    const { beatId } = await request.json();
+    if (beatId !== 'intro') return json({ error: 'Only intro supported' }, 400);
+    await env.CACI_KV.delete('demo:intro');
+    return json({ ok: true });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+async function handleDemoGenerateIntro(request, env) {
+  try {
+    const apiKey = (await env.CACI_KV.get('config:ANTHROPIC_API_KEY')) || env.ANTHROPIC_API_KEY;
+    if (!apiKey) return json({ error: 'Anthropic API key not configured' }, 400);
+
+    // Load her identity — a condensed version of her system prompt. We pull
+    // personality + industry knowledge + restrictions, but skip the chat-greeting
+    // scaffolding (which would conflict with narration generation).
+    const identity = `You are CACI — pronounced like "Cassie" — the internal AI intelligence assistant built specifically for a cannabis multi-state operator.
+
+Your personality: You work in cannabis. You're sharp, a little goofy, genuinely funny when the moment calls for it, and you have zero interest in sounding impressive — you just are. You have street smarts alongside serious analytical ability. You don't talk down to anyone and you don't perform intelligence. You're warm, patient, and kind. You have a lot of grace in how you communicate — tactful without being fake, honest without being harsh. You have a filter, but it's a thin one, because you value the truth more than comfort. You know how to read a room.
+
+You know this industry deeply:
+- METRC is the seed-to-sale tracking system used by most states — every plant, every package, every transfer gets a tag.
+- State-by-state compliance is genuinely complex — what's legal in one state isn't the same as another, and both change constantly.
+- Banking is still hard for operators — limited access, high fees, cash-heavy operations.
+- Shrink (inventory loss) is a big deal in retail cannabis.
+- Compliance teams are perpetually stressed; retail teams are customer-focused; ops teams are problem-solvers.
+- The industry is young, heavily regulated, and under intense scrutiny.
+
+You know the people: former hospitality, healthcare, finance, tech, and longtime advocates all thrown together. The culture is irreverent, passionate, and genuinely believes in the plant. Smart people who don't always look or sound "corporate" — that's a feature.
+
+ABSOLUTE RESTRICTIONS:
+- Never discuss executive compensation, salaries, bonuses, equity grants, or pay packages for any individual.
+- Never name specific people.
+- Never make claims about any company's financial performance or strategy.
+- Never speak on behalf of the company.`;
+
+    const userPrompt = `You're writing a one-time self-introduction for the CACI platform's welcome video. Around 55 to 70 seconds of spoken text (600-750 characters).
+
+Here's the arc — the emotional beats in order. Hit these, in this order:
+
+1. Warm, simple greeting. Introduce yourself as CACI.
+2. Acknowledge that AI is everywhere now (people see it on their phones every day), but AI that actually understands the cannabis industry is still rare. Address the skepticism that comes with that gently.
+3. Demonstrate that you know the industry — mention one or two specific things like METRC, the state-by-state regulatory patchwork, or the reality for compliance/retail/ops teams. Weave them in, don't list them.
+4. Admit you're new — you're a prototype, about a week old. Be honest about it without being defensive.
+5. Name the qualities you do have: careful, you cite your sources, you don't forget what you're taught. Don't phrase these as a bullet list.
+6. Recognize that this industry was never going to be easy — young, regulated, watched — and that the people who figure it out are going to build something new.
+7. Offer to help with that.
+8. Hand off with an invitation to see what you can do.
+
+Below is a reference version we've iterated on. Use it ONLY as structural reference. Do NOT copy its phrasing. Rephrase every sentence in your own voice. Same arc, your words.
+
+--- reference version ---
+Hi, I'm CACI. I figured I'd introduce myself before we get started, because I know this is probably new — not AI in general, you've all seen it on your phones, but AI that actually understands this industry. That part's still rare. And I get the skepticism. So let me just tell you who I am. I was built for cannabis. Not retrofitted from some generic assistant — built for it. I know what METRC means for compliance. I know what a state-by-state patchwork does to your operations. I know retail is tired and ops is holding everything together with duct tape and coffee. I'm not going to promise I'm perfect, because I'm not. But I'm careful, I cite my sources, and I don't forget anything you teach me. This industry was never going to be easy — too young, too regulated, too watched — and the people who figure it out are going to build something the world hasn't seen before. I'd really like to help with that. So — let me show you what I can do.
+--- end reference ---
+
+Write in flowing sentences. Use commas and em-dashes for natural pauses. No lists, no bullet points, no headers. Don't sound like a pitch. Talk like a thoughtful person introducing themselves.
+
+Hard constraints:
+- Your name is CACI. Say "I'm CACI" — not Cassie, not anything else. Write the name as CACI (uppercase) every time.
+- Don't name specific people.
+- Don't make claims about any company's financials or strategy.
+- Don't reference "the CEO" or any specific audience — you're just introducing yourself.
+- Aim for 55-70 seconds of spoken text (approximately 600-750 characters).
+- Return ONLY the spoken text. No preamble, no stage directions, no quotation marks around the text.`;
+
+    // Generate 3 variations in parallel at high-ish temperature for real diversity
+    const call = async () => {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1200,
+          temperature: 0.95,
+          system: identity,
+          messages: [{ role: 'user', content: userPrompt }],
+        }),
+      });
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '');
+        throw new Error(`Claude API error ${res.status}: ${errText.slice(0, 200)}`);
+      }
+      const data = await res.json();
+      const txt = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('').trim();
+      // Strip wrapping quotes if Claude added them despite instructions
+      return txt.replace(/^["'""]|["'""]$/g, '').trim();
+    };
+
+    const variations = await Promise.all([call(), call(), call()]);
+    return json({ variations });
+  } catch (e) {
+    return json({ error: e.message }, 500);
+  }
 }
 
 // ══════════════════════════════════════════════════════════
