@@ -1761,6 +1761,214 @@ body::before {
   letter-spacing: 0.36em;
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   FIRST-TIME USER TOUR — spotlight-style walkthrough
+   Dims the UI, highlights the target element, shows a tooltip with
+   step counter, Back/Skip/Next. Matches demo aesthetic.
+   ═══════════════════════════════════════════════════════════════ */
+.tour-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s cubic-bezier(0.22,0.61,0.36,1);
+}
+.tour-overlay.active { opacity: 1; pointer-events: auto; }
+
+/* Four dim panels surround the spotlight cutout (top/bottom/left/right).
+   This is cleaner than SVG clip-path for click handling. */
+.tour-mask {
+  position: absolute;
+  background: rgba(2, 4, 10, 0.78);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  transition: all 0.45s cubic-bezier(0.22,0.61,0.36,1);
+}
+
+/* The spotlight ring — a glowing gold border around the highlighted element */
+.tour-spotlight {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 8px;
+  box-shadow:
+    0 0 0 2px rgba(245, 227, 152, 0.9),
+    0 0 0 4px rgba(212, 168, 50, 0.35),
+    0 0 28px 6px rgba(212, 168, 50, 0.35),
+    0 0 60px 12px rgba(212, 168, 50, 0.18);
+  transition: all 0.45s cubic-bezier(0.22,0.61,0.36,1);
+  animation: tourPulse 2.4s ease-in-out infinite;
+}
+@keyframes tourPulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(245,227,152,0.9), 0 0 0 4px rgba(212,168,50,0.35), 0 0 28px 6px rgba(212,168,50,0.35), 0 0 60px 12px rgba(212,168,50,0.18); }
+  50%      { box-shadow: 0 0 0 2px rgba(245,227,152,1),   0 0 0 4px rgba(212,168,50,0.50), 0 0 40px 10px rgba(212,168,50,0.50), 0 0 80px 18px rgba(212,168,50,0.25); }
+}
+
+/* The tooltip card — serif headline, gold accent, rest of the text clean */
+.tour-card {
+  position: absolute;
+  max-width: 380px;
+  min-width: 280px;
+  background: linear-gradient(160deg, rgba(14,18,32,0.98) 0%, rgba(6,9,18,1) 100%);
+  border-radius: 8px;
+  padding: 22px 24px 18px;
+  box-shadow:
+    0 0 0 1px rgba(212,168,50,0.50),
+    0 0 0 2px rgba(212,168,50,0.12),
+    inset 0 1px 0 rgba(245,227,152,0.12),
+    0 24px 60px rgba(0,0,0,0.85),
+    0 0 40px rgba(212,168,50,0.12);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.45s cubic-bezier(0.22,0.61,0.36,1), transform 0.45s cubic-bezier(0.22,0.61,0.36,1);
+  pointer-events: auto;
+}
+.tour-card.visible { opacity: 1; transform: translateY(0); }
+
+/* Gold top edge on the tooltip */
+.tour-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent 0%, rgba(212,168,50,0.3) 15%,
+    rgba(245,227,152,0.9) 50%,
+    rgba(212,168,50,0.3) 85%, transparent 100%);
+}
+
+.tour-step-label {
+  font-family: var(--f-mono, 'JetBrains Mono', monospace);
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 0.30em;
+  text-transform: uppercase;
+  color: rgba(212,168,50,0.70);
+  margin-bottom: 10px;
+}
+.tour-title {
+  font-family: var(--f-display, 'Cormorant Garamond', serif);
+  font-weight: 300;
+  font-size: 24px;
+  line-height: 1.2;
+  color: rgba(245,227,152,0.95);
+  letter-spacing: 0.01em;
+  margin-bottom: 10px;
+}
+.tour-body {
+  font-size: 13px;
+  line-height: 1.55;
+  color: rgba(230,220,200,0.88);
+  margin-bottom: 16px;
+}
+.tour-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-top: 14px;
+  border-top: 1px solid rgba(212,168,50,0.15);
+}
+.tour-progress {
+  font-family: var(--f-mono, 'JetBrains Mono', monospace);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: rgba(230,220,200,0.55);
+}
+.tour-btns {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.tour-btn {
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid rgba(212,168,50,0.30);
+  border-radius: 3px;
+  color: rgba(245,227,152,0.80);
+  font-family: var(--f-ui, 'Inter', sans-serif);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.25s var(--ease, cubic-bezier(0.22,0.61,0.36,1));
+  -webkit-appearance: none;
+}
+.tour-btn:hover {
+  border-color: rgba(212,168,50,0.70);
+  color: rgba(245,227,152,0.98);
+  background: rgba(212,168,50,0.05);
+}
+.tour-btn.primary {
+  background: linear-gradient(180deg, rgba(30,22,8,0.9) 0%, rgba(18,12,4,0.98) 100%);
+  border-color: rgba(212,168,50,0.60);
+  color: rgba(245,227,152,0.95);
+  box-shadow: inset 0 1px 0 rgba(245,227,152,0.18), 0 2px 6px rgba(0,0,0,0.5);
+}
+.tour-btn.primary:hover {
+  border-color: rgba(212,168,50,0.95);
+  box-shadow: inset 0 1px 0 rgba(245,227,152,0.28), 0 3px 10px rgba(0,0,0,0.65), 0 0 22px rgba(212,168,50,0.30);
+}
+.tour-btn.ghost {
+  border-color: transparent;
+  color: rgba(200,185,150,0.55);
+  letter-spacing: 0.18em;
+}
+.tour-btn.ghost:hover {
+  color: rgba(230,220,200,0.85);
+  background: transparent;
+}
+.tour-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* The arrow from the card to the highlighted element */
+.tour-arrow {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+.tour-card[data-arrow="top"] .tour-arrow {
+  top: -10px; left: 50%; transform: translateX(-50%);
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-bottom: 10px solid rgba(14,18,32,0.98);
+  filter: drop-shadow(0 -1px 0 rgba(212,168,50,0.5));
+}
+.tour-card[data-arrow="bottom"] .tour-arrow {
+  bottom: -10px; left: 50%; transform: translateX(-50%);
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-top: 10px solid rgba(14,18,32,0.98);
+  filter: drop-shadow(0 1px 0 rgba(212,168,50,0.5));
+}
+.tour-card[data-arrow="left"] .tour-arrow {
+  left: -10px; top: 50%; transform: translateY(-50%);
+  border-top: 10px solid transparent;
+  border-bottom: 10px solid transparent;
+  border-right: 10px solid rgba(14,18,32,0.98);
+  filter: drop-shadow(-1px 0 0 rgba(212,168,50,0.5));
+}
+.tour-card[data-arrow="right"] .tour-arrow {
+  right: -10px; top: 50%; transform: translateY(-50%);
+  border-top: 10px solid transparent;
+  border-bottom: 10px solid transparent;
+  border-left: 10px solid rgba(14,18,32,0.98);
+  filter: drop-shadow(1px 0 0 rgba(212,168,50,0.5));
+}
+
+@media (max-width: 640px) {
+  .tour-card {
+    max-width: calc(100vw - 40px);
+    min-width: 0;
+    padding: 18px 18px 14px;
+  }
+  .tour-title { font-size: 20px; }
+  .tour-body { font-size: 12px; }
+}
+
 /* ── THEATRE CONTROLS ── */
 .demo-controls {
   position: absolute;
@@ -15187,6 +15395,397 @@ document.addEventListener('DOMContentLoaded', () => ScenarioMode.init());
 // Fallback if DOMContentLoaded already fired
 if (document.readyState !== 'loading') ScenarioMode.init();
 
+
+// ═══════════════════════════════════════════════════════════════
+// FIRST-TIME USER TOUR
+// Spotlight-style walkthrough that auto-runs on a user's first login
+// and is also accessible any time from the "Take the tour" menu link.
+// Steps whose target element isn't in the DOM are auto-skipped, so
+// admin-only steps don't break for non-admins.
+// ═══════════════════════════════════════════════════════════════
+const UserTour = (() => {
+  const STORAGE_KEY = 'caci_tour_seen_v1';
+  const PADDING = 10;  // px of space around spotlighted element
+
+  // Tour steps — ordered. `target` is a CSS selector. If the element
+  // doesn't exist at runtime, the step is skipped automatically.
+  // `panel` optionally switches to a specific panel before showing the step.
+  const STEPS = [
+    {
+      target: '#chat-ta',
+      panel:  'chat',
+      arrow:  'bottom',
+      label:  'Step 1 of 6',
+      title:  'Ask her anything',
+      body:   'Type your question here. CACI reads the documents you\u2019ve given her and answers with citations \u2014 no guessing, no made-up numbers. Try asking about something specific in one of her documents.',
+    },
+    {
+      target: '#upload-btn',
+      panel:  'chat',
+      arrow:  'bottom',
+      label:  'Step 2 of 6',
+      title:  'Teach her',
+      body:   'Drop documents here and she\u2019ll read them cover to cover, tag them, and file them automatically. PDFs, Word docs, spreadsheets, even images \u2014 she handles all of them.',
+    },
+    {
+      target: '#dept-chip',
+      panel:  'chat',
+      arrow:  'bottom',
+      label:  'Step 3 of 6',
+      title:  'Scope her context',
+      body:   'Switch departments to change which documents she draws from. Compliance, Finance, Operations, Retail \u2014 she knows each department has different concerns and adjusts accordingly.',
+    },
+    {
+      target: '#new-chat-btn',
+      panel:  'chat',
+      arrow:  'top',
+      label:  'Step 4 of 6',
+      title:  'Fresh start',
+      body:   'Starting a new conversation clears context but keeps her memory of your documents. Useful when you\u2019re switching topics and don\u2019t want earlier questions shaping her answers.',
+    },
+    {
+      target: '#sb-nav .nav-btn[data-p="files"], #botbar .tab-btn[data-p="files"]',
+      arrow:  'right',
+      label:  'Step 5 of 6',
+      title:  'Her library',
+      body:   'Everything she\u2019s read lives here. You can see what\u2019s been uploaded, re-tag things, and remove documents you no longer need. The more she has, the sharper her answers.',
+    },
+    {
+      target: '#sb-nav .nav-btn[data-p="admin"], #botbar .tab-btn[data-p="admin"]',
+      arrow:  'right',
+      label:  'Step 6 of 6',
+      title:  'Behind the scenes',
+      body:   'Admins can tune retrieval weights, manage users, turn demo mode on or off, and let CACI write her own intro scripts. Most people won\u2019t need this \u2014 but it\u2019s there when you do.',
+    },
+  ];
+
+  let state = {
+    active: false,
+    stepIndex: 0,
+    validSteps: [],   // steps whose target exists in DOM (filtered at start)
+    resizeObs: null,
+    keyHandler: null,
+    rafId: null,
+  };
+
+  function $$ (id) { return document.getElementById(id); }
+
+  function hasSeenTour() {
+    try { return localStorage.getItem(STORAGE_KEY) === '1'; } catch { return false; }
+  }
+  function markSeen() {
+    try { localStorage.setItem(STORAGE_KEY, '1'); } catch {}
+  }
+
+  // Returns the first DOM element matching the step's target selector,
+  // or null if none is present (e.g. admin-only targets for regular users).
+  function resolveTarget(step) {
+    const selectors = step.target.split(',').map(s => s.trim());
+    for (const sel of selectors) {
+      try {
+        const el = document.querySelector(sel);
+        if (el && el.offsetParent !== null) return el;  // visible
+        if (el && el.getClientRects().length > 0) return el;
+      } catch {}
+    }
+    // Even if not visible right now, try first match if it exists
+    for (const sel of selectors) {
+      try {
+        const el = document.querySelector(sel);
+        if (el) return el;
+      } catch {}
+    }
+    return null;
+  }
+
+  // Filter steps: only keep ones whose target resolves.
+  // For steps that request a panel switch, we'll evaluate at show-time
+  // because switching panels may change which elements exist.
+  function buildValidSteps() {
+    return STEPS.filter(step => {
+      // If step switches to a panel, we trust it will exist when we switch
+      if (step.panel) return true;
+      return resolveTarget(step) !== null;
+    });
+  }
+
+  function maybeSwitchPanel(step) {
+    if (step.panel && typeof switchPanel === 'function' && curPanel !== step.panel) {
+      try { switchPanel(step.panel); } catch {}
+    }
+  }
+
+  function positionElements(step) {
+    const overlay    = $$('tour-overlay');
+    const spotlight  = $$('tour-spotlight');
+    const card       = $$('tour-card');
+    const maskTop    = $$('tour-mask-top');
+    const maskBottom = $$('tour-mask-bottom');
+    const maskLeft   = $$('tour-mask-left');
+    const maskRight  = $$('tour-mask-right');
+    if (!overlay || !spotlight || !card) return;
+
+    const target = resolveTarget(step);
+    if (!target) { next(); return; }
+
+    const rect = target.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    // Spotlight box (adds padding around target)
+    const sTop    = Math.max(0, rect.top    - PADDING);
+    const sLeft   = Math.max(0, rect.left   - PADDING);
+    const sRight  = Math.min(vw, rect.right  + PADDING);
+    const sBottom = Math.min(vh, rect.bottom + PADDING);
+    const sW = sRight - sLeft;
+    const sH = sBottom - sTop;
+
+    spotlight.style.top    = sTop    + 'px';
+    spotlight.style.left   = sLeft   + 'px';
+    spotlight.style.width  = sW      + 'px';
+    spotlight.style.height = sH      + 'px';
+
+    // Four mask panels: top, bottom, left (only covers the vertical strip
+    // NEXT to the spotlight), right (same). Using four rects gives a clean
+    // cutout without SVG or clip-path.
+    maskTop.style.top = '0'; maskTop.style.left = '0';
+    maskTop.style.width = '100%'; maskTop.style.height = sTop + 'px';
+
+    maskBottom.style.top = sBottom + 'px'; maskBottom.style.left = '0';
+    maskBottom.style.width = '100%'; maskBottom.style.height = Math.max(0, vh - sBottom) + 'px';
+
+    maskLeft.style.top = sTop + 'px'; maskLeft.style.left = '0';
+    maskLeft.style.width = sLeft + 'px'; maskLeft.style.height = sH + 'px';
+
+    maskRight.style.top = sTop + 'px'; maskRight.style.left = sRight + 'px';
+    maskRight.style.width = Math.max(0, vw - sRight) + 'px'; maskRight.style.height = sH + 'px';
+
+    // Card positioning — pick the side of the spotlight that has the most room,
+    // or honor the step's `arrow` preference when feasible.
+    const cardEl = card;
+    // Force a layout read of card's natural size
+    cardEl.style.visibility = 'hidden';
+    cardEl.style.left = '0px';
+    cardEl.style.top  = '0px';
+    const cardW = cardEl.offsetWidth || 340;
+    const cardH = cardEl.offsetHeight || 200;
+    cardEl.style.visibility = '';
+
+    // Available space on each side
+    const spaceBelow = vh - sBottom;
+    const spaceAbove = sTop;
+    const spaceRight = vw - sRight;
+    const spaceLeft  = sLeft;
+
+    // Preferred arrow side based on step; fall back based on available space
+    let side = step.arrow || 'bottom';
+    const needsV = cardH + 20;
+    const needsH = cardW + 20;
+
+    if (side === 'bottom' && spaceBelow < needsV) {
+      if (spaceAbove >= needsV) side = 'top';
+      else if (spaceRight >= needsH) side = 'left';  // card on right means arrow on left of card
+      else side = 'right';
+    } else if (side === 'top' && spaceAbove < needsV) {
+      if (spaceBelow >= needsV) side = 'bottom';
+      else if (spaceRight >= needsH) side = 'left';
+      else side = 'right';
+    } else if (side === 'right' && spaceLeft < needsH) {
+      // Arrow on right of card = card is to the LEFT of target; if not enough left space, flip
+      if (spaceRight >= needsH) side = 'left';
+      else if (spaceBelow >= needsV) side = 'bottom';
+      else side = 'top';
+    } else if (side === 'left' && spaceRight < needsH) {
+      if (spaceLeft >= needsH) side = 'right';
+      else if (spaceBelow >= needsV) side = 'bottom';
+      else side = 'top';
+    }
+    cardEl.setAttribute('data-arrow', side);
+
+    // Compute card x/y based on chosen side
+    const cx = (sLeft + sRight) / 2;
+    const cy = (sTop + sBottom) / 2;
+    let cardLeft, cardTop;
+    if (side === 'bottom') {
+      cardTop  = sBottom + 18;
+      cardLeft = cx - cardW / 2;
+    } else if (side === 'top') {
+      cardTop  = sTop - cardH - 18;
+      cardLeft = cx - cardW / 2;
+    } else if (side === 'left') {
+      cardTop  = cy - cardH / 2;
+      cardLeft = sRight + 18;
+    } else { // right: arrow on right of card, so card sits to left of target
+      cardTop  = cy - cardH / 2;
+      cardLeft = sLeft - cardW - 18;
+    }
+    // Clamp inside viewport
+    cardLeft = Math.max(12, Math.min(vw - cardW - 12, cardLeft));
+    cardTop  = Math.max(12, Math.min(vh - cardH - 12, cardTop));
+    cardEl.style.left = cardLeft + 'px';
+    cardEl.style.top  = cardTop  + 'px';
+  }
+
+  function renderStep(stepIdx) {
+    const step = state.validSteps[stepIdx];
+    if (!step) { finish(); return; }
+
+    maybeSwitchPanel(step);
+
+    // Wait a frame after any panel switch so DOM updates settle
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        // If the target still isn't found after switching, skip forward
+        const target = resolveTarget(step);
+        if (!target) {
+          if (stepIdx < state.validSteps.length - 1) {
+            state.stepIndex = stepIdx + 1;
+            renderStep(state.stepIndex);
+          } else { finish(); }
+          return;
+        }
+
+        $$('tour-step-label').textContent = step.label;
+        $$('tour-title').textContent      = step.title;
+        $$('tour-body').textContent       = step.body;
+        $$('tour-progress').textContent   = (stepIdx + 1) + ' / ' + state.validSteps.length;
+        $$('tour-back').disabled = (stepIdx === 0);
+        $$('tour-next').textContent = (stepIdx === state.validSteps.length - 1) ? 'Finish' : 'Next';
+
+        positionElements(step);
+
+        // Make card visible after position is set
+        const card = $$('tour-card');
+        if (card) card.classList.add('visible');
+      });
+    });
+  }
+
+  function next() {
+    if (!state.active) return;
+    if (state.stepIndex >= state.validSteps.length - 1) {
+      finish();
+      return;
+    }
+    state.stepIndex++;
+    const card = $$('tour-card');
+    if (card) card.classList.remove('visible');
+    setTimeout(() => renderStep(state.stepIndex), 180);
+  }
+
+  function back() {
+    if (!state.active || state.stepIndex === 0) return;
+    state.stepIndex--;
+    const card = $$('tour-card');
+    if (card) card.classList.remove('visible');
+    setTimeout(() => renderStep(state.stepIndex), 180);
+  }
+
+  function start() {
+    if (state.active) return;
+    state.validSteps = buildValidSteps();
+    if (state.validSteps.length === 0) return;
+    state.active = true;
+    state.stepIndex = 0;
+
+    const overlay = $$('tour-overlay');
+    if (overlay) overlay.classList.add('active');
+
+    // Keyboard shortcuts
+    state.keyHandler = (e) => {
+      if (!state.active) return;
+      if (e.key === 'Escape') { e.preventDefault(); skip(); }
+      else if (e.key === 'ArrowRight' || e.key === 'Enter') { e.preventDefault(); next(); }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); back(); }
+    };
+    document.addEventListener('keydown', state.keyHandler);
+
+    // Reposition on resize / panel changes
+    const reposition = () => {
+      if (!state.active) return;
+      const step = state.validSteps[state.stepIndex];
+      if (step) positionElements(step);
+    };
+    window.addEventListener('resize', reposition);
+    state._repositionHandler = reposition;
+    // Also reposition every few seconds as a safety net for dynamic UI changes
+    state._repositionInterval = setInterval(reposition, 800);
+
+    renderStep(0);
+  }
+
+  function finish() {
+    markSeen();
+    cleanup();
+  }
+
+  function skip() {
+    markSeen();
+    cleanup();
+  }
+
+  function cleanup() {
+    state.active = false;
+    const overlay = $$('tour-overlay');
+    const card = $$('tour-card');
+    if (card) card.classList.remove('visible');
+    if (overlay) overlay.classList.remove('active');
+    if (state.keyHandler) {
+      document.removeEventListener('keydown', state.keyHandler);
+      state.keyHandler = null;
+    }
+    if (state._repositionHandler) {
+      window.removeEventListener('resize', state._repositionHandler);
+      state._repositionHandler = null;
+    }
+    if (state._repositionInterval) {
+      clearInterval(state._repositionInterval);
+      state._repositionInterval = null;
+    }
+  }
+
+  function init() {
+    const nextBtn = $$('tour-next');
+    const backBtn = $$('tour-back');
+    const skipBtn = $$('tour-skip');
+    if (nextBtn && !nextBtn._wired) { nextBtn._wired = true; nextBtn.addEventListener('click', next); }
+    if (backBtn && !backBtn._wired) { backBtn._wired = true; backBtn.addEventListener('click', back); }
+    if (skipBtn && !skipBtn._wired) { skipBtn._wired = true; skipBtn.addEventListener('click', skip); }
+
+    // Auto-run if user hasn't seen it. Wait a bit so the app fully loads first.
+    // If the demo is currently playing, wait for it to end.
+    if (!hasSeenTour()) {
+      const tryAutoStart = () => {
+        // Don't start while demo is playing
+        if (window.DemoMode && window.DemoMode.running) {
+          setTimeout(tryAutoStart, 1200);
+          return;
+        }
+        // Only start if the user is actually logged in (sees chat UI)
+        if (document.getElementById('chat-ta')) {
+          start();
+        } else {
+          // Login screen still up — wait for login to complete
+          setTimeout(tryAutoStart, 1500);
+        }
+      };
+      setTimeout(tryAutoStart, 2000);
+    }
+  }
+
+  // Public API so other code can start/restart the tour on demand
+  return {
+    init,
+    start: () => { try { localStorage.removeItem(STORAGE_KEY); } catch {} start(); },
+    reset: () => { try { localStorage.removeItem(STORAGE_KEY); } catch {} },
+  };
+})();
+
+// Expose for menu link access
+window.UserTour = UserTour;
+document.addEventListener('DOMContentLoaded', () => UserTour.init());
+if (document.readyState !== 'loading') UserTour.init();
+
 </script>
 
 
@@ -15508,6 +16107,29 @@ if (document.readyState !== 'loading') ScenarioMode.init();
     <div class="compliance-modal-btns">
       <button class="compliance-modal-cancel" id="compliance-modal-cancel">Never mind</button>
       <button class="compliance-modal-confirm" id="compliance-modal-confirm">Arm it</button>
+    </div>
+  </div>
+</div>
+
+<!-- FIRST-TIME USER TOUR — spotlight walkthrough overlay -->
+<div class="tour-overlay" id="tour-overlay" role="dialog" aria-label="Product tour">
+  <div class="tour-mask" id="tour-mask-top"></div>
+  <div class="tour-mask" id="tour-mask-bottom"></div>
+  <div class="tour-mask" id="tour-mask-left"></div>
+  <div class="tour-mask" id="tour-mask-right"></div>
+  <div class="tour-spotlight" id="tour-spotlight"></div>
+  <div class="tour-card" id="tour-card" data-arrow="bottom">
+    <span class="tour-arrow"></span>
+    <div class="tour-step-label" id="tour-step-label">Welcome</div>
+    <div class="tour-title" id="tour-title"></div>
+    <div class="tour-body" id="tour-body"></div>
+    <div class="tour-actions">
+      <div class="tour-progress" id="tour-progress">1 / 1</div>
+      <div class="tour-btns">
+        <button class="tour-btn ghost" id="tour-skip" type="button">Skip</button>
+        <button class="tour-btn" id="tour-back" type="button">Back</button>
+        <button class="tour-btn primary" id="tour-next" type="button">Next</button>
+      </div>
     </div>
   </div>
 </div>
