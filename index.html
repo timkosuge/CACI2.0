@@ -7477,6 +7477,12 @@ body::before {
             </div>
             <div id="caci-intro-variations" style="margin-top:14px;display:none"></div>
           </div>
+
+          <div class="acard admin-only" id="caci-chorus-card">
+            <div class="acard-title">Chorus Scripts (Beats 1, 3&mdash;8)</div>
+            <div class="acard-sub">Let CACI write the narration for each chorus beat in third person about herself. Each beat has a clear role in the arc. Verified facts are passed to her so the content stays truthful. Generate per-beat; pick, edit, and save independently.</div>
+            <div id="caci-chorus-beats" style="margin-top:14px"></div>
+          </div>
         </div>
 
         <!-- RETRIEVAL INTELLIGENCE -->
@@ -8701,6 +8707,7 @@ function bootApp() {
   }
   // Load whatever's currently saved so admin sees it
   loadSavedCaciIntro();
+  renderChorusBeatsUI();
 
   // ── Recurring gold glimmer sweep — fires every 60s ──────────
   function triggerAppGlimmer() {
@@ -10821,6 +10828,173 @@ async function resetCaciIntro() {
     if (status) status.textContent = '\u2717 ' + e.message;
   }
 }
+
+// ── Chorus Beats admin (Beats 1, 3, 4, 5, 6, 7, 8) ────────────
+const CHORUS_BEATS = [
+  { id: '1', label: 'Beat 1 — The problem she was built to solve', voice: 'Leo (M)' },
+  { id: '3', label: 'Beat 3 — How she organizes documents',       voice: 'Ara (F)' },
+  { id: '4', label: 'Beat 4 — How she answers questions',         voice: 'Rex (M)' },
+  { id: '5', label: 'Beat 5 — How her knowledge compounds',       voice: 'Ara (F)' },
+  { id: '6', label: 'Beat 6 — Honest inventory (prototype)',      voice: 'Leo (M)' },
+  { id: '7', label: 'Beat 7 — The guarantees',                    voice: 'Ara (F)' },
+  { id: '8', label: 'Beat 8 — Not a chatbot with files attached', voice: 'Rex (M)' },
+];
+
+async function loadSavedChorusBeats() {
+  try {
+    const res = await apiFetch('/demo/scripts');
+    if (!res.ok) return {};
+    const d = await res.json();
+    return d.scripts || {};
+  } catch { return {}; }
+}
+
+async function renderChorusBeatsUI() {
+  const wrap = $('caci-chorus-beats');
+  if (!wrap) return;
+  const saved = await loadSavedChorusBeats();
+
+  wrap.innerHTML = '';
+  CHORUS_BEATS.forEach((beat) => {
+    const row = document.createElement('div');
+    row.style.cssText = 'padding:14px;margin-bottom:10px;background:rgba(8,12,22,0.40);border:1px solid rgba(212,168,50,0.22);border-radius:6px';
+
+    const header = document.createElement('div');
+    header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px';
+    const titleBox = document.createElement('div');
+    titleBox.innerHTML =
+      '<div style="font-family:var(--f-display);font-size:14px;color:rgba(245,227,152,0.95);letter-spacing:.04em">' + beat.label + '</div>' +
+      '<div style="font-family:var(--f-mono);font-size:10px;color:var(--smoke3);letter-spacing:.08em;margin-top:2px">Voice: ' + beat.voice + '</div>';
+    header.appendChild(titleBox);
+
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;gap:8px;align-items:center';
+    const genBtn = document.createElement('button');
+    genBtn.className = 'asave'; genBtn.textContent = 'Generate 3';
+    genBtn.style.cssText = 'padding:6px 14px;font-size:10px;white-space:nowrap';
+    const resetBtn = document.createElement('button');
+    resetBtn.className = 'asave'; resetBtn.textContent = 'Reset';
+    resetBtn.style.cssText = 'padding:6px 14px;font-size:10px;background:transparent;border:1px solid rgba(220,90,90,0.5);color:rgba(240,160,160,0.95)';
+    const status = document.createElement('span');
+    status.style.cssText = 'font-family:var(--f-mono);font-size:10px;color:var(--smoke3);letter-spacing:.06em;min-width:0';
+    btnRow.appendChild(genBtn); btnRow.appendChild(resetBtn); btnRow.appendChild(status);
+    header.appendChild(btnRow);
+    row.appendChild(header);
+
+    // Currently saved preview (if any)
+    const savedWrap = document.createElement('div');
+    savedWrap.style.cssText = 'margin-top:6px' + (saved[beat.id] ? '' : ';display:none');
+    savedWrap.innerHTML =
+      '<div style="font-family:var(--f-mono);font-size:10px;color:var(--smoke3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">Currently saved:</div>';
+    const savedText = document.createElement('div');
+    savedText.style.cssText = 'padding:8px 10px;background:rgba(212,168,50,0.05);border:1px solid rgba(212,168,50,0.2);border-radius:4px;font-size:12px;line-height:1.55;color:rgba(240,230,200,0.9);font-style:italic;max-height:110px;overflow-y:auto';
+    savedText.textContent = saved[beat.id] || '';
+    savedWrap.appendChild(savedText);
+    row.appendChild(savedWrap);
+
+    const variationsWrap = document.createElement('div');
+    variationsWrap.style.cssText = 'margin-top:10px;display:none';
+    row.appendChild(variationsWrap);
+
+    genBtn.addEventListener('click', async () => {
+      genBtn.disabled = true; genBtn.textContent = 'Generating\u2026';
+      status.textContent = '';
+      variationsWrap.style.display = 'none';
+      variationsWrap.innerHTML = '';
+      try {
+        const res = await apiFetch('/demo/generate-beat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ beatId: beat.id }),
+        });
+        const d = await res.json();
+        if (!res.ok || d.error) throw new Error(d.error || 'Generation failed');
+        if (!d.variations || !d.variations.length) throw new Error('No variations returned');
+        renderBeatVariations(variationsWrap, beat.id, d.variations, savedWrap, savedText);
+        status.textContent = '\u2713 ' + d.variations.length + ' variations';
+      } catch (e) {
+        status.textContent = '\u2717 ' + e.message;
+      } finally {
+        genBtn.disabled = false; genBtn.textContent = 'Generate 3';
+      }
+    });
+
+    resetBtn.addEventListener('click', async () => {
+      if (!confirm('Delete the saved script for ' + beat.label + '?')) return;
+      status.textContent = 'Resetting\u2026';
+      try {
+        const res = await apiFetch('/demo/reset-script', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ beatId: beat.id }),
+        });
+        const d = await res.json();
+        if (!res.ok || d.error) throw new Error(d.error || 'Reset failed');
+        status.textContent = '\u2713 Reset';
+        savedText.textContent = '';
+        savedWrap.style.display = 'none';
+        variationsWrap.style.display = 'none';
+        variationsWrap.innerHTML = '';
+      } catch (e) { status.textContent = '\u2717 ' + e.message; }
+    });
+
+    wrap.appendChild(row);
+  });
+}
+
+function renderBeatVariations(container, beatId, variations, savedWrap, savedText) {
+  container.style.display = 'block';
+  container.innerHTML = '<div style="font-family:var(--f-mono);font-size:10px;color:var(--smoke3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px">Variations (edit, then Use This)</div>';
+
+  variations.forEach((text, idx) => {
+    const card = document.createElement('div');
+    card.style.cssText = 'margin-bottom:10px;padding:12px;background:rgba(4,6,12,0.55);border:1px solid rgba(212,168,50,0.18);border-radius:4px';
+
+    const label = document.createElement('div');
+    label.style.cssText = 'font-family:var(--f-mono);font-size:10px;color:rgba(212,168,50,0.7);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px';
+    label.textContent = 'Variation ' + (idx+1) + ' — ' + text.length + ' chars (~' + Math.round(text.length/14) + 's)';
+    card.appendChild(label);
+
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.cssText = 'width:100%;min-height:90px;padding:8px 10px;background:rgba(2,4,10,0.6);border:1px solid rgba(212,168,50,0.14);border-radius:3px;font-family:var(--f-body);font-size:12px;line-height:1.55;color:rgba(240,230,200,0.95);resize:vertical;box-sizing:border-box';
+    card.appendChild(textarea);
+
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap';
+    const useBtn = document.createElement('button');
+    useBtn.className = 'asave';
+    useBtn.textContent = 'Use This';
+    useBtn.style.cssText = 'padding:5px 14px;font-size:10px';
+    const msg = document.createElement('span');
+    msg.style.cssText = 'font-family:var(--f-mono);font-size:10px;color:var(--smoke3);letter-spacing:.06em';
+
+    useBtn.addEventListener('click', async () => {
+      useBtn.disabled = true; useBtn.textContent = 'Saving\u2026'; msg.textContent = '';
+      try {
+        const res = await apiFetch('/demo/save-script', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ beatId, text: textarea.value }),
+        });
+        const d = await res.json();
+        if (!res.ok || d.error) throw new Error(d.error || 'Save failed');
+        useBtn.textContent = '\u2713 Saved';
+        msg.textContent = 'Beat ' + beatId + ' updated';
+        savedText.textContent = textarea.value.trim();
+        savedWrap.style.display = 'block';
+      } catch (e) {
+        useBtn.textContent = 'Use This';
+        useBtn.disabled = false;
+        msg.textContent = '\u2717 ' + e.message;
+      }
+    });
+    row.appendChild(useBtn); row.appendChild(msg);
+    card.appendChild(row);
+    container.appendChild(card);
+  });
+}
+
 async function checkHealth() {
   try {
     const res = await fetch(API + '/health'); const ok = res.ok;
@@ -10908,26 +11082,32 @@ const DemoMode = {
       }
     } catch {}
 
-    // Load admin-saved intro override (CACI's generated intro).
-    // If saved, swap it into the Beat 2 narration so the demo plays her words.
-    // If not saved, beats[0].narr keeps its hardcoded default.
+    // Load admin-saved scripts (intro + chorus beats 1,3,4,5,6,7,8).
+    // For any beat with saved text, swap the narration and recompute timing
+    // based on actual text length (~14 chars/sec TTS speech rate).
     try {
       const res = await apiFetch('/demo/scripts');
       if (res.ok) {
         const d = await res.json();
-        if (d.intro && typeof d.intro === 'string' && d.intro.trim().length > 20) {
-          // beats[0] is the preshow (id:2) — CACI's intro
-          const introText = d.intro.trim();
-          this.beats[0].narr = introText;
-          // Dynamic timing: TTS speaks at ~14 chars/sec. Compute beat durations
-          // from actual text length so short intros don't leave dead silence
-          // and long ones don't get clipped by the ceiling.
-          const estMs = Math.round((introText.length / 14) * 1000);
-          this.beats[0].minDur = Math.max(12000, Math.round(estMs * 0.85));
-          this.beats[0].maxDur = Math.max(30000, Math.round(estMs * 2.0));
-          // Preshow visual timeline scales to the same expected duration
-          this._preshowExpected = estMs;
-        }
+        const scripts = d.scripts || (d.intro ? { intro: d.intro } : {});
+        // Map beat IDs → their index in this.beats array
+        // (Beat ID 2 is intro and lives at index 0; others at their own indices)
+        const idToIndex = {};
+        this.beats.forEach((b, i) => { idToIndex[b.id === 2 ? 'intro' : String(b.id)] = i; });
+
+        Object.entries(scripts).forEach(([beatKey, text]) => {
+          if (!text || typeof text !== 'string' || text.trim().length < 10) return;
+          const idx = idToIndex[beatKey];
+          if (idx === undefined) return;
+          const clean = text.trim();
+          this.beats[idx].narr = clean;
+          // Dynamic timing from char count
+          const estMs = Math.round((clean.length / 14) * 1000);
+          this.beats[idx].minDur = Math.max(6000, Math.round(estMs * 0.85));
+          this.beats[idx].maxDur = Math.max(18000, Math.round(estMs * 2.0));
+          // For the intro (beat 2), also feed the preshow visual its expected length
+          if (beatKey === 'intro') this._preshowExpected = estMs;
+        });
       }
     } catch {}
 
@@ -11975,11 +12155,19 @@ const DemoMode = {
     // Voice: per-beat override, falls back to admin choice, then eve.
     const provider = localStorage.getItem('caci_tts_provider') || 'grok';
     const v = voice || localStorage.getItem('caci_tts_grok_voice') || 'eve';
-    // Pronunciation fix: stored narration uses "CACI" (her real name), but
-    // Grok TTS reads that as "KAH-chee". Swap to phonetic "Cassie" right
+    // Pronunciation fixes: the stored text uses canonical names/acronyms, but
+    // Grok TTS mangles most industry acronyms. Swap to phonetic forms right
     // before the TTS call — doesn't affect stored scripts or admin UI.
-    // Match whole-word CACI only (case-insensitive) so we don't mangle other text.
-    const ttsText = (text || '').replace(/\bCACI\b/g, 'Cassie');
+    // Order: longest / most specific patterns first.
+    let ttsText = (text || '');
+    ttsText = ttsText.replace(/\bCACI\b/g, 'Cassie');        // KAH-chee → Cassie
+    ttsText = ttsText.replace(/\bMETRC\b/g, 'metric');       // "M-E-T-R-C" → metric (industry pronunciation)
+    ttsText = ttsText.replace(/\bOLCC\b/g, 'O L C C');       // Oregon regulator — spell out
+    ttsText = ttsText.replace(/\bCDTFA\b/g, 'C D T F A');    // CA tax agency
+    ttsText = ttsText.replace(/\bCCB\b/g, 'C C B');          // WI regulator
+    ttsText = ttsText.replace(/\bDCC\b/g, 'D C C');          // CA Department of Cannabis Control
+    ttsText = ttsText.replace(/\bSOP\b/g, 'S O P');          // Standard operating procedure
+    ttsText = ttsText.replace(/\bSOPs\b/g, 'S O Ps');
     try {
       const res = await fetch(API + '/tts', {
         method: 'POST',
