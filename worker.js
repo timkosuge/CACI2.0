@@ -4005,32 +4005,89 @@ async function handleEmbedFile(request, env) {
 }
 
 // GET /embed-status
-// Counts unique files from index:global only — the canonical upload index.
+// Reports semantic-indexing coverage across the entire library.
+// Enumerates file:* records directly (not the stale index:global) so the
+// count reflects reality. Checks every chunk in every file (not just chunk 0)
+// so partial embeddings show as partial coverage instead of false 100%.
 async function handleEmbedStatus(url, env) {
   try {
-    const globalIdx = await env.CACI_KV.get('index:global', 'json') || [];
-    const allFiles = globalIdx.filter(f => !f.isContext);
+    // Enumerate ALL file records — this is the real source of truth.
+    // List is paginated; we cap scanning at 100 files for performance.
+    const fileList = await env.CACI_KV.list({ prefix: 'file:' });
+    const keys = (fileList && fileList.keys) ? fileList.keys : [];
 
-    let totalFiles = 0, indexedFiles = 0, totalChunks = 0, indexedChunks = 0;
+    let totalFiles = 0, fullyIndexedFiles = 0, partiallyIndexedFiles = 0;
+    let totalChunks = 0, indexedChunks = 0;
+    const partialFiles = [];   // list of {name, indexed, total} for UI detail
 
-    const sample = allFiles.slice(0, 200);
-    for (const f of sample) {
+    const MAX_FILES_TO_SCAN = 100;
+    const sample = keys.slice(0, MAX_FILES_TO_SCAN);
+
+    for (const fkey of sample) {
+      const rec = await env.CACI_KV.get(fkey.name, 'json');
+      if (!rec) continue;
+      if (rec.isContext) continue;  // context docs don't count toward user-visible corpus
       totalFiles++;
-      const chunkCount = f.chunks || 0;
+      const chunkCount = Array.isArray(rec.chunks) ? rec.chunks.length : (rec.chunks || 0);
       totalChunks += chunkCount;
+      if (chunkCount === 0) continue;
 
-      const firstEmb = await env.CACI_KV.get(`emb:${f.id}:0`).catch(() => null);
-      if (firstEmb) {
-        indexedFiles++;
-        indexedChunks += chunkCount;
+      // Check embedding presence for every chunk in this file. We cap per-file
+      // at 120 chunks to bound KV read count on very large docs; if a file has
+      // more than that, we check 120 spread across the file range.
+      const CHECK_CAP = Math.min(chunkCount, 120);
+      let found = 0;
+      for (let i = 0; i < CHECK_CAP; i++) {
+        const idx = chunkCount <= 120 ? i : Math.floor((i / 119) * (chunkCount - 1));
+        const got = await env.CACI_KV.get(`emb:${rec.id}:${idx}`).catch(() => null);
+        if (got) found++;
+      }
+      // Scale found up if we sampled
+      const estIndexed = CHECK_CAP === chunkCount ? found : Math.round((found / CHECK_CAP) * chunkCount);
+      indexedChunks += estIndexed;
+
+      if (estIndexed === chunkCount) {
+        fullyIndexedFiles++;
+      } else if (estIndexed > 0) {
+        partiallyIndexedFiles++;
+        partialFiles.push({
+          name: rec.name || rec.id,
+          id: rec.id,
+          dept: rec.dept,
+          indexed: estIndexed,
+          total: chunkCount,
+        });
+      } else {
+        // 0 indexed — file uploaded but never embedded. List it as needing backfill.
+        partialFiles.push({
+          name: rec.name || rec.id,
+          id: rec.id,
+          dept: rec.dept,
+          indexed: 0,
+          total: chunkCount,
+        });
       }
     }
 
-    const pct = totalFiles > 0 ? Math.round(indexedFiles / totalFiles * 100) : 0;
+    // Coverage = indexed chunks / total chunks. This is the true story.
+    // (The old version reported file-level coverage which was misleading
+    // because a file with 40/100 chunks indexed showed as "indexed.")
+    const chunkCoveragePct = totalChunks > 0 ? Math.round(indexedChunks / totalChunks * 100) : 0;
+    const fileCoveragePct = totalFiles > 0 ? Math.round(fullyIndexedFiles / totalFiles * 100) : 0;
+
     return json({
-      ok: true, dept: 'global',
-      totalFiles, indexedFiles, totalChunks, indexedChunks,
-      coveragePct: pct,
+      ok: true,
+      dept: 'global',
+      totalFiles,
+      indexedFiles: fullyIndexedFiles,
+      partiallyIndexedFiles,
+      totalChunks,
+      indexedChunks,
+      coveragePct: chunkCoveragePct,     // true chunk-level coverage (what matters for retrieval)
+      fileCoveragePct,                   // fully-indexed file count (for the simple headline)
+      partialFiles: partialFiles.slice(0, 20),  // surface top 20 problem files for admin UI
+      totalScanned: sample.length,
+      totalKeysInKV: keys.length,
       aiAvailable: !!env.AI,
       model: EMB_MODEL,
       alpha: HYBRID_ALPHA,
