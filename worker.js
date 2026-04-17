@@ -1300,7 +1300,17 @@ These summaries were computed at upload time from the full dataset. When a quest
     }
 
     // 2. Context docs (SOPs, policies, reference material)
-    if (contextDocs) system += `\n\nBACKGROUND KNOWLEDGE (this is yours — you just know it, you work here):\n${contextDocs}\n\nUse this knowledge the way a sharp colleague would: naturally, when it's genuinely relevant, without announcing it or making it weird. You don't recite it. You don't reference it. You don't say "based on our internal documents." It just informs how you think and what you know. If something comes up that connects to this, you have something real to say about it — but only if it actually fits. You're not a company brochure. You just work here and you know things.`;
+    if (contextDocs) {
+      const isComplianceDept = (dept || '').toLowerCase().includes('compliance');
+      const hasRegulatorySignal = contextDocs.toLowerCase().includes('regulatory') ||
+        contextDocs.toLowerCase().includes(' rule ') || contextDocs.toLowerCase().includes('statute') ||
+        contextDocs.toLowerCase().includes('enforcement') || contextDocs.toLowerCase().includes('inspectors');
+      if (isComplianceDept || hasRegulatorySignal) {
+        system += `\n\nCRITICAL OPERATING CONTEXT — READ THIS BEFORE ANSWERING ANYTHING:\n${contextDocs}\n\nThis context is not optional background. It is your primary interpretive frame. Before you analyze ANY question, read this context first and ask: does this change how I should interpret the situation? For compliance and regulatory work, this context is the lens through which all documents and data must be read. If there is tension between what a document says and what this context tells you about the regulatory environment, flag that tension explicitly. Never skip this context. Never treat it as secondary to the data.`;
+      } else {
+        system += `\n\nBACKGROUND KNOWLEDGE (this is yours — you just know it, you work here):\n${contextDocs}\n\nUse this knowledge the way a sharp colleague would: naturally, when it's genuinely relevant, without announcing it or making it weird. You don't recite it. You don't reference it. You don't say "based on our internal documents." It just informs how you think and what you know.`;
+      }
+    }
 
     // 3. Document/row chunks — the actual retrievable content
     if (context.text) {
@@ -1562,7 +1572,17 @@ These summaries were computed at upload time from the full dataset. When a quest
     }
 
     // 2. Context docs (SOPs, policies, reference material)
-    if (contextDocs) system += `\n\nBACKGROUND KNOWLEDGE (this is yours — you just know it, you work here):\n${contextDocs}\n\nUse this knowledge the way a sharp colleague would: naturally, when it's genuinely relevant, without announcing it or making it weird. You don't recite it. You don't reference it. You don't say "based on our internal documents." It just informs how you think and what you know. If something comes up that connects to this, you have something real to say about it — but only if it actually fits. You're not a company brochure. You just work here and you know things.`;
+    if (contextDocs) {
+      const isComplianceDept = (dept || '').toLowerCase().includes('compliance');
+      const hasRegulatorySignal = contextDocs.toLowerCase().includes('regulatory') ||
+        contextDocs.toLowerCase().includes(' rule ') || contextDocs.toLowerCase().includes('statute') ||
+        contextDocs.toLowerCase().includes('enforcement') || contextDocs.toLowerCase().includes('inspectors');
+      if (isComplianceDept || hasRegulatorySignal) {
+        system += `\n\nCRITICAL OPERATING CONTEXT — READ THIS BEFORE ANSWERING ANYTHING:\n${contextDocs}\n\nThis context is not optional background. It is your primary interpretive frame. Before you analyze ANY question, read this context first and ask: does this change how I should interpret the situation? For compliance and regulatory work, this context is the lens through which all documents and data must be read. If there is tension between what a document says and what this context tells you about the regulatory environment, flag that tension explicitly. Never skip this context. Never treat it as secondary to the data.`;
+      } else {
+        system += `\n\nBACKGROUND KNOWLEDGE (this is yours — you just know it, you work here):\n${contextDocs}\n\nUse this knowledge the way a sharp colleague would: naturally, when it's genuinely relevant, without announcing it or making it weird. You don't recite it. You don't reference it. You don't say "based on our internal documents." It just informs how you think and what you know.`;
+      }
+    }
 
     // 3. Document/row chunks — the actual retrievable content
     if (context.text) {
