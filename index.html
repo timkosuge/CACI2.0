@@ -7462,6 +7462,21 @@ body::before {
               <span class="ai-classify-cost" id="demo-mode-status">&mdash;</span>
             </div>
           </div>
+
+          <div class="acard admin-only" id="caci-intro-card">
+            <div class="acard-title">CACI's Intro</div>
+            <div class="acard-sub">Let CACI write her own intro in her voice. Generates 3 variations using her system prompt. Pick one, edit if needed, save. If unsaved, the demo plays the hardcoded default script.</div>
+            <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;align-items:center">
+              <button class="asave" id="caci-intro-generate" style="white-space:nowrap">Generate 3 Variations</button>
+              <button class="asave" id="caci-intro-reset" style="background:transparent;border:1px solid rgba(220,90,90,0.5);color:rgba(240,160,160,0.95)">Reset to Default</button>
+              <span id="caci-intro-status" style="font-family:var(--f-mono);font-size:10px;color:var(--smoke3);letter-spacing:.06em"></span>
+            </div>
+            <div id="caci-intro-current" style="margin-top:14px;display:none">
+              <div style="font-family:var(--f-mono);font-size:10px;color:var(--smoke3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px">Currently saved:</div>
+              <div id="caci-intro-current-text" style="padding:10px 12px;background:rgba(212,168,50,0.05);border:1px solid rgba(212,168,50,0.25);border-radius:4px;font-size:13px;line-height:1.55;color:rgba(240,230,200,0.92);font-style:italic;max-height:140px;overflow-y:auto"></div>
+            </div>
+            <div id="caci-intro-variations" style="margin-top:14px;display:none"></div>
+          </div>
         </div>
 
         <!-- RETRIEVAL INTELLIGENCE -->
@@ -8672,6 +8687,20 @@ function bootApp() {
     demoTog._wired = true;
     demoTog.addEventListener('change', () => saveDemoMode(demoTog.checked));
   }
+
+  // Wire CACI intro admin buttons
+  const introGen = $('caci-intro-generate');
+  if (introGen && !introGen._wired) {
+    introGen._wired = true;
+    introGen.addEventListener('click', () => generateCaciIntro());
+  }
+  const introRst = $('caci-intro-reset');
+  if (introRst && !introRst._wired) {
+    introRst._wired = true;
+    introRst.addEventListener('click', () => resetCaciIntro());
+  }
+  // Load whatever's currently saved so admin sees it
+  loadSavedCaciIntro();
 
   // ── Recurring gold glimmer sweep — fires every 60s ──────────
   function triggerAppGlimmer() {
@@ -10685,6 +10714,113 @@ async function saveDemoMode(enabled) {
     if (status) status.textContent = '\u2717 ' + e.message;
   }
 }
+
+// ── CACI Intro (script generation) ────────────────────────
+async function loadSavedCaciIntro() {
+  try {
+    const res = await apiFetch('/demo/scripts');
+    if (!res.ok) return;
+    const d = await res.json();
+    const wrap = $('caci-intro-current');
+    const textEl = $('caci-intro-current-text');
+    if (d.intro && d.intro.trim().length > 20) {
+      if (textEl) textEl.textContent = d.intro.trim();
+      if (wrap) wrap.style.display = 'block';
+    } else {
+      if (wrap) wrap.style.display = 'none';
+    }
+  } catch {}
+}
+
+async function generateCaciIntro() {
+  const btn = $('caci-intro-generate');
+  const status = $('caci-intro-status');
+  const wrap = $('caci-intro-variations');
+  if (btn) { btn.disabled = true; btn.textContent = 'Generating\u2026 (this takes 15-30 sec)'; }
+  if (status) status.textContent = '';
+  if (wrap) wrap.innerHTML = '';
+
+  try {
+    const res = await apiFetch('/demo/generate-intro', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    const d = await res.json();
+    if (!res.ok || d.error) throw new Error(d.error || 'Generation failed');
+    if (!d.variations || !Array.isArray(d.variations) || d.variations.length === 0) {
+      throw new Error('No variations returned');
+    }
+    renderCaciVariations(d.variations);
+    if (status) status.textContent = '\u2713 Generated ' + d.variations.length + ' variations';
+  } catch (e) {
+    if (status) status.textContent = '\u2717 ' + e.message;
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Generate 3 Variations'; }
+  }
+}
+
+function renderCaciVariations(variations) {
+  const wrap = $('caci-intro-variations');
+  if (!wrap) return;
+  wrap.style.display = 'block';
+  wrap.innerHTML = '<div style="font-family:var(--f-mono);font-size:10px;color:var(--smoke3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px">Variations</div>';
+  variations.forEach((text, idx) => {
+    const card = document.createElement('div');
+    card.style.cssText = 'margin-bottom:12px;padding:14px;background:rgba(8,12,22,0.5);border:1px solid rgba(212,168,50,0.25);border-radius:6px';
+    const label = document.createElement('div');
+    label.style.cssText = 'font-family:var(--f-mono);font-size:10px;color:rgba(212,168,50,0.75);letter-spacing:.12em;text-transform:uppercase;margin-bottom:8px';
+    label.textContent = 'Variation ' + (idx + 1) + ' — ' + text.length + ' chars';
+    card.appendChild(label);
+
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.cssText = 'width:100%;min-height:120px;padding:10px 12px;background:rgba(4,6,12,0.55);border:1px solid rgba(212,168,50,0.18);border-radius:4px;font-family:var(--f-body);font-size:13px;line-height:1.55;color:rgba(240,230,200,0.95);resize:vertical;box-sizing:border-box';
+    card.appendChild(textarea);
+
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap';
+    const useBtn = document.createElement('button');
+    useBtn.className = 'asave';
+    useBtn.textContent = 'Use This';
+    useBtn.style.cssText = 'padding:6px 16px;font-size:10px';
+    const msg = document.createElement('span');
+    msg.style.cssText = 'font-family:var(--f-mono);font-size:10px;color:var(--smoke3);letter-spacing:.06em';
+    useBtn.addEventListener('click', async () => {
+      useBtn.disabled = true; useBtn.textContent = 'Saving\u2026';
+      msg.textContent = '';
+      try {
+        const res = await apiFetch('/demo/save-script', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ beatId: 'intro', text: textarea.value }) });
+        const d = await res.json();
+        if (!res.ok || d.error) throw new Error(d.error || 'Save failed');
+        useBtn.textContent = '\u2713 Saved';
+        msg.textContent = 'CACI\u2019s intro updated';
+        loadSavedCaciIntro();
+      } catch (e) {
+        useBtn.textContent = 'Use This';
+        useBtn.disabled = false;
+        msg.textContent = '\u2717 ' + e.message;
+      }
+    });
+    btnRow.appendChild(useBtn);
+    btnRow.appendChild(msg);
+    card.appendChild(btnRow);
+    wrap.appendChild(card);
+  });
+}
+
+async function resetCaciIntro() {
+  if (!confirm('Delete the saved intro and fall back to the hardcoded default?')) return;
+  const status = $('caci-intro-status');
+  if (status) status.textContent = 'Resetting\u2026';
+  try {
+    const res = await apiFetch('/demo/reset-script', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ beatId: 'intro' }) });
+    const d = await res.json();
+    if (!res.ok || d.error) throw new Error(d.error || 'Reset failed');
+    if (status) status.textContent = '\u2713 Reset to default';
+    loadSavedCaciIntro();
+    const wrap = $('caci-intro-variations');
+    if (wrap) { wrap.style.display = 'none'; wrap.innerHTML = ''; }
+  } catch (e) {
+    if (status) status.textContent = '\u2717 ' + e.message;
+  }
+}
 async function checkHealth() {
   try {
     const res = await fetch(API + '/health'); const ok = res.ok;
@@ -10743,21 +10879,21 @@ const DemoMode = {
   //   The actual transition fires on audio.onended + a short breath (gap).
   beats: [
     { id: 2, minDur: 62000, maxDur: 120000, setup: 'setupPreshow', voice: 'eve',
-      narr: "Hi, I'm Cassie. I figured I'd introduce myself before we get started, because I know this is probably new — not AI in general, you've all seen it on your phones, but AI that actually understands this industry. That part's still rare. And I get the skepticism. So let me just tell you who I am. I was built for cannabis. Not retrofitted from some generic assistant — built for it. I know what 280E does to your margins. I know METRC isn't optional. I know compliance is stressed, retail is tired, and ops is holding everything together with duct tape and coffee. I'm not going to promise I'm perfect, because I'm not. But I'm careful, I cite my sources, and I don't forget anything you teach me. This industry was never going to be easy — too young, too regulated, too watched — and the people who figure it out are going to build something the world hasn't seen before. I'd really like to help with that. So — let me show you what I can do." },
+      narr: "Hi, I'm CACI. I figured I'd introduce myself before we get started, because I know this is probably new — not AI in general, you've all seen it on your phones, but AI that actually understands this industry. That part's still rare. And I get the skepticism. So let me just tell you who I am. I was built for cannabis. Not retrofitted from some generic assistant — built for it. I know what METRC means for compliance. I know what a state-by-state patchwork does to your operations. I know retail is tired and ops is holding everything together with duct tape and coffee. I'm not going to promise I'm perfect, because I'm not. But I'm careful, I cite my sources, and I don't forget anything you teach me. This industry was never going to be easy — too young, too regulated, too watched — and the people who figure it out are going to build something the world hasn't seen before. I'd really like to help with that. So — let me show you what I can do." },
     { id: 1, minDur: 8000, maxDur: 25000, setup: null, voice: 'leo',
       narr: "Here's what she was made for. Somewhere in all those earnings reports, regulations, and filings — the answer is already there. But finding it takes hours you don't have, and by the time you get to it, you've already moved on." },
     { id: 3, minDur: 12000, maxDur: 35000, setup: 'setupDepts', voice: 'ara',
       narr: "Every document you give her, she actually reads — not just the filename and metadata, the whole thing. Then she analyzes it seven ways: what it is, when it's from, where it applies, what it contains. Files it by department, period, and jurisdiction. By the time a question comes, she already knows where to look." },
     { id: 4, minDur: 10000, maxDur: 30000, setup: 'setupQuery', voice: 'rex',
-      narr: "She doesn't search, she answers. Before pulling anything, she figures out what you're actually asking — then picks the right places to look, weighs every passage by how directly it answers, and won't tell you something she can't back up with a source." },
+      narr: "She doesn't search, she answers. Before pulling anything, she figures out what you're actually asking — then picks the right places to look, weighs every passage by how directly it answers, and shows you the source for every claim she makes." },
     { id: 5, minDur: 9000, maxDur: 28000, setup: 'setupNetwork', voice: 'ara',
       narr: "The more she reads, the more she sees. A new regulation changes what a policy means. A new earnings report reframes an old trend. She notices things nobody thinks to ask about." },
     { id: 6, minDur: 20000, maxDur: 50000, setup: 'setupScenario', voice: 'leo',
       narr: "Now — to be clear, she's a prototype. About a week old. What she knows right now is a starting point: Jushi's earnings history, Ohio's regulatory code, Illinois regulations and their 2025 annual report. It's not everything she'll know. But it's enough to prove the point. Give her more, and her answers get sharper. This is what day one looks like." },
     { id: 7, minDur: 8000, maxDur: 26000, setup: 'setupStats', voice: 'ara',
-      narr: "Every answer cites its sources. Every upload is logged. Her memory lives in your walls — yours, not anyone else's, and it never trains another model." },
+      narr: "Her answers come with sources. Every upload is logged. Your documents stay in your infrastructure — they never leave, and none of your data is used to train anyone's model." },
     { id: 8, minDur: 9000, maxDur: 28000, setup: null, voice: 'rex',
-      narr: "She isn't a chatbot with your files attached. She's a system that learns how your business actually thinks — department by department, document by document, one question at a time." },
+      narr: "She isn't a chatbot with your files attached. She's a system built around the way your business actually works — department by department, document by document, one question at a time." },
     { id: 9, minDur: 999999, maxDur: 999999, setup: null, voice: 'eve',
       narr: "So — let's get to work." }
   ],
@@ -10769,6 +10905,20 @@ const DemoMode = {
       if (res.ok) {
         const d = await res.json();
         this.enabled = !!d.DEMO_MODE_ENABLED;
+      }
+    } catch {}
+
+    // Load admin-saved intro override (CACI's generated intro).
+    // If saved, swap it into the Beat 2 narration so the demo plays her words.
+    // If not saved, beats[0].narr keeps its hardcoded default.
+    try {
+      const res = await apiFetch('/demo/scripts');
+      if (res.ok) {
+        const d = await res.json();
+        if (d.intro && typeof d.intro === 'string' && d.intro.trim().length > 20) {
+          // beats[0] is the preshow (id:2) — Cassie's intro
+          this.beats[0].narr = d.intro.trim();
+        }
       }
     } catch {}
 
@@ -11824,11 +11974,16 @@ const DemoMode = {
     // Voice: per-beat override, falls back to admin choice, then eve.
     const provider = localStorage.getItem('caci_tts_provider') || 'grok';
     const v = voice || localStorage.getItem('caci_tts_grok_voice') || 'eve';
+    // Pronunciation fix: stored narration uses "CACI" (her real name), but
+    // Grok TTS reads that as "KAH-chee". Swap to phonetic "Cassie" right
+    // before the TTS call — doesn't affect stored scripts or admin UI.
+    // Match whole-word CACI only (case-insensitive) so we don't mangle other text.
+    const ttsText = (text || '').replace(/\bCACI\b/g, 'Cassie');
     try {
       const res = await fetch(API + '/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, provider, voice: v })
+        body: JSON.stringify({ text: ttsText, provider, voice: v })
       });
       if (!res.ok) return null;
       return await res.blob();
