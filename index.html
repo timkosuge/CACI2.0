@@ -11462,12 +11462,34 @@ const DemoMode = {
 
     // ─── 3D beat-object reveal ───
     // Hide the previous beat's 3D content; show this beat's.
-    // Also hide the DOM overlay for any beat that has a 3D replacement,
-    // so we don't show both at once.
-    const BEATS_WITH_3D = [1, 3, 4, 5, 7];
+    // Also hide the DOM overlay for any beat that has a 3D replacement.
+    //
+    // Persistence rules: some beats build on the 3D content of earlier beats,
+    // so we keep them visible through the continuation:
+    //   • Beat 3 (clusters) stays visible through Beat 4 (retrieval into a cluster)
+    //     and Beat 5 (connection threads within the cluster).
+    //   • All other beats cleanly hand off.
+    const BEATS_WITH_3D = [1, 3, 4, 5, 6, 7];
+    const PERSISTENT_SCENES = {
+      // If the CURRENT beat is in this list, the PREVIOUS beat's 3D content stays
+      4: [3],           // Beat 4 needs Beat 3 clusters visible
+      5: [3],           // Beat 5 needs Beat 3 clusters visible (camera is inside one)
+    };
     if (this.cinema) {
-      if (this._previousBeatId !== undefined && BEATS_WITH_3D.includes(this._previousBeatId)) {
+      const keepVisible = PERSISTENT_SCENES[beat.id] || [];
+      if (this._previousBeatId !== undefined
+          && BEATS_WITH_3D.includes(this._previousBeatId)
+          && !keepVisible.includes(this._previousBeatId)) {
         this.hideBeatObjects(this._previousBeatId);
+      }
+      // Also: if we're at Beat 6 or later, clean up any lingering persistent scenes
+      // that were kept visible across beats 3→4→5. Otherwise clusters would hang around.
+      if (beat.id >= 6) {
+        [3].forEach(persistentId => {
+          if (this.cinema.beatObjects[persistentId] && this.cinema.beatObjects[persistentId].group.visible) {
+            this.hideBeatObjects(persistentId);
+          }
+        });
       }
       if (BEATS_WITH_3D.includes(beat.id)) {
         this.showBeatObjects(beat.id);
@@ -12096,7 +12118,7 @@ const DemoMode = {
     3: { pos: [0, 40, 280],      look: [0, 0, -10],     fov: 52 }, // pulled back — all 3 clusters visible
     4: { pos: [60, 20, 180],     look: [0, 0, 40],      fov: 44 }, // diving toward Finance cluster
     5: { pos: [-6, 4, 52],       look: [20, 0, 40],     fov: 68 }, // INSIDE the Finance cluster
-    6: { pos: [160, -80, 280],   look: [0, -40, 0],     fov: 48 }, // pulled back low
+    6: { pos: [0, 20, 320],      look: [0, 0, 0],       fov: 50 }, // pulled back, framing the 4 stacks
     7: { pos: [0, 0, 260],       look: [0, 0, 0],       fov: 50 }, // framing the 4 orbs
     8: { pos: [0, 0, 420],       look: [0, 0, 0],       fov: 38 }, // pulled way back — the grand view
     9: { pos: [0, 0, 180],       look: [0, 0, 0],       fov: 40 }, // settle center for the card reveal
@@ -12461,6 +12483,86 @@ const DemoMode = {
     });
     C.scene.add(beat7Group);
     C.beatObjects[7] = { group: beat7Group, orbs, pulseSequenceStart: 0 };
+
+    // ─── BEAT 6: Her actual library — 4 document stacks ───────────────
+    // Honest visualization of what CACI has read. Each stack is a cluster
+    // of document planes with a floating canvas-texture label showing the
+    // real collection name. No fake stats, no made-up simulations.
+    const beat6Group = new THREE.Group();
+    beat6Group.visible = false;
+    const LIBRARY_ITEMS = [
+      { name: 'JUSHI EARNINGS',     sub: '2019 — 2024',            pos: [-130,  50, 0],  docCount: 12 },
+      { name: 'OHIO',               sub: 'Regulatory code',        pos: [ -45, -40, 20], docCount: 18 },
+      { name: 'ILLINOIS',           sub: 'Regulations',            pos: [  60,  50, 0],  docCount: 14 },
+      { name: 'ILLINOIS 2025',      sub: 'Annual report',          pos: [ 150, -35, 30], docCount: 8 },
+    ];
+    const libraryStacks = [];
+    LIBRARY_ITEMS.forEach((item, idx) => {
+      const stackGroup = new THREE.Group();
+      stackGroup.position.set(...item.pos);
+
+      // Build a stack — documents at slightly offset positions/rotations,
+      // like a pile of papers gently askew
+      const stackDocs = [];
+      const sDocGeom = new THREE.PlaneGeometry(30, 40, 1, 1);
+      for (let i = 0; i < item.docCount; i++) {
+        const mesh = new THREE.Mesh(sDocGeom, docMaterial);
+        // Slight random offsets for an organic stack appearance
+        mesh.position.set(
+          (Math.random() - 0.5) * 8,
+          i * 1.2 - item.docCount * 0.6,
+          (Math.random() - 0.5) * 8
+        );
+        mesh.rotation.set(
+          Math.PI / 2 + (Math.random() - 0.5) * 0.12,   // laying roughly flat with tilt
+          (Math.random() - 0.5) * 0.2,
+          (Math.random() - 0.5) * 0.15
+        );
+        stackGroup.add(mesh);
+        stackDocs.push(mesh);
+      }
+
+      // Label canvas — two lines, serif gold gradient like Beat 3's cluster labels
+      const labelCanvas = document.createElement('canvas');
+      labelCanvas.width = 768; labelCanvas.height = 192;
+      const lctx = labelCanvas.getContext('2d');
+      // Primary name line
+      lctx.font = '300 64px "Cormorant Garamond", serif';
+      lctx.textAlign = 'center';
+      lctx.textBaseline = 'middle';
+      const gradN = lctx.createLinearGradient(0, 30, 0, 100);
+      gradN.addColorStop(0.0, '#fff4cc');
+      gradN.addColorStop(0.4, '#f5e398');
+      gradN.addColorStop(0.7, '#e8c84a');
+      gradN.addColorStop(1.0, '#c9a832');
+      lctx.fillStyle = gradN;
+      lctx.shadowColor = 'rgba(212,168,50,0.4)';
+      lctx.shadowBlur = 14;
+      lctx.fillText(item.name, 384, 75);
+      // Subtitle line — smaller, muted
+      lctx.shadowBlur = 0;
+      lctx.font = '300 italic 30px "Cormorant Garamond", serif';
+      lctx.fillStyle = 'rgba(230,210,160,0.70)';
+      lctx.fillText(item.sub, 384, 135);
+      const labelTex = new THREE.CanvasTexture(labelCanvas);
+      labelTex.needsUpdate = true;
+      const labelMat = new THREE.MeshBasicMaterial({
+        map: labelTex,
+        transparent: true,
+        depthWrite: false,
+        opacity: 0,
+      });
+      const labelGeom = new THREE.PlaneGeometry(100, 25);
+      const label = new THREE.Mesh(labelGeom, labelMat);
+      label.position.set(0, 40, 0);
+      label.userData.billboard = true;
+      stackGroup.add(label);
+
+      beat6Group.add(stackGroup);
+      libraryStacks.push({ group: stackGroup, docs: stackDocs, label, labelMat, name: item.name });
+    });
+    C.scene.add(beat6Group);
+    C.beatObjects[6] = { group: beat6Group, stacks: libraryStacks };
   },
 
   // Fade in the 3D objects for a given beat. Tweens uOpacity (for shader
@@ -12772,6 +12874,40 @@ const DemoMode = {
         const lineFade = Math.min(1, lineTimeT / 1.5);
         line.material.opacity = fade * lineFade * 0.45;
       });
+    }
+
+    // ─── Beat 6: her actual library — stacks of real documents ───
+    const b6 = C.beatObjects[6];
+    if (b6 && b6.group.visible) {
+      const fade = computeFade(b6);
+      b6.stacks.forEach((stack, si) => {
+        // Gentle floating motion for each stack (phase-offset so they don't sync)
+        const floatY = Math.sin(tSec * 0.4 + si * 1.3) * 2.5;
+        stack.group.position.y = stack.group.userData.baseY !== undefined
+          ? stack.group.userData.baseY + floatY
+          : (() => {
+              stack.group.userData.baseY = stack.group.position.y;
+              return stack.group.userData.baseY + floatY;
+            })();
+        // Slow rotation on Y for gentle parallax
+        stack.group.rotation.y = Math.sin(tSec * 0.25 + si * 0.9) * 0.25;
+        // Billboard the label to camera
+        if (stack.label && stack.labelMat) {
+          stack.label.lookAt(C.camera.position);
+          stack.labelMat.opacity = fade * 0.92;
+        }
+      });
+      // Fade the stack docs (shared shader material is tricky — already handled by beat 1/3 logic above,
+      // but we make sure the material is at least at `fade` strength when beat 6 is active)
+      if (b6.stacks[0] && b6.stacks[0].docs[0]) {
+        const docMat = b6.stacks[0].docs[0].material;
+        if (docMat.uniforms) {
+          docMat.uniforms.uOpacity.value = Math.max(
+            docMat.uniforms.uOpacity.value || 0,
+            fade
+          );
+        }
+      }
     }
 
     // ─── Beat 7: pulsing guarantee orbs (one per guarantee, in sequence) ───
