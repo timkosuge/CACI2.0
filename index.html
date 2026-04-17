@@ -7111,7 +7111,12 @@ function bootApp() {
   } catch(e) { chatHistory = []; clearChatHistory(); }
   const newChatBtn = $('new-chat-btn');
   if (newChatBtn) {
-    newChatBtn.addEventListener('click', () => {
+    let isResetting = false;
+    newChatBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (isResetting) return;
+      isResetting = true;
       chatHistory = [];
       clearChatHistory();
       const msgs = $('chat-msgs');
@@ -7122,6 +7127,7 @@ function bootApp() {
       setScope('all');
       renderScopeCollections(window._caciCollections || []);
       initChatGreeting();
+      setTimeout(() => { isResetting = false; }, 500);
     });
   }
   // ── Compliance Mode ──────────────────────────────────────────
