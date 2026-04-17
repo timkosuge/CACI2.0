@@ -13600,8 +13600,74 @@ const DemoMode = {
         labelText: op.label,
       });
     });
+
+    // ─── CACI centerpiece ─────────────────────────────────────────
+    // Luminous gold sphere in the center of the Beat 7 icon constellation.
+    // Represents CACI herself at the heart of her guarantees. Radiating lines
+    // connect her to each icon — the visual metaphor: these are HER promises.
+    // The inner sphere is solid gold; the outer halo is additive-blended for
+    // the bloom effect. Breathing scale keeps her feeling alive.
+    const caciInnerGeom = new THREE.SphereGeometry(7, 32, 24);
+    const caciInnerMat = new THREE.MeshBasicMaterial({
+      color: 0xf5e398,
+      transparent: true,
+      opacity: 0,
+    });
+    const caciInner = new THREE.Mesh(caciInnerGeom, caciInnerMat);
+    beat7Group.add(caciInner);
+
+    const caciHaloGeom = new THREE.SphereGeometry(14, 32, 24);
+    const caciHaloMat = new THREE.MeshBasicMaterial({
+      color: 0xffe8a0,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+    });
+    const caciHalo = new THREE.Mesh(caciHaloGeom, caciHaloMat);
+    beat7Group.add(caciHalo);
+
+    // Outermost soft bloom — bigger sphere, very low opacity
+    const caciBloomGeom = new THREE.SphereGeometry(26, 24, 18);
+    const caciBloomMat = new THREE.MeshBasicMaterial({
+      color: 0xf0d060,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+    });
+    const caciBloom = new THREE.Mesh(caciBloomGeom, caciBloomMat);
+    beat7Group.add(caciBloom);
+
+    // Radiating lines from CACI → each of the 4 icons.
+    // One line material per radial, so we can brighten individual lines
+    // when that icon pulses (matching the pulse sequence in the update loop).
+    const radialLines = [];
+    orbs.forEach((orb, i) => {
+      const radialMat = new THREE.LineBasicMaterial({
+        color: 0xf5e398,
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+      });
+      const radialGeom = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(orb.position[0], orb.position[1], orb.position[2]),
+      ]);
+      const radialLine = new THREE.Line(radialGeom, radialMat);
+      beat7Group.add(radialLine);
+      radialLines.push({ line: radialLine, mat: radialMat, orbIdx: i });
+    });
+
     C.scene.add(beat7Group);
-    C.beatObjects[7] = { group: beat7Group, orbs, pulseSequenceStart: 0, iconMat };
+    C.beatObjects[7] = {
+      group: beat7Group,
+      orbs,
+      pulseSequenceStart: 0,
+      iconMat,
+      caciInner, caciInnerMat,
+      caciHalo,  caciHaloMat,
+      caciBloom, caciBloomMat,
+      radialLines,
+    };
 
     // ─── BEAT 6: Her actual library — 4 document stacks ───────────────
     // Honest visualization of what CACI has read. Each stack is a cluster
@@ -13683,18 +13749,25 @@ const DemoMode = {
 
     // ─── Real data bar charts floating next to library stacks ───
     // Pull from statsBank.charts — each chart sits as a 3D holographic bar
-    // visualization near its associated document stack. Real Jushi numbers.
+    // visualization near its associated document stack. Real numbers, big enough
+    // to actually see and read at viewing distance.
     const libraryCharts = [];
-    if (this.statsBank && Array.isArray(this.statsBank.charts)) {
-      // Chart placements keyed by chartId → position and the stack it supplements
-      const chartPlacements = [
-        { chartId: 'revenue_growth',  pos: [-130,  -10,  40], scale: 0.85 },   // next to JUSHI EARNINGS stack
-        { chartId: 'ebitda_margin',   pos: [ 150,   -5,  70], scale: 0.85 },   // next to ILLINOIS 2025 stack
+    if (this.statsBank && Array.isArray(this.statsBank.charts) && this.statsBank.charts.length > 0) {
+      // Place up to 2 charts as companions to the library stacks. Positions are
+      // tuned so charts sit BETWEEN or BESIDE stacks rather than on top of them.
+      // Previous sizing (W:70, H:45, scale:0.85) was way too small relative to
+      // the stack labels — charts were getting lost in the scene. Now much bigger.
+      const CHART_PLACEMENTS = [
+        { pos: [-140,   10,  30], scale: 1.0 },   // left of JUSHI EARNINGS stack
+        { pos: [ 140,   10,  30], scale: 1.0 },   // right of ILLINOIS 2025 stack
       ];
-      chartPlacements.forEach((placement, i) => {
-        const chart = this.statsBank.charts.find(c => c.id === placement.chartId);
-        if (!chart) return;
-        const chartMesh = this._makeBarChart3D(chart, { width: 70, height: 45 });
+      // Take the first N charts from whatever's in the bank (works with
+      // either the hardcoded data or the harvested/saved data from KV)
+      const picked = this.statsBank.charts.slice(0, CHART_PLACEMENTS.length);
+      picked.forEach((chart, i) => {
+        const placement = CHART_PLACEMENTS[i];
+        // Bigger dimensions — chart now feels like a companion, not an afterthought
+        const chartMesh = this._makeBarChart3D(chart, { width: 150, height: 95 });
         if (!chartMesh) return;
         chartMesh.position.set(...placement.pos);
         chartMesh.scale.setScalar(placement.scale);
@@ -14469,8 +14542,10 @@ const DemoMode = {
         }
       });
       // iconMat is shared across all icons, so manage its opacity as the max of fades
-      // Each icon pulses sequentially — at its assigned offset
+      // Each icon pulses sequentially — at its assigned offset. Track which icon
+      // is active so we can brighten the radial line from CACI to it.
       let maxIconOpacity = 0.4 * fade;  // baseline glow so icons are always visible when beat active
+      const pulseValues = [];
       b7.orbs.forEach((orb, i) => {
         const pulseOffset = i * 2.5;
         const timeIntoPulse = since - pulseOffset;
@@ -14479,6 +14554,7 @@ const DemoMode = {
           const t01 = timeIntoPulse / 2.5;
           pulse = Math.sin(t01 * Math.PI);  // 0..1..0
         }
+        pulseValues.push(pulse);
         // Halo pulses distinctly from the icon — bright burst
         orb.haloMat.opacity = fade * (0.08 + pulse * 0.4);
         // Label fades in with icon, brightens with pulse
@@ -14493,6 +14569,32 @@ const DemoMode = {
         maxIconOpacity = Math.max(maxIconOpacity, fade * iconPulse);
       });
       if (b7.iconMat) b7.iconMat.opacity = maxIconOpacity;
+
+      // CACI centerpiece — breathing scale + layered fade
+      if (b7.caciInner) {
+        const breathe = 1 + Math.sin(tSec * 1.2) * 0.06;
+        b7.caciInner.scale.setScalar(breathe);
+        b7.caciHalo.scale.setScalar(breathe * 1.05);
+        b7.caciBloom.scale.setScalar(breathe * 1.02);
+        // Slow gentle drift in rotation to feel alive
+        b7.caciInner.rotation.y = tSec * 0.3;
+        b7.caciHalo.rotation.y = -tSec * 0.15;
+        // Opacity fade — inner solid, halo soft, bloom very soft
+        // Brighten slightly when any icon is pulsing (she's "speaking")
+        const maxPulse = Math.max(0, ...pulseValues);
+        b7.caciInnerMat.opacity = fade * (0.85 + maxPulse * 0.15);
+        b7.caciHaloMat.opacity  = fade * (0.38 + maxPulse * 0.25);
+        b7.caciBloomMat.opacity = fade * (0.12 + maxPulse * 0.18);
+      }
+
+      // Radial lines: each line brightens when its icon pulses.
+      // Baseline dim glow keeps all 4 lines visible throughout the beat.
+      if (b7.radialLines) {
+        b7.radialLines.forEach(rl => {
+          const p = pulseValues[rl.orbIdx] || 0;
+          rl.mat.opacity = fade * (0.12 + p * 0.58);
+        });
+      }
     }
   },
 
