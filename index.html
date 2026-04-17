@@ -13038,10 +13038,41 @@ const DemoMode = {
     group.add(new THREE.Line(accentG, cyanMat));
 
     // ─── Layer 3: Big number (canvas texture, generous size) ───
+    // Compact any unwieldy display strings. '$262,900,000' → '$262.9M'
+    // so text never bursts the panel. Short values pass through unchanged.
+    const compactDisplay = (s) => {
+      if (!s || typeof s !== 'string') return s;
+      // Match $NNN,NNN,NNN or $NNNNNNNNN and convert to $N.NM/B style
+      const m = s.match(/^(\$?)([\d,]+)(.*)$/);
+      if (m) {
+        const prefix = m[1];
+        const digits = parseFloat(m[2].replace(/,/g, ''));
+        const suffix = m[3];
+        if (!isNaN(digits) && digits >= 1_000_000) {
+          if (digits >= 1_000_000_000) {
+            return prefix + (digits / 1_000_000_000).toFixed(1).replace(/\.0$/, '') + 'B' + suffix;
+          }
+          return prefix + (digits / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M' + suffix;
+        }
+        if (!isNaN(digits) && digits >= 10_000) {
+          return prefix + (digits / 1_000).toFixed(0) + 'K' + suffix;
+        }
+      }
+      return s;
+    };
+    const displayText = compactDisplay(fact.display);
+    // Auto-fit font size: if the text is unusually long, shrink it so it
+    // fits within the panel width. 200px works for ≤8 chars; beyond that
+    // we scale down proportionally.
+    let numFontPx = 200;
+    if (displayText.length > 8)  numFontPx = 170;
+    if (displayText.length > 10) numFontPx = 150;
+    if (displayText.length > 13) numFontPx = 120;
+
     const numCanvas = document.createElement('canvas');
     numCanvas.width = 1024; numCanvas.height = 320;
     const nctx = numCanvas.getContext('2d');
-    nctx.font = '500 200px "Cormorant Garamond", serif';
+    nctx.font = `500 ${numFontPx}px "Cormorant Garamond", serif`;
     nctx.textAlign = 'center';
     nctx.textBaseline = 'middle';
     const numGrad = nctx.createLinearGradient(0, 40, 0, 280);
@@ -13052,10 +13083,10 @@ const DemoMode = {
     nctx.fillStyle = numGrad;
     nctx.shadowColor = 'rgba(245,227,152,0.95)';
     nctx.shadowBlur = 36;
-    nctx.fillText(fact.display, 512, 160);
+    nctx.fillText(displayText, 512, 160);
     // Second pass (smaller shadow) for cleaner edges
     nctx.shadowBlur = 0;
-    nctx.fillText(fact.display, 512, 160);
+    nctx.fillText(displayText, 512, 160);
     const numTex = new THREE.CanvasTexture(numCanvas);
     numTex.needsUpdate = true;
     numTex.anisotropy = 4;
@@ -13253,7 +13284,7 @@ const DemoMode = {
       vMesh.userData.valMat = vMat;
       group.add(vMesh);
 
-      // Category label below the baseline
+      // Category label below the baseline — moved further down for breathing room
       const cCanvas = document.createElement('canvas');
       cCanvas.width = 512; cCanvas.height = 96;
       const cctx = cCanvas.getContext('2d');
@@ -13277,12 +13308,15 @@ const DemoMode = {
         map: cTex, transparent: true, depthWrite: false, opacity: 0,
       });
       const cMesh = new THREE.Mesh(new THREE.PlaneGeometry(barWidth * 3, barWidth * 0.7), cMat);
-      cMesh.position.set(xPos, -H / 2 - barWidth * 0.6, 0);
+      // Moved further below baseline (from -0.6 to -1.4) so they don't collide
+      // with the stack labels sitting below charts in the scene
+      cMesh.position.set(xPos, -H / 2 - barWidth * 1.4, 0);
       cMesh.userData.catMat = cMat;
       group.add(cMesh);
     });
 
-    // Title above the chart
+    // Title above the chart — lifted higher so it doesn't collide with
+    // value labels on tall bars. Also narrower so long titles compress less.
     if (chart.title) {
       const tCanvas = document.createElement('canvas');
       tCanvas.width = 1024; tCanvas.height = 128;
@@ -13297,14 +13331,20 @@ const DemoMode = {
       tctx.fillStyle = tGrad;
       tctx.shadowColor = 'rgba(212,168,50,0.5)';
       tctx.shadowBlur = 14;
-      tctx.fillText(chart.title, 512, 64);
+      // Truncate overly long titles so they don't get squished in the canvas
+      const titleText = chart.title.length > 34
+        ? chart.title.slice(0, 32) + '…'
+        : chart.title;
+      tctx.fillText(titleText, 512, 64);
       const tTex = new THREE.CanvasTexture(tCanvas);
       tTex.needsUpdate = true;
       const tMat = new THREE.MeshBasicMaterial({
         map: tTex, transparent: true, depthWrite: false, opacity: 0,
       });
-      const tMesh = new THREE.Mesh(new THREE.PlaneGeometry(W * 0.9, W * 0.11), tMat);
-      tMesh.position.set(0, H / 2 + W * 0.08, 0);
+      // Title was at H/2 + W*0.08 — now lifted to H/2 + W*0.16 so there's
+      // clear space between the title and the tallest bar's value label.
+      const tMesh = new THREE.Mesh(new THREE.PlaneGeometry(W * 0.85, W * 0.10), tMat);
+      tMesh.position.set(0, H / 2 + W * 0.16, 0);
       tMesh.userData.titleMat = tMat;
       group.add(tMesh);
     }
@@ -14212,22 +14252,20 @@ const DemoMode = {
     }
     entry5.dataNodes = [];
     // Pick the first 5 facts from the stats bank. Distribute them around the
-    // camera's interior view of the Finance cluster — larger (readable) and
-    // spread further apart now that each is a full holographic panel.
+    // camera's interior view of the Finance cluster. Positions tightened so
+    // holograms stay inside the viewport at scale 1.1 (they extend ~47 local
+    // units wide after scaling, so extreme positions clipped the frustum).
     const pickedStats = (this.statsBank && this.statsBank.singles || []).slice(0, 5);
-    // Positions relative to the Finance cluster center (which is at (0,0,40)).
-    // Camera is at roughly (-6, 4, 52) looking toward (20, 0, 40), so nodes
-    // should be placed around that view in an arc — spread wider for bigger panels.
     const NODE_POSITIONS = [
-      [ 55,  35,   10],   // upper right, set back
-      [-30, -25,   70],   // lower left, close to camera
-      [ 70,  -8,   60],   // right middle, closer
-      [ 10,  50,   90],   // top center, very close
-      [-45,  15,   -10],  // left, far back
+      [ 38,  20,   25],   // upper right
+      [-25, -15,   55],   // lower left, close
+      [ 50,  -8,   50],   // right middle
+      [  5,  25,   70],   // top center
+      [-35,   8,    5],   // left, farther back
     ];
     pickedStats.forEach((fact, i) => {
       if (i >= NODE_POSITIONS.length) return;
-      const node = this._makeFloatingNumber3D(fact, { scale: 1.4 });
+      const node = this._makeFloatingNumber3D(fact, { scale: 1.1 });
       if (!node) return;
       node.position.set(...NODE_POSITIONS[i]);
       node.userData.revealDelay = 0.5 + i * 0.6;  // staggered fade-in
