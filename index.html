@@ -11753,6 +11753,56 @@ const DemoMode = {
       }
     } catch {}
 
+    // Load admin-saved real stats (from Demo Data Bank harvest).
+    // If nothing's saved, falls back to the hardcoded statsBank. When the admin
+    // harvests new stats and saves, the demo picks them up on next load.
+    try {
+      const res2 = await apiFetch('/demo/stats');
+      if (res2.ok) {
+        const d2 = await res2.json();
+        const savedSingles = Array.isArray(d2.singles) ? d2.singles : [];
+        const savedCharts  = Array.isArray(d2.charts)  ? d2.charts  : [];
+        // Normalize: saved singles may have { number, label, period, source } OR
+        // { display, label, source }. Charts may have series OR data. Accept both.
+        const normSingles = savedSingles
+          .filter(s => s && !s._excluded)
+          .map(s => ({
+            display: s.display || s.number || String(s.value || ''),
+            label:   s.label || '',
+            source:  s.source || '',
+          }))
+          .filter(s => s.display && s.label);
+        const normCharts = savedCharts
+          .filter(c => c && !c._excluded && Array.isArray(c.series || c.data))
+          .map(c => {
+            const rawSeries = c.series || c.data || [];
+            const series = rawSeries.map(pt => ({
+              label:   pt.label || pt.period || pt.metric || '',
+              value:   typeof pt.value === 'number' ? pt.value : parseFloat(String(pt.value || '0').replace(/[^0-9.\-]/g, '')) || 0,
+              display: pt.display || pt.displayValue || (typeof pt.value === 'string' ? pt.value : String(pt.value || '')),
+            })).filter(pt => pt.label);
+            return {
+              id:     c.id || (c.title || '').toLowerCase().replace(/\W+/g, '_'),
+              title:  c.title || '',
+              unit:   c.unit || 'count',
+              series,
+              source: c.source || '',
+            };
+          })
+          .filter(c => c.title && c.series.length >= 2);
+        if (normSingles.length > 0 || normCharts.length > 0) {
+          this.statsBank = {
+            singles: normSingles.length > 0 ? normSingles : this.statsBank.singles,
+            charts:  normCharts.length  > 0 ? normCharts  : this.statsBank.charts,
+          };
+          console.log('[CACI Demo] Loaded real stats:', {
+            singles: this.statsBank.singles.length,
+            charts:  this.statsBank.charts.length,
+          });
+        }
+      }
+    } catch {}
+
     // URL override for quick testing: ?demo=1 forces the button to show
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('demo') === '1') this.enabled = true;
@@ -12871,10 +12921,15 @@ const DemoMode = {
   // geometry for the Tony Stark holographic feel.
   // ═══════════════════════════════════════════════════════════════
 
-  // Build a single floating-number 3D element: big number, small label,
-  // tiny source line. Returns a Group billboarded to always face the camera.
-  // `fact` = { display, label, source }
-  // `opts` = { scale, labelScale, numberColor }
+  // Build a holographic floating-number 3D element.
+  // Composition (z-layers, camera-facing):
+  //   z=-1.5  background plate — dark recessed panel w/ faint grid
+  //   z=-0.5  frame accents — gold corner brackets + cyan tick marks
+  //   z= 0    big number (canvas texture, larger)
+  //   z=+0.3  label & source overlays
+  //   z=+0.6  scan line that sweeps vertically (animated in update loop)
+  //   z=+0.6  live-data indicator dot (pulsing green)
+  // All billboarded. Layered offsets produce parallax when camera moves.
   _makeFloatingNumber3D(fact, opts) {
     const C = this.cinema;
     if (!C || !fact) return null;
@@ -12883,50 +12938,131 @@ const DemoMode = {
     const scale = opts.scale || 1;
 
     const group = new THREE.Group();
+    // Panel dimensions (local units — `scale` multiplies the whole group)
+    const W = 95;
+    const H = 40;
 
-    // Big number
+    // ─── Layer 1: Background plate — dark recessed panel with faint grid ───
+    const bgCanvas = document.createElement('canvas');
+    bgCanvas.width = 1024; bgCanvas.height = 420;
+    const bctx = bgCanvas.getContext('2d');
+    // Subtle dark navy fill
+    bctx.fillStyle = 'rgba(6, 11, 22, 0.55)';
+    bctx.fillRect(0, 0, 1024, 420);
+    // Faint grid lines — mostly vertical, very subdued
+    bctx.strokeStyle = 'rgba(110, 208, 232, 0.06)';
+    bctx.lineWidth = 1;
+    const gridStep = 40;
+    for (let x = gridStep; x < 1024; x += gridStep) {
+      bctx.beginPath(); bctx.moveTo(x, 0); bctx.lineTo(x, 420); bctx.stroke();
+    }
+    for (let y = gridStep; y < 420; y += gridStep) {
+      bctx.beginPath(); bctx.moveTo(0, y); bctx.lineTo(1024, y); bctx.stroke();
+    }
+    const bgTex = new THREE.CanvasTexture(bgCanvas);
+    bgTex.needsUpdate = true;
+    const bgMat = new THREE.MeshBasicMaterial({
+      map: bgTex, transparent: true, depthWrite: false, opacity: 0,
+    });
+    const bgMesh = new THREE.Mesh(new THREE.PlaneGeometry(W, H), bgMat);
+    bgMesh.position.z = -1.5;
+    group.add(bgMesh);
+
+    // ─── Layer 2: Frame — corner brackets (gold) + cyan tick marks ───
+    const frameMat = new THREE.LineBasicMaterial({
+      color: 0xf5e398,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+    });
+    const cyanMat = new THREE.LineBasicMaterial({
+      color: 0x6ed0e8,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+    });
+    // Corner brackets — 4 L-shapes, one per corner
+    const brLen = 6;  // bracket arm length
+    const brX = W / 2 - 1;
+    const brY = H / 2 - 1;
+    [
+      [[-brX, brY], [-brX + brLen, brY], [-brX, brY], [-brX, brY - brLen]],   // top-left
+      [[brX, brY], [brX - brLen, brY], [brX, brY], [brX, brY - brLen]],       // top-right
+      [[-brX, -brY], [-brX + brLen, -brY], [-brX, -brY], [-brX, -brY + brLen]], // bottom-left
+      [[brX, -brY], [brX - brLen, -brY], [brX, -brY], [brX, -brY + brLen]],   // bottom-right
+    ].forEach(segments => {
+      for (let i = 0; i < segments.length; i += 2) {
+        const a = segments[i], b = segments[i + 1];
+        const g = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(a[0], a[1], -0.5),
+          new THREE.Vector3(b[0], b[1], -0.5),
+        ]);
+        group.add(new THREE.Line(g, frameMat));
+      }
+    });
+    // Cyan tick marks along the top edge — 5 short vertical marks
+    const tickY = H / 2 - 0.5;
+    for (let i = 0; i < 5; i++) {
+      const tx = -W / 2 + (i + 1) * (W / 6);
+      const g = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(tx, tickY, -0.5),
+        new THREE.Vector3(tx, tickY - 2, -0.5),
+      ]);
+      group.add(new THREE.Line(g, cyanMat));
+    }
+    // Cyan horizontal accent line below the label
+    const accentG = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-W / 2 + 6, -H / 2 + 6, -0.5),
+      new THREE.Vector3( W / 2 - 6, -H / 2 + 6, -0.5),
+    ]);
+    group.add(new THREE.Line(accentG, cyanMat));
+
+    // ─── Layer 3: Big number (canvas texture, generous size) ───
     const numCanvas = document.createElement('canvas');
-    numCanvas.width = 1024; numCanvas.height = 256;
+    numCanvas.width = 1024; numCanvas.height = 320;
     const nctx = numCanvas.getContext('2d');
-    nctx.font = '300 160px "Cormorant Garamond", serif';
+    nctx.font = '500 200px "Cormorant Garamond", serif';
     nctx.textAlign = 'center';
     nctx.textBaseline = 'middle';
-    const numGrad = nctx.createLinearGradient(0, 30, 0, 220);
-    numGrad.addColorStop(0.0, '#fff8e0');
-    numGrad.addColorStop(0.35, '#ffeea0');
-    numGrad.addColorStop(0.65, '#e8c84a');
-    numGrad.addColorStop(1.0, '#b8962a');
+    const numGrad = nctx.createLinearGradient(0, 40, 0, 280);
+    numGrad.addColorStop(0.0, '#ffffe8');
+    numGrad.addColorStop(0.25, '#fff2a8');
+    numGrad.addColorStop(0.65, '#f0cc50');
+    numGrad.addColorStop(1.0, '#b8902a');
     nctx.fillStyle = numGrad;
-    nctx.shadowColor = 'rgba(212,168,50,0.6)';
-    nctx.shadowBlur = 24;
-    nctx.fillText(fact.display, 512, 128);
+    nctx.shadowColor = 'rgba(245,227,152,0.95)';
+    nctx.shadowBlur = 36;
+    nctx.fillText(fact.display, 512, 160);
+    // Second pass (smaller shadow) for cleaner edges
+    nctx.shadowBlur = 0;
+    nctx.fillText(fact.display, 512, 160);
     const numTex = new THREE.CanvasTexture(numCanvas);
     numTex.needsUpdate = true;
+    numTex.anisotropy = 4;
     const numMat = new THREE.MeshBasicMaterial({
       map: numTex, transparent: true, depthWrite: false, opacity: 0,
     });
-    const numMesh = new THREE.Mesh(new THREE.PlaneGeometry(80 * scale, 20 * scale), numMat);
-    numMesh.position.y = 6 * scale;
+    const numMesh = new THREE.Mesh(new THREE.PlaneGeometry(W * 0.92, H * 0.55), numMat);
+    numMesh.position.set(0, H * 0.1, 0);
     group.add(numMesh);
 
-    // Small label
+    // ─── Layer 4: Label — letter-spaced uppercase, muted warm white ───
     if (fact.label) {
       const lblCanvas = document.createElement('canvas');
       lblCanvas.width = 1024; lblCanvas.height = 96;
       const lctx = lblCanvas.getContext('2d');
-      lctx.font = '400 44px "Inter", sans-serif';
-      lctx.textAlign = 'center';
+      lctx.font = '500 42px "Inter", sans-serif';
       lctx.textBaseline = 'middle';
-      lctx.fillStyle = 'rgba(230,220,200,0.88)';
-      lctx.shadowColor = 'rgba(0,0,0,0.8)';
-      lctx.shadowBlur = 6;
-      // Letter-spacing simulation
       const txt = fact.label.toUpperCase();
-      const tracking = 8;
+      const tracking = 6;
+      lctx.font = '500 42px "Inter", sans-serif';
+      lctx.textAlign = 'left';
       const metrics = lctx.measureText(txt);
       const totalW = metrics.width + tracking * (txt.length - 1);
       let x = 512 - totalW / 2;
-      lctx.textAlign = 'left';
+      lctx.fillStyle = 'rgba(240,230,200,0.88)';
+      lctx.shadowColor = 'rgba(0,0,0,0.9)';
+      lctx.shadowBlur = 4;
       for (const ch of txt) {
         lctx.fillText(ch, x, 48);
         x += lctx.measureText(ch).width + tracking;
@@ -12936,36 +13072,70 @@ const DemoMode = {
       const lblMat = new THREE.MeshBasicMaterial({
         map: lblTex, transparent: true, depthWrite: false, opacity: 0,
       });
-      const lblMesh = new THREE.Mesh(new THREE.PlaneGeometry(80 * scale, 7.5 * scale), lblMat);
-      lblMesh.position.y = -6 * scale;
+      const lblMesh = new THREE.Mesh(new THREE.PlaneGeometry(W * 0.85, H * 0.13), lblMat);
+      lblMesh.position.set(0, -H * 0.12, 0.3);
       group.add(lblMesh);
       group.userData.labelMat = lblMat;
     }
 
-    // Source line (tiny, italic, very muted)
+    // ─── Layer 4b: Source — tiny italic, very muted ───
     if (fact.source) {
       const srcCanvas = document.createElement('canvas');
       srcCanvas.width = 1024; srcCanvas.height = 64;
       const sctx = srcCanvas.getContext('2d');
-      sctx.font = '300 italic 28px "Cormorant Garamond", serif';
+      sctx.font = '300 italic 26px "Cormorant Garamond", serif';
       sctx.textAlign = 'center';
       sctx.textBaseline = 'middle';
-      sctx.fillStyle = 'rgba(200,185,150,0.50)';
-      sctx.fillText(fact.source, 512, 32);
+      sctx.fillStyle = 'rgba(180,170,140,0.60)';
+      // Truncate long source names
+      const src = fact.source.length > 50 ? fact.source.slice(0, 47) + '\u2026' : fact.source;
+      sctx.fillText(src, 512, 32);
       const srcTex = new THREE.CanvasTexture(srcCanvas);
       srcTex.needsUpdate = true;
       const srcMat = new THREE.MeshBasicMaterial({
         map: srcTex, transparent: true, depthWrite: false, opacity: 0,
       });
-      const srcMesh = new THREE.Mesh(new THREE.PlaneGeometry(80 * scale, 5 * scale), srcMat);
-      srcMesh.position.y = -11 * scale;
+      const srcMesh = new THREE.Mesh(new THREE.PlaneGeometry(W * 0.75, H * 0.09), srcMat);
+      srcMesh.position.set(0, -H * 0.32, 0.3);
       group.add(srcMesh);
       group.userData.srcMat = srcMat;
     }
 
+    // ─── Layer 5: Scan line — animated horizontal bar that sweeps the panel ───
+    const scanMat = new THREE.MeshBasicMaterial({
+      color: 0x6ed0e8,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+    });
+    const scanMesh = new THREE.Mesh(new THREE.PlaneGeometry(W * 0.94, 0.5), scanMat);
+    scanMesh.position.set(0, 0, 0.6);
+    group.add(scanMesh);
+    group.userData.scanMat = scanMat;
+    group.userData.scanMesh = scanMesh;
+    group.userData.panelH = H;
+
+    // ─── Layer 6: Live-data indicator dot — tiny pulsing green in top-left ───
+    const liveMat = new THREE.MeshBasicMaterial({
+      color: 0x58e89e,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+    });
+    const liveMesh = new THREE.Mesh(new THREE.CircleGeometry(0.9, 16), liveMat);
+    liveMesh.position.set(-W / 2 + 4, H / 2 - 4, 0.6);
+    group.add(liveMesh);
+    group.userData.liveMat = liveMat;
+
     group.userData.numMat = numMat;
-    group.userData.billboard = true;  // flagged for the update loop to billboard
+    group.userData.bgMat = bgMat;
+    group.userData.frameMat = frameMat;
+    group.userData.cyanMat = cyanMat;
+    group.userData.billboard = true;
     group.userData.isFloatingNumber = true;
+
+    // Apply the caller's scale uniformly
+    group.scale.setScalar(scale);
     return group;
   },
 
@@ -13679,6 +13849,27 @@ const DemoMode = {
     entry4.highlights = highlights;
     entry4.highlightTimes = highlightTimes;
     entry4.traceStart = performance.now();
+
+    // ─── Answer hologram: the real stat that CACI "found" ───
+    // After the query orb has traveled through all 4 documents, a real stat
+    // appears near the end of the trace — the retrieved answer. This is the
+    // "payoff" moment of the beat. Uses the most impressive single stat.
+    if (entry4.answerHologram) {
+      entry4.group.remove(entry4.answerHologram);
+    }
+    const pickedAnswer = (this.statsBank && this.statsBank.singles && this.statsBank.singles[0]) || null;
+    if (pickedAnswer) {
+      const answer = this._makeFloatingNumber3D(pickedAnswer, { scale: 1.6 });
+      if (answer) {
+        // Position just off to the side of the final trace point, closer to camera
+        const finalPt = points[points.length - 1].clone();
+        answer.position.set(finalPt.x + 15, finalPt.y + 30, finalPt.z + 25);
+        // Reveal after all 4 documents have been highlighted (4 × 1.4 = 5.6s + buffer)
+        answer.userData.revealDelay = 6.4;
+        entry4.group.add(answer);
+        entry4.answerHologram = answer;
+      }
+    }
   },
 
   // Create connection threads for Beat 5 — thin gold lines connecting nearby
@@ -13796,22 +13987,22 @@ const DemoMode = {
     }
     entry5.dataNodes = [];
     // Pick the first 5 facts from the stats bank. Distribute them around the
-    // camera's interior view of the Finance cluster — some near, some far,
-    // offset so they don't overlap threads.
+    // camera's interior view of the Finance cluster — larger (readable) and
+    // spread further apart now that each is a full holographic panel.
     const pickedStats = (this.statsBank && this.statsBank.singles || []).slice(0, 5);
     // Positions relative to the Finance cluster center (which is at (0,0,40)).
     // Camera is at roughly (-6, 4, 52) looking toward (20, 0, 40), so nodes
-    // should be placed in a rough arc in that direction.
+    // should be placed around that view in an arc — spread wider for bigger panels.
     const NODE_POSITIONS = [
-      [ 35,  22,   20],   // upper right, a bit back
-      [-10, -18,   58],   // lower left, close
-      [ 45,  -5,   65],   // right middle, closer
-      [  5,  30,   75],   // top center, close
-      [-25,  10,   15],   // left, far back
+      [ 55,  35,   10],   // upper right, set back
+      [-30, -25,   70],   // lower left, close to camera
+      [ 70,  -8,   60],   // right middle, closer
+      [ 10,  50,   90],   // top center, very close
+      [-45,  15,   -10],  // left, far back
     ];
     pickedStats.forEach((fact, i) => {
       if (i >= NODE_POSITIONS.length) return;
-      const node = this._makeFloatingNumber3D(fact, { scale: 0.8 });
+      const node = this._makeFloatingNumber3D(fact, { scale: 1.4 });
       if (!node) return;
       node.position.set(...NODE_POSITIONS[i]);
       node.userData.revealDelay = 0.5 + i * 0.6;  // staggered fade-in
@@ -14065,6 +14256,38 @@ const DemoMode = {
           }
         });
       }
+
+      // Answer hologram — the payoff stat that appears after the trace completes
+      if (b4.answerHologram) {
+        const ah = b4.answerHologram;
+        const delay = ah.userData.revealDelay || 0;
+        const timeAfter = since - delay;
+        let aFade = 0;
+        if (timeAfter > 0) {
+          aFade = Math.min(1, timeAfter / 1.4);
+          aFade = aFade * aFade * (3 - 2 * aFade);
+        }
+        const eff = fade * aFade;
+        const ud = ah.userData;
+        if (ud.bgMat)    ud.bgMat.opacity    = eff * 0.82;
+        if (ud.frameMat) ud.frameMat.opacity = eff * 0.92;
+        if (ud.cyanMat)  ud.cyanMat.opacity  = eff * 0.78;
+        if (ud.numMat)   ud.numMat.opacity   = eff * 1.00;
+        if (ud.labelMat) ud.labelMat.opacity = eff * 0.85;
+        if (ud.srcMat)   ud.srcMat.opacity   = eff * 0.58;
+        if (ud.scanMesh && ud.scanMat && ud.panelH) {
+          const sweepPhase = ((tSec) / 4) % 1;
+          ud.scanMesh.position.y = ud.panelH / 2 + (-ud.panelH) * sweepPhase;
+          ud.scanMat.opacity = eff * Math.sin(sweepPhase * Math.PI) * 0.55;
+        }
+        if (ud.liveMat) {
+          ud.liveMat.opacity = eff * (0.45 + 0.45 * Math.sin(tSec * 5));
+        }
+        if (ud.billboard) ah.lookAt(C.camera.position);
+        const breathe = 1 + Math.sin(tSec * 0.5) * 0.012;
+        const base = ud._baseScale || (ud._baseScale = ah.scale.x);
+        ah.scale.set(base * breathe, base * breathe, base * breathe);
+      }
     }
 
     // ─── Beat 5: connection threads + traveling pulses + real data nodes ───
@@ -14109,28 +14332,47 @@ const DemoMode = {
       }
 
       // Floating number data nodes — staggered reveal, billboard to camera
+      // Full holographic treatment: fade all layers, animate scan line, pulse live dot
       if (b5.dataNodes && b5.dataNodes.length > 0) {
         b5.dataNodes.forEach(node => {
           const delay = node.userData.revealDelay || 0;
           const timeAfter = since - delay;
           let nodeFade = 0;
           if (timeAfter > 0) {
-            // Quick ease-in over 1.2 seconds
             nodeFade = Math.min(1, timeAfter / 1.2);
-            nodeFade = nodeFade * nodeFade * (3 - 2 * nodeFade);  // smoothstep
+            nodeFade = nodeFade * nodeFade * (3 - 2 * nodeFade);
           }
           const effective = fade * nodeFade;
-          // Apply to the node's sub-materials. Different strengths for number vs label vs source.
-          if (node.userData.numMat)   node.userData.numMat.opacity   = effective * 0.98;
-          if (node.userData.labelMat) node.userData.labelMat.opacity = effective * 0.80;
-          if (node.userData.srcMat)   node.userData.srcMat.opacity   = effective * 0.55;
-          // Billboard the node's parent group toward the camera
-          if (node.userData.billboard) {
+          const ud = node.userData;
+          // Apply to every layer of the holographic element
+          if (ud.bgMat)    ud.bgMat.opacity    = effective * 0.82;
+          if (ud.frameMat) ud.frameMat.opacity = effective * 0.92;
+          if (ud.cyanMat)  ud.cyanMat.opacity  = effective * 0.78;
+          if (ud.numMat)   ud.numMat.opacity   = effective * 1.00;
+          if (ud.labelMat) ud.labelMat.opacity = effective * 0.85;
+          if (ud.srcMat)   ud.srcMat.opacity   = effective * 0.58;
+          // Scan line: sweeps top-to-bottom every 4 seconds
+          if (ud.scanMesh && ud.scanMat && ud.panelH) {
+            const sweepPhase = ((tSec + (ud.revealDelay || 0) * 2) / 4) % 1;
+            const yStart = ud.panelH / 2;
+            const yEnd = -ud.panelH / 2;
+            ud.scanMesh.position.y = yStart + (yEnd - yStart) * sweepPhase;
+            // Scan opacity peaks mid-sweep, invisible at extremes
+            ud.scanMat.opacity = effective * Math.sin(sweepPhase * Math.PI) * 0.55;
+          }
+          // Live indicator: pulses between 0.3 and 1.0 on a ~1.2s cycle
+          if (ud.liveMat) {
+            const livePulse = 0.45 + 0.45 * Math.sin(tSec * 5 + (ud.revealDelay || 0));
+            ud.liveMat.opacity = effective * livePulse;
+          }
+          // Billboard the node toward the camera
+          if (ud.billboard) {
             node.lookAt(C.camera.position);
           }
-          // Gentle breathing scale so numbers feel alive, not pasted
-          const breathe = 1 + Math.sin((tSec + (node.userData.revealDelay || 0) * 0.7) * 0.6) * 0.02;
-          node.scale.set(breathe, breathe, breathe);
+          // Gentle breathing scale so hologram feels alive, not pasted
+          const breathe = 1 + Math.sin((tSec + (ud.revealDelay || 0) * 0.7) * 0.5) * 0.012;
+          const baseScale = node.userData._baseScale || (node.userData._baseScale = node.scale.x);
+          node.scale.set(baseScale * breathe, baseScale * breathe, baseScale * breathe);
         });
       }
     }
