@@ -86,12 +86,18 @@ export default {
     if (path === '/admin/config' && method === 'GET') return handleAdminGet(env);
     if (path === '/tts' && method === 'POST') return handleTTS(request, env);
     if (path === '/demo/scripts' && method === 'GET') return handleDemoGetScripts(env);
+    if (path === '/demo/stats'   && method === 'GET') return handleDemoGetStats(env);
 
     if (!verifyToken(request, env)) return json({ error: 'Unauthorized' }, 401);
 
     // Demo script management (admin-auth required)
     if (path === '/demo/generate-all'   && method === 'POST') return handleDemoGenerateAll(request, env);
     if (path === '/demo/reset-all'      && method === 'POST') return handleDemoResetAll(request, env);
+    // Demo stats data bank — real numbers CACI extracts from her library
+    // for use in the 3D holographic charts in the demo's chorus beats.
+    if (path === '/demo/harvest-stats'  && method === 'POST') return handleDemoHarvestStats(request, env);
+    if (path === '/demo/save-stats'     && method === 'POST') return handleDemoSaveStats(request, env);
+    if (path === '/demo/reset-stats'    && method === 'POST') return handleDemoResetStats(request, env);
     // Legacy (single-variant) endpoints — still available for back-compat:
     if (path === '/demo/generate-intro' && method === 'POST') return handleDemoGenerateIntro(request, env);
     if (path === '/demo/generate-beat'  && method === 'POST') return handleDemoGenerateBeat(request, env);
@@ -4517,6 +4523,252 @@ async function handleDemoResetAll(request, env) {
     await Promise.all(ops);
     return json({ ok: true });
   } catch (e) { return json({ error: e.message }, 500); }
+}
+
+// ══════════════════════════════════════════════════════════
+// DEMO STATS DATA BANK — real numbers extracted from CACI's library
+// for the 3D holographic charts. Stored at KV key `demo:stats:v1` as
+// JSON with the shape:
+//
+//   {
+//     singles: [{ id, kind, value, displayValue, label, period, source, beat }],
+//     charts:  [{ id, title, unit, series: [{ label, value, displayValue }], source, beat }],
+//     harvestedAt: ISO timestamp,
+//     reviewedAt: ISO timestamp | null,   // set when admin clicks Save
+//   }
+//
+// `singles` = individual floating numbers ("$474M", "22 licenses")
+// `charts`  = grouped series for bar/line charts (revenue across FY23-25, etc.)
+// ══════════════════════════════════════════════════════════
+
+const STATS_KV_KEY = 'demo:stats:v1';
+
+async function handleDemoGetStats(env) {
+  try {
+    const raw = await env.CACI_KV.get(STATS_KV_KEY);
+    if (!raw) return json({ singles: [], charts: [], harvestedAt: null, reviewedAt: null });
+    const parsed = JSON.parse(raw);
+    return json(parsed);
+  } catch (e) {
+    return json({ singles: [], charts: [], harvestedAt: null, reviewedAt: null });
+  }
+}
+
+async function handleDemoSaveStats(request, env) {
+  try {
+    const body = await request.json();
+    if (!body || typeof body !== 'object') return json({ error: 'Invalid body' }, 400);
+    const payload = {
+      singles: Array.isArray(body.singles) ? body.singles : [],
+      charts:  Array.isArray(body.charts)  ? body.charts  : [],
+      harvestedAt: body.harvestedAt || new Date().toISOString(),
+      reviewedAt: new Date().toISOString(),
+    };
+    await env.CACI_KV.put(STATS_KV_KEY, JSON.stringify(payload));
+    return json({ ok: true, saved: payload });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+async function handleDemoResetStats(request, env) {
+  try {
+    await env.CACI_KV.delete(STATS_KV_KEY);
+    return json({ ok: true });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+// Harvest stats: CACI sweeps her library and extracts real numeric facts.
+// This is the heavy endpoint — it uses Claude to read retrieved chunks from
+// the library and pull out concrete numbers with source citations.
+//
+// Strategy:
+//   1. Issue 4 targeted retrieval queries against the corpus, one per topic
+//      (revenue/financials, licensing counts, regulatory structure, operational)
+//   2. For each query, send the retrieved chunks to Claude with a strict
+//      extraction prompt that demands numbers + source attribution
+//   3. Parse Claude's JSON response, validate, return as harvest payload
+//
+// The result is NOT saved automatically — admin reviews it, edits if needed,
+// then clicks Save. This is the same generate→review→commit pattern we use
+// for scripts.
+async function handleDemoHarvestStats(request, env) {
+  try {
+    const apiKey = (await env.CACI_KV.get('config:ANTHROPIC_API_KEY')) || env.ANTHROPIC_API_KEY;
+    if (!apiKey) return json({ error: 'Anthropic API key not configured' }, 400);
+
+    // The queries that drive retrieval. Each is tuned to pull number-dense
+    // chunks from the library. The retrieval pipeline (buildContextMultiCollection)
+    // already exists in the app — we reuse it by calling the same helpers.
+    const topicQueries = [
+      {
+        topic: 'revenue',
+        query: 'quarterly revenue earnings total sales cannabis operations financial performance',
+        scope: 'Illinois 2025 annual report, Jushi quarterly earnings',
+      },
+      {
+        topic: 'licensing',
+        query: 'dispensary license count operators active medical adult-use',
+        scope: 'Illinois 2025 annual report',
+      },
+      {
+        topic: 'regulatory',
+        query: 'compliance requirements testing regulation sections chapters rules',
+        scope: 'Ohio regulatory code, Illinois regulations',
+      },
+      {
+        topic: 'collections',
+        query: 'tax collections monthly remittance fund transfers community services',
+        scope: 'Illinois 2025 annual report',
+      },
+    ];
+
+    // Retrieve chunks for each query. The retrieval function lives in the
+    // app but we need a lightweight version here — query KV for relevant chunks.
+    // For this harvest we use a simpler approach: read all chunks from each
+    // uploaded doc's collection and pass them to Claude with the topic query.
+    // Performance: 4 sequential Claude calls, ~5-10s total.
+    const retrievedPerTopic = [];
+    for (const { topic, query, scope } of topicQueries) {
+      const context = await harvestRetrieveContext(env, query);
+      retrievedPerTopic.push({ topic, query, scope, context });
+    }
+
+    // Ask Claude to extract structured stats from all retrieved contexts at once
+    const systemPrompt = `You are CACI's data extraction subsystem. Your job is to extract real numeric facts from document excerpts for display in a demo video. You are strict about only returning numbers that are explicitly stated in the source text. Never invent or infer numbers. If a number is not directly stated, do not include it.`;
+
+    const extractionPrompt = `Below are excerpts from four topic sweeps of CACI's document library. Extract real, concrete numeric facts from these excerpts for use in a demo video's 3D data visualizations.
+
+SWEEPS:
+${retrievedPerTopic.map((r, i) => `
+--- Sweep ${i + 1}: ${r.topic} (sources: ${r.scope}) ---
+${r.context || '(no relevant excerpts found — skip this sweep)'}
+`).join('\n')}
+
+Return a JSON object with two arrays: "singles" and "charts".
+
+"singles" = individual standout numeric facts, good for displaying as large floating numbers. Each item:
+{
+  "id": "snake_case_id",
+  "kind": "currency" | "count" | "percentage",
+  "value": <number>,
+  "displayValue": "<pretty string, e.g. '$474.1M' or '22' or '77%'>",
+  "label": "<short label, max 45 chars>",
+  "period": "<time period or null>",
+  "source": "<doc name>"
+}
+
+"charts" = multi-value series for bar/line charts. Each item:
+{
+  "id": "snake_case_id",
+  "title": "<chart title, max 50 chars>",
+  "unit": "currency" | "count" | "percentage",
+  "series": [{ "label": "<x-axis label>", "value": <number>, "displayValue": "<pretty string>" }],
+  "source": "<doc name>"
+}
+
+Rules:
+1. Only include facts that are directly stated in the excerpts. If you're guessing, omit.
+2. Prefer numbers that will look good as charts: multi-year trends, by-state breakdowns, categorical counts.
+3. Aim for 6-10 singles and 2-4 charts total. Quality over quantity.
+4. Numbers must be plain numbers (no currency symbols in "value"). Use "displayValue" for formatting.
+5. If a sweep returned no useful facts, don't force it.
+
+Return ONLY the JSON object. No preamble, no markdown, no explanation.`;
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 4000,
+        temperature: 0.2,  // low temp — we want precise extraction, not creativity
+        system: systemPrompt,
+        messages: [{ role: 'user', content: extractionPrompt }],
+      }),
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      return json({ error: `Claude API error ${res.status}: ${errText.slice(0, 300)}` }, 500);
+    }
+    const data = await res.json();
+    const txt = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('').trim();
+
+    // Strip any markdown code fences Claude might add
+    let jsonText = txt;
+    const fenceMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (fenceMatch) jsonText = fenceMatch[1];
+
+    let parsed;
+    try { parsed = JSON.parse(jsonText); }
+    catch (e) {
+      return json({ error: 'Could not parse extraction JSON', raw: txt.slice(0, 500) }, 500);
+    }
+
+    // Validate shape
+    const singles = Array.isArray(parsed.singles) ? parsed.singles.filter(s =>
+      s && typeof s.id === 'string' && typeof s.value === 'number'
+        && typeof s.displayValue === 'string' && typeof s.label === 'string'
+    ) : [];
+    const charts = Array.isArray(parsed.charts) ? parsed.charts.filter(c =>
+      c && typeof c.id === 'string' && typeof c.title === 'string'
+        && Array.isArray(c.series) && c.series.length >= 2
+    ) : [];
+
+    return json({
+      singles, charts,
+      harvestedAt: new Date().toISOString(),
+      reviewedAt: null,
+      topicsSwept: topicQueries.map(t => t.topic),
+      retrievedContexts: retrievedPerTopic.map(r => ({
+        topic: r.topic,
+        contextLength: (r.context || '').length,
+      })),
+    });
+  } catch (e) {
+    return json({ error: e.message }, 500);
+  }
+}
+
+// Lightweight retrieval helper for harvesting: scans document chunks in KV
+// for the query's keywords and returns the top-matching text. This is a
+// simpler, synchronous version of the main retrieval pipeline — sufficient
+// for the harvester because we don't need semantic scoring, just "give me
+// chunks that mention these words."
+async function harvestRetrieveContext(env, query) {
+  try {
+    const keywords = query.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+    // List all chunk keys across all collections
+    const list = await env.CACI_KV.list({ prefix: 'chunk:' });
+    if (!list.keys || list.keys.length === 0) return '';
+    // Score chunks by keyword hits
+    const scored = [];
+    const MAX_KEYS_TO_SCAN = 200;  // cap for performance
+    const sample = list.keys.slice(0, MAX_KEYS_TO_SCAN);
+    for (const k of sample) {
+      const raw = await env.CACI_KV.get(k.name);
+      if (!raw) continue;
+      let chunk;
+      try { chunk = JSON.parse(raw); } catch { continue; }
+      const text = (chunk.text || chunk.content || '').toLowerCase();
+      if (!text) continue;
+      let score = 0;
+      for (const kw of keywords) {
+        const hits = (text.match(new RegExp(kw, 'g')) || []).length;
+        score += hits;
+      }
+      if (score > 0) {
+        scored.push({ score, text: chunk.text || chunk.content, source: chunk.source || chunk.docName || 'unknown' });
+      }
+    }
+    scored.sort((a, b) => b.score - a.score);
+    const top = scored.slice(0, 6);
+    return top.map(t => `[${t.source}]\n${t.text}`).join('\n\n---\n\n');
+  } catch (e) {
+    return '';
+  }
 }
 
 // ══════════════════════════════════════════════════════════
