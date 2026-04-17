@@ -74,13 +74,6 @@ export default {
     const method = request.method;
 
     if (method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
-    
-    // Serve static files BEFORE auth check
-    if (path === '/JUSHI.webp' && method === 'GET') {
-      const img = await env.CACI_R2.get('JUSHI.webp');
-      if (img) return new Response(img.body, { headers: { 'Content-Type': 'image/webp', 'Cache-Control': 'public, max-age=86400' } });
-    }
-    
     if (path === '/auth/login' && method === 'POST') return handleLogin(request, env);
     if (path === '/health') return json({ ok: true, version: '6.1.0' });
 
@@ -2727,6 +2720,12 @@ async function handleAdminSave(request, env) {
         saved.push(key);
       }
     }
+    // Demo mode toggle (boolean)
+    if (body.DEMO_MODE_ENABLED !== undefined) {
+      const v = body.DEMO_MODE_ENABLED ? '1' : '0';
+      await env.CACI_KV.put('config:DEMO_MODE_ENABLED', v);
+      saved.push('DEMO_MODE_ENABLED');
+    }
     if (saved.length) writeAudit(env, requireAdmin(request, env), 'config.save', { dept: 'global', keys: saved });
     return json({ ok: true, saved });
   } catch (err) { return json({ error: err.message }, 500); }
@@ -2736,6 +2735,7 @@ async function handleAdminGet(env) {
   try {
     const kvAnt = await env.CACI_KV.get('config:ANTHROPIC_API_KEY');
     const kvXai = await env.CACI_KV.get('config:XAI_API_KEY');
+    const kvDemo = await env.CACI_KV.get('config:DEMO_MODE_ENABLED');
     return json({
       ANTHROPIC_API_KEY: {
         configured: !!(kvAnt || env.ANTHROPIC_API_KEY),
@@ -2745,6 +2745,7 @@ async function handleAdminGet(env) {
         configured: !!(kvXai || env.XAI_API_KEY),
         source: kvXai ? 'admin' : env.XAI_API_KEY ? 'secret' : 'none',
       },
+      DEMO_MODE_ENABLED: kvDemo === '1',
     });
   } catch (err) { return json({ error: err.message }, 500); }
 }
