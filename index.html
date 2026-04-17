@@ -8585,6 +8585,9 @@ function applyIdentityUI() {
           <div style="font-family:var(--f-ui);font-size:11px;font-weight:300;color:var(--smoke2);letter-spacing:0.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(displayName)}</div>
           <div style="font-family:var(--f-mono);font-size:8px;letter-spacing:0.10em;color:rgba(212,168,50,0.40);text-transform:uppercase;margin-top:1px">${isAdmin ? 'Admin' : 'User'}</div>
         </div>
+        <button id="sb-tour-btn" title="Take the tour" style="flex-shrink:0;background:none;border:1px solid rgba(212,168,50,0.18);border-radius:3px;padding:4px 5px;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0.55;transition:opacity 0.15s,border-color 0.15s;" onmouseover="this.style.opacity='1';this.style.borderColor='rgba(212,168,50,0.45)'" onmouseout="this.style.opacity='0.55';this.style.borderColor='rgba(212,168,50,0.18)'">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="6" cy="6" r="4.5" stroke="rgba(212,168,50,0.8)" stroke-width="1.1"/><path d="M4.6 4.8a1.4 1.4 0 0 1 2.8 0c0 .9-1.4 1.2-1.4 2" stroke="rgba(212,168,50,0.8)" stroke-width="1.1" stroke-linecap="round"/><circle cx="6" cy="8.6" r="0.55" fill="rgba(212,168,50,0.8)"/></svg>
+        </button>
         <button id="sb-chpw-btn" title="Change password" style="flex-shrink:0;background:none;border:1px solid rgba(212,168,50,0.18);border-radius:3px;padding:4px 5px;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0.55;transition:opacity 0.15s,border-color 0.15s;" onmouseover="this.style.opacity='1';this.style.borderColor='rgba(212,168,50,0.45)'" onmouseout="this.style.opacity='0.55';this.style.borderColor='rgba(212,168,50,0.18)'">
           <svg width="11" height="12" viewBox="0 0 11 12" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="5" width="9" height="6.5" rx="1.2" stroke="rgba(212,168,50,0.8)" stroke-width="1.1"/><path d="M3 5V3.5a2.5 2.5 0 0 1 5 0V5" stroke="rgba(212,168,50,0.8)" stroke-width="1.1" stroke-linecap="round"/><circle cx="5.5" cy="8.2" r="0.9" fill="rgba(212,168,50,0.8)"/></svg>
         </button>
@@ -8594,6 +8597,11 @@ function applyIdentityUI() {
       </div>`;
     $("sb-chpw-btn")?.addEventListener("click", openChangePasswordModal);
     $("sb-logout-btn")?.addEventListener("click", logout);
+    $("sb-tour-btn")?.addEventListener("click", () => {
+      if (window.UserTour && typeof window.UserTour.start === 'function') {
+        window.UserTour.start();
+      }
+    });
   }
 
   // Show/hide admin-gated elements
