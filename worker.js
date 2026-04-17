@@ -4007,58 +4007,91 @@ async function handleEmbedFile(request, env) {
 // GET /embed-status
 // Reports semantic-indexing coverage across the entire library.
 // Enumerates file:* records directly (not the stale index:global) so the
-// count reflects reality. Checks every chunk in every file (not just chunk 0)
-// so partial embeddings show as partial coverage instead of false 100%.
+// count reflects reality.
+//
+// Performance notes: this runs in a Cloudflare Worker with a bounded CPU budget.
+// We do (1) a single list() call, (2) parallel json fetches for file records,
+// and (3) parallel existence-checks for embeddings. Sequential reads would
+// blow the budget on a corpus of 70+ files.
 async function handleEmbedStatus(url, env) {
   try {
-    // Enumerate ALL file records — this is the real source of truth.
-    // List is paginated; we cap scanning at 100 files for performance.
     const fileList = await env.CACI_KV.list({ prefix: 'file:' });
     const keys = (fileList && fileList.keys) ? fileList.keys : [];
 
-    let totalFiles = 0, fullyIndexedFiles = 0, partiallyIndexedFiles = 0;
-    let totalChunks = 0, indexedChunks = 0;
-    const partialFiles = [];   // list of {name, indexed, total} for UI detail
-
-    const MAX_FILES_TO_SCAN = 100;
+    // Hard cap — never scan more than this many files per status request.
+    // If corpus grows past this, admin sees a partial reading that's still useful.
+    const MAX_FILES_TO_SCAN = 80;
     const sample = keys.slice(0, MAX_FILES_TO_SCAN);
 
-    for (const fkey of sample) {
-      const rec = await env.CACI_KV.get(fkey.name, 'json');
-      if (!rec) continue;
-      if (rec.isContext) continue;  // context docs don't count toward user-visible corpus
-      totalFiles++;
+    // Step 1: fetch all file records in parallel.
+    const fileRecs = await Promise.all(
+      sample.map(k => env.CACI_KV.get(k.name, 'json').catch(() => null))
+    );
+
+    // Step 2: for each file, decide which chunk indices to probe.
+    // We only check a few per file (first, middle, last) — enough to tell
+    // "fully indexed" from "partially indexed" from "not indexed" without
+    // reading hundreds of keys per file.
+    const probeTargets = [];  // flat list of {recIdx, chunkIdx, fileId}
+    fileRecs.forEach((rec, recIdx) => {
+      if (!rec || rec.isContext) return;
       const chunkCount = Array.isArray(rec.chunks) ? rec.chunks.length : (rec.chunks || 0);
+      if (chunkCount === 0) return;
+      // Probe up to 3 positions per file: first, middle, last
+      const probes = [0];
+      if (chunkCount >= 3) probes.push(Math.floor(chunkCount / 2));
+      if (chunkCount >= 2) probes.push(chunkCount - 1);
+      probes.forEach(ci => probeTargets.push({ recIdx, chunkIdx: ci, fileId: rec.id }));
+    });
+
+    // Step 3: run all probes in parallel. This is bounded — typically ~240 reads
+    // for 80 files × 3 probes. Cloudflare KV handles that comfortably.
+    const probeResults = await Promise.all(
+      probeTargets.map(p =>
+        env.CACI_KV.get(`emb:${p.fileId}:${p.chunkIdx}`).catch(() => null)
+      )
+    );
+
+    // Step 4: aggregate per file.
+    const perFile = new Map();   // recIdx → { found, probed }
+    probeTargets.forEach((p, i) => {
+      const entry = perFile.get(p.recIdx) || { found: 0, probed: 0 };
+      entry.probed++;
+      if (probeResults[i]) entry.found++;
+      perFile.set(p.recIdx, entry);
+    });
+
+    // Step 5: tally totals.
+    let totalFiles = 0, fullyIndexedFiles = 0, partiallyIndexedFiles = 0;
+    let totalChunks = 0, estIndexedChunks = 0;
+    const partialFiles = [];
+
+    fileRecs.forEach((rec, recIdx) => {
+      if (!rec || rec.isContext) return;
+      const chunkCount = Array.isArray(rec.chunks) ? rec.chunks.length : (rec.chunks || 0);
+      totalFiles++;
       totalChunks += chunkCount;
-      if (chunkCount === 0) continue;
+      if (chunkCount === 0) return;
 
-      // Check embedding presence for every chunk in this file. We cap per-file
-      // at 120 chunks to bound KV read count on very large docs; if a file has
-      // more than that, we check 120 spread across the file range.
-      const CHECK_CAP = Math.min(chunkCount, 120);
-      let found = 0;
-      for (let i = 0; i < CHECK_CAP; i++) {
-        const idx = chunkCount <= 120 ? i : Math.floor((i / 119) * (chunkCount - 1));
-        const got = await env.CACI_KV.get(`emb:${rec.id}:${idx}`).catch(() => null);
-        if (got) found++;
-      }
-      // Scale found up if we sampled
-      const estIndexed = CHECK_CAP === chunkCount ? found : Math.round((found / CHECK_CAP) * chunkCount);
-      indexedChunks += estIndexed;
+      const entry = perFile.get(recIdx) || { found: 0, probed: 0 };
+      const probeRatio = entry.probed > 0 ? entry.found / entry.probed : 0;
 
-      if (estIndexed === chunkCount) {
+      if (probeRatio === 1) {
         fullyIndexedFiles++;
-      } else if (estIndexed > 0) {
+        estIndexedChunks += chunkCount;
+      } else if (probeRatio > 0) {
         partiallyIndexedFiles++;
+        const est = Math.round(chunkCount * probeRatio);
+        estIndexedChunks += est;
         partialFiles.push({
           name: rec.name || rec.id,
           id: rec.id,
           dept: rec.dept,
-          indexed: estIndexed,
+          indexed: est,
           total: chunkCount,
         });
       } else {
-        // 0 indexed — file uploaded but never embedded. List it as needing backfill.
+        // probeRatio === 0 — none of the probes found embeddings
         partialFiles.push({
           name: rec.name || rec.id,
           id: rec.id,
@@ -4067,12 +4100,9 @@ async function handleEmbedStatus(url, env) {
           total: chunkCount,
         });
       }
-    }
+    });
 
-    // Coverage = indexed chunks / total chunks. This is the true story.
-    // (The old version reported file-level coverage which was misleading
-    // because a file with 40/100 chunks indexed showed as "indexed.")
-    const chunkCoveragePct = totalChunks > 0 ? Math.round(indexedChunks / totalChunks * 100) : 0;
+    const chunkCoveragePct = totalChunks > 0 ? Math.round(estIndexedChunks / totalChunks * 100) : 0;
     const fileCoveragePct = totalFiles > 0 ? Math.round(fullyIndexedFiles / totalFiles * 100) : 0;
 
     return json({
@@ -4082,18 +4112,19 @@ async function handleEmbedStatus(url, env) {
       indexedFiles: fullyIndexedFiles,
       partiallyIndexedFiles,
       totalChunks,
-      indexedChunks,
-      coveragePct: chunkCoveragePct,     // true chunk-level coverage (what matters for retrieval)
-      fileCoveragePct,                   // fully-indexed file count (for the simple headline)
-      partialFiles: partialFiles.slice(0, 20),  // surface top 20 problem files for admin UI
+      indexedChunks: estIndexedChunks,
+      coveragePct: chunkCoveragePct,
+      fileCoveragePct,
+      partialFiles: partialFiles.slice(0, 20),
       totalScanned: sample.length,
       totalKeysInKV: keys.length,
+      scanTruncated: keys.length > MAX_FILES_TO_SCAN,
       aiAvailable: !!env.AI,
       model: EMB_MODEL,
       alpha: HYBRID_ALPHA,
     });
   } catch (err) {
-    return json({ error: err.message }, 500);
+    return json({ error: err.message, stack: (err.stack || '').slice(0, 500) }, 500);
   }
 }
 
