@@ -11498,8 +11498,24 @@ async function harvestDemoStats() {
       reviewedAt: null,
     };
     renderStatsReview();
-    if (status) status.textContent = `\u2713 harvested ${d.singles.length} facts + ${d.charts.length} charts. Review and Save to activate.`;
-    if (saveBtn) saveBtn.style.display = 'inline-block';
+
+    // Diagnostic: if nothing came back, tell user WHY (retrieval empty vs extraction empty)
+    const totalItems = (d.singles || []).length + (d.charts || []).length;
+    if (totalItems === 0) {
+      const ctxInfo = (d.retrievedContexts || []).map(c => `${c.topic}:${c.contextLength}`).join(' ');
+      const totalCtxLen = (d.retrievedContexts || []).reduce((a, c) => a + (c.contextLength || 0), 0);
+      if (totalCtxLen === 0) {
+        if (status) status.textContent = '\u26a0 No document chunks found. Library may be empty or chunks stored differently. Check console for diagnostics.';
+        console.log('[Harvest] Empty retrieval. Raw response:', d);
+      } else {
+        if (status) status.textContent = `\u26a0 Retrieved ${totalCtxLen} chars of context but Claude extracted 0 facts. Context may lack numeric data. [${ctxInfo}]`;
+        console.log('[Harvest] Retrieved context but no facts extracted:', d);
+      }
+      if (saveBtn) saveBtn.style.display = 'none';
+    } else {
+      if (status) status.textContent = `\u2713 harvested ${d.singles.length} facts + ${d.charts.length} charts. Review and Save to activate.`;
+      if (saveBtn) saveBtn.style.display = 'inline-block';
+    }
   } catch (e) {
     if (status) status.textContent = '\u2717 ' + (e.message || 'Harvest failed');
   } finally {
