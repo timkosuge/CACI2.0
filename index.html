@@ -1692,11 +1692,12 @@ body::before {
 .db9-card-tagline {
   font-family: var(--f-display, 'Cormorant Garamond', serif);
   font-weight: 300;
-  font-style: italic;
-  font-size: clamp(24px, 3.2vw, 40px);
-  line-height: 1.2;
-  letter-spacing: 0.04em;
+  font-style: normal;
+  font-size: clamp(22px, 2.9vw, 36px);
+  line-height: 1.18;
+  letter-spacing: 0.14em;
   text-align: center;
+  text-transform: uppercase;
   background: linear-gradient(160deg,
     #fffae8 0%, #fff0a0 20%, #e8c84a 45%,
     #c9a832 65%, #f5e398 85%, #fffae8 100%);
@@ -1707,6 +1708,31 @@ body::before {
     drop-shadow(0 1px 0px rgba(0,0,0,1))
     drop-shadow(0 2px 3px rgba(0,0,0,0.75))
     drop-shadow(0 0 14px rgba(212,168,50,0.22));
+}
+/* Thin gold rule between the tagline and the company name */
+.db9-card-rule {
+  width: 60%;
+  max-width: 160px;
+  height: 1px;
+  margin: 18px auto 16px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(212,168,50,0.4) 20%,
+    rgba(245,227,152,0.85) 50%,
+    rgba(212,168,50,0.4) 80%,
+    transparent 100%);
+}
+/* JUSHI company name beneath the tagline — thinner, wider letter-spacing */
+.db9-card-company {
+  font-family: var(--f-ui, 'Inter', sans-serif);
+  font-weight: 300;
+  font-size: clamp(10px, 1.3vw, 14px);
+  letter-spacing: 0.58em;
+  text-align: center;
+  color: rgba(245,227,152,0.72);
+  text-transform: uppercase;
+  text-indent: 0.58em;  /* compensate for trailing letter-spacing on last char */
+  text-shadow: 0 1px 0 rgba(0,0,0,0.8), 0 0 12px rgba(212,168,50,0.15);
 }
 
 .db9-cta {
@@ -6864,7 +6890,9 @@ body::before {
             <div class="corner tl"></div><div class="corner tr"></div>
             <div class="corner bl"></div><div class="corner br"></div>
             <div class="db9-card-inner">
-              <div class="db9-card-tagline">The future<br>of cannabis</div>
+              <div class="db9-card-tagline">THE FUTURE<br>OF CANNABIS</div>
+              <div class="db9-card-rule"></div>
+              <div class="db9-card-company">JUSHI</div>
             </div>
           </div>
         </div>
@@ -15412,10 +15440,19 @@ const UserTour = (() => {
   // `panel` optionally switches to a specific panel before showing the step.
   const STEPS = [
     {
+      target: '#tambour-handle',
+      arrow:  'left',
+      label:  'Step 1 of 7',
+      title:  'Open the shutter',
+      body:   'This is the tambour \u2014 pull the handle to reveal the navigation underneath. It\u2019s how you move between chat, documents, and settings.',
+      // Do NOT auto-open for this step; we want the user to see it closed and
+      // understand what it is. The tour advances to the next step normally.
+    },
+    {
       target: '#chat-ta',
       panel:  'chat',
       arrow:  'bottom',
-      label:  'Step 1 of 6',
+      label:  'Step 2 of 7',
       title:  'Ask her anything',
       body:   'Type your question here. CACI reads the documents you\u2019ve given her and answers with citations \u2014 no guessing, no made-up numbers. Try asking about something specific in one of her documents.',
     },
@@ -15423,7 +15460,7 @@ const UserTour = (() => {
       target: '#upload-btn',
       panel:  'chat',
       arrow:  'bottom',
-      label:  'Step 2 of 6',
+      label:  'Step 3 of 7',
       title:  'Teach her',
       body:   'Drop documents here and she\u2019ll read them cover to cover, tag them, and file them automatically. PDFs, Word docs, spreadsheets, even images \u2014 she handles all of them.',
     },
@@ -15431,7 +15468,7 @@ const UserTour = (() => {
       target: '#dept-chip',
       panel:  'chat',
       arrow:  'bottom',
-      label:  'Step 3 of 6',
+      label:  'Step 4 of 7',
       title:  'Scope her context',
       body:   'Switch departments to change which documents she draws from. Compliance, Finance, Operations, Retail \u2014 she knows each department has different concerns and adjusts accordingly.',
     },
@@ -15439,23 +15476,25 @@ const UserTour = (() => {
       target: '#new-chat-btn',
       panel:  'chat',
       arrow:  'top',
-      label:  'Step 4 of 6',
+      label:  'Step 5 of 7',
       title:  'Fresh start',
       body:   'Starting a new conversation clears context but keeps her memory of your documents. Useful when you\u2019re switching topics and don\u2019t want earlier questions shaping her answers.',
     },
     {
       target: '#sb-nav .nav-btn[data-p="files"], #botbar .tab-btn[data-p="files"]',
       arrow:  'right',
-      label:  'Step 5 of 6',
+      label:  'Step 6 of 7',
       title:  'Her library',
       body:   'Everything she\u2019s read lives here. You can see what\u2019s been uploaded, re-tag things, and remove documents you no longer need. The more she has, the sharper her answers.',
+      needsTambourOpen: true,  // nav buttons are covered by tambour when closed
     },
     {
       target: '#sb-nav .nav-btn[data-p="admin"], #botbar .tab-btn[data-p="admin"]',
       arrow:  'right',
-      label:  'Step 6 of 6',
+      label:  'Step 7 of 7',
       title:  'Behind the scenes',
       body:   'Admins can tune retrieval weights, manage users, turn demo mode on or off, and let CACI write her own intro scripts. Most people won\u2019t need this \u2014 but it\u2019s there when you do.',
+      needsTambourOpen: true,
     },
   ];
 
@@ -15512,6 +15551,20 @@ const UserTour = (() => {
   function maybeSwitchPanel(step) {
     if (step.panel && typeof switchPanel === 'function' && curPanel !== step.panel) {
       try { switchPanel(step.panel); } catch {}
+    }
+  }
+
+  // Some tour steps target elements that live underneath the tambour shutter
+  // in the sidebar (the nav buttons). If the shutter is closed, we open it
+  // programmatically before showing the step — otherwise the spotlight lands
+  // on something the user can't actually see.
+  function maybeOpenTambour(step) {
+    if (!step.needsTambourOpen) return;
+    const tambour = document.getElementById('tambour');
+    if (!tambour) return;
+    if (!tambour.classList.contains('open')) {
+      tambour.classList.add('open');
+      tambour.style.pointerEvents = 'none';
     }
   }
 
@@ -15631,34 +15684,42 @@ const UserTour = (() => {
     if (!step) { finish(); return; }
 
     maybeSwitchPanel(step);
+    maybeOpenTambour(step);
 
-    // Wait a frame after any panel switch so DOM updates settle
-    requestAnimationFrame(() => {
+    // If we just opened the tambour, the nav buttons animate in over ~550ms.
+    // Give that time to finish so getBoundingClientRect returns the real
+    // final positions (not mid-animation transforms).
+    const settleDelay = step.needsTambourOpen ? 600 : 0;
+
+    setTimeout(() => {
+      // Wait a frame after any panel switch so DOM updates settle
       requestAnimationFrame(() => {
-        // If the target still isn't found after switching, skip forward
-        const target = resolveTarget(step);
-        if (!target) {
-          if (stepIdx < state.validSteps.length - 1) {
-            state.stepIndex = stepIdx + 1;
-            renderStep(state.stepIndex);
-          } else { finish(); }
-          return;
-        }
+        requestAnimationFrame(() => {
+          // If the target still isn't found after switching, skip forward
+          const target = resolveTarget(step);
+          if (!target) {
+            if (stepIdx < state.validSteps.length - 1) {
+              state.stepIndex = stepIdx + 1;
+              renderStep(state.stepIndex);
+            } else { finish(); }
+            return;
+          }
 
-        $$('tour-step-label').textContent = step.label;
-        $$('tour-title').textContent      = step.title;
-        $$('tour-body').textContent       = step.body;
-        $$('tour-progress').textContent   = (stepIdx + 1) + ' / ' + state.validSteps.length;
-        $$('tour-back').disabled = (stepIdx === 0);
-        $$('tour-next').textContent = (stepIdx === state.validSteps.length - 1) ? 'Finish' : 'Next';
+          $$('tour-step-label').textContent = step.label;
+          $$('tour-title').textContent      = step.title;
+          $$('tour-body').textContent       = step.body;
+          $$('tour-progress').textContent   = (stepIdx + 1) + ' / ' + state.validSteps.length;
+          $$('tour-back').disabled = (stepIdx === 0);
+          $$('tour-next').textContent = (stepIdx === state.validSteps.length - 1) ? 'Finish' : 'Next';
 
-        positionElements(step);
+          positionElements(step);
 
-        // Make card visible after position is set
-        const card = $$('tour-card');
-        if (card) card.classList.add('visible');
+          // Make card visible after position is set
+          const card = $$('tour-card');
+          if (card) card.classList.add('visible');
+        });
       });
-    });
+    }, settleDelay);
   }
 
   function next() {
@@ -15687,6 +15748,18 @@ const UserTour = (() => {
     if (state.validSteps.length === 0) return;
     state.active = true;
     state.stepIndex = 0;
+
+    // Remember the sidebar state and force it open so spotlighted nav
+    // buttons are visible. We'll restore on finish/skip.
+    const sidebarEl = document.getElementById('sidebar');
+    const sbToggleEl = document.getElementById('sb-toggle');
+    const contentEl = document.getElementById('content');
+    state._sidebarWasCollapsed = !!(sidebarEl && sidebarEl.classList.contains('collapsed'));
+    if (state._sidebarWasCollapsed) {
+      sidebarEl.classList.remove('collapsed');
+      if (sbToggleEl) sbToggleEl.classList.remove('collapsed');
+      if (contentEl) contentEl.classList.remove('sb-collapsed');
+    }
 
     const overlay = $$('tour-overlay');
     if (overlay) overlay.classList.add('active');
@@ -15730,6 +15803,16 @@ const UserTour = (() => {
     const card = $$('tour-card');
     if (card) card.classList.remove('visible');
     if (overlay) overlay.classList.remove('active');
+    // Restore sidebar state if we opened it for the tour
+    if (state._sidebarWasCollapsed) {
+      const sidebarEl = document.getElementById('sidebar');
+      const sbToggleEl = document.getElementById('sb-toggle');
+      const contentEl = document.getElementById('content');
+      if (sidebarEl) sidebarEl.classList.add('collapsed');
+      if (sbToggleEl) sbToggleEl.classList.add('collapsed');
+      if (contentEl) contentEl.classList.add('sb-collapsed');
+      state._sidebarWasCollapsed = false;
+    }
     if (state.keyHandler) {
       document.removeEventListener('keydown', state.keyHandler);
       state.keyHandler = null;
