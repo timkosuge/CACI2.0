@@ -716,47 +716,99 @@ body::before {
 }
 .lcard-demo-prompt-btn {
   display: inline-block;
-  padding: 9px 22px;
-  background: linear-gradient(180deg, rgba(30,22,8,0.88) 0%, rgba(18,12,4,0.96) 100%);
-  border: 1px solid rgba(212,168,50,0.45);
-  border-radius: 2px;
-  color: rgba(245,227,152,0.92);
+  padding: 10px 26px;
+  /* Real gold surface — gradient from bright highlight at top to deeper gold at bottom */
+  background: linear-gradient(180deg,
+    #fff4cc 0%,
+    #f5e398 25%,
+    #e8c84a 55%,
+    #c9a832 85%,
+    #a88829 100%);
+  border: 1px solid rgba(255, 240, 170, 0.85);
+  border-radius: 3px;
+  /* Dark text against bright gold — readable and rich */
+  color: rgba(38, 26, 6, 0.95);
   font-family: var(--f-ui);
   font-size: 10px;
-  font-weight: 400;
+  font-weight: 600;
   letter-spacing: 0.30em;
   text-transform: uppercase;
   cursor: pointer;
-  transition: all 0.3s var(--ease);
+  transition: all 0.35s var(--ease);
   -webkit-appearance: none;
   position: relative;
   overflow: hidden;
+  text-shadow: 0 1px 0 rgba(255, 245, 200, 0.4);
+  /* Layered glow — bright inner edge + soft outer halo that breathes */
   box-shadow:
-    inset 0 1px 0 rgba(245,227,152,0.18),
-    0 2px 6px rgba(0,0,0,0.60),
-    0 0 14px rgba(212,168,50,0.12);
+    inset 0 1px 0 rgba(255, 250, 220, 0.85),
+    inset 0 -1px 0 rgba(120, 90, 20, 0.35),
+    0 2px 6px rgba(0, 0, 0, 0.55),
+    0 0 22px rgba(245, 227, 152, 0.35),
+    0 0 44px rgba(212, 168, 50, 0.25);
+  animation: lcardDemoPulse 2.8s ease-in-out infinite;
 }
+@keyframes lcardDemoPulse {
+  0%, 100% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 250, 220, 0.85),
+      inset 0 -1px 0 rgba(120, 90, 20, 0.35),
+      0 2px 6px rgba(0, 0, 0, 0.55),
+      0 0 22px rgba(245, 227, 152, 0.35),
+      0 0 44px rgba(212, 168, 50, 0.25);
+  }
+  50% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 250, 220, 0.95),
+      inset 0 -1px 0 rgba(120, 90, 20, 0.35),
+      0 2px 6px rgba(0, 0, 0, 0.55),
+      0 0 32px rgba(255, 240, 170, 0.55),
+      0 0 64px rgba(212, 168, 50, 0.42);
+  }
+}
+/* Shine sweep that passes across the surface on hover */
 .lcard-demo-prompt-btn::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(110deg, transparent 30%, rgba(245,227,152,0.14) 50%, transparent 70%);
+  background: linear-gradient(110deg,
+    transparent 30%,
+    rgba(255, 255, 240, 0.55) 50%,
+    transparent 70%);
   background-size: 300% 100%;
   background-position: 120% 0;
-  transition: background-position 0.8s ease;
+  transition: background-position 0.9s ease;
   pointer-events: none;
 }
 .lcard-demo-prompt-btn:hover {
-  border-color: rgba(212,168,50,0.78);
-  color: rgba(255,240,180,1);
-  box-shadow:
-    inset 0 1px 0 rgba(245,227,152,0.28),
-    0 3px 10px rgba(0,0,0,0.70),
-    0 0 26px rgba(212,168,50,0.28);
+  /* Slightly brighter gold when hovered, with a stronger halo */
+  background: linear-gradient(180deg,
+    #fffae8 0%,
+    #fff0a0 25%,
+    #f0d260 55%,
+    #d4b238 85%,
+    #b8942e 100%);
+  border-color: rgba(255, 250, 220, 1);
+  color: rgba(30, 18, 2, 1);
   letter-spacing: 0.38em;
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 252, 230, 1),
+    inset 0 -1px 0 rgba(140, 105, 25, 0.45),
+    0 4px 14px rgba(0, 0, 0, 0.75),
+    0 0 40px rgba(255, 240, 170, 0.70),
+    0 0 80px rgba(212, 168, 50, 0.55);
+  animation: none;   /* hover takes over the glow */
 }
 .lcard-demo-prompt-btn:hover::before {
   background-position: -40% 0;
+}
+.lcard-demo-prompt-btn:active {
+  transform: translateY(0);
+  box-shadow:
+    inset 0 2px 4px rgba(90, 60, 10, 0.4),
+    0 1px 3px rgba(0, 0, 0, 0.6),
+    0 0 24px rgba(245, 227, 152, 0.45);
 }
 
 /* ─────────── DEMO THEATRE OVERLAY ─────────── */
@@ -7999,6 +8051,26 @@ body::before {
           </div>
         </div>
 
+        <!-- DEMO DATA BANK -->
+        <div class="asec admin-only">
+          <div class="asec-head"><div class="asec-title">Demo Data Bank</div><div class="asec-line"></div></div>
+          <div class="acard">
+            <div class="acard-title">Real stats for the demo reveal</div>
+            <div class="acard-sub">CACI sweeps her library and extracts real numeric facts &mdash; revenue figures, license counts, regulatory numbers. The demo&apos;s 3D holographic charts use these actual numbers, so what viewers see is pulled directly from her documents. Harvest, review, save. Re-harvest any time she&apos;s fed new documents.</div>
+            <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;align-items:center">
+              <button class="asave" id="demo-stats-harvest">Harvest Stats from Library</button>
+              <button class="asave" id="demo-stats-save" style="background:transparent;border:1px solid rgba(212,168,50,0.5);color:rgba(245,227,152,0.92);display:none">Save to Demo</button>
+              <button class="asave" id="demo-stats-reset" style="background:transparent;border:1px solid rgba(220,90,90,0.5);color:rgba(240,160,160,0.95)">Reset</button>
+              <span id="demo-stats-status" style="font-family:var(--f-mono);font-size:10px;color:var(--smoke3);letter-spacing:.06em"></span>
+            </div>
+            <div id="demo-stats-review" style="margin-top:14px;display:none">
+              <div style="font-family:var(--f-mono);font-size:10px;color:var(--smoke3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px">Review &mdash; uncheck to exclude, click value to edit</div>
+              <div id="demo-stats-singles-wrap" style="margin-bottom:14px"></div>
+              <div id="demo-stats-charts-wrap"></div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -9158,6 +9230,24 @@ function bootApp() {
   }
   // Load what's currently stored (for the summary display)
   loadDemoScriptsSummary();
+
+  // Wire Demo Data Bank admin card (stats harvesting)
+  const statsHarvestBtn = $('demo-stats-harvest');
+  if (statsHarvestBtn && !statsHarvestBtn._wired) {
+    statsHarvestBtn._wired = true;
+    statsHarvestBtn.addEventListener('click', () => harvestDemoStats());
+  }
+  const statsSaveBtn = $('demo-stats-save');
+  if (statsSaveBtn && !statsSaveBtn._wired) {
+    statsSaveBtn._wired = true;
+    statsSaveBtn.addEventListener('click', () => saveDemoStats());
+  }
+  const statsResetBtn = $('demo-stats-reset');
+  if (statsResetBtn && !statsResetBtn._wired) {
+    statsResetBtn._wired = true;
+    statsResetBtn.addEventListener('click', () => resetDemoStats());
+  }
+  loadDemoStatsSummary();
 
   // ── Recurring gold glimmer sweep — fires every 60s ──────────
   function triggerAppGlimmer() {
@@ -11258,6 +11348,215 @@ async function resetAllDemoScripts() {
     if (!res.ok || d.error) throw new Error(d.error || 'Reset failed');
     if (status) status.textContent = '\u2713 All cleared \u2014 using defaults';
     loadDemoScriptsSummary();
+  } catch (e) {
+    if (status) status.textContent = '\u2717 ' + (e.message || 'Reset failed');
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+// DEMO DATA BANK (AI Settings → Demo Data Bank)
+// Harvest stats from CACI's library, review in admin UI, save for demo use.
+// ══════════════════════════════════════════════════════════
+
+let _demoStatsDraft = null;   // unsaved harvested payload pending review
+
+async function loadDemoStatsSummary() {
+  // On admin panel load, show what's already stored
+  const reviewWrap = $('demo-stats-review');
+  const saveBtn = $('demo-stats-save');
+  const status = $('demo-stats-status');
+  try {
+    const res = await apiFetch('/demo/stats');
+    if (!res.ok) return;
+    const d = await res.json();
+    const singles = Array.isArray(d.singles) ? d.singles : [];
+    const charts = Array.isArray(d.charts) ? d.charts : [];
+    if (singles.length === 0 && charts.length === 0) {
+      if (status) status.textContent = '— no stats yet. Click Harvest to have CACI sweep her library.';
+      if (reviewWrap) reviewWrap.style.display = 'none';
+      if (saveBtn) saveBtn.style.display = 'none';
+      return;
+    }
+    // Show the saved set
+    _demoStatsDraft = { singles, charts, harvestedAt: d.harvestedAt, reviewedAt: d.reviewedAt };
+    renderStatsReview();
+    if (status) status.textContent = `\u2713 ${singles.length} facts, ${charts.length} charts saved`;
+    if (saveBtn) saveBtn.style.display = 'none';  // already saved, hide the save button
+  } catch (e) {
+    if (status) status.textContent = '\u2717 ' + (e.message || 'Load failed');
+  }
+}
+
+function renderStatsReview() {
+  const reviewWrap = $('demo-stats-review');
+  const singlesWrap = $('demo-stats-singles-wrap');
+  const chartsWrap = $('demo-stats-charts-wrap');
+  if (!reviewWrap || !singlesWrap || !chartsWrap || !_demoStatsDraft) return;
+  reviewWrap.style.display = 'block';
+
+  // SINGLES
+  if (_demoStatsDraft.singles.length === 0) {
+    singlesWrap.innerHTML = '';
+  } else {
+    let html = '<div style="font-family:var(--f-mono);font-size:10px;color:rgba(212,168,50,0.7);letter-spacing:.12em;text-transform:uppercase;margin-bottom:8px">Singles &mdash; floating numbers</div>';
+    _demoStatsDraft.singles.forEach((s, i) => {
+      html += `
+        <div class="stat-review-row" data-kind="single" data-idx="${i}" style="display:flex;align-items:center;gap:10px;padding:8px 10px;margin-bottom:6px;background:rgba(4,6,12,0.5);border:1px solid rgba(212,168,50,0.12);border-radius:3px">
+          <input type="checkbox" ${s._excluded ? '' : 'checked'} class="stat-incl" style="accent-color:var(--gold);flex-shrink:0"/>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap">
+              <span class="stat-display" contenteditable="true" style="font-family:var(--f-display);font-size:18px;font-weight:400;color:rgba(245,227,152,0.95);outline:none;border-bottom:1px dashed rgba(212,168,50,0.25);padding-bottom:1px">${esc(s.displayValue)}</span>
+              <span class="stat-label" contenteditable="true" style="font-size:12px;color:rgba(230,220,200,0.85);outline:none;border-bottom:1px dashed rgba(212,168,50,0.15);padding-bottom:1px">${esc(s.label)}</span>
+            </div>
+            <div style="font-family:var(--f-mono);font-size:9px;color:rgba(200,185,150,0.5);letter-spacing:.06em;margin-top:3px">${esc(s.source || 'unknown source')}${s.period ? ' · ' + esc(s.period) : ''}</div>
+          </div>
+        </div>`;
+    });
+    singlesWrap.innerHTML = html;
+  }
+
+  // CHARTS
+  if (_demoStatsDraft.charts.length === 0) {
+    chartsWrap.innerHTML = '';
+  } else {
+    let html = '<div style="font-family:var(--f-mono);font-size:10px;color:rgba(212,168,50,0.7);letter-spacing:.12em;text-transform:uppercase;margin-bottom:8px">Charts &mdash; multi-value series</div>';
+    _demoStatsDraft.charts.forEach((c, i) => {
+      html += `
+        <div class="stat-review-row" data-kind="chart" data-idx="${i}" style="padding:10px 12px;margin-bottom:8px;background:rgba(4,6,12,0.5);border:1px solid rgba(212,168,50,0.15);border-radius:3px">
+          <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:6px">
+            <input type="checkbox" ${c._excluded ? '' : 'checked'} class="stat-incl" style="accent-color:var(--gold);flex-shrink:0"/>
+            <span class="stat-title" contenteditable="true" style="font-family:var(--f-display);font-size:15px;color:rgba(245,227,152,0.95);outline:none;border-bottom:1px dashed rgba(212,168,50,0.2);padding-bottom:1px;flex:1">${esc(c.title)}</span>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-left:22px">
+            ${c.series.map((pt, j) => `
+              <div style="background:rgba(212,168,50,0.06);padding:4px 8px;border-radius:2px;border:1px solid rgba(212,168,50,0.12);font-family:var(--f-mono);font-size:10px">
+                <span style="color:rgba(200,185,150,0.55)">${esc(pt.label)}:</span> <span style="color:rgba(245,227,152,0.95);font-weight:500">${esc(pt.displayValue)}</span>
+              </div>
+            `).join('')}
+          </div>
+          <div style="font-family:var(--f-mono);font-size:9px;color:rgba(200,185,150,0.5);letter-spacing:.06em;margin-top:6px;margin-left:22px">${esc(c.source || 'unknown source')}</div>
+        </div>`;
+    });
+    chartsWrap.innerHTML = html;
+  }
+
+  // Wire exclusion checkboxes and contenteditable blurs
+  reviewWrap.querySelectorAll('.stat-incl').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const row = cb.closest('.stat-review-row');
+      if (!row) return;
+      const idx = parseInt(row.dataset.idx, 10);
+      const kind = row.dataset.kind;
+      const arr = kind === 'single' ? _demoStatsDraft.singles : _demoStatsDraft.charts;
+      if (arr[idx]) arr[idx]._excluded = !cb.checked;
+      showSaveButton();
+    });
+  });
+  reviewWrap.querySelectorAll('[contenteditable="true"]').forEach(el => {
+    el.addEventListener('blur', () => {
+      const row = el.closest('.stat-review-row');
+      if (!row) return;
+      const idx = parseInt(row.dataset.idx, 10);
+      const kind = row.dataset.kind;
+      const text = el.textContent.trim();
+      if (kind === 'single') {
+        if (el.classList.contains('stat-display')) _demoStatsDraft.singles[idx].displayValue = text;
+        if (el.classList.contains('stat-label'))   _demoStatsDraft.singles[idx].label = text;
+      } else {
+        if (el.classList.contains('stat-title')) _demoStatsDraft.charts[idx].title = text;
+      }
+      showSaveButton();
+    });
+  });
+}
+
+function showSaveButton() {
+  const btn = $('demo-stats-save');
+  if (btn) btn.style.display = 'inline-block';
+}
+
+async function harvestDemoStats() {
+  const btn = $('demo-stats-harvest');
+  const status = $('demo-stats-status');
+  const saveBtn = $('demo-stats-save');
+  if (!confirm('Have CACI scan her library and extract real numeric facts?\nTakes about 10-20 seconds.')) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Scanning library\u2026'; }
+  if (status) status.textContent = 'Retrieving chunks, extracting with Claude\u2026';
+
+  try {
+    const res = await apiFetch('/demo/harvest-stats', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    const d = await res.json();
+    if (!res.ok || d.error) throw new Error(d.error || 'Harvest failed');
+    _demoStatsDraft = {
+      singles: d.singles || [],
+      charts:  d.charts  || [],
+      harvestedAt: d.harvestedAt,
+      reviewedAt: null,
+    };
+    renderStatsReview();
+    if (status) status.textContent = `\u2713 harvested ${d.singles.length} facts + ${d.charts.length} charts. Review and Save to activate.`;
+    if (saveBtn) saveBtn.style.display = 'inline-block';
+  } catch (e) {
+    if (status) status.textContent = '\u2717 ' + (e.message || 'Harvest failed');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Harvest Stats from Library'; }
+  }
+}
+
+async function saveDemoStats() {
+  if (!_demoStatsDraft) return;
+  const status = $('demo-stats-status');
+  if (status) status.textContent = 'Saving\u2026';
+  // Filter out excluded items
+  const payload = {
+    singles: _demoStatsDraft.singles.filter(s => !s._excluded).map(s => {
+      const { _excluded, ...rest } = s;
+      return rest;
+    }),
+    charts: _demoStatsDraft.charts.filter(c => !c._excluded).map(c => {
+      const { _excluded, ...rest } = c;
+      return rest;
+    }),
+    harvestedAt: _demoStatsDraft.harvestedAt,
+  };
+  try {
+    const res = await apiFetch('/demo/save-stats', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const d = await res.json();
+    if (!res.ok || d.error) throw new Error(d.error || 'Save failed');
+    if (status) status.textContent = `\u2713 saved. Demo now uses ${payload.singles.length} facts + ${payload.charts.length} charts.`;
+    const saveBtn = $('demo-stats-save');
+    if (saveBtn) saveBtn.style.display = 'none';
+  } catch (e) {
+    if (status) status.textContent = '\u2717 ' + (e.message || 'Save failed');
+  }
+}
+
+async function resetDemoStats() {
+  if (!confirm('Delete all stored demo stats?\nThe demo will show generic visuals until you re-harvest.')) return;
+  const status = $('demo-stats-status');
+  if (status) status.textContent = 'Resetting\u2026';
+  try {
+    const res = await apiFetch('/demo/reset-stats', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    const d = await res.json();
+    if (!res.ok || d.error) throw new Error(d.error || 'Reset failed');
+    _demoStatsDraft = null;
+    if (status) status.textContent = '\u2713 cleared';
+    const reviewWrap = $('demo-stats-review');
+    if (reviewWrap) reviewWrap.style.display = 'none';
+    const saveBtn = $('demo-stats-save');
+    if (saveBtn) saveBtn.style.display = 'none';
   } catch (e) {
     if (status) status.textContent = '\u2717 ' + (e.message || 'Reset failed');
   }
