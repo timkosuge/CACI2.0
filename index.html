@@ -850,6 +850,69 @@ body::before {
   animation: preshowCoreAppear 1.8s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
+/* ─── Preshow name (minimal v2) — serif type with drawing underline ─── */
+.preshow-name-v2 {
+  position: absolute;
+  left: 7%;
+  bottom: 18%;
+  pointer-events: none;
+  opacity: 0;
+  animation: preshowNameAppear 2.4s cubic-bezier(0.2, 0.7, 0.2, 1) 0.8s forwards;
+  transition: opacity 0.6s ease;
+  max-width: 55%;
+}
+@keyframes preshowNameAppear {
+  0%   { opacity: 0; transform: translateY(8px); letter-spacing: 0.06em; }
+  60%  { opacity: 1; letter-spacing: 0.14em; }
+  100% { opacity: 1; transform: translateY(0);  letter-spacing: 0.18em; }
+}
+.preshow-name-text {
+  font-family: var(--f-display, 'Cormorant Garamond', serif);
+  font-weight: 300;
+  font-size: clamp(48px, 8vw, 120px);
+  line-height: 1;
+  letter-spacing: 0.18em;
+  color: rgba(245, 227, 152, 0.96);
+  /* Subtle metallic gradient on the letters */
+  background: linear-gradient(180deg,
+    #fff4cc 0%,
+    #f5e398 28%,
+    #e8c84a 55%,
+    #c9a832 78%,
+    #a58820 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 24px rgba(212, 168, 50, 0.18);
+  user-select: none;
+  font-variant: small-caps;
+}
+.preshow-name-line {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+  height: 1px;
+  margin-top: 18px;
+  overflow: hidden;
+}
+.preshow-name-line-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg,
+    rgba(212, 168, 50, 0) 0%,
+    rgba(212, 168, 50, 0.85) 10%,
+    rgba(245, 227, 152, 1) 50%,
+    rgba(212, 168, 50, 0.85) 90%,
+    rgba(212, 168, 50, 0) 100%);
+  transform-origin: left center;
+  transform: scaleX(0);
+  /* JS sets the transform directly each frame for audio-sync progress */
+  box-shadow: 0 0 6px rgba(245, 227, 152, 0.4);
+}
+
 /* The cinematic stage — 16:9, grows from the card's position */
 .demo-stage {
   position: relative;
@@ -10528,26 +10591,29 @@ const DemoMode = {
   // 2) Beat 1 — "here's the problem" transition, still Eve's voice.
   // 3) Beats 3-9 — chorus narrates about her in third person.
   //
-  // Durations tuned to narration length + 1.5-2s tail buffer. Total ~2:55.
+  // Each beat has:
+  //   minDur: floor — beat won't advance before this (gives visual time to land)
+  //   maxDur: ceiling — forced advance (safety against stuck audio)
+  //   The actual transition fires on audio.onended + a short breath (gap).
   beats: [
-    { id: 2, dur: 52000, setup: 'setupPreshow', voice: 'eve',
-      narr: "I'm Cassie. I know — another AI assistant. Well...... I guess I can't refute that. But, I think you'll find that I am a little different. That's partially because of the way this system was designed to function, but it's also because I actually know this industry. I know what 280E does to your margins. I know METRC isn't optional. I know compliance is stressed out and retail is tired and ops is trying to keep everything running. I'm not perfect, but I can certainly make your life easier. An industry this young, this regulated, this watched — it was never going to be easy. Or better said, it should be hard. The people who figure it out get to build something the world hasn't seen before." },
-    { id: 1, dur: 12500, setup: null, voice: 'eve',
-      narr: "Here's the problem I was built to solve. Your answers live in thousands of documents — earnings, regulations, policies — scattered across departments, different formats, hours to find." },
-    { id: 3, dur: 18000, setup: 'setupDepts', voice: 'ara',
-      narr: "Every document she reads gets analyzed seven ways — what it is, when it's from, where it applies, what it contains — then filed by department, period, and jurisdiction. By the time a question arrives, she already knows where to look." },
-    { id: 4, dur: 16500, setup: 'setupQuery', voice: 'sal',
-      narr: "She doesn't hunt for keywords. She figures out what you're really asking, picks the right places to look, weighs every passage by how directly it answers — and she won't tell you something she can't back up." },
-    { id: 5, dur: 14500, setup: 'setupNetwork', voice: 'leo',
-      narr: "The more she reads, the more she sees. A new regulation changes what a policy means. A new earnings report reframes an old trend. She notices things even when you don't think to ask." },
-    { id: 6, dur: 14500, setup: 'setupScenario', voice: 'rex',
-      narr: "When a decision is in front of you — a price change, a new market, a regulatory shift — she models it against your actual data. She shows you where it works, and where it breaks." },
-    { id: 7, dur: 12500, setup: 'setupStats', voice: 'ara',
+    { id: 2, minDur: 55000, maxDur: 80000, setup: 'setupPreshow', voice: 'eve',
+      narr: "Hi, I'm Cassie. I figured I'd introduce myself before we get started, because I know this is probably new — not AI in general, you've all seen it on your phones, but AI that actually understands this industry. That part's still rare. And I get the skepticism. So let me just tell you who I am. I was built for cannabis. Not retrofitted from some generic assistant — built for it. I know what 280E does to your margins. I know METRC isn't optional. I know compliance is stressed, retail is tired, and ops is holding everything together with duct tape and coffee. I'm not going to promise I'm perfect, because I'm not. But I'm careful, I cite my sources, and I don't forget anything you teach me. This industry was never going to be easy — too young, too regulated, too watched — and the people who figure it out are going to build something the world hasn't seen before. I'd really like to help with that. So — let me show you what I can do." },
+    { id: 1, minDur: 8000, maxDur: 16000, setup: null, voice: 'leo',
+      narr: "Here's what she was made for. Somewhere in all those earnings reports, regulations, and filings — the answer is already there. But finding it takes hours you don't have, and by the time you get to it, you've already moved on." },
+    { id: 3, minDur: 12000, maxDur: 22000, setup: 'setupDepts', voice: 'ara',
+      narr: "Every document you give her, she actually reads — not just the filename and metadata, the whole thing. Then she analyzes it seven ways: what it is, when it's from, where it applies, what it contains. Files it by department, period, and jurisdiction. By the time a question comes, she already knows where to look." },
+    { id: 4, minDur: 10000, maxDur: 20000, setup: 'setupQuery', voice: 'rex',
+      narr: "She doesn't search, she answers. Before pulling anything, she figures out what you're actually asking — then picks the right places to look, weighs every passage by how directly it answers, and won't tell you something she can't back up with a source." },
+    { id: 5, minDur: 9000, maxDur: 18000, setup: 'setupNetwork', voice: 'ara',
+      narr: "The more she reads, the more she sees. A new regulation changes what a policy means. A new earnings report reframes an old trend. She notices things nobody thinks to ask about." },
+    { id: 6, minDur: 14000, maxDur: 28000, setup: 'setupScenario', voice: 'leo',
+      narr: "Here's what she's actually read. Every Jushi earnings report since 2019. The full Ohio regulatory code — her strongest collection. Illinois regulations. The Illinois 2025 annual report. Ask her about margin trends across seven years of earnings, or what changed in Ohio between revisions — she'll show you the passage, cite the page, and tell you what it means." },
+    { id: 7, minDur: 8000, maxDur: 16000, setup: 'setupStats', voice: 'ara',
       narr: "Every answer cites its sources. Every upload is logged. Her memory lives in your walls — yours, not anyone else's, and it never trains another model." },
-    { id: 8, dur: 14500, setup: null, voice: 'leo',
-      narr: "She isn't a chatbot with your files attached. She's a system built for the way your business actually thinks — department by department, document by document, decision by decision." },
-    { id: 9, dur: 999999, setup: null, voice: 'eve',
-      narr: "Ready to glimpse the future of cannabis?" }
+    { id: 8, minDur: 9000, maxDur: 18000, setup: null, voice: 'rex',
+      narr: "She isn't a chatbot with your files attached. She's a system that learns how your business actually thinks — department by department, document by document, one question at a time." },
+    { id: 9, minDur: 999999, maxDur: 999999, setup: null, voice: 'eve',
+      narr: "So — let's get to work." }
   ],
 
   async init() {
@@ -10644,6 +10710,7 @@ const DemoMode = {
     if (!this.running || idx >= this.beats.length) return;
     this.currentBeat = idx;
     const beat = this.beats[idx];
+    const beatStartTime = performance.now();
 
     // Update progress dots
     const dots = document.querySelectorAll('.demo-dot');
@@ -10671,21 +10738,47 @@ const DemoMode = {
     }
 
     // If this beat isn't the preshow, make sure preshow is torn down
-    // (preshow runs during beat id=2, which plays first in the array)
     if (beat.id !== 2) this.stopPreshow();
 
-    // Play this beat's narration (if available and not muted)
-    this.speakBeat(idx);
-
-    // Prefetch the next TWO beats so the upcoming transition is zero-latency
-    // (previous-only prefetch was leaving a gap when fetches ran slow)
+    // Prefetch the next TWO beats for zero-latency transitions
     if (idx + 1 < this.beats.length) this.prefetchBeatAudio(idx + 1);
     if (idx + 2 < this.beats.length) this.prefetchBeatAudio(idx + 2);
 
-    // Schedule next beat (except the last one, which waits for click)
-    if (idx < this.beats.length - 1) {
-      this.timer = setTimeout(() => this.playBeat(idx + 1), beat.dur);
+    // Schedule advance (except the last beat, which waits for click)
+    if (idx >= this.beats.length - 1) {
+      this.speakBeat(idx);
+      return;
     }
+
+    const minDur = beat.minDur || 8000;
+    const maxDur = beat.maxDur || 30000;
+    const BREATH = 700;  // natural pause between beats after audio ends
+    let advanced = false;
+
+    const advance = () => {
+      if (advanced || !this.running || this.currentBeat !== idx) return;
+      advanced = true;
+      if (this.timer) { clearTimeout(this.timer); this.timer = null; }
+      this.playBeat(idx + 1);
+    };
+
+    // Hard ceiling — if something goes wrong (audio never fires onended),
+    // force-advance at maxDur so the demo can't hang
+    const ceilingTimer = setTimeout(advance, maxDur);
+
+    // Play narration. When audio finishes, honor minDur floor then advance
+    // after a short breath. This makes beats follow speech pace, not a timer.
+    this.speakBeat(idx, () => {
+      // Audio ended (or failed). Wait for minDur floor, then breath, then advance.
+      const elapsed = performance.now() - beatStartTime;
+      const wait = Math.max(BREATH, minDur - elapsed + BREATH);
+      this.timer = setTimeout(() => {
+        clearTimeout(ceilingTimer);
+        advance();
+      }, wait);
+    });
+    // Safety: if TTS is unavailable entirely and onended never fires,
+    // the ceilingTimer will still advance us.
   },
 
   // ── BEAT 1: Chaotic documents ──
@@ -10924,34 +11017,26 @@ const DemoMode = {
   },
 
   // ══════════════════════════════════════════════════════════
-  // PRESHOW — Cassie's intro visual
+  // PRESHOW — Cassie's intro visual (minimal, sophisticated)
   //
-  // Choreography (timed to 52s narration):
-  //   t=0s      core fades in, zoomed way in (fills screen)
-  //   t=1-17s   camera pulls back; points of light appear at varying Z depths
-  //   t=17-23s  field holds still; core + points breathing
-  //   t=23-40s  connections weave out from core through the network
-  //   t=40-47s  network alive; pulses travel along threads
-  //   t=47-52s  camera drifts into Beat 1; preshow fades; Beat 1 takes over
+  // Design: near-black screen. ~28 stars breathing softly, scattered.
+  // Her name "Cassie" set in serif, offset (lower-left third).
+  // A thin gold underline draws itself beneath her name over ~8s.
+  // Starting ~55% through her intro, faint threads begin connecting
+  // nearby stars — slow, almost invisible, builds by the end.
   //
-  // Implementation notes:
-  //   - Pseudo-3D: points have x,y,z; projected to screen each frame
-  //   - ~420 points distributed in a 3D volume around the camera
-  //   - Connections are chosen in setup; drawn progressively in the weave phase
-  //   - Uses the beat duration (52000ms) as the timeline's total length
+  // Driven by audio time: phases key off the audio playback position
+  // so the visual stays in sync no matter how long TTS actually takes.
   // ══════════════════════════════════════════════════════════
 
   setupPreshow(beatEl) {
-    const canvas = document.getElementById('demo-preshow-canvas');
     const preshow = document.getElementById('demo-preshow');
-    const svg = document.getElementById('demo-preshow-svg');
-    if (!canvas || !preshow || !svg) return;
+    const canvas  = document.getElementById('demo-preshow-canvas');
+    if (!preshow || !canvas) return;
     const ctx = canvas.getContext('2d');
 
-    // Activate preshow overlay
     preshow.classList.add('active');
 
-    // Resize handling
     const dpr = window.devicePixelRatio || 1;
     const resize = () => {
       const rect = preshow.getBoundingClientRect();
@@ -10959,277 +11044,163 @@ const DemoMode = {
       canvas.height = Math.floor(rect.height * dpr);
       canvas.style.width  = rect.width  + 'px';
       canvas.style.height = rect.height + 'px';
-      svg.setAttribute('viewBox', `0 0 ${rect.width} ${rect.height}`);
     };
     resize();
     window.addEventListener('resize', resize);
     this._preshowResize = resize;
 
-    // Generate 3D point cloud around origin
-    // Points placed in a loose ellipsoid; bias toward front (closer z)
-    const N = 420;
-    const points = [];
+    // Build sparse star field — positions in 0..1 normalized space
+    // Avoid the lower-left quadrant where "Cassie" sits, and give name some breathing room
+    const N = 28;
+    const stars = [];
     for (let i = 0; i < N; i++) {
-      // Spherical distribution, slightly flattened
-      const theta = Math.random() * Math.PI * 2;
-      const phi   = Math.acos(2 * Math.random() - 1);
-      const r     = 200 + Math.pow(Math.random(), 0.7) * 1000;
-      const x = r * Math.sin(phi) * Math.cos(theta);
-      const y = r * Math.sin(phi) * Math.sin(theta) * 0.7;  // slightly flattened
-      const z = r * Math.cos(phi);
-      points.push({
-        x, y, z,
-        brightness: 0.25 + Math.random() * 0.55,
-        twinkleSpeed: 0.5 + Math.random() * 1.2,
-        twinklePhase: Math.random() * Math.PI * 2,
-        // Each point fades in at a different time during zoom-out
-        appearAt: 1000 + Math.random() * 15000,
-        // Gentle drift
-        driftX: (Math.random() - 0.5) * 0.03,
-        driftY: (Math.random() - 0.5) * 0.03,
+      let sx, sy;
+      let tries = 0;
+      do {
+        sx = Math.random();
+        sy = Math.random();
+        tries++;
+      } while (tries < 10 && (sx < 0.55 && sy > 0.55 && sy < 0.85));  // keep clear of name area
+      stars.push({
+        nx: sx, ny: sy,
+        brightness: 0.35 + Math.random() * 0.5,
+        breatheSpeed: 0.4 + Math.random() * 0.8,
+        breathePhase: Math.random() * Math.PI * 2,
+        size: 0.8 + Math.random() * 1.3,  // small variance in size
+        appearAt: Math.random() * 3.0,     // seconds — staggered fade-in over first few
       });
     }
 
-    // Choose connections: nearest-neighbor graph, sparse.
-    // Each point gets 1-3 connections to the closest other points.
-    // Connections are revealed in order of distance from the camera (closer = earlier).
-    const connections = [];
+    // Pre-compute nearest-neighbor threads for the late phase.
+    // Each star links to 0-2 nearest neighbors within a distance threshold.
+    const threads = [];
     for (let i = 0; i < N; i++) {
       const neighbors = [];
       for (let j = 0; j < N; j++) {
         if (i === j) continue;
-        const dx = points[i].x - points[j].x;
-        const dy = points[i].y - points[j].y;
-        const dz = points[i].z - points[j].z;
-        neighbors.push({ j, d: Math.sqrt(dx*dx + dy*dy + dz*dz) });
+        const dx = stars[i].nx - stars[j].nx;
+        const dy = stars[i].ny - stars[j].ny;
+        neighbors.push({ j, d: Math.sqrt(dx*dx + dy*dy) });
       }
-      neighbors.sort((a, b) => a.d - b.d);
-      // Take 1-2 nearest; skip if too far
-      const take = 1 + (Math.random() < 0.35 ? 1 : 0);
+      neighbors.sort((a,b) => a.d - b.d);
+      const take = Math.random() < 0.6 ? 1 : (Math.random() < 0.4 ? 2 : 0);
       for (let k = 0; k < take; k++) {
         const n = neighbors[k];
-        if (n && n.d < 450) {
-          // Avoid duplicates (i->j and j->i)
+        if (n && n.d < 0.35) {
           const a = Math.min(i, n.j), b = Math.max(i, n.j);
-          if (!connections.some(c => c.a === a && c.b === b)) {
-            connections.push({ a, b, d: n.d });
+          if (!threads.some(t => t.a === a && t.b === b)) {
+            threads.push({ a, b, d: n.d });
           }
         }
       }
     }
-    // Sort connections by minimum z-depth of their endpoints — closer first
-    connections.forEach(c => {
-      c.minZ = Math.min(points[c.a].z, points[c.b].z);
-      c.progress = 0;   // 0..1, how much of the line has drawn
-    });
-    connections.sort((a, b) => a.minZ - b.minZ);
+    // Give each thread a weave order (spread them across the late phase)
+    threads.sort((a,b) => a.d - b.d);
 
-    // Camera state — starts very close to origin (zoomed in on core), pulls back
-    const camera = {
-      z: -80,          // starting very close
-      targetZ: -1600,  // final camera position (pulled way back)
-      zoomDuration: 16000,
-      panX: 0, panY: 0,  // final pan toward Beat 1 target
-      panDuration: 4000,
+    // Create the name element — absolutely positioned, offset to lower-left third
+    // (CSS in document should handle style; if not present, inline styles here)
+    let nameEl = preshow.querySelector('.preshow-name-v2');
+    if (nameEl) nameEl.remove();
+    nameEl = document.createElement('div');
+    nameEl.className = 'preshow-name-v2';
+    nameEl.innerHTML = '<div class="preshow-name-text">Cassie</div><div class="preshow-name-line"><div class="preshow-name-line-fill"></div></div>';
+    preshow.appendChild(nameEl);
+
+    // Timeline — based on audio elapsed time, not beat start time.
+    // We'll update a phase variable from audio.currentTime when available;
+    // fall back to performance.now() if no audio.
+    const t0 = performance.now();
+    const getT = () => {
+      // Prefer audio currentTime for sync
+      if (this.currentAudio && !this.currentAudio.paused && !isNaN(this.currentAudio.currentTime)) {
+        return this.currentAudio.currentTime * 1000;
+      }
+      return performance.now() - t0;
     };
 
-    // Core element — a DOM element with stacked gradient layers, cheaper than redrawing in canvas
-    // We update its transform each frame as the "camera" moves
-    let core = preshow.querySelector('.preshow-core');
-    if (!core) {
-      core = document.createElement('div');
-      core.className = 'preshow-core';
-      // Three layered halos for depth
-      const sizes = [180, 320, 560];
-      const opacities = [1.0, 0.55, 0.22];
-      for (let i = 0; i < sizes.length; i++) {
-        const h = document.createElement('div');
-        h.className = 'preshow-core-halo';
-        h.style.width  = sizes[i] + 'px';
-        h.style.height = sizes[i] + 'px';
-        h.style.background = 'radial-gradient(circle, #fff4b8 0%, #f5d57a 22%, #c9a832 52%, rgba(201,168,50,0) 75%)';
-        h.style.opacity = opacities[i];
-        core.appendChild(h);
-      }
-      // The bright inner center
-      const inner = document.createElement('div');
-      inner.className = 'preshow-core-halo';
-      inner.style.width  = '48px';
-      inner.style.height = '48px';
-      inner.style.background = 'radial-gradient(circle, #ffffff 0%, #fff4b8 40%, rgba(245,213,122,0) 80%)';
-      inner.style.opacity = '1';
-      inner.style.filter = 'blur(2px)';
-      core.appendChild(inner);
-      preshow.appendChild(core);
-    }
+    // Expected narration length (from minDur). Visual phases reference this.
+    const EXPECTED = 65000;
 
-    // Master timeline
-    const t0 = performance.now();
-    const TOTAL = 52000;
-    const ZOOM_END = 16000;      // camera stops pulling back
-    const HOLD_END = 23000;      // held-field moment ends
-    const WEAVE_START = 23000;   // connections begin forming
-    const WEAVE_END = 40000;     // all connections drawn
-    const PAN_START = 47000;     // camera begins drifting to Beat 1 target
-    const FADEOUT_START = 50000; // preshow begins fading out
-
-    // Easing helpers
-    const easeInOutCubic = t => t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2;
-    const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
-    const easeInCubic = t => t*t*t;
-
-    // Main animation loop
     let raf = null;
-    const frame = (now) => {
-      const t = now - t0;
-      if (!this.running || t > TOTAL + 2000) {
-        cancelAnimationFrame(raf);
-        return;
-      }
+    const frame = () => {
+      if (!this.running) { cancelAnimationFrame(raf); return; }
+      const t = getT();
       const w = canvas.width, h = canvas.height;
-      const cx = w / 2, cy = h / 2;
-      const focalLength = 900 * dpr;
 
-      // Camera Z interpolation (zoom-out, with ease)
-      let camZ;
-      if (t < ZOOM_END) {
-        const tn = t / ZOOM_END;
-        camZ = camera.z + (camera.targetZ - camera.z) * easeInOutCubic(tn);
-      } else {
-        camZ = camera.targetZ;
-      }
-
-      // Camera pan toward Beat 1 (drift right-down slightly near end)
-      let panX = 0, panY = 0;
-      if (t > PAN_START) {
-        const tn = Math.min(1, (t - PAN_START) / camera.panDuration);
-        panX = easeInCubic(tn) * 220 * dpr;   // drift right
-        panY = easeInCubic(tn) * 60 * dpr;    // slight downward
-      }
-
-      // Overall fade for end-of-preshow handoff
-      let globalAlpha = 1;
-      if (t > FADEOUT_START) {
-        const tn = Math.min(1, (t - FADEOUT_START) / 2000);
-        globalAlpha = 1 - easeOutCubic(tn);
-      }
-
-      // Clear
       ctx.clearRect(0, 0, w, h);
-      ctx.globalAlpha = globalAlpha;
 
-      // Draw points
-      for (const p of points) {
-        // Apply gentle drift
-        p.x += p.driftX;
-        p.y += p.driftY;
+      // STARS — breathe in, breathe always, fade out at end
+      const tsec = t / 1000;
+      // Global fade-in of the whole field (reaches full by 4s)
+      const globalFadeIn = Math.min(1, tsec / 4);
+      // Global fade-out when audio nears end (last 2s of EXPECTED window)
+      const fadeOutStart = (EXPECTED - 2500);
+      const globalFadeOut = t > fadeOutStart ? Math.max(0, 1 - (t - fadeOutStart) / 2500) : 1;
+      const globalA = globalFadeIn * globalFadeOut;
 
-        // Project 3D → 2D
-        const relZ = p.z - camZ;  // relative z from camera
-        if (relZ <= 1) continue;   // behind camera
-        const scale = focalLength / relZ;
-        const sx = cx + p.x * scale + panX;
-        const sy = cy + p.y * scale + panY;
-
-        // Skip off-screen (with margin)
-        if (sx < -50 || sx > w + 50 || sy < -50 || sy > h + 50) continue;
-
-        // Appearance fade-in based on time
-        let alpha = 0;
-        if (t >= p.appearAt) {
-          alpha = Math.min(1, (t - p.appearAt) / 800);
-        }
-        if (alpha <= 0) continue;
-
-        // Twinkle
-        const tw = 0.8 + 0.2 * Math.sin(t / 1000 * p.twinkleSpeed + p.twinklePhase);
-
-        // Size attenuates with distance; closer points are bigger
-        const size = Math.max(0.6, 2.4 * scale / dpr) * dpr;
-
-        // Brightness fades with distance a bit too
-        const distFade = Math.min(1, 600 / relZ);
-
-        const a = alpha * tw * p.brightness * distFade;
+      for (const s of stars) {
+        // Individual appear time
+        const appearT = Math.max(0, tsec - s.appearAt);
+        const appearA = Math.min(1, appearT / 1.2);
+        if (appearA <= 0) continue;
+        // Breathing
+        const breathe = 0.75 + 0.25 * Math.sin(tsec * s.breatheSpeed + s.breathePhase);
+        const alpha = globalA * appearA * breathe * s.brightness;
+        const x = s.nx * w;
+        const y = s.ny * h;
+        const r = s.size * dpr;
 
         ctx.beginPath();
-        ctx.arc(sx, sy, size, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(245, 213, 122, ${a})`;
-        ctx.shadowColor = 'rgba(212, 168, 50, 0.7)';
-        ctx.shadowBlur = 6 * dpr;
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(245, 213, 122, ${alpha})`;
+        ctx.shadowColor = 'rgba(212, 168, 50, 0.6)';
+        ctx.shadowBlur = 4 * dpr;
         ctx.fill();
       }
       ctx.shadowBlur = 0;
 
-      // Draw connections during WEAVE phase
-      if (t > WEAVE_START) {
+      // THREADS — begin weaving at 55% through EXPECTED duration
+      const WEAVE_START = EXPECTED * 0.55;
+      const WEAVE_END   = EXPECTED * 0.97;
+      if (t > WEAVE_START && threads.length > 0) {
         const weaveT = Math.min(1, (t - WEAVE_START) / (WEAVE_END - WEAVE_START));
-        const totalConnections = connections.length;
-        // Each connection has its own start time staggered across the weave duration
-        for (let i = 0; i < totalConnections; i++) {
-          const conn = connections[i];
-          const connStart = i / totalConnections;        // 0..1
-          const connDur = 0.08;                           // how long each line takes to draw
-          const localT = Math.max(0, (weaveT - connStart) / connDur);
-          if (localT <= 0) continue;
-          const draw = Math.min(1, localT);
-
-          const pa = points[conn.a];
-          const pb = points[conn.b];
-
-          const relZa = pa.z - camZ;
-          const relZb = pb.z - camZ;
-          if (relZa <= 1 || relZb <= 1) continue;
-
-          const scaleA = focalLength / relZa;
-          const scaleB = focalLength / relZb;
-          const ax = cx + pa.x * scaleA + panX;
-          const ay = cy + pa.y * scaleA + panY;
-          const bx = cx + pb.x * scaleB + panX;
-          const by = cy + pb.y * scaleB + panY;
-
-          // Interpolated endpoint
-          const ex = ax + (bx - ax) * draw;
-          const ey = ay + (by - ay) * draw;
-
-          // Line alpha based on depth
-          const avgZ = (relZa + relZb) / 2;
-          const depthFade = Math.min(1, 800 / avgZ);
-
-          ctx.strokeStyle = `rgba(232, 200, 74, ${0.28 * depthFade * globalAlpha})`;
-          ctx.lineWidth = 0.7 * dpr;
+        const numToShow = Math.floor(threads.length * weaveT);
+        for (let i = 0; i < numToShow; i++) {
+          const th = threads[i];
+          const pa = stars[th.a];
+          const pb = stars[th.b];
+          const ax = pa.nx * w, ay = pa.ny * h;
+          const bx = pb.nx * w, by = pb.ny * h;
+          // Fade in per-thread: each takes ~0.8s to fully appear
+          const threadStart = i / threads.length;
+          const localT = Math.max(0, (weaveT - threadStart) * (threads.length * 0.9));
+          const threadA = Math.min(1, localT) * 0.22 * globalA;
+          if (threadA <= 0) continue;
+          ctx.strokeStyle = `rgba(232, 200, 74, ${threadA})`;
+          ctx.lineWidth = 0.5 * dpr;
           ctx.beginPath();
           ctx.moveTo(ax, ay);
-          ctx.lineTo(ex, ey);
+          ctx.lineTo(bx, by);
           ctx.stroke();
         }
       }
 
-      // Update core position & scale
-      // Core is visually at origin in 3D; project it and scale based on camera distance
-      if (core) {
-        const coreRelZ = 0 - camZ;
-        const coreScale = Math.max(0.05, focalLength / coreRelZ / dpr * 0.8);
-        const coreX = (panX / dpr);
-        const coreY = (panY / dpr);
-        // Breathing pulse
-        const breath = 1 + 0.04 * Math.sin(t / 2000);
-        core.style.transform = `translate(calc(-50% + ${coreX}px), calc(-50% + ${coreY}px)) scale(${coreScale * breath})`;
-        core.style.opacity = String(globalAlpha);
+      // NAME — fade the underline fill based on audio progress
+      const nameLineFill = nameEl && nameEl.querySelector('.preshow-name-line-fill');
+      if (nameLineFill) {
+        // Underline draws over the first ~12 seconds
+        const lineProgress = Math.min(1, tsec / 12);
+        nameLineFill.style.transform = `scaleX(${lineProgress})`;
       }
+      // Fade whole name during last 2.5s
+      if (nameEl) nameEl.style.opacity = String(globalFadeOut);
 
       raf = requestAnimationFrame(frame);
     };
     this._preshowRaf = requestAnimationFrame(frame);
-
-    // Schedule the handoff: hide preshow shortly before beat 1 starts
-    this._preshowFadeoutTimer = setTimeout(() => {
-      if (preshow) preshow.classList.remove('active');
-    }, TOTAL);
   },
 
   stopPreshow() {
-    // Cancel animation, remove element state
     if (this._preshowRaf) { cancelAnimationFrame(this._preshowRaf); this._preshowRaf = null; }
     if (this._preshowFadeoutTimer) { clearTimeout(this._preshowFadeoutTimer); this._preshowFadeoutTimer = null; }
     if (this._preshowResize) { window.removeEventListener('resize', this._preshowResize); this._preshowResize = null; }
@@ -11240,18 +11211,13 @@ const DemoMode = {
       const ctx = canvas.getContext('2d');
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
+    const nameEl = preshow && preshow.querySelector('.preshow-name-v2');
+    if (nameEl) nameEl.remove();
     const core = preshow && preshow.querySelector('.preshow-core');
     if (core) core.remove();
   },
 
-  // ══════════════════════════════════════════════════════════
-  // VOICE — Caci narrates the demo
-  // Pipeline:
-  //   speakIntro()          — plays during 900ms stage-expand
-  //   prefetchBeatAudio(i)  — fetches beat i audio, caches as Blob
-  //   speakBeat(i)          — cancels previous, plays cached or awaits fetch
-  //   toggleMute() / stop() — cancel in-flight + playing audio cleanly
-  // ══════════════════════════════════════════════════════════
+
 
   toggleMute() {
     this.muted = !this.muted;
@@ -11314,47 +11280,69 @@ const DemoMode = {
     if (sess !== this.audioSession) return;        // stale
     if (!blob) {
       if (this.ttsAvailable === null) this.ttsAvailable = false;
+      // If this beat is currently playing and it was waiting for audio,
+      // fire its pending onEnd so the demo advances (no audio = treat as ended)
+      if (this.running && this.currentBeat === idx && this._pendingSpeakEnd) {
+        const cb = this._pendingSpeakEnd;
+        this._pendingSpeakEnd = null;
+        try { cb(); } catch {}
+      }
       return;
     }
     this.ttsAvailable = true;
     this.audioCache[beat.id] = blob;
     // If this beat is currently playing and no audio has started, play now
     if (this.running && this.currentBeat === idx && !this.currentAudio && !this.muted) {
-      this.playAudioBlob(blob, sess);
+      const onEnd = this._pendingSpeakEnd;
+      this._pendingSpeakEnd = null;
+      this.playAudioBlob(blob, sess, onEnd);
     }
   },
 
-  async speakBeat(idx) {
-    if (!this.running || this.muted) return;
+  async speakBeat(idx, onEnd) {
+    if (!this.running) return;
     const beat = this.beats[idx];
-    if (!beat || !beat.narr) return;
-    // Kill the prior beat's audio so beats don't overlap
+    if (!beat || !beat.narr) { if (onEnd) onEnd(); return; }
+
+    // Muted: still need to fire onEnd so the beat can advance
+    if (this.muted) { if (onEnd) setTimeout(onEnd, 0); return; }
+
+    // Kill prior beat's audio
     this.stopAudio();
-    // Cached? Play immediately.
+
+    // Cached? Play immediately with callback
     if (this.audioCache[beat.id]) {
-      this.playAudioBlob(this.audioCache[beat.id], this.audioSession);
+      this.playAudioBlob(this.audioCache[beat.id], this.audioSession, onEnd);
       return;
     }
-    // Not cached — prefetch will play as soon as it resolves (see prefetch tail)
+
+    // TTS known unavailable? Fire onEnd so beat can advance on its timer floor
+    if (this.ttsAvailable === false) { if (onEnd) setTimeout(onEnd, 0); return; }
+
+    // Not cached — register the callback so prefetchBeatAudio can fire it
+    // when the audio arrives (or fails)
+    this._pendingSpeakEnd = onEnd || null;
     this.prefetchBeatAudio(idx);
   },
 
-  playAudioBlob(blob, sess) {
-    if (sess !== this.audioSession) return;  // stale session
-    if (this.muted || !this.running) return;
+  playAudioBlob(blob, sess, onEnd) {
+    if (sess !== this.audioSession) { if (onEnd) setTimeout(onEnd, 0); return; }
+    if (this.muted || !this.running) { if (onEnd) setTimeout(onEnd, 0); return; }
     this.stopAudio();
     const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
-    // Don't set audio.volume — leaving at 1.0 avoids the volume-bobbing artifact
-    // some browsers introduce when we touch the gain curve
     this.currentAudio = audio;
-    const cleanup = () => {
+    let fired = false;
+    const fire = () => {
+      if (fired) return;
+      fired = true;
       URL.revokeObjectURL(url);
       if (this.currentAudio === audio) this.currentAudio = null;
+      if (onEnd) { try { onEnd(); } catch {} }
     };
-    audio.onended = cleanup;
-    audio.onerror = cleanup;
-    audio.play().catch(() => cleanup());
+    audio.onended = fire;
+    audio.onerror = fire;
+    audio.play().catch(() => fire());
   }
 };
 
