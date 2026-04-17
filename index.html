@@ -1618,16 +1618,82 @@ body::before {
   perspective: 1400px;
   width: clamp(260px, 28vw, 400px);
   margin: 0 auto 18px;
+  position: relative;
 }
+
+/* Burst element — sits behind the card and radiates outward when the flip
+   completes. A radial gold gradient that expands from a tiny point to full
+   size, then fades. Triggered by JS adding .bursting class. */
+.db9-burst {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  background: radial-gradient(circle,
+    rgba(255,240,170,0.85) 0%,
+    rgba(245,227,152,0.55) 18%,
+    rgba(212,168,50,0.30) 40%,
+    rgba(212,168,50,0.10) 65%,
+    transparent 85%);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 0;
+  filter: blur(8px);
+}
+.db9-card-scene.bursting .db9-burst {
+  animation: db9BurstAnim 2.8s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+}
+@keyframes db9BurstAnim {
+  0%   { transform: translate(-50%, -50%) scale(0);   opacity: 0; }
+  15%  { transform: translate(-50%, -50%) scale(8);   opacity: 1; }
+  55%  { transform: translate(-50%, -50%) scale(36);  opacity: 0.55; }
+  100% { transform: translate(-50%, -50%) scale(60);  opacity: 0; }
+}
+
 .db9-card-flipper {
   position: relative;
   width: 100%;
   aspect-ratio: 1 / 1.05;
   transform-style: preserve-3d;
-  transition: transform 1.1s cubic-bezier(0.4, 0.05, 0.2, 1);
+  /* Dramatic flip: longer duration, overshoot easing so it "lands" */
+  transition: transform 1.6s cubic-bezier(0.22, 0.85, 0.32, 1.08);
+  z-index: 1;
 }
 .db9-card-flipper.flipped {
   transform: rotateY(180deg);
+}
+
+/* Shimmer sweep across the front card — a quick light pass before the flip
+   to signal "something is about to happen." Triggered by .shimmering class. */
+.db9-card-front::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(105deg,
+    transparent 0%,
+    rgba(255,240,170,0.0) 25%,
+    rgba(255,240,170,0.35) 48%,
+    rgba(255,250,220,0.55) 50%,
+    rgba(255,240,170,0.35) 52%,
+    rgba(255,240,170,0.0) 75%,
+    transparent 100%);
+  pointer-events: none;
+  opacity: 0;
+  transform: skewX(-12deg);
+}
+.db9-card-scene.shimmering .db9-card-front::after {
+  animation: db9Shimmer 1.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+@keyframes db9Shimmer {
+  0%   { left: -100%; opacity: 0; }
+  30%  { opacity: 1; }
+  70%  { opacity: 1; }
+  100% { left: 200%; opacity: 0; }
 }
 .db9-card {
   position: absolute;
@@ -1679,6 +1745,40 @@ body::before {
 
 .db9-card-back {
   transform: rotateY(180deg);
+}
+
+/* Post-flip breathing glow on the back card — activated by .landed class.
+   Subtle, slow, continuous — gives the reveal presence instead of sitting static. */
+.db9-card-scene.landed .db9-card-back {
+  animation: db9CardBreath 4.2s ease-in-out infinite;
+}
+@keyframes db9CardBreath {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1px rgba(212,168,50,0.55),
+      0 0 0 2px rgba(212,168,50,0.14),
+      inset 0 2px 8px rgba(0,0,0,0.70),
+      inset 2px 0 6px rgba(0,0,0,0.40),
+      inset 0 -1px 0 rgba(245,227,152,0.06),
+      inset 0 0 0 1px rgba(245,227,152,0.10),
+      inset 0 0 40px rgba(212,168,50,0.06),
+      0 40px 100px rgba(0,0,0,0.85),
+      0 4px 8px rgba(0,0,0,0.6),
+      0 0 60px rgba(212,168,50,0.20);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(245,227,152,0.80),
+      0 0 0 2px rgba(245,227,152,0.26),
+      inset 0 2px 8px rgba(0,0,0,0.70),
+      inset 2px 0 6px rgba(0,0,0,0.40),
+      inset 0 -1px 0 rgba(245,227,152,0.12),
+      inset 0 0 0 1px rgba(245,227,152,0.18),
+      inset 0 0 50px rgba(212,168,50,0.12),
+      0 40px 100px rgba(0,0,0,0.85),
+      0 4px 8px rgba(0,0,0,0.6),
+      0 0 100px rgba(212,168,50,0.36);
+  }
 }
 .db9-card-inner {
   position: absolute;
@@ -6873,7 +6973,8 @@ body::before {
     <!-- BEAT 9: Invitation -->
     <div class="demo-beat" data-beat="9">
       <!-- Flip card: front shows CACI (matches the real login card), back reveals the tagline -->
-      <div class="db9-card-scene db-in d1">
+      <div class="db9-card-scene db-in d1" id="db9-card-scene">
+        <div class="db9-burst" aria-hidden="true"></div>
         <div class="db9-card-flipper" id="db9-card-flipper">
           <!-- FRONT: CACI -->
           <div class="db9-card db9-card-front">
@@ -11373,9 +11474,11 @@ const DemoMode = {
       });
     }
     this._previousBeatId = undefined;
-    // Flip Beat 9's card back to front face for next show
+    // Flip Beat 9's card back to front face for next show & clear reveal state
     const flipper = document.getElementById('db9-card-flipper');
     if (flipper) flipper.classList.remove('flipped');
+    const scene9 = document.getElementById('db9-card-scene');
+    if (scene9) scene9.classList.remove('shimmering', 'bursting', 'landed');
     // Reset camera state so cinema smoothly returns to preshow
     if (this.cinema && this.cinema.camState) {
       this.setCameraTarget('preshowStart', 0.06);
@@ -11437,16 +11540,31 @@ const DemoMode = {
       // Special handling: Beat 1 triggers chaos docs
       if (beat.id === 1) this.setupChaos(beatEl);
 
-      // Special handling: Beat 9 — flip card from CACI to tagline after showing
-      // the CACI face briefly, then reveal tagline in sync with Eve saying it
+      // Special handling: Beat 9 — the dramatic reveal sequence.
+      //   1.0s: shimmer sweeps across the card (build-up, "wait for it")
+      //   2.4s: flip begins — 1.6s with overshoot easing, lands like a coin
+      //   3.4s: mid-flip burst — gold light radiates outward behind the card
+      //   4.0s: flip settles, breathing glow kicks in and sustains
       if (beat.id === 9) {
+        const scene = document.getElementById('db9-card-scene');
         const flipper = beatEl.querySelector('#db9-card-flipper');
-        if (flipper) {
+        if (scene && flipper) {
+          // Reset any lingering state from previous play
+          scene.classList.remove('shimmering', 'bursting', 'landed');
           flipper.classList.remove('flipped');
-          // Flip shortly after Eve's "So —" pause, before "let's get to work"
-          setTimeout(() => {
-            if (this.running && flipper) flipper.classList.add('flipped');
-          }, 1600);
+          // Schedule each beat of the sequence, guarded by `this.running`
+          // so stopping the demo mid-reveal kills the animation cleanly
+          const SEQ = [
+            { at: 1000, fn: () => scene.classList.add('shimmering') },
+            { at: 2400, fn: () => flipper.classList.add('flipped') },
+            { at: 3400, fn: () => scene.classList.add('bursting') },
+            { at: 4000, fn: () => scene.classList.add('landed') },
+          ];
+          SEQ.forEach(step => {
+            setTimeout(() => {
+              if (this.running) step.fn();
+            }, step.at);
+          });
         }
       }
     }
