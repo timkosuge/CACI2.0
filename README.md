@@ -1,7 +1,7 @@
 CACI Intelligence Platform
 Internal Operational Intelligence System for Jushi Holdings
 Version 6.1 — April 2026
-
+Demo Mode: https://caci2-0.pages.dev/?demo=1
 
 WHAT CACI IS
 
