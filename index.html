@@ -10405,15 +10405,8 @@ function bootApp() {
       isResetting = true;
       chatHistory = [];
       clearChatHistory();
-      const msgs = $('chat-msgs');
-      if (msgs) { msgs.innerHTML = ''; msgs.classList.remove('has-messages'); }
-      $('chat-bar').classList.remove('has-messages');
-      $('chat-empty').style.display = 'none';
-      selectedCollection = null; chatCollection = null; chatFileId = null; chatFileName = null;
-      setScope('all');
-      renderScopeCollections(window._caciCollections || []);
-      initChatGreeting();
-      setTimeout(() => { isResetting = false; }, 500);
+      // Do a full page reload to ensure everything is fresh
+      setTimeout(() => location.reload(), 100);
     });
   }
   // ── Compliance Mode ──────────────────────────────────────────
@@ -17531,10 +17524,15 @@ async function speakTextQueued(btn, text) {
     .replace(/\b[\w\-]+\.(pdf|docx?|xlsx?|txt|csv|md)\b/gi, '') // Remove filenames
     .replace(/\[[\w\s\-\.]+\]/g, '') // Remove [bracketed citations]
     .replace(/\([\w\s\-\.]+\.(pdf|docx?|xlsx?|txt|csv|md)\)/gi, '') // Remove (filename.ext)
-    // Remove document/rule codes and section numbers completely
-    .replace(/\b(Rule|Section|Code|Document|Form|Policy)\s+[\d:\-\.]+(\s*\([^)]+\))?/gi, '') // Remove "Rule 1301:18-8-09" entirely
-    .replace(/\b[\d]{3,}:[\d:\-\.]+\b/g, '') // Remove standalone codes like "1301:18-8-09" or "3796:8-2-04"
-    .replace(/\bfrom\s+[\d:\-\.]+/gi, 'from the regulations') // "from 1301:18..." becomes "from the regulations"
+    // Remove "from/at/in Rule X:Y-Z" patterns - more natural removal
+    .replace(/\b(from|at|in|to|per|under)\s+(Rule|Section|Code|Document|Form|Policy)\s+[\d:\-\.]+(\s*\([^)]+\))?\s*,?/gi, 'from the regulations') 
+    // Remove standalone rule codes
+    .replace(/\b(Rule|Section|Code|Document|Form|Policy)\s+[\d:\-\.]+(\s*\([^)]+\))?\s*,?/gi, '') 
+    .replace(/\b[\d]{3,}:[\d:\-\.]+\b/g, '') // Remove standalone codes like "1301:18-8-09"
+    // Clean up artifacts from removals
+    .replace(/\s*,\s*,\s*/g, ', ') // Remove double commas
+    .replace(/\s+,/g, ',') // Remove space before comma
+    .replace(/,\s*([.!?])/g, '$1') // Remove comma before punctuation
     .replace(/\s+/g, ' ') // Clean up multiple spaces
     .replace(/\n+/g, ' ').trim();
 
@@ -17590,10 +17588,15 @@ async function appendToTtsQueue(text) {
     .replace(/\b[\w\-]+\.(pdf|docx?|xlsx?|txt|csv|md)\b/gi, '') // Remove filenames
     .replace(/\[[\w\s\-\.]+\]/g, '') // Remove [bracketed citations]
     .replace(/\([\w\s\-\.]+\.(pdf|docx?|xlsx?|txt|csv|md)\)/gi, '') // Remove (filename.ext)
-    // Remove document/rule codes and section numbers completely
-    .replace(/\b(Rule|Section|Code|Document|Form|Policy)\s+[\d:\-\.]+(\s*\([^)]+\))?/gi, '') // Remove "Rule 1301:18-8-09" entirely
-    .replace(/\b[\d]{3,}:[\d:\-\.]+\b/g, '') // Remove standalone codes like "1301:18-8-09" or "3796:8-2-04"
-    .replace(/\bfrom\s+[\d:\-\.]+/gi, 'from the regulations') // "from 1301:18..." becomes "from the regulations"
+    // Remove "from/at/in Rule X:Y-Z" patterns - more natural removal
+    .replace(/\b(from|at|in|to|per|under)\s+(Rule|Section|Code|Document|Form|Policy)\s+[\d:\-\.]+(\s*\([^)]+\))?\s*,?/gi, 'from the regulations') 
+    // Remove standalone rule codes
+    .replace(/\b(Rule|Section|Code|Document|Form|Policy)\s+[\d:\-\.]+(\s*\([^)]+\))?\s*,?/gi, '') 
+    .replace(/\b[\d]{3,}:[\d:\-\.]+\b/g, '') // Remove standalone codes like "1301:18-8-09"
+    // Clean up artifacts from removals
+    .replace(/\s*,\s*,\s*/g, ', ') // Remove double commas
+    .replace(/\s+,/g, ',') // Remove space before comma
+    .replace(/,\s*([.!?])/g, '$1') // Remove comma before punctuation
     .replace(/\s+/g, ' ') // Clean up multiple spaces
     .replace(/\n+/g, ' ').trim();
   const ttsMaxLen = parseInt(localStorage.getItem('caci_tts_length') || '3000', 10);
