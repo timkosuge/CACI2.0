@@ -9421,6 +9421,18 @@ html body[data-theme="light"] #discovery-greeting-strip .dgs-text strong {
     <div class="panel" data-panel="admin">
       <div class="admin-wrap">
 
+        <!-- Admin sub-tabs -->
+        <div class="files-tab-bar" id="admin-tab-bar" style="padding-bottom:10px;margin-bottom:18px">
+          <button class="ftab active" data-atab="users">Users</button>
+          <button class="ftab" data-atab="system">System</button>
+          <button class="ftab" data-atab="integrations">Integrations</button>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════════
+             USERS TAB
+             ═══════════════════════════════════════════════════════ -->
+        <div class="admin-tab-section" data-asection="users">
+
         <!-- WHO'S ONLINE (admin only) -->
         <div class="asec" id="presence-asec">
           <div class="asec-head"><div class="asec-title">Who's Online</div><div class="asec-line"></div></div>
@@ -9432,12 +9444,35 @@ html body[data-theme="light"] #discovery-greeting-strip .dgs-text strong {
 
         <!-- USERS (admin only) -->
         <div class="asec" id="users-asec">
-          <div class="asec-head"><div class="asec-title">Users</div><div class="asec-line"></div></div>
+          <div class="asec-head"><div class="asec-title">User Accounts</div><div class="asec-line"></div></div>
           <div class="asec-sub-title" style="margin:-8px 0 14px">
             Manage named user accounts. Each user has their own password, role, and preferences that follow them across devices.
           </div>
           <div id="users-wrap"><div class="tune-empty">Loading...</div></div>
         </div>
+
+        <!-- USAGE OVERVIEW -->
+        <div class="asec" id="admin-usage-asec">
+          <div class="asec-head"><div class="asec-title">Usage Overview</div><div class="asec-line"></div></div>
+          <div class="asec-sub-title" style="margin:-8px 0 14px">
+            Activity summary across all users and departments.
+          </div>
+          <div id="admin-usage-wrap"><div class="tune-empty">Loading...</div></div>
+        </div>
+
+        <!-- QUERY LOG -->
+        <div class="asec" id="admin-queries-asec">
+          <div class="asec-head"><div class="asec-title">Query Log</div><div class="asec-line"></div></div>
+          <div class="asec-sub-title" style="margin:-8px 0 14px">Recent questions submitted to CACI — newest first.</div>
+          <div id="admin-queries-wrap"><div class="tune-empty">Loading...</div></div>
+        </div>
+
+        </div><!-- /USERS TAB -->
+
+        <!-- ═══════════════════════════════════════════════════════
+             SYSTEM TAB
+             ═══════════════════════════════════════════════════════ -->
+        <div class="admin-tab-section" data-asection="system" style="display:none">
 
         <div class="asec">
           <div class="asec-head"><div class="asec-title">System Status</div><div class="asec-line"></div></div>
@@ -9460,6 +9495,13 @@ html body[data-theme="light"] #discovery-greeting-strip .dgs-text strong {
           </div>
           <div id="audit-wrap"><div class="tune-empty">Loading...</div></div>
         </div>
+
+        </div><!-- /SYSTEM TAB -->
+
+        <!-- ═══════════════════════════════════════════════════════
+             INTEGRATIONS TAB
+             ═══════════════════════════════════════════════════════ -->
+        <div class="admin-tab-section" data-asection="integrations" style="display:none">
 
         <!-- INTEGRATIONS — Microsoft 365 -->
         <div class="asec">
@@ -9553,6 +9595,8 @@ html body[data-theme="light"] #discovery-greeting-strip .dgs-text strong {
             </div>
           </div>
         </div>
+
+        </div><!-- /INTEGRATIONS TAB -->
 
       </div>
     </div>
@@ -10678,6 +10722,8 @@ function switchPanel(id) {
   if (id === 'admin') {
     loadAdminConfig(); loadIntegrationStatuses(); loadConnectorStatuses();
     loadUsersPanel(); loadPresence(); loadAuditLog();
+    loadAdminUsageData();
+    initAdminSubTabs();
   }
   // Gate admin-only sections based on role
   const isAdmin = (sessionStorage.getItem('caci_role') || 'admin') === 'admin';
@@ -18053,6 +18099,33 @@ function disconnectConnector(id) {
 }
 
 /* ═══════════════════════════════════════════════════════════
+   ADMIN SUB-TABS
+═══════════════════════════════════════════════════════════ */
+
+function initAdminSubTabs() {
+  const bar = document.getElementById('admin-tab-bar');
+  if (!bar || bar._wired) return;
+  bar._wired = true;
+  bar.querySelectorAll('.ftab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = btn.dataset.atab;
+      // Update active state on tabs
+      bar.querySelectorAll('.ftab').forEach(b => b.classList.toggle('active', b === btn));
+      // Show/hide sections
+      document.querySelectorAll('.admin-tab-section').forEach(sec => {
+        sec.style.display = sec.dataset.asection === target ? '' : 'none';
+      });
+      // Refresh data when switching to Users tab to keep it current
+      if (target === 'users') {
+        if (typeof loadPresence === 'function') loadPresence();
+        if (typeof loadUsersPanel === 'function') loadUsersPanel();
+        if (typeof loadAdminUsageData === 'function') loadAdminUsageData();
+      }
+    });
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════
    USER MANAGEMENT PANEL
 ═══════════════════════════════════════════════════════════ */
 
@@ -18322,8 +18395,100 @@ async function loadAnalytics() {
     renderAnalyticsStats(data);
     renderAnalyticsQueries(data);
     loadCachedInsights();
+    // Also mirror into admin Users tab so admins see same data in one place
+    mirrorAnalyticsToAdmin(data);
   } catch (e) {
     statsWrap.innerHTML = `<div class="tune-empty">Failed: ${e.message}</div>`;
+  }
+}
+
+// Fetch analytics data fresh for admin Users tab (when user hits admin without analytics first)
+async function loadAdminUsageData() {
+  const usageWrap   = $('admin-usage-wrap');
+  const queriesWrap = $('admin-queries-wrap');
+  if (!usageWrap && !queriesWrap) return;
+  if (usageWrap)   usageWrap.innerHTML   = '<div class="tune-empty">Loading...</div>';
+  if (queriesWrap) queriesWrap.innerHTML = '<div class="tune-empty">Loading...</div>';
+  try {
+    const res  = await apiFetch('/analytics?limit=500');
+    const data = await res.json();
+    if (!data.ok) {
+      if (usageWrap)   usageWrap.innerHTML   = `<div class="tune-empty">Error: ${data.error}</div>`;
+      if (queriesWrap) queriesWrap.innerHTML = `<div class="tune-empty">Error: ${data.error}</div>`;
+      return;
+    }
+    _analyticsData = data;
+    mirrorAnalyticsToAdmin(data);
+  } catch (e) {
+    if (usageWrap)   usageWrap.innerHTML   = `<div class="tune-empty">Failed: ${e.message}</div>`;
+    if (queriesWrap) queriesWrap.innerHTML = `<div class="tune-empty">Failed: ${e.message}</div>`;
+  }
+}
+
+// Render analytics data into the admin Users tab mirror elements.
+// Reuses the existing render functions by temporarily repointing the target IDs.
+function mirrorAnalyticsToAdmin(data) {
+  const adminUsage = $('admin-usage-wrap');
+  const adminQueries = $('admin-queries-wrap');
+  if (!adminUsage && !adminQueries) return;
+  
+  // Build stats HTML using same logic as renderAnalyticsStats
+  if (adminUsage && data) {
+    const { totalQueries, uniqueUsers, missCount, deptCounts } = data;
+    const hitRate = totalQueries > 0 ? Math.round(((totalQueries - missCount) / totalQueries) * 100) : 0;
+    const deptRows = Object.entries(deptCounts || {})
+      .sort((a,b) => b[1]-a[1])
+      .map(([d,c]) => {
+        const pct = totalQueries > 0 ? Math.round(c / totalQueries * 100) : 0;
+        return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+          <div style="font-family:var(--f-mono);font-size:10px;color:var(--smoke2);letter-spacing:0.05em;width:110px;text-transform:capitalize">${esc(d)}</div>
+          <div style="flex:1;height:3px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden">
+            <div style="height:100%;width:${pct}%;background:rgba(212,168,50,0.5);border-radius:2px"></div>
+          </div>
+          <div style="font-family:var(--f-mono);font-size:9px;color:var(--smoke4);width:60px;text-align:right">${c} (${pct}%)</div>
+        </div>`;
+      }).join('');
+    adminUsage.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px">
+        <div class="acard" style="padding:14px 16px">
+          <div style="font-family:var(--f-mono);font-size:9px;color:var(--smoke4);letter-spacing:0.12em;text-transform:uppercase">Total Queries</div>
+          <div style="font-family:var(--f-display);font-size:26px;color:var(--gold-lt);margin-top:4px">${(totalQueries||0).toLocaleString()}</div>
+        </div>
+        <div class="acard" style="padding:14px 16px">
+          <div style="font-family:var(--f-mono);font-size:9px;color:var(--smoke4);letter-spacing:0.12em;text-transform:uppercase">Active Users</div>
+          <div style="font-family:var(--f-display);font-size:26px;color:var(--gold-lt);margin-top:4px">${uniqueUsers||0}</div>
+        </div>
+        <div class="acard" style="padding:14px 16px">
+          <div style="font-family:var(--f-mono);font-size:9px;color:var(--smoke4);letter-spacing:0.12em;text-transform:uppercase">Hit Rate</div>
+          <div style="font-family:var(--f-display);font-size:26px;color:var(--gold-lt);margin-top:4px">${hitRate}%</div>
+        </div>
+      </div>
+      ${deptRows ? `<div style="font-family:var(--f-mono);font-size:9px;color:var(--smoke4);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:10px">By Department</div>${deptRows}` : ''}
+    `;
+  }
+  
+  // Build queries HTML - simplified list of recent queries
+  if (adminQueries && data) {
+    const logs = data.recentLogs || [];
+    if (!logs.length) {
+      adminQueries.innerHTML = '<div class="tune-empty">No queries logged yet.</div>';
+    } else {
+      const rows = logs.slice(0, 50).map(l => {
+        const when = l.ts ? new Date(l.ts).toLocaleString() : '—';
+        const user = esc(l.username || 'unknown');
+        const dep  = esc(l.dept || '—');
+        const msg  = esc((l.message || '').slice(0, 140));
+        const hit  = l.retrieval ? '<span style="color:rgba(100,220,130,0.85)">● hit</span>' : '<span style="color:rgba(220,170,60,0.85)">○ miss</span>';
+        return `<div style="padding:8px 10px;border-bottom:1px solid rgba(212,168,50,0.08);display:flex;gap:10px;align-items:flex-start">
+          <div style="flex-shrink:0;width:140px;font-family:var(--f-mono);font-size:9px;color:var(--smoke4)">${esc(when)}</div>
+          <div style="flex-shrink:0;width:110px;font-family:var(--f-mono);font-size:10px;color:var(--smoke2)">${user}</div>
+          <div style="flex-shrink:0;width:80px;font-family:var(--f-mono);font-size:9px;color:var(--smoke4);text-transform:capitalize">${dep}</div>
+          <div style="flex-shrink:0;width:50px;font-family:var(--f-mono);font-size:9px">${hit}</div>
+          <div style="flex:1;font-family:var(--f-body);font-size:11px;color:var(--smoke);line-height:1.5">${msg}</div>
+        </div>`;
+      }).join('');
+      adminQueries.innerHTML = `<div style="max-height:500px;overflow-y:auto;border:1px solid rgba(212,168,50,0.12);border-radius:3px">${rows}</div>`;
+    }
   }
 }
 
