@@ -8511,7 +8511,7 @@ html body[data-theme="light"] #discovery-greeting-strip .dgs-text strong {
     <div class="sb-section-label">Department</div>
     <div class="sb-depts" id="sb-depts"></div>
     <!-- Tambour shutter -->
-    <div class="tambour" id="tambour">
+    <div class="tambour open" id="tambour" style="pointer-events:none">
       <div class="tambour-slats" id="tambour-slats"></div>
       <div class="tambour-handle" id="tambour-handle">
         <div class="tambour-handle-bar"></div>
@@ -16677,7 +16677,10 @@ function initTambour() {
     '<div class="tambour-slat"></div>'
   ).join('');
 
-  let isOpen = false;
+  let isOpen = true;
+  // Start in open state
+  tambour.classList.add('open');
+  tambour.style.pointerEvents = 'none';
   handle.addEventListener('click', () => {
     isOpen = !isOpen;
     tambour.classList.toggle('open', isOpen);
