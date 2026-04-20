@@ -1042,9 +1042,9 @@ ABSOLUTE RESTRICTION — never discuss, reference, or include any information ab
       // Eliminates 1000-2000ms lag on page load - critical for demos
       const greetings = [
         `Hey${displayName ? ' ' + displayName.split(' ')[0] : ''}, I'm Caci—your AI teammate at Jushi, always ready to dig in. What can I help the ${dept} crew with today?`,
-        `Hi${displayName ? ' ' + displayName.split(' ')[0] : ''}, Caci here—built specifically for Jushi, know this place inside out. What's on your mind for ${dept}?`,
+        `Hi${displayName ? ' ' + displayName.split(' ')[0] : ''}, Caci here—built specifically for Jushi. I know this place inside out. What's on your mind for ${dept}?`,
         `What's up${displayName ? ' ' + displayName.split(' ')[0] : ''}? I'm Caci, your internal AI sidekick. What does ${dept} need today?`,
-        `Hey${displayName ? ' ' + displayName.split(' ')[0] : ''}, Caci here—think of me as the teammate who's read every document. How can I help ${dept}?`,
+        `Hey${displayName ? ' ' + displayName.split(' ')[0] : ''}, Oh, hi! My name is Caci. How can I help ${dept}?`,
         `Hi${displayName ? ' ' + displayName.split(' ')[0] : ''}, ready to jump in wherever you need me. What's the ${dept} team working on?`,
       ];
       // Rotate greetings by hour (feels fresh without randomness)
