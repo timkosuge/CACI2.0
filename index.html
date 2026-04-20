@@ -7034,6 +7034,25 @@ body[data-theme="light"] .login-frame-box {
   flex-shrink: 0; overflow-x: auto; scrollbar-width: none;
 }
 .filter-bar::-webkit-scrollbar { display: none; }
+.filter-search {
+  padding: 5px 10px 5px 28px;
+  min-width: 200px;
+  background: linear-gradient(180deg, rgba(16,21,36,0.95) 0%, rgba(10,13,24,0.98) 100%);
+  border: 1px solid rgba(212,168,50,0.22);
+  border-top-color: rgba(245,227,152,0.08);
+  border-bottom-color: rgba(0,0,0,0.55);
+  border-radius: 3px;
+  color: var(--smoke);
+  font-family: var(--f-ui); font-size: 10px;
+  letter-spacing: 0.04em;
+  outline: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23c9a832' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: left 9px center;
+  box-shadow: inset 0 1px 0 rgba(245,227,152,0.05), 0 1px 3px rgba(0,0,0,0.50);
+  flex-shrink: 0; transition: border-color 0.15s;
+}
+.filter-search:focus { border-color: rgba(212,168,50,0.50); }
+.filter-search::placeholder { color: var(--smoke4); letter-spacing: 0.06em; }
 .filter-label {
   font-family: var(--f-ui);
   font-size: 9px; letter-spacing: 0.18em;
@@ -9127,6 +9146,7 @@ html body[data-theme="light"] #discovery-greeting-strip .dgs-text strong {
     <div class="panel" data-panel="files">
                 <!-- Filter Bar -->
           <div class="filter-bar" id="filter-bar">
+            <input type="text" class="filter-search" id="f-search" placeholder="Search documents..." autocomplete="off"/>
             <span class="filter-label">Filter</span>
             <select class="filter-select" id="f-category">
               <option value="">All Categories</option>
@@ -10590,15 +10610,26 @@ function bootApp() {
     const fc = document.getElementById('f-category');
     const fp = document.getElementById('f-period');
     const fs = document.getElementById('f-state');
+    const fSearch = document.getElementById('f-search');
     if (fc) fc.value = '';
     if (fp) fp.value = '';
     if (fs) fs.value = '';
+    if (fSearch) fSearch.value = '';
     loadFiles();
   });
   ['f-category','f-period','f-state'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener('change', () => loadFiles());
   });
+  // Search input with debounce so we don't filter on every keystroke
+  const fSearch = document.getElementById('f-search');
+  if (fSearch) {
+    let searchTimer = null;
+    fSearch.addEventListener('input', () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => loadFiles(), 200);
+    });
+  }
 
   $('dept-chip').addEventListener('click', e => { e.stopPropagation(); $('dept-dd').classList.toggle('open'); });
   document.addEventListener('click', () => $('dept-dd').classList.remove('open'));
@@ -12217,7 +12248,24 @@ async function loadFiles() {
     if (fPer) qs += `&period=${encodeURIComponent(fPer)}`;
     if (fSt)  qs += `&state=${encodeURIComponent(fSt)}`;
     const res = await apiFetch(qs);
-    const files = await res.json();
+    let files = await res.json();
+    
+    // Apply client-side search filter (fast, no network round-trip)
+    const searchQuery = ($('f-search')?.value || '').trim().toLowerCase();
+    if (searchQuery) {
+      files = files.filter(f => {
+        const name = (f.name || '').toLowerCase();
+        const col = (f.collection || '').toLowerCase();
+        const cat = (f.meta?.category || f.category || '').toLowerCase();
+        const period = (f.meta?.period || f.period || '').toLowerCase();
+        const reportName = (f.meta?.reportName || f.reportName || '').toLowerCase();
+        return name.includes(searchQuery) || 
+               col.includes(searchQuery) || 
+               cat.includes(searchQuery) || 
+               period.includes(searchQuery) ||
+               reportName.includes(searchQuery);
+      });
+    }
     
     // Populate file name to ID mapping for citation linking
     _fileNameToIdMap = {};
@@ -12227,7 +12275,7 @@ async function loadFiles() {
       }
     });
     
-    $('fbadge').textContent = files.length + ' file' + (files.length !== 1 ? 's' : '');
+    $('fbadge').textContent = files.length + ' file' + (files.length !== 1 ? 's' : '') + (searchQuery ? ' matching' : '');
     $('ftitle').textContent = _colView === 'uncollected' ? 'Unsorted Files' : (selectedCollection || 'All Documents');
 
     // Populate filter dropdowns with unique values from current file set
