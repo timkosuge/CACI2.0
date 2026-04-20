@@ -3092,7 +3092,13 @@ async function generateEmbedding(text, env) {
   if (!env?.AI) return null;
   try {
     const truncated = text.slice(0, EMB_MAX_CHARS);
-    const result = await env.AI.run(EMB_MODEL, { text: truncated });
+    // Add a timeout wrapper to prevent hanging
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Embedding timeout')), 10000) // 10 second timeout
+    );
+    const embeddingPromise = env.AI.run(EMB_MODEL, { text: truncated });
+    
+    const result = await Promise.race([embeddingPromise, timeoutPromise]);
     // result.data is Float32Array or number[]
     const vec = result?.data;
     if (!vec || !vec.length) return null;
@@ -3100,7 +3106,12 @@ async function generateEmbedding(text, env) {
     const floats = new Float32Array(vec);
     const bytes  = new Uint8Array(floats.buffer);
     return btoa(String.fromCharCode(...bytes));
-  } catch { return null; }
+  } catch (err) {
+    // Log error but don't throw - graceful degradation to keyword-only
+    console.error('Embedding generation failed:', err.message);
+    return null;
+  }
+}
 }
 
 function decodeEmbedding(b64) {
@@ -3128,7 +3139,7 @@ function cosineSim(a, b) {
 // Store embeddings for all chunks of a file — fire-and-forget from upload
 async function storeChunkEmbeddings(fileId, chunks, env) {
   if (!env?.AI || !env?.CACI_KV) return;
-  const EMB_BATCH = 8; // embed 8 chunks at a time to avoid CPU time limits
+  const EMB_BATCH = 4; // Reduced from 8 to avoid CPU/timeout limits
   for (let i = 0; i < chunks.length; i += EMB_BATCH) {
     const batch = chunks.slice(i, i + EMB_BATCH);
     await Promise.all(batch.map(async (chunk, j) => {
@@ -3992,9 +4003,9 @@ async function handleEmbedFile(request, env) {
       return json({ ok: true, embedded: 0, skipped: chunks.length, message: 'Already indexed' });
     }
 
-    // Embed in batches of 6
+    // Embed in batches of 4 (reduced from 6 to avoid timeouts)
     let embedded = 0;
-    const BATCH = 6;
+    const BATCH = 4;
     for (let b = 0; b < toEmbed.length; b += BATCH) {
       const batch = toEmbed.slice(b, b + BATCH);
       await Promise.all(batch.map(async ({ chunk, idx }) => {
@@ -4020,7 +4031,7 @@ async function handleEmbedFile(request, env) {
 async function handleEmbedStatus(url, env) {
   try {
     // Enumerate ALL file records — this is the real source of truth.
-    // List is paginated; we cap scanning at 100 files for performance.
+    // List is paginated; we sample files for performance.
     const fileList = await env.CACI_KV.list({ prefix: 'file:' });
     const keys = (fileList && fileList.keys) ? fileList.keys : [];
 
@@ -4028,7 +4039,8 @@ async function handleEmbedStatus(url, env) {
     let totalChunks = 0, indexedChunks = 0;
     const partialFiles = [];   // list of {name, indexed, total} for UI detail
 
-    const MAX_FILES_TO_SCAN = 100;
+    // Reduced from 100 to 30 to prevent timeouts with large collections
+    const MAX_FILES_TO_SCAN = 30;
     const sample = keys.slice(0, MAX_FILES_TO_SCAN);
 
     for (const fkey of sample) {
@@ -4040,13 +4052,11 @@ async function handleEmbedStatus(url, env) {
       totalChunks += chunkCount;
       if (chunkCount === 0) continue;
 
-      // Check embedding presence for every chunk in this file. We cap per-file
-      // at 120 chunks to bound KV read count on very large docs; if a file has
-      // more than that, we check 120 spread across the file range.
-      const CHECK_CAP = Math.min(chunkCount, 120);
+      // Sample only 10 chunks per file instead of 120 to speed up status checks
+      const CHECK_CAP = Math.min(chunkCount, 10);
       let found = 0;
       for (let i = 0; i < CHECK_CAP; i++) {
-        const idx = chunkCount <= 120 ? i : Math.floor((i / 119) * (chunkCount - 1));
+        const idx = chunkCount <= 10 ? i : Math.floor((i / 9) * (chunkCount - 1));
         const got = await env.CACI_KV.get(`emb:${rec.id}:${idx}`).catch(() => null);
         if (got) found++;
       }
