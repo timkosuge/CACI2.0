@@ -11214,16 +11214,9 @@ async function sendChat() {
             if (evt.correction) fullText += `\n\n> \u26A0 *Data check: ${evt.correction}*`;
 
             // Replace live bubble with full appendMsg bubble (sources, feedback buttons, etc.)
+            // Note: appendMsg internally handles auto-speak for AI messages when voiceAutoSpeak is on
             msgEl.remove();
             appendMsg('ai', fullText, evt.sources || [], evt.scope || body.scope, evt.model || 'claude', evt.responseId || '');
-
-            // Auto-speak: now that streaming is complete, speak the full response
-            // in one go. All sentences fetch in parallel and play sequentially —
-            // no pause, no cut-restart. Costs a small latency (until streaming
-            // finishes) before voice starts, but the playback is smooth.
-            if (voiceAutoSpeak) {
-              speakTextQueued(null, fullText);
-            }
 
             chatHistory.push({role:'assistant', content:fullText});
             saveChatHistory();
