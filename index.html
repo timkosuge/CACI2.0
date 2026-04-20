@@ -9856,9 +9856,9 @@ async function refreshFileMapping() {
     console.warn('Failed to refresh file mapping:', e);
   }
 }
-
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  CACI DISPLAY BRIGHTNESS FIX - Auto-detects dark screens
+//  CACI ENHANCED BRIGHTNESS FIX - More Aggressive for Dark Displays
+//  Replace the previous DisplayFix code with this stronger version
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 (function() {
@@ -9867,21 +9867,40 @@ async function refreshFileMapping() {
   const DisplayFix = {
     isLowDPI: false,
     isHDR: false,
+    isDarkEnvironment: false,
     userBrightness: null,
     
     init() {
-      console.log('🔆 CACI Display Adaptation Loading...');
+      console.log('🔆 CACI Enhanced Brightness Loading...');
       this.detectDisplay();
+      this.detectEnvironment();
       this.loadUserPreference();
       this.applyBrightness();
       this.setupListeners();
-      console.log('✅ Display adaptation active');
+      this.addManualControls();
+      console.log('✅ Enhanced brightness active');
     },
     
     detectDisplay() {
-      this.isLowDPI = (window.devicePixelRatio || 1) < 1.5;
+      // More aggressive detection
+      const ratio = window.devicePixelRatio || 1;
+      this.isLowDPI = ratio < 2; // Changed from 1.5 to 2 (catches more displays)
       this.isHDR = window.matchMedia && window.matchMedia('(dynamic-range: high)').matches;
-      console.log('Display:', { pixelRatio: window.devicePixelRatio, isLowDPI: this.isLowDPI, isHDR: this.isHDR });
+      
+      console.log('Display detected:', { 
+        pixelRatio: ratio, 
+        isLowDPI: this.isLowDPI, 
+        isHDR: this.isHDR,
+        screenBrightness: 'low-DPI' 
+      });
+    },
+    
+    detectEnvironment() {
+      // Check if user prefers dark mode (might be in dark environment)
+      if (window.matchMedia) {
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        this.isDarkEnvironment = prefersDark;
+      }
     },
     
     loadUserPreference() {
@@ -9889,7 +9908,7 @@ async function refreshFileMapping() {
         const saved = localStorage.getItem('caci_brightness');
         if (saved && !isNaN(parseFloat(saved))) {
           this.userBrightness = parseFloat(saved);
-          console.log('Loaded brightness:', this.userBrightness);
+          console.log('🎚️ User brightness loaded:', this.userBrightness);
         }
       } catch(e) {}
     },
@@ -9905,37 +9924,86 @@ async function refreshFileMapping() {
       let brightness = 1.0;
       let contrast = 1.0;
       
+      // User preference always wins
       if (this.userBrightness !== null) {
         brightness = this.userBrightness;
-        app.style.filter = `brightness(${brightness})`;
-        console.log(`User brightness: ${brightness}`);
+        app.style.filter = `brightness(${brightness}) contrast(${contrast})`;
+        console.log(`🎚️ User brightness applied: ${brightness}`);
         return;
       }
       
+      // Auto-detect and apply MORE AGGRESSIVE brightening
       if (theme === 'dark') {
-        if (this.isLowDPI) {
-          brightness = 1.15;
-          contrast = 1.05;
-          console.log('🔆 Low-DPI: boosting brightness');
-        } else if (this.isHDR) {
+        if (this.isHDR) {
+          // HDR displays - slight reduction
           brightness = 0.95;
-          console.log('✨ HDR: reducing brightness');
+          console.log('✨ HDR display: reducing to 0.95');
+        } else if (this.isLowDPI) {
+          // Non-Retina displays - MUCH BRIGHTER
+          brightness = 1.35;  // Increased from 1.15 to 1.35
+          contrast = 1.15;    // Increased from 1.05 to 1.15
+          console.log('🔆 Low-DPI display: boosting to 1.35 brightness, 1.15 contrast');
+        } else {
+          // Default for normal displays - slight boost
+          brightness = 1.1;
+          contrast = 1.05;
+          console.log('💡 Standard display: boosting to 1.1');
+        }
+        
+        // Additional boost for dark environment
+        if (this.isDarkEnvironment && brightness < 1.3) {
+          brightness += 0.1;
+          console.log('🌙 Dark environment detected: +0.1 brightness');
         }
       }
       
-      if (brightness !== 1.0 || contrast !== 1.0) {
-        app.style.filter = `brightness(${brightness}) contrast(${contrast})`;
-      } else {
-        app.style.filter = 'none';
+      // Apply the filter
+      app.style.filter = `brightness(${brightness}) contrast(${contrast})`;
+      console.log(`✅ Final brightness: ${brightness}, contrast: ${contrast}`);
+      
+      // Also boost gold colors specifically
+      this.boostGoldColors();
+    },
+    
+    boostGoldColors() {
+      // Inject CSS to make gold elements brighter
+      if (!document.getElementById('caci-gold-boost')) {
+        const style = document.createElement('style');
+        style.id = 'caci-gold-boost';
+        style.textContent = `
+          /* Boost gold accents for better visibility */
+          body[data-theme="dark"] {
+            --gold: #e8c84a !important;      /* Brighter gold */
+            --gold-lt: #ffd966 !important;   /* Even brighter gold */
+          }
+          
+          /* Boost text contrast */
+          body[data-theme="dark"] .msg-bubble,
+          body[data-theme="dark"] .chat-welcome,
+          body[data-theme="dark"] .setting-label {
+            color: #f0f2f5 !important;
+          }
+          
+          /* Brighten the circuit board background */
+          body[data-theme="dark"] #circuit-overlay,
+          body[data-theme="dark"] .chat-bg-overlay {
+            opacity: 0.15 !important;  /* More visible */
+          }
+        `;
+        document.head.appendChild(style);
+        console.log('🎨 Gold boost applied');
       }
     },
     
     setupListeners() {
+      // Re-detect on focus (user might move to different monitor)
       window.addEventListener('focus', () => {
         this.detectDisplay();
+        this.detectEnvironment();
         this.applyBrightness();
       });
       
+      // Re-apply when theme changes
       const observer = new MutationObserver((mutations) => {
         mutations.forEach((mutation) => {
           if (mutation.attributeName === 'data-theme') {
@@ -9944,18 +10012,92 @@ async function refreshFileMapping() {
         });
       });
       observer.observe(document.body, { attributes: true });
+    },
+    
+    addManualControls() {
+      // Add quick brightness buttons to the page
+      setTimeout(() => {
+        if (document.getElementById('caci-brightness-quick')) return;
+        
+        const quickControls = document.createElement('div');
+        quickControls.id = 'caci-brightness-quick';
+        quickControls.style.cssText = `
+          position: fixed;
+          bottom: 80px;
+          right: 20px;
+          z-index: 9999;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          padding: 12px;
+          background: var(--ink3);
+          border: 1px solid var(--line2);
+          border-radius: var(--r2);
+          font-size: 11px;
+          color: var(--smoke2);
+          opacity: 0.7;
+          transition: opacity 0.2s;
+        `;
+        
+        quickControls.innerHTML = `
+          <div style="font-weight: 500; margin-bottom: 4px; color: var(--gold);">Brightness</div>
+          <button id="caci-bright-low" style="padding: 4px 8px; font-size: 10px;">Normal (1.0x)</button>
+          <button id="caci-bright-mid" style="padding: 4px 8px; font-size: 10px;">Bright (1.3x)</button>
+          <button id="caci-bright-high" style="padding: 4px 8px; font-size: 10px;">Very Bright (1.5x)</button>
+          <button id="caci-bright-ultra" style="padding: 4px 8px; font-size: 10px;">Max (1.7x)</button>
+        `;
+        
+        quickControls.addEventListener('mouseenter', () => quickControls.style.opacity = '1');
+        quickControls.addEventListener('mouseleave', () => quickControls.style.opacity = '0.7');
+        
+        document.body.appendChild(quickControls);
+        
+        // Wire up buttons
+        const setBrightness = (value) => {
+          this.userBrightness = value;
+          localStorage.setItem('caci_brightness', value.toString());
+          this.applyBrightness();
+        };
+        
+        document.getElementById('caci-bright-low').addEventListener('click', () => setBrightness(1.0));
+        document.getElementById('caci-bright-mid').addEventListener('click', () => setBrightness(1.3));
+        document.getElementById('caci-bright-high').addEventListener('click', () => setBrightness(1.5));
+        document.getElementById('caci-bright-ultra').addEventListener('click', () => setBrightness(1.7));
+        
+        console.log('🎛️ Quick brightness controls added');
+      }, 2000);
     }
   };
   
+  // Initialize
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => DisplayFix.init());
   } else {
     DisplayFix.init();
   }
   
+  // Expose for manual control
   window.CACIDisplayFix = DisplayFix;
+  
+  // Add global quick-fix function
+  window.makeBrighter = function(level) {
+    const levels = {
+      1: 1.0,
+      2: 1.2,
+      3: 1.4,
+      4: 1.6,
+      5: 1.8
+    };
+    const brightness = levels[level] || 1.3;
+    localStorage.setItem('caci_brightness', brightness.toString());
+    DisplayFix.userBrightness = brightness;
+    DisplayFix.applyBrightness();
+    console.log(`🔆 Brightness set to ${brightness}x`);
+  };
+  
+  console.log('💡 Quick fix: Type makeBrighter(3) in console for instant boost');
+  
 })();
-
 
 // ── Chat history persistence ─────────────────────────────────
 function chatHistoryKey() { return 'caci_history_' + dept; }
