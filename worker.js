@@ -3992,8 +3992,9 @@ async function handleEmbedFile(request, env) {
     if (!chunks.length) return json({ ok: true, embedded: 0, skipped: 0 });
 
     // Check which chunks already have embeddings — skip those
+    // No cap on chunks - index ALL of them so we get full semantic coverage
     const toEmbed = [];
-    for (let i = 0; i < Math.min(chunks.length, 40); i++) {
+    for (let i = 0; i < chunks.length; i++) {
       const existing = await env.CACI_KV.get(`emb:${fileId}:${i}`).catch(() => null);
       if (!existing) toEmbed.push({ chunk: chunks[i], idx: i });
     }
@@ -4030,7 +4031,6 @@ async function handleEmbedFile(request, env) {
 async function handleEmbedStatus(url, env) {
   try {
     // Enumerate ALL file records — this is the real source of truth.
-    // List is paginated; we sample files for performance.
     const fileList = await env.CACI_KV.list({ prefix: 'file:' });
     const keys = (fileList && fileList.keys) ? fileList.keys : [];
 
@@ -4038,8 +4038,9 @@ async function handleEmbedStatus(url, env) {
     let totalChunks = 0, indexedChunks = 0;
     const partialFiles = [];   // list of {name, indexed, total} for UI detail
 
-    // Reduced from 100 to 30 to prevent timeouts with large collections
-    const MAX_FILES_TO_SCAN = 30;
+    // Scan ALL files (up to 500 to handle large collections), but only do
+    // a fast spot-check per file to stay within timeout limits.
+    const MAX_FILES_TO_SCAN = 500;
     const sample = keys.slice(0, MAX_FILES_TO_SCAN);
 
     for (const fkey of sample) {
@@ -4051,16 +4052,21 @@ async function handleEmbedStatus(url, env) {
       totalChunks += chunkCount;
       if (chunkCount === 0) continue;
 
-      // Sample only 10 chunks per file instead of 120 to speed up status checks
-      const CHECK_CAP = Math.min(chunkCount, 10);
+      // Fast check: sample just 3 chunks (first, middle, last) per file
+      // This is enough to detect "fully indexed", "partial", or "none"
+      const checkIndices = chunkCount === 1 ? [0] : 
+                           chunkCount === 2 ? [0, 1] :
+                           [0, Math.floor(chunkCount / 2), chunkCount - 1];
       let found = 0;
-      for (let i = 0; i < CHECK_CAP; i++) {
-        const idx = chunkCount <= 10 ? i : Math.floor((i / 9) * (chunkCount - 1));
+      for (const idx of checkIndices) {
         const got = await env.CACI_KV.get(`emb:${rec.id}:${idx}`).catch(() => null);
         if (got) found++;
       }
-      // Scale found up if we sampled
-      const estIndexed = CHECK_CAP === chunkCount ? found : Math.round((found / CHECK_CAP) * chunkCount);
+      // Estimate: if all sampled exist, assume fully indexed
+      // If some exist, assume partial (estimate based on ratio)
+      const estIndexed = found === checkIndices.length 
+        ? chunkCount 
+        : Math.round((found / checkIndices.length) * chunkCount);
       indexedChunks += estIndexed;
 
       if (estIndexed === chunkCount) {
@@ -4087,8 +4093,6 @@ async function handleEmbedStatus(url, env) {
     }
 
     // Coverage = indexed chunks / total chunks. This is the true story.
-    // (The old version reported file-level coverage which was misleading
-    // because a file with 40/100 chunks indexed showed as "indexed.")
     const chunkCoveragePct = totalChunks > 0 ? Math.round(indexedChunks / totalChunks * 100) : 0;
     const fileCoveragePct = totalFiles > 0 ? Math.round(fullyIndexedFiles / totalFiles * 100) : 0;
 
