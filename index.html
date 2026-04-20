@@ -3179,11 +3179,11 @@ body[data-theme="light"] .login-frame-box {
     112deg,
     transparent 0%,
     transparent 25%,
-    rgba(245,227,152,0.02) 38%,
-    rgba(255,248,200,0.055) 48%,
-    rgba(255,252,220,0.07) 50%,
-    rgba(255,248,200,0.055) 52%,
-    rgba(245,227,152,0.02) 62%,
+    rgba(245,227,152,0.008) 38%,
+    rgba(255,248,200,0.018) 48%,
+    rgba(255,252,220,0.025) 50%,
+    rgba(255,248,200,0.018) 52%,
+    rgba(245,227,152,0.008) 62%,
     transparent 75%,
     transparent 100%
   );
@@ -3194,8 +3194,8 @@ body[data-theme="light"] .login-frame-box {
 }
 @keyframes appGlimmer {
   0%   { background-position: 150% 0; opacity: 0; }
-  4%   { opacity: 0.4; }
-  96%  { opacity: 0.3; }
+  4%   { opacity: 0.15; }
+  96%  { opacity: 0.12; }
   100% { background-position: -50% 0; opacity: 0; }
 }
 
@@ -19863,13 +19863,11 @@ const UserTour = (() => {
   // `panel` optionally switches to a specific panel before showing the step.
   const STEPS = [
     {
-      target: '#tambour-handle',
-      arrow:  'left',
+      target: '.sb-plaque',
+      arrow:  'right',
       label:  'Step 1 of 7',
-      title:  'Open the shutter',
-      body:   'This is the tambour \u2014 pull the handle to reveal the navigation underneath. It\u2019s how you move between chat, documents, and settings.',
-      // Do NOT auto-open for this step; we want the user to see it closed and
-      // understand what it is. The tour advances to the next step normally.
+      title:  'Meet CACI',
+      body:   'This is CACI \u2014 your operational intelligence assistant. She reads your documents, learns your business, and answers questions with citations. Let\u2019s walk through what she can do.',
     },
     {
       target: '#chat-ta',
@@ -19881,7 +19879,7 @@ const UserTour = (() => {
     },
     {
       target: '#upload-btn',
-      panel:  'chat',
+      panel:  'files',
       arrow:  'bottom',
       label:  'Step 3 of 7',
       title:  'Teach her',
@@ -19896,28 +19894,25 @@ const UserTour = (() => {
       body:   'Switch departments to change which documents she draws from. Compliance, Finance, Operations, Retail \u2014 she knows each department has different concerns and adjusts accordingly.',
     },
     {
-      target: '#new-chat-btn',
-      panel:  'chat',
-      arrow:  'top',
-      label:  'Step 5 of 7',
-      title:  'Fresh start',
-      body:   'Starting a new conversation clears context but keeps her memory of your documents. Useful when you\u2019re switching topics and don\u2019t want earlier questions shaping her answers.',
-    },
-    {
       target: '#sb-nav .nav-btn[data-p="files"], #botbar .tab-btn[data-p="files"]',
       arrow:  'right',
-      label:  'Step 6 of 7',
+      label:  'Step 5 of 7',
       title:  'Her library',
-      body:   'Everything she\u2019s read lives here. You can see what\u2019s been uploaded, re-tag things, and remove documents you no longer need. The more she has, the sharper her answers.',
-      needsTambourOpen: true,  // nav buttons are covered by tambour when closed
+      body:   'Everything she\u2019s read lives here. You can see what\u2019s been uploaded, re-tag things, organize into collections, and remove documents you no longer need. The more she has, the sharper her answers.',
+    },
+    {
+      target: '#sb-nav .nav-btn[data-p="aisettings"], #botbar .tab-btn[data-p="aisettings"]',
+      arrow:  'right',
+      label:  'Step 6 of 7',
+      title:  'Tune her brain',
+      body:   'Fine-tune how CACI finds information \u2014 semantic search weights, retrieval preferences, and her voice settings. Most people won\u2019t need this, but power users can dial her in.',
     },
     {
       target: '#sb-nav .nav-btn[data-p="admin"], #botbar .tab-btn[data-p="admin"]',
       arrow:  'right',
       label:  'Step 7 of 7',
       title:  'Behind the scenes',
-      body:   'Admins can tune retrieval weights, manage users, turn demo mode on or off, and let CACI write her own intro scripts. Most people won\u2019t need this \u2014 but it\u2019s there when you do.',
-      needsTambourOpen: true,
+      body:   'Admins can manage users, view query activity, check system status, and connect integrations. Most people won\u2019t need this \u2014 but it\u2019s there when you do.',
     },
   ];
 
