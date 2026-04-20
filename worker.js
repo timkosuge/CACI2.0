@@ -1419,7 +1419,9 @@ Do not comment on anything else. Do not rewrite the response. Only flag hard num
     writeQueryLog(env, { message, dept, username: verifyToken(request, env)?.username || 'unknown', collection: collection || null, retrieval: !!context.text, scope });
 
     // Only surface sources if documents were actually retrieved — not for general conversation
-    const sourcesToReturn = context.text ? context.sources : [];
+    // And only the ones actually referenced in the response
+    const rawSources = context.text ? context.sources : [];
+    const sourcesToReturn = filterUsedSources(rawSources, verifiedResponse);
     const mainRespId = `${dept}:${Date.now()}:${Math.random().toString(36).slice(2,8)}`;
     return json({ ok: true, response: verifiedResponse, sources: sourcesToReturn, scope, model: model || 'claude', verified: shouldVerify, responseId: mainRespId });
   } catch (err) { return json({ error: 'Chat error: ' + err.message }, 500); }
@@ -1696,7 +1698,9 @@ These summaries were computed at upload time from the full dataset. When a quest
 
       // ── Final metadata event ──
       const responseId = `${dept}:${Date.now()}:${Math.random().toString(36).slice(2,8)}`;
-      const sourcesToReturn = context.text ? context.sources : [];
+      // Filter sources to only include files actually referenced in the response
+      const rawSources = context.text ? context.sources : [];
+      const sourcesToReturn = filterUsedSources(rawSources, fullText);
       await send({ done: true, sources: sourcesToReturn, responseId, scope, model: model || 'claude', correction });
 
     } catch (err) {
@@ -3401,6 +3405,74 @@ function expandKeywords(keywords) {
     else expanded.add(kw + 's');
   }
   return [...expanded];
+}
+
+// Filter source list to only include files actually referenced in the response.
+// CACI retrieves many docs during search, but often only uses a few for her answer.
+// This post-hoc filter scans the response text for signals that a source was used:
+//   - The filename (or part of it) appears in the response
+//   - A rule code from the filename (like "1301:18-8-02") appears in the response
+//   - Specific identifying keywords from the filename appear in the response
+// Falls back to returning ALL sources if we can't determine which were used
+// (better to over-cite than to leave the user with no sources at all).
+function filterUsedSources(sources, responseText) {
+  if (!sources || !sources.length || !responseText) return sources || [];
+  const respLower = responseText.toLowerCase();
+  
+  const usedSources = sources.filter(src => {
+    if (!src) return false;
+    const srcLower = src.toLowerCase();
+    
+    // Strip path prefix (e.g., "Collection / filename.pdf" -> "filename.pdf")
+    const justName = src.includes(' / ') ? src.split(' / ').pop() : src;
+    const nameLower = justName.toLowerCase();
+    const nameNoExt = nameLower.replace(/\.[a-z]+$/, '');
+    
+    // Check 1: Full filename appears in response
+    if (respLower.includes(nameLower) || respLower.includes(nameNoExt)) return true;
+    
+    // Check 2: Extract rule/section codes from filename
+    // Handles formats like: OH_1301_18_8_02, 1301-18-8-02, 1301:18:8:02
+    const codeMatches = justName.match(/\b\d{3,}[_:\-\.]\d+[_:\-\.]\d+[_:\-\.]?\d*/g);
+    if (codeMatches) {
+      for (const code of codeMatches) {
+        // Normalize the code to various formats the LLM might use
+        const normalized = code.replace(/[_\-\.]/g, ':');
+        const withHyphens = code.replace(/[_:\.]/g, '-');
+        const withDots = code.replace(/[_:\-]/g, '.');
+        if (respLower.includes(normalized.toLowerCase()) || 
+            respLower.includes(withHyphens.toLowerCase()) ||
+            respLower.includes(withDots.toLowerCase())) {
+          return true;
+        }
+      }
+    }
+    
+    // Check 3: Extract distinctive keywords from filename (3+ chars, not common words)
+    // e.g., "Dispensary_Operating_Procedures" → ["Dispensary", "Operating", "Procedures"]
+    const stopWords = new Set(['the','and','for','with','from','this','that','what','have','has','had','been','were','are','was','can']);
+    const keywords = nameNoExt
+      .split(/[_\-\s\.]+/)
+      .filter(w => w.length >= 5 && !stopWords.has(w.toLowerCase()) && !/^\d+$/.test(w));
+    
+    // If at least 2 distinctive keywords from the filename appear, consider it used
+    if (keywords.length >= 2) {
+      const matches = keywords.filter(kw => respLower.includes(kw.toLowerCase())).length;
+      if (matches >= 2) return true;
+      // Or if a single very distinctive keyword (8+ chars) matches
+      if (keywords.some(kw => kw.length >= 8 && respLower.includes(kw.toLowerCase()))) return true;
+    }
+    
+    return false;
+  });
+  
+  // Safety fallback: if filter removed ALL sources, return original list
+  // (better to over-cite than leave user with no way to verify)
+  if (usedSources.length === 0 && sources.length > 0) {
+    return sources;
+  }
+  
+  return usedSources;
 }
 
 function scoreChunk(chunk, keywords) {
