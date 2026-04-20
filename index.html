@@ -3708,6 +3708,9 @@ body[data-theme="light"] .login-frame-box {
   border-radius: 4px;
   position: relative;
   isolation: isolate;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
   /* Raised face — bright metallic border all around */
   border: 1px solid rgba(212,168,50,0.50);
   border-top-color: rgba(245,227,152,0.90);
@@ -16740,21 +16743,31 @@ function initTambour() {
   });
 }
 
-/* ── Easter egg — triple-click CACI plate → Jushi ────────── */
+/* ── Easter egg — triple-click CACI plate → Jushi Holdings ────────── */
 (function() {
-  const plate = document.querySelector('.sb-plaque');
-  if (!plate) return;
   let clicks = 0, timer = null;
-  plate.addEventListener('mousedown', e => { if (e.detail >= 2) e.preventDefault(); });
-  plate.addEventListener('click', () => {
+
+  function triggerEasterEgg() {
     clicks++;
     clearTimeout(timer);
-    timer = setTimeout(() => { clicks = 0; }, 500);
+    timer = setTimeout(() => { clicks = 0; }, 600);
     if (clicks >= 3) {
       clicks = 0;
       clearTimeout(timer);
       window.open('https://jushico.com/', '_blank', 'noopener,noreferrer');
     }
+  }
+
+  // Prevent text selection on multi-click
+  document.addEventListener('mousedown', (e) => {
+    const plate = e.target.closest('.sb-plaque');
+    if (plate && e.detail >= 2) e.preventDefault();
+  });
+
+  // Event delegation — works even if .sb-plaque is re-rendered
+  document.addEventListener('click', (e) => {
+    const plate = e.target.closest('.sb-plaque');
+    if (plate) triggerEasterEgg();
   });
 })();
 
