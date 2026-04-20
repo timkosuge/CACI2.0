@@ -2192,15 +2192,15 @@ async function buildContextTwoPass({ message, dept, collection, env }) {
     const hasStrongSignal = queryYears.size > 0 || queryQuarters.size > 0 || (rangeStart && rangeEnd);
     let topFiles;
     if (hasStrongSignal) {
-      topFiles = scoredFiles.slice(0, 12);
+      topFiles = scoredFiles.slice(0, 20); // Increased from 12 - need more coverage for large regulatory collections
     } else {
-      // Broad query: top 3 + spread 7 evenly across rest for full coverage
-      const top3 = scoredFiles.slice(0, 3);
-      const rest  = scoredFiles.slice(3);
+      // Broad query: top 5 + spread 15 evenly across rest for comprehensive coverage
+      const top5 = scoredFiles.slice(0, 5); // Increased from 3
+      const rest  = scoredFiles.slice(5);
       const spread = [];
-      const step = Math.max(1, Math.floor(rest.length / 7));
-      for (let i = 0; i < rest.length && spread.length < 7; i += step) spread.push(rest[i]);
-      topFiles = [...top3, ...spread];
+      const step = Math.max(1, Math.floor(rest.length / 15)); // Increased from 7
+      for (let i = 0; i < rest.length && spread.length < 15; i += step) spread.push(rest[i]);
+      topFiles = [...top5, ...spread];
     }
 
     // Load full content for selected files — preserve _score for chunk boosting
@@ -3365,9 +3365,13 @@ const DOMAIN_SYNONYMS = {
   'edible':     ['edibles', 'gummy', 'gummies', 'chocolate', 'capsule'],
   'preroll':    ['pre-roll', 'pre roll', 'joint', 'infused'],
   'compliance': ['regulatory', 'regulation', 'audit', 'metrc'],
+  'security':   ['surveillance', 'monitoring', 'safety', 'operating', 'procedures', 'requirements'],
+  'testing':    ['laboratory', 'lab', 'quality', 'assurance', 'procedures', 'requirements'],
+  'packaging':  ['labeling', 'label', 'requirements', 'procedures', 'standards'],
+  'transport':  ['transportation', 'transfer', 'manifest', 'delivery', 'procedures'],
   'return':     ['returns', 'refund', 'credit', 'complaint'],
   'transfer':   ['transfers', 'manifest', 'transport'],
-  'dispensary': ['store', 'retail', 'location', 'site'],
+  'dispensary': ['store', 'retail', 'location', 'site', 'operating', 'procedures'],
   'delivery':   ['curbside', 'drive-up', 'drive-through', 'pickup', 'operating', 'operations', 'procedures'],
   'curbside':   ['delivery', 'drive-up', 'pickup', 'operating', 'operations', 'procedures'],
   'pickup':     ['curbside', 'delivery', 'drive-up', 'operating', 'operations'],
