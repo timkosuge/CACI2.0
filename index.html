@@ -10837,9 +10837,39 @@ function resetSendState() {
 }
 
 function setDept(id) {
+  if (dept === id) return; // No change, skip
+  dept = id;
   localStorage.setItem('caci_dept', id);
   saveUserPref('dept', id);
-  location.reload();
+  
+  // Refresh everything that depends on dept, without reloading the browser
+  syncDept();
+  
+  // Clear chat state — different dept means different context
+  chatHistory = [];
+  clearChatHistory();
+  const msgs = $('chat-msgs');
+  if (msgs) { msgs.innerHTML = ''; msgs.classList.remove('has-messages'); }
+  $('chat-bar')?.classList.remove('has-messages');
+  const chatEmpty = $('chat-empty');
+  if (chatEmpty) chatEmpty.style.display = '';
+  
+  // Reset scope and collection selection
+  selectedCollection = null;
+  chatCollection = null;
+  chatFileId = null;
+  chatFileName = null;
+  _colView = 'all';
+  if (typeof setScope === 'function') setScope('all');
+  
+  // Refresh all dept-scoped data
+  if (typeof loadCollections === 'function') loadCollections();
+  if (typeof loadFiles === 'function') loadFiles();
+  if (typeof refreshFileMapping === 'function') refreshFileMapping();
+  if (typeof initChatGreeting === 'function') initChatGreeting();
+  
+  // Refresh presence so the dept change is reflected in logs
+  if (window._presencePing) window._presencePing();
 }
 function syncDept() {
   const d = DEPTS.find(x => x.id === dept) || DEPTS[0];
