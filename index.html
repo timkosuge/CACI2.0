@@ -19869,7 +19869,7 @@ const UserTour = (() => {
     {
       target: '.sb-plaque',
       arrow:  'right',
-      label:  'Step 1 of 12',
+      label:  'Step 1 of 13',
       title:  'Meet CACI',
       body:   'This is CACI \u2014 your operational intelligence assistant. She reads your documents, learns your business, and answers questions with citations. Let\u2019s walk through what she can do.',
     },
@@ -19877,7 +19877,7 @@ const UserTour = (() => {
       target: '#chat-ta',
       panel:  'chat',
       arrow:  'bottom',
-      label:  'Step 2 of 12',
+      label:  'Step 2 of 13',
       title:  'Ask her anything',
       body:   'Type your question here. CACI reads the documents you\u2019ve given her and answers with citations \u2014 no guessing, no made-up numbers. Try asking about something specific in one of her documents.',
     },
@@ -19885,15 +19885,24 @@ const UserTour = (() => {
       target: '#mic-btn, #spk-toggle-btn',
       panel:  'chat',
       arrow:  'bottom',
-      label:  'Step 3 of 12',
+      label:  'Step 3 of 13',
       title:  'Talk and listen',
       body:   'Click the microphone to speak your question instead of typing. Click the speaker to toggle auto-speak \u2014 CACI will read her responses aloud so you can keep working while she answers.',
+      multi:  true,
+    },
+    {
+      target: '#img-attach-btn',
+      panel:  'chat',
+      arrow:  'bottom',
+      label:  'Step 4 of 13',
+      title:  'Show her an image',
+      body:   'Attach an image to your question \u2014 a chart, a photo, a screenshot. CACI will read what\u2019s in it and factor it into her answer along with your documents.',
     },
     {
       target: '#upload-btn',
       panel:  'files',
       arrow:  'bottom',
-      label:  'Step 4 of 12',
+      label:  'Step 5 of 13',
       title:  'Teach her',
       body:   'Drop documents here and she\u2019ll read them cover to cover, tag them, and file them automatically. PDFs, Word docs, spreadsheets, even images \u2014 she handles all of them.',
     },
@@ -19901,58 +19910,59 @@ const UserTour = (() => {
       target: '#dept-chip',
       panel:  'chat',
       arrow:  'bottom',
-      label:  'Step 5 of 12',
+      label:  'Step 6 of 13',
       title:  'Scope her context',
       body:   'Switch departments to change which documents she draws from. Compliance, Finance, Operations, Retail \u2014 she knows each department has different concerns and adjusts accordingly.',
     },
     {
       target: '#sb-model-pill, #tb-model-chip',
       arrow:  'right',
-      label:  'Step 6 of 12',
+      label:  'Step 7 of 13',
       title:  'Choose her brain',
       body:   'Switch between AI models \u2014 Claude for deep reasoning, Grok for fast answers, or run locally with Ollama. Each has strengths; pick whichever fits the task.',
     },
     {
       target: '#sb-nav .nav-btn[data-p="files"], #botbar .tab-btn[data-p="files"]',
       arrow:  'right',
-      label:  'Step 7 of 12',
+      label:  'Step 8 of 13',
       title:  'Her library',
       body:   'Everything she\u2019s read lives here. You can see what\u2019s been uploaded, re-tag things, organize into collections, and remove documents you no longer need. The more she has, the sharper her answers.',
     },
     {
       target: '#sb-nav .nav-btn[data-p="responses"], #botbar .tab-btn[data-p="responses"]',
       arrow:  'right',
-      label:  'Step 8 of 12',
+      label:  'Step 9 of 13',
       title:  'Saved responses',
       body:   'Save any of CACI\u2019s answers to revisit later. Click the save icon on a response and it shows up here \u2014 organized, searchable, and ready to share with your team.',
     },
     {
       target: '#sb-nav .nav-btn[data-p="analytics"], #botbar .tab-btn[data-p="analytics"]',
       arrow:  'right',
-      label:  'Step 9 of 12',
+      label:  'Step 10 of 13',
       title:  'Usage insights',
       body:   'See how your team is using CACI \u2014 which questions get asked most, where she\u2019s finding gaps in her knowledge, and patterns worth acting on. Admins only.',
     },
     {
       target: '#sb-nav .nav-btn[data-p="aisettings"], #botbar .tab-btn[data-p="aisettings"]',
       arrow:  'right',
-      label:  'Step 10 of 12',
+      label:  'Step 11 of 13',
       title:  'Tune her brain',
       body:   'Fine-tune how CACI finds information \u2014 semantic search weights, retrieval preferences, and her voice settings. Most people won\u2019t need this, but power users can dial her in.',
     },
     {
       target: '#sb-nav .nav-btn[data-p="admin"], #botbar .tab-btn[data-p="admin"]',
       arrow:  'right',
-      label:  'Step 11 of 12',
+      label:  'Step 12 of 13',
       title:  'Behind the scenes',
       body:   'Admins can manage users, view query activity, check system status, and connect integrations. Most people won\u2019t need this \u2014 but it\u2019s there when you do.',
     },
     {
       target: '#sb-chpw-btn, #sb-logout-btn',
       arrow:  'top',
-      label:  'Step 12 of 12',
+      label:  'Step 13 of 13',
       title:  'Your account',
       body:   'Change your password any time with the lock icon. When you\u2019re done for the day, the arrow icon logs you out. Your settings, saved responses, and preferences follow you to any device.',
+      multi:  true,
     },
   ];
 
@@ -19993,6 +20003,44 @@ const UserTour = (() => {
       } catch {}
     }
     return null;
+  }
+
+  // Returns ALL visible elements matching any of the step's selectors.
+  // Used for multi-element steps (e.g. mic + speaker) where the spotlight
+  // should cover both buttons, not just one.
+  function resolveAllTargets(step) {
+    const selectors = step.target.split(',').map(s => s.trim());
+    const found = [];
+    const seen = new Set();
+    for (const sel of selectors) {
+      try {
+        const el = document.querySelector(sel);
+        if (el && !seen.has(el) && (el.offsetParent !== null || el.getClientRects().length > 0)) {
+          seen.add(el);
+          found.push(el);
+        }
+      } catch {}
+    }
+    return found;
+  }
+
+  // Compute a bounding rect that covers all the given elements.
+  function unionRect(elements) {
+    if (!elements || elements.length === 0) return null;
+    let top = Infinity, left = Infinity, right = -Infinity, bottom = -Infinity;
+    for (const el of elements) {
+      const r = el.getBoundingClientRect();
+      top    = Math.min(top, r.top);
+      left   = Math.min(left, r.left);
+      right  = Math.max(right, r.right);
+      bottom = Math.max(bottom, r.bottom);
+    }
+    if (top === Infinity) return null;
+    return {
+      top, left, right, bottom,
+      width: right - left,
+      height: bottom - top,
+    };
   }
 
   // Filter steps: only keep ones whose target resolves.
@@ -20039,7 +20087,16 @@ const UserTour = (() => {
     const target = resolveTarget(step);
     if (!target) { next(); return; }
 
-    const rect = target.getBoundingClientRect();
+    // For multi-element steps (e.g. mic + speaker, change pw + logout),
+    // compute a bounding rect that covers all matching elements so the
+    // spotlight encompasses the whole group instead of just the first one.
+    let rect;
+    if (step.multi) {
+      const allTargets = resolveAllTargets(step);
+      rect = unionRect(allTargets) || target.getBoundingClientRect();
+    } else {
+      rect = target.getBoundingClientRect();
+    }
     const vw = window.innerWidth;
     const vh = window.innerHeight;
 
