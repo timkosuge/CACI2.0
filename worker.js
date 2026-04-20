@@ -4036,42 +4036,84 @@ async function handleEmbedStatus(url, env) {
 
     let totalFiles = 0, fullyIndexedFiles = 0, partiallyIndexedFiles = 0;
     let totalChunks = 0, indexedChunks = 0;
-    const partialFiles = [];   // list of {name, indexed, total} for UI detail
+    const partialFiles = [];
 
-    // Scan ALL files (up to 500 to handle large collections), but only do
-    // a fast spot-check per file to stay within timeout limits.
-    const MAX_FILES_TO_SCAN = 500;
+    // Scan up to 200 files. Parallel batching keeps this under timeout.
+    const MAX_FILES_TO_SCAN = 200;
     const sample = keys.slice(0, MAX_FILES_TO_SCAN);
 
-    for (const fkey of sample) {
-      const rec = await env.CACI_KV.get(fkey.name, 'json');
-      if (!rec) continue;
-      if (rec.isContext) continue;  // context docs don't count toward user-visible corpus
-      totalFiles++;
+    // Step 1: Fetch all file records in parallel batches of 25
+    const BATCH_SIZE = 25;
+    const fileRecords = [];
+    for (let i = 0; i < sample.length; i += BATCH_SIZE) {
+      const batch = sample.slice(i, i + BATCH_SIZE);
+      const results = await Promise.all(
+        batch.map(fkey => env.CACI_KV.get(fkey.name, 'json').catch(() => null))
+      );
+      fileRecords.push(...results);
+    }
+
+    // Step 2: Build list of embedding keys to check (just 1 per file - chunk 0)
+    // This is the fastest way to know if a file has ANY embeddings
+    const embedChecks = [];
+    const fileChunkCounts = [];
+    
+    for (const rec of fileRecords) {
+      if (!rec) { fileChunkCounts.push(null); embedChecks.push(null); continue; }
+      if (rec.isContext) { fileChunkCounts.push(null); embedChecks.push(null); continue; }
+      
       const chunkCount = Array.isArray(rec.chunks) ? rec.chunks.length : (rec.chunks || 0);
-      totalChunks += chunkCount;
-      if (chunkCount === 0) continue;
-
-      // Fast check: sample just 3 chunks (first, middle, last) per file
-      // This is enough to detect "fully indexed", "partial", or "none"
-      const checkIndices = chunkCount === 1 ? [0] : 
-                           chunkCount === 2 ? [0, 1] :
-                           [0, Math.floor(chunkCount / 2), chunkCount - 1];
-      let found = 0;
-      for (const idx of checkIndices) {
-        const got = await env.CACI_KV.get(`emb:${rec.id}:${idx}`).catch(() => null);
-        if (got) found++;
+      fileChunkCounts.push({ rec, chunkCount });
+      
+      if (chunkCount === 0) {
+        embedChecks.push(null);
+      } else {
+        // Check 2 chunks: first and last (fastest way to detect partial vs full)
+        const lastIdx = chunkCount - 1;
+        embedChecks.push({ 
+          firstKey: `emb:${rec.id}:0`, 
+          lastKey: chunkCount > 1 ? `emb:${rec.id}:${lastIdx}` : null,
+          chunkCount,
+          rec 
+        });
       }
-      // Estimate: if all sampled exist, assume fully indexed
-      // If some exist, assume partial (estimate based on ratio)
-      const estIndexed = found === checkIndices.length 
-        ? chunkCount 
-        : Math.round((found / checkIndices.length) * chunkCount);
-      indexedChunks += estIndexed;
+    }
 
-      if (estIndexed === chunkCount) {
+    // Step 3: Parallel check all embeddings in batches of 50
+    const allKeysToCheck = [];
+    embedChecks.forEach(check => {
+      if (check) {
+        allKeysToCheck.push(check.firstKey);
+        if (check.lastKey) allKeysToCheck.push(check.lastKey);
+      }
+    });
+
+    const checkResults = {};
+    for (let i = 0; i < allKeysToCheck.length; i += 50) {
+      const batch = allKeysToCheck.slice(i, i + 50);
+      const results = await Promise.all(
+        batch.map(key => env.CACI_KV.get(key).then(v => v !== null).catch(() => false))
+      );
+      batch.forEach((key, idx) => { checkResults[key] = results[idx]; });
+    }
+
+    // Step 4: Calculate stats from results
+    for (const check of embedChecks) {
+      if (!check) continue;
+      
+      const { rec, chunkCount, firstKey, lastKey } = check;
+      totalFiles++;
+      totalChunks += chunkCount;
+      
+      const firstExists = checkResults[firstKey] || false;
+      const lastExists = lastKey ? (checkResults[lastKey] || false) : firstExists;
+      
+      let estIndexed;
+      if (firstExists && lastExists) {
+        estIndexed = chunkCount; // Assume fully indexed
         fullyIndexedFiles++;
-      } else if (estIndexed > 0) {
+      } else if (firstExists || lastExists) {
+        estIndexed = Math.round(chunkCount * 0.5); // Partial
         partiallyIndexedFiles++;
         partialFiles.push({
           name: rec.name || rec.id,
@@ -4081,7 +4123,7 @@ async function handleEmbedStatus(url, env) {
           total: chunkCount,
         });
       } else {
-        // 0 indexed — file uploaded but never embedded. List it as needing backfill.
+        estIndexed = 0;
         partialFiles.push({
           name: rec.name || rec.id,
           id: rec.id,
@@ -4090,9 +4132,9 @@ async function handleEmbedStatus(url, env) {
           total: chunkCount,
         });
       }
+      indexedChunks += estIndexed;
     }
 
-    // Coverage = indexed chunks / total chunks. This is the true story.
     const chunkCoveragePct = totalChunks > 0 ? Math.round(indexedChunks / totalChunks * 100) : 0;
     const fileCoveragePct = totalFiles > 0 ? Math.round(fullyIndexedFiles / totalFiles * 100) : 0;
 
@@ -4104,9 +4146,9 @@ async function handleEmbedStatus(url, env) {
       partiallyIndexedFiles,
       totalChunks,
       indexedChunks,
-      coveragePct: chunkCoveragePct,     // true chunk-level coverage (what matters for retrieval)
-      fileCoveragePct,                   // fully-indexed file count (for the simple headline)
-      partialFiles: partialFiles.slice(0, 20),  // surface top 20 problem files for admin UI
+      coveragePct: chunkCoveragePct,
+      fileCoveragePct,
+      partialFiles: partialFiles.slice(0, 20),
       totalScanned: sample.length,
       totalKeysInKV: keys.length,
       aiAvailable: !!env.AI,
