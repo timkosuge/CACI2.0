@@ -4918,6 +4918,16 @@ body[data-theme="light"] .login-frame-box {
   text-transform: uppercase;
 }
 .msg-sources b { color: var(--gold); font-weight: 400; }
+.msg-sources .source-link {
+  cursor: pointer;
+  transition: all 0.2s var(--ease);
+  border-bottom: 1px solid rgba(212,168,50,0.3);
+  padding-bottom: 1px;
+}
+.msg-sources .source-link:hover {
+  color: var(--gold-lt);
+  border-bottom-color: var(--gold);
+}
 
 .typing-wrap { display: flex; align-items: center; gap: 5px; padding: 12px 16px; }
 .td {
@@ -9754,6 +9764,7 @@ let curPanel = 'chat';
 let _chatImageBase64 = null;   // base64 string of attached image
 let _chatImageMime   = null;   // mime type e.g. 'image/jpeg'
 let _chatImageName   = null;   // original filename for display
+let _fileNameToIdMap = {};     // maps file names to IDs for citation linking
 
 // ── Chat history persistence ─────────────────────────────────
 function chatHistoryKey() { return 'caci_history_' + dept; }
@@ -11263,7 +11274,21 @@ function appendMsg(role, text, sources, scope, model = '', responseId = '', imag
   const displayName = sessionStorage.getItem('caci_displayname') || '';
   const av = role === 'user' ? (getInitials(displayName) || 'YOU') : 'CACI';
   const imgHtml = (role === 'user' && imageDataUrl) ? `<img class="msg-image" src="${imageDataUrl}" alt="attached image"/>` : '';
-  const src = sources && sources.length ? `<div class="msg-sources">Sources &mdash; <b>${sources.join(' \u00b7 ')}</b></div>` : '';
+  
+  // Make sources clickable - each source becomes a link that opens the document viewer
+  let src = '';
+  if (sources && sources.length) {
+    const sourceLinks = sources.map(sourceName => {
+      const fileId = _fileNameToIdMap[sourceName];
+      if (fileId) {
+        return `<span class="source-link" data-file-id="${fileId}" data-file-name="${esc(sourceName)}">${esc(sourceName)}</span>`;
+      } else {
+        return esc(sourceName);
+      }
+    }).join(' · ');
+    src = `<div class="msg-sources">Sources &mdash; <b>${sourceLinks}</b></div>`;
+  }
+  
   const sc = scope && scope !== 'all' ? `<div class="msg-scope">Scope: ${scope === 'file' ? chatFileName : scope === 'collection' ? chatCollection : 'all'}</div>` : '';
   const spk = role === 'ai' ? `<button class="msg-action-btn spk-btn" title="Read aloud" data-spk="1">
     <svg class="spk-play-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 010 7.07"/><path d="M19.07 4.93a10 10 0 010 14.14"/></svg>
@@ -11374,6 +11399,18 @@ function appendMsg(role, text, sources, scope, model = '', responseId = '', imag
         });
       });
     }
+
+    // ── Citation source links ──────────────────────────────
+    const sourceLinks = el.querySelectorAll('.source-link');
+    sourceLinks.forEach(link => {
+      link.addEventListener('click', function() {
+        const fileId = this.dataset.fileId;
+        const fileName = this.dataset.fileName;
+        if (fileId && fileName) {
+          openFileViewer(fileId, fileName);
+        }
+      });
+    });
 
     // ── Feedback signal buttons ───────────────────────────
     if (responseId) {
@@ -12206,6 +12243,15 @@ async function loadFiles() {
     if (fSt)  qs += `&state=${encodeURIComponent(fSt)}`;
     const res = await apiFetch(qs);
     const files = await res.json();
+    
+    // Populate file name to ID mapping for citation linking
+    _fileNameToIdMap = {};
+    files.forEach(f => {
+      if (f.name && f.id) {
+        _fileNameToIdMap[f.name] = f.id;
+      }
+    });
+    
     $('fbadge').textContent = files.length + ' file' + (files.length !== 1 ? 's' : '');
     $('ftitle').textContent = _colView === 'uncollected' ? 'Unsorted Files' : (selectedCollection || 'All Documents');
 
