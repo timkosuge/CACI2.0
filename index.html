@@ -9857,6 +9857,106 @@ async function refreshFileMapping() {
   }
 }
 
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  CACI DISPLAY BRIGHTNESS FIX - Auto-detects dark screens
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+(function() {
+  'use strict';
+  
+  const DisplayFix = {
+    isLowDPI: false,
+    isHDR: false,
+    userBrightness: null,
+    
+    init() {
+      console.log('🔆 CACI Display Adaptation Loading...');
+      this.detectDisplay();
+      this.loadUserPreference();
+      this.applyBrightness();
+      this.setupListeners();
+      console.log('✅ Display adaptation active');
+    },
+    
+    detectDisplay() {
+      this.isLowDPI = (window.devicePixelRatio || 1) < 1.5;
+      this.isHDR = window.matchMedia && window.matchMedia('(dynamic-range: high)').matches;
+      console.log('Display:', { pixelRatio: window.devicePixelRatio, isLowDPI: this.isLowDPI, isHDR: this.isHDR });
+    },
+    
+    loadUserPreference() {
+      try {
+        const saved = localStorage.getItem('caci_brightness');
+        if (saved && !isNaN(parseFloat(saved))) {
+          this.userBrightness = parseFloat(saved);
+          console.log('Loaded brightness:', this.userBrightness);
+        }
+      } catch(e) {}
+    },
+    
+    applyBrightness() {
+      const app = document.getElementById('app');
+      if (!app) {
+        setTimeout(() => this.applyBrightness(), 500);
+        return;
+      }
+      
+      const theme = document.body.getAttribute('data-theme');
+      let brightness = 1.0;
+      let contrast = 1.0;
+      
+      if (this.userBrightness !== null) {
+        brightness = this.userBrightness;
+        app.style.filter = `brightness(${brightness})`;
+        console.log(`User brightness: ${brightness}`);
+        return;
+      }
+      
+      if (theme === 'dark') {
+        if (this.isLowDPI) {
+          brightness = 1.15;
+          contrast = 1.05;
+          console.log('🔆 Low-DPI: boosting brightness');
+        } else if (this.isHDR) {
+          brightness = 0.95;
+          console.log('✨ HDR: reducing brightness');
+        }
+      }
+      
+      if (brightness !== 1.0 || contrast !== 1.0) {
+        app.style.filter = `brightness(${brightness}) contrast(${contrast})`;
+      } else {
+        app.style.filter = 'none';
+      }
+    },
+    
+    setupListeners() {
+      window.addEventListener('focus', () => {
+        this.detectDisplay();
+        this.applyBrightness();
+      });
+      
+      const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          if (mutation.attributeName === 'data-theme') {
+            this.applyBrightness();
+          }
+        });
+      });
+      observer.observe(document.body, { attributes: true });
+    }
+  };
+  
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => DisplayFix.init());
+  } else {
+    DisplayFix.init();
+  }
+  
+  window.CACIDisplayFix = DisplayFix;
+})();
+
+
 // ── Chat history persistence ─────────────────────────────────
 function chatHistoryKey() { return 'caci_history_' + dept; }
 
