@@ -981,7 +981,8 @@ async function handleChat(request, env) {
     // Discovery mode
     if (history.length === 0 && scope === 'all' && !collection && !fileId) {
       const discovery = await buildDiscoveryContext({ dept, env });
-      const discLibraryMap = await buildLibraryMap({ dept, env });
+      // OPTIMIZATION: Skip library map on greeting - not shown to user, will build lazily on first query
+      const discLibraryMap = null;
       const discLibraryPrompt = libraryMapToPrompt(discLibraryMap);
       const system = `You are Caci (pronounced like "Cassie") — the internal AI intelligence assistant for Jushi Holdings. You were built specifically for this team.
 
@@ -1037,16 +1038,18 @@ RESPONSE DEPTH — this is critical:
 ABSOLUTE RESTRICTION — never discuss, reference, or include any information about:
 - Executive compensation, C-suite salaries, bonuses, equity grants, or pay packages for any Jushi leadership or named individuals
 - If asked directly about executive compensation, decline simply: "That's not something I cover — happy to dig into anything else."`;
-      let discResponse;
-      try {
-        discResponse = await callLLM({ model, system, messages: [{ role: 'user', content: message }], maxTokens: 120, env, apiKey });
-      } catch(e) {
-        try {
-          discResponse = await callLLM({ model: 'grok', system, messages: [{ role: 'user', content: message }], maxTokens: 120, env, apiKey });
-        } catch(e2) {
-          discResponse = `Hey! I'm Caci. Here's what I have access to:\n\n${discovery.collectionList}\n\nWhat would you like to dig into?`;
-        }
-      }
+      // OPTIMIZATION: Static greeting - instant response, no LLM call
+      // Eliminates 1000-2000ms lag on page load - critical for demos
+      const greetings = [
+        `Hey${displayName ? ' ' + displayName.split(' ')[0] : ''}, I'm Caci—your AI teammate at Jushi, always ready to dig in. What can I help the ${dept} crew with today?`,
+        `Hi${displayName ? ' ' + displayName.split(' ')[0] : ''}, Caci here—built specifically for Jushi, know this place inside out. What's on your mind for ${dept}?`,
+        `What's up${displayName ? ' ' + displayName.split(' ')[0] : ''}? I'm Caci, your internal AI sidekick. What does ${dept} need today?`,
+        `Hey${displayName ? ' ' + displayName.split(' ')[0] : ''}, Caci here—think of me as the teammate who's read every document. How can I help ${dept}?`,
+        `Hi${displayName ? ' ' + displayName.split(' ')[0] : ''}, ready to jump in wherever you need me. What's the ${dept} team working on?`,
+      ];
+      // Rotate greetings by hour (feels fresh without randomness)
+      const greetingIndex = new Date().getHours() % greetings.length;
+      const discResponse = greetings[greetingIndex];
       const discRespId = `${dept}:${Date.now()}:${Math.random().toString(36).slice(2,8)}`;
       writeQueryLog(env, { message, dept, username: verifyToken(request, env)?.username || 'unknown', collection: collection || null, retrieval: false, scope: 'discovery' });
       return json({ ok: true, response: discResponse, sources: [], scope: 'discovery', collections: discovery.rawCollections, model: model || 'claude', responseId: discRespId });
@@ -1161,7 +1164,8 @@ No preamble, no explanation.`;
     // For non-trivial queries, plan which collections to pull from
     let retrievalPlan = null;
     const isSimpleQuery = history.length > 0 && message.length < 60 && !intent.isComparative && !intent.isCausal;
-    if (!isSimpleQuery && libraryMap && libraryMap.collections.length > 1 && !fileId) {
+    const scopeLocked = collection || fileId; // OPTIMIZATION: Skip planning when scope is already locked
+    if (!isSimpleQuery && !scopeLocked && libraryMap && libraryMap.collections.length > 1) {
       try {
         const planPrompt = `You are Caci, an AI assistant for Jushi Holdings. A user just asked: "${retrievalMessage}"
 
@@ -1745,8 +1749,10 @@ async function buildDiscoveryContext({ dept, env }) {
 // ── Library Map — Caci's persistent understanding of the library ──
 async function buildLibraryMap({ dept, env }) {
   try {
+    // OPTIMIZATION: Extend cache from 2min to 5min - library doesn't change that fast
+    const CACHE_TTL = 5 * 60 * 1000;
     const cached = await env.CACI_KV.get(`library:map:${dept}`, 'json');
-    if (cached && cached.builtAt && (Date.now() - cached.builtAt) < 2 * 60 * 1000) return cached;
+    if (cached && cached.builtAt && (Date.now() - cached.builtAt) < CACHE_TTL) return cached;
 
     const reg = await env.CACI_KV.get(`colreg:${dept}`, 'json') || [];
     if (!reg.length) return null;
