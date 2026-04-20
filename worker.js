@@ -4038,12 +4038,12 @@ async function handleEmbedStatus(url, env) {
     let totalChunks = 0, indexedChunks = 0;
     const partialFiles = [];
 
-    // Scan up to 200 files. Parallel batching keeps this under timeout.
-    const MAX_FILES_TO_SCAN = 200;
+    // Scan up to 1000 files with aggressive parallel batching
+    const MAX_FILES_TO_SCAN = 1000;
     const sample = keys.slice(0, MAX_FILES_TO_SCAN);
 
-    // Step 1: Fetch all file records in parallel batches of 25
-    const BATCH_SIZE = 25;
+    // Step 1: Fetch all file records in parallel batches of 100
+    const BATCH_SIZE = 100;
     const fileRecords = [];
     for (let i = 0; i < sample.length; i += BATCH_SIZE) {
       const batch = sample.slice(i, i + BATCH_SIZE);
@@ -4089,8 +4089,8 @@ async function handleEmbedStatus(url, env) {
     });
 
     const checkResults = {};
-    for (let i = 0; i < allKeysToCheck.length; i += 50) {
-      const batch = allKeysToCheck.slice(i, i + 50);
+    for (let i = 0; i < allKeysToCheck.length; i += 100) {
+      const batch = allKeysToCheck.slice(i, i + 100);
       const results = await Promise.all(
         batch.map(key => env.CACI_KV.get(key).then(v => v !== null).catch(() => false))
       );
