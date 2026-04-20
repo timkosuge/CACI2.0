@@ -11302,7 +11302,9 @@ function appendMsg(role, text, sources, scope, model = '', responseId = '', imag
   let src = '';
   if (sources && sources.length) {
     const sourceLinks = sources.map(sourceName => {
-      const fileId = _fileNameToIdMap[sourceName];
+      // Strip folder path to get just the filename (sources may include "Folder / filename")
+      const justFilename = sourceName.includes(' / ') ? sourceName.split(' / ').pop() : sourceName;
+      const fileId = _fileNameToIdMap[justFilename];
       if (fileId) {
         // Escape for HTML attributes - replace quotes
         const escapedName = String(sourceName).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
