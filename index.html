@@ -5,6 +5,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="theme-color" content="#050810"/>
 <title>CACI Intelligence Platform</title>
@@ -10351,49 +10352,10 @@ function bootApp() {
   // ── Restore chat history from previous session ───────────────
   try {
     // Load local immediately, then check server for a longer history (cross-device sync)
-    const savedHistory = loadChatHistory();
-    if (savedHistory.length > 0) {
-      chatHistory = savedHistory;
-      // Re-render messages — skip the greeting call
-      const msgs = $('chat-msgs');
-      if (msgs) {
-        msgs.innerHTML = '';
-        // Filter out the greeting (first assistant message with no prior user message)
-        let startIdx = 0;
-        if (savedHistory[0] && savedHistory[0].role === 'assistant') startIdx = 1;
-        for (let i = startIdx; i < savedHistory.length; i++) {
-          try {
-            const h = savedHistory[i];
-            appendMsg(h.role, h.content, h.sources || null, h.scope || null, h.model || '', '');
-          } catch(e) { /* skip malformed message */ }
-        }
-        // Show a subtle "session restored" indicator
-        const restoreEl = document.createElement('div');
-        restoreEl.style.cssText = 'text-align:center;font-family:var(--f-mono);font-size:9px;color:rgba(212,168,50,0.35);letter-spacing:0.12em;padding:8px 0 4px;text-transform:uppercase;';
-        restoreEl.textContent = '— Session restored —';
-        msgs.insertBefore(restoreEl, msgs.firstChild);
-        setTimeout(() => { restoreEl.style.transition = 'opacity 1.5s'; restoreEl.style.opacity = '0'; setTimeout(() => restoreEl.remove(), 1500); }, 3000);
-        // Mark as having messages
-        $('chat-bar').classList.add('has-messages');
-        msgs.classList.add('has-messages');
-        $('chat-empty').style.display = 'none';
-      }
-    }
-    // Async: check server for longer history (cross-device sync), re-render if newer
-    loadChatHistoryFromServer().then(serverHistory => {
-      if (serverHistory && serverHistory.length > chatHistory.length && $('chat-msgs')) {
-        chatHistory = serverHistory;
-        const msgs = $('chat-msgs');
-        msgs.innerHTML = '';
-        let startIdx = serverHistory[0]?.role === 'assistant' ? 1 : 0;
-        for (let i = startIdx; i < serverHistory.length; i++) {
-          try { appendMsg(serverHistory[i].role, serverHistory[i].content, serverHistory[i].sources || null, serverHistory[i].scope || null, serverHistory[i].model || '', ''); } catch {}
-        }
-        $('chat-bar').classList.add('has-messages');
-        msgs.classList.add('has-messages');
-        $('chat-empty').style.display = 'none';
-      }
-    }).catch(() => {});
+    // Always start fresh - no chat restoration on page load
+    // (Users prefer a clean chat; history is saved separately for future "chat history" feature)
+    chatHistory = [];
+    clearChatHistory();
   } catch(e) { chatHistory = []; clearChatHistory(); }
   const newChatBtn = $('new-chat-btn');
   if (newChatBtn) {
@@ -19473,9 +19435,9 @@ Be thorough. A compliance gap in a scenario like this is far more costly than a 
   // ── Quality evaluation + save ────────────────────────────
   async function evaluateAndSave(dept, scenario, scenarioId, transcript) {
     try {
-      const resp = await fetch('/scenario/evaluate', {
+      const resp = await apiFetch('/scenario/evaluate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${window.SESSION_TOKEN || ''}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dept, scenarioId, scenario, transcript }),
       });
       if (!resp.ok) return;
@@ -19494,9 +19456,7 @@ Be thorough. A compliance gap in a scenario like this is far more costly than a 
   async function loadLibrary() {
     const dept = window.currentDept || 'compliance';
     try {
-      const resp = await fetch(`/scenario/list?dept=${encodeURIComponent(dept)}`, {
-        headers: { 'Authorization': `Bearer ${window.SESSION_TOKEN || ''}` },
-      });
+      const resp = await apiFetch(`/scenario/list?dept=${encodeURIComponent(dept)}`);
       if (!resp.ok) return;
       const data = await resp.json();
       libraryItems = data.items || [];
@@ -19506,7 +19466,8 @@ Be thorough. A compliance gap in a scenario like this is far more costly than a 
         document.getElementById('scenario-btn').classList.add('has-library');
       }
     } catch(e) {
-      console.warn('Scenario library load failed:', e);
+      // Scenario library is optional - silently ignore fetch failures
+      // (endpoint may not be deployed yet, or network may be temporarily unavailable)
     }
   }
 
