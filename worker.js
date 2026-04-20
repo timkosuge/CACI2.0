@@ -3112,7 +3112,6 @@ async function generateEmbedding(text, env) {
     return null;
   }
 }
-}
 
 function decodeEmbedding(b64) {
   if (!b64) return null;
