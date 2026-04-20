@@ -2112,6 +2112,7 @@ async function buildContextTwoPass({ message, dept, collection, env }) {
 
     // Score each file
     const W = await getScoringWeights(dept, env);
+    const expandedKeywords = expandKeywords(keywords); // Expand synonyms for better file matching
     const scoredFiles = colFiles.map(f => {
       const nameLower = (f.name || '').toLowerCase();
       let score = 0;
@@ -2158,7 +2159,7 @@ async function buildContextTwoPass({ message, dept, collection, env }) {
       }
 
       // ── 6. Keyword match in filename ──────────────────────
-      for (const kw of keywords) {
+      for (const kw of expandedKeywords) {
         if (nameLower.includes(kw)) score += W.keywordFilenameBonus;
       }
 
@@ -2174,7 +2175,7 @@ async function buildContextTwoPass({ message, dept, collection, env }) {
         for (const vals of Object.values(f.stats.categoryCols)) {
           for (const val of vals) {
             const vLower = val.toLowerCase();
-            if (keywords.some(kw => vLower === kw || vLower.includes(kw) || kw.includes(vLower))) {
+            if (expandedKeywords.some(kw => vLower === kw || vLower.includes(kw) || kw.includes(vLower))) {
               score += W.categoryColBonus;
               break;
             }
