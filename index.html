@@ -17425,8 +17425,24 @@ async function _fetchTTSBlob(text) {
 
 function _ttsPlayNext(sessionId) {
   if (sessionId !== _ttsSessionId) return; // stale session
-  const item = _ttsQueue.find(i => i.blob && !i.played);
-  if (!item) { _ttsPlaying = false; if (_ttsQueue.every(i => i.done)) _ttsFinish(); return; }
+  // Find the FIRST unplayed item in order. If its blob isn't ready yet, wait.
+  // This ensures sentences play in the correct order (1, 2, 3...) regardless
+  // of which fetch finishes first.
+  const nextIdx = _ttsQueue.findIndex(i => !i.played);
+  if (nextIdx === -1) { _ttsPlaying = false; if (_ttsQueue.every(i => i.done)) _ttsFinish(); return; }
+  const item = _ttsQueue[nextIdx];
+  // If this sentence's blob isn't ready yet, wait — don't skip to a later one
+  if (!item.blob) {
+    // If the fetch already failed (done but no blob), skip it
+    if (item.done) {
+      item.played = true;
+      _ttsPlayNext(sessionId);
+      return;
+    }
+    // Otherwise wait - the fetch will call _ttsPlayNext again when it completes
+    _ttsPlaying = false;
+    return;
+  }
   item.played = true;
   _ttsPlaying = true;
   const url = URL.createObjectURL(item.blob);
