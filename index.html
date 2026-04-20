@@ -9766,6 +9766,24 @@ let _chatImageMime   = null;   // mime type e.g. 'image/jpeg'
 let _chatImageName   = null;   // original filename for display
 let _fileNameToIdMap = {};     // maps file names to IDs for citation linking
 
+// Populate file name to ID mapping for citation linking (lightweight - no UI update)
+async function refreshFileMapping() {
+  try {
+    const res = await apiFetch(`/files?dept=${dept}`);
+    const files = await res.json();
+    _fileNameToIdMap = {};
+    if (Array.isArray(files)) {
+      files.forEach(f => {
+        if (f.name && f.id) {
+          _fileNameToIdMap[f.name] = f.id;
+        }
+      });
+    }
+  } catch(e) {
+    console.warn('Failed to refresh file mapping:', e);
+  }
+}
+
 // ── Chat history persistence ─────────────────────────────────
 function chatHistoryKey() { return 'caci_history_' + dept; }
 
@@ -10284,6 +10302,9 @@ function bootApp() {
   }
   checkHealth(); loadAdminConfig();
 
+  // Load file mapping for citation links
+  refreshFileMapping();
+
   // ── Presence heartbeat — ping every 2 minutes ───────────────
   function pingPresence() {
     const page = document.querySelector('.nav-btn.active')?.dataset?.p || 'chat';
@@ -10678,6 +10699,8 @@ function switchPanel(id) {
     initChatGreeting();
     // Always refresh pills when entering chat — loadCollections populates scope bar
     loadCollections();
+    // Refresh file mapping for citation links
+    refreshFileMapping();
   }
 }
 
@@ -11281,7 +11304,9 @@ function appendMsg(role, text, sources, scope, model = '', responseId = '', imag
     const sourceLinks = sources.map(sourceName => {
       const fileId = _fileNameToIdMap[sourceName];
       if (fileId) {
-        return `<span class="source-link" data-file-id="${fileId}" data-file-name="${esc(sourceName)}">${esc(sourceName)}</span>`;
+        // Escape for HTML attributes - replace quotes
+        const escapedName = String(sourceName).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        return `<span class="source-link" data-file-id="${fileId}" data-file-name="${escapedName}">${esc(sourceName)}</span>`;
       } else {
         return esc(sourceName);
       }
