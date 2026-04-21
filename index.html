@@ -4326,9 +4326,9 @@ body[data-theme="light"] .login-frame-box {
 .chat-bg-overlay::before {
   content: '';
   position: absolute; inset: 0;
-  background: url('JUSHI.webp') center center / cover no-repeat;
-  opacity: var(--bg-img-opacity, 0.45);
-  filter: grayscale(0%) contrast(1.0) brightness(0.75);
+  background: url('KAIT.webp') center center / cover no-repeat;
+  opacity: var(--bg-img-opacity, 0.85);
+  filter: grayscale(0%) contrast(1.0) brightness(1.0);
 }
 /* Dark ink wash — heavier center for text readability, lighter at edges */
 .chat-bg-overlay::after {
@@ -10096,7 +10096,7 @@ window.addEventListener('beforeunload', () => {
 (function() {
   // Defaults per theme — adjust these once you dial in the right values
   const DEFAULTS = {
-    dark:  { bg: 2.0, text: 1.0 },
+    dark:  { bg: 1.0, text: 1.0 },
     light: { bg: 1.0, text: 1.0 },
   };
 
@@ -10225,8 +10225,8 @@ window.addEventListener('beforeunload', () => {
       // level > 1.0 = brighter (more image, less wash)
       // level < 1.0 = darker (less image, more wash)
       const normalized = (level - 0.5) / (4.0 - 0.5); // 0 to 1
-      const imgOpacity  = Math.min(1.0, 0.20 + (normalized * 0.80)); // 0.20 to 1.0
-      const washOpacity = Math.max(0.0, 1.0 - (normalized * 1.2));   // 1.0 to 0.0
+      const imgOpacity  = Math.min(1.0, 0.40 + (normalized * 0.60)); // 0.40 to 1.0
+      const washOpacity = Math.max(0.0, 0.8 - (normalized * 1.0));   // 0.8 to 0.0
 
       // Apply to image layer (::before via CSS var)
       document.querySelectorAll('.chat-bg-overlay').forEach(el => {
