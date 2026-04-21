@@ -7869,18 +7869,19 @@ body[data-theme="light"] .login-frame-box {
    even without !important, but we use !important anyway for safety. */
 
 html body[data-theme="light"] aside#sidebar {
-  background: #EEF2F7 !important;
+  background: linear-gradient(180deg, #F8FAFC 0%, #F1F5F9 100%) !important;
   background-image: none !important;
+  box-shadow: inset -1px 0 0 rgba(30,58,95,0.15), 2px 0 8px rgba(30,58,95,0.06) !important;
 }
 html body[data-theme="light"] aside#sidebar::after {
   background: transparent !important;
   display: none !important;
 }
+html body[data-theme="light"] aside#sidebar::before {
+  display: none !important;
+}
 
-/* The tambour shutter — a hand-designed rolling metal-slat decoration that
-   covers the sidebar nav when closed. Beautiful in dark mode, but its
-   hardcoded dark brown gradients and gold highlights look completely wrong
-   on a light sidebar. Hide entirely in light mode. */
+/* The tambour shutter — hide in light mode */
 html body[data-theme="light"] .tambour,
 html body[data-theme="light"] #tambour,
 html body[data-theme="light"] .tambour-slats,
@@ -7891,39 +7892,101 @@ html body[data-theme="light"] #tambour-handle {
   display: none !important;
 }
 
-/* Sidebar nav items — text was too dim on light bg. Boost contrast. */
+/* Sidebar nav items — dark navy text on white sidebar */
 html body[data-theme="light"] .nav-btn {
-  color: rgba(30, 58, 95, 0.85) !important;
+  color: #334155 !important;
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
 }
 html body[data-theme="light"] .nav-btn:hover {
-  color: #0F172A !important;
-  background: rgba(30, 58, 95, 0.08) !important;
-  border-color: rgba(30, 58, 95, 0.22) !important;
+  color: #1E3A5F !important;
+  background: #E2E8F0 !important;
+  border-color: rgba(30,58,95,0.10) !important;
+  box-shadow: none !important;
 }
 html body[data-theme="light"] .nav-btn.active {
-  color: #1E3A5F !important;
-  background: rgba(30, 58, 95, 0.12) !important;
-  border-bottom-color: rgba(30, 58, 95, 0.35) !important;
-  font-weight: 400 !important;
+  color: #1E40AF !important;
+  background: #CBD5E1 !important;
+  border-bottom-color: rgba(30,58,95,0.20) !important;
+  font-weight: 500 !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
 }
+html body[data-theme="light"] .nav-btn::before { display: none !important; }
+
 html body[data-theme="light"] .dept-btn {
-  color: rgba(30, 58, 95, 0.78) !important;
+  color: #475569 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
 }
 html body[data-theme="light"] .dept-btn:hover {
-  color: #0F172A !important;
-  background: rgba(30, 58, 95, 0.08) !important;
+  color: #1E3A5F !important;
+  background: #E2E8F0 !important;
+  box-shadow: none !important;
 }
 html body[data-theme="light"] .dept-btn.active {
-  color: #1E3A5F !important;
-  background: rgba(30, 58, 95, 0.10) !important;
-  font-weight: 400 !important;
+  color: #1E40AF !important;
+  background: #CBD5E1 !important;
+  font-weight: 500 !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
 }
+html body[data-theme="light"] .dept-btn::before { display: none !important; }
 /* Department / section label divider */
 html body[data-theme="light"] .sb-section-label,
 html body[data-theme="light"] .sb-divider {
   color: rgba(30, 58, 95, 0.60) !important;
   border-color: rgba(30, 58, 95, 0.15) !important;
 }
+
+/* TOPBAR — white with navy elements */
+html body[data-theme="light"] header#topbar {
+  background: #FFFFFF !important;
+  border-bottom: 1px solid rgba(30,58,95,0.12) !important;
+  box-shadow: 0 1px 6px rgba(30,58,95,0.06) !important;
+}
+html body[data-theme="light"] header#topbar .tb-logo { color: #1E3A5F !important; }
+html body[data-theme="light"] header#topbar .tb-module { color: #64748B !important; }
+html body[data-theme="light"] header#topbar .dept-chip { background: #FFFFFF !important; border-color: rgba(30,58,95,0.20) !important; }
+html body[data-theme="light"] header#topbar .dept-chip .dc-name,
+html body[data-theme="light"] header#topbar .dept-chip .dc-caret { color: #1E3A5F !important; }
+html body[data-theme="light"] header#topbar .tb-status { background: #FFFFFF !important; border-color: rgba(30,58,95,0.20) !important; }
+html body[data-theme="light"] header#topbar .tb-status .tb-status-text { color: #334155 !important; }
+html body[data-theme="light"] header#topbar .tb-model-chip { background: #FFFFFF !important; border-color: rgba(30,58,95,0.20) !important; }
+html body[data-theme="light"] header#topbar .tb-model-chip .tmc-name { color: #334155 !important; }
+html body[data-theme="light"] header#topbar #tb-user-chip { background: #FFFFFF !important; border-color: rgba(30,58,95,0.20) !important; }
+html body[data-theme="light"] header#topbar #tb-user-name { color: #1E3A5F !important; }
+html body[data-theme="light"] header#topbar #tb-user-role { color: #64748B !important; }
+html body[data-theme="light"] header#topbar #tb-brightness-btn,
+html body[data-theme="light"] header#topbar #theme-toggle { background: #FFFFFF !important; border-color: rgba(30,58,95,0.20) !important; }
+html body[data-theme="light"] header#topbar #tb-brightness-btn svg,
+html body[data-theme="light"] header#topbar #theme-toggle svg { stroke: #475569 !important; }
+
+/* SCOPE BAR — white buttons, navy text */
+html body[data-theme="light"] .scope-btn { background: #FFFFFF !important; color: #475569 !important; border: 1px solid rgba(30,58,95,0.18) !important; box-shadow: none !important; }
+html body[data-theme="light"] .scope-btn.active { background: #CBD5E1 !important; color: #1E40AF !important; border-color: rgba(30,58,95,0.25) !important; }
+html body[data-theme="light"] .scope-btn:hover { background: #F1F5F9 !important; color: #1E3A5F !important; }
+html body[data-theme="light"] #col-picker-btn,
+html body[data-theme="light"] .col-picker-btn { background: #FFFFFF !important; color: #334155 !important; border: 1px solid rgba(30,58,95,0.20) !important; box-shadow: none !important; }
+
+/* CHAT BAR — white with navy text */
+html body[data-theme="light"] #chat-bar { background: #FFFFFF !important; border-top: 1px solid rgba(30,58,95,0.12) !important; box-shadow: 0 -2px 8px rgba(30,58,95,0.04) !important; }
+html body[data-theme="light"] #chat-ta { color: #0F172A !important; }
+html body[data-theme="light"] #chat-ta::placeholder { color: #94A3B8 !important; }
+
+/* BOTTOM BUTTONS — white bg, navy icon, navy border */
+html body[data-theme="light"] .scenario-btn { background: #FFFFFF !important; border: 1px solid rgba(30,58,95,0.22) !important; color: #334155 !important; box-shadow: none !important; }
+html body[data-theme="light"] .mic-btn,
+html body[data-theme="light"] .spk-toggle-btn { background: #FFFFFF !important; border: 1px solid rgba(30,58,95,0.22) !important; color: #334155 !important; box-shadow: none !important; }
+html body[data-theme="light"] .mic-btn svg *,
+html body[data-theme="light"] .spk-toggle-btn svg * { stroke: #334155 !important; }
+html body[data-theme="light"] .img-attach-btn { background: #FFFFFF !important; border: 1px solid rgba(30,58,95,0.22) !important; color: #334155 !important; box-shadow: none !important; }
+html body[data-theme="light"] .send-btn { background: #1E3A5F !important; border: 1px solid #1E3A5F !important; color: #FFFFFF !important; box-shadow: none !important; }
+html body[data-theme="light"] .send-btn svg * { stroke: #FFFFFF !important; fill: #FFFFFF !important; }
+html body[data-theme="light"] .send-btn:hover { background: #2D4F7C !important; }
 
 /* ─── ADMIN / DOCUMENTS PAGE ───
    The files admin page uses its own dark gradient backgrounds hardcoded,
@@ -8213,7 +8276,7 @@ html body[data-theme="light"] .dg-eyebrow {
   filter: drop-shadow(0 1px 2px rgba(255, 255, 255, 0.7)) !important;
 }
 
-/* The "CACI" centerpiece wordmark below Jushi — was gold-metal gradient,
+/* The KAIT centerpiece wordmark — gold-metal gradient,
    in light mode it SHOULD be the steel-blue gradient (remapped palette).
    Add a text shadow so it pops against the cloud image. */
 html body[data-theme="light"] .dg-name {
@@ -8568,7 +8631,7 @@ html body[data-theme="light"] #discovery-greeting-strip .dgs-text strong {
       </div>
       <div class="db8-divider db-in d3"></div>
       <div class="db8-credentials db-in d4" id="db8-credentials">
-        &mdash; trained on Jushi earnings, Illinois &amp; Ohio regulations, internal operations
+        &mdash; trained on Illinois &amp; Ohio cannabis regulations, market data, and compliance frameworks
       </div>
       <div class="db8-accent-line db8-accent-top db-in d3"></div>
       <div class="db8-accent-line db8-accent-bottom db-in d3"></div>
@@ -13624,50 +13687,64 @@ const DemoMode = {
   particles: null,
 
   // ─── REAL DATA for 3D holographic charts ────────────────────────────
-  // These numbers were extracted from Jushi's actual earnings transcripts
-  // and internal operations data via CACI. Each fact has a source.
-  // Visible in the demo as floating 3D numbers and bar charts.
+  // Illinois 2025 cannabis market data — sourced from regulatory and market documents
   statsBank: {
     singles: [
-      { display: '$262.9M',  label: 'FY 2025 Revenue',              source: 'Jushi Q4 2025 Transcript' },
-      { display: '19.1%',    label: 'Adjusted EBITDA Margin',       source: 'Jushi Q4 2025 Transcript' },
-      { display: '84 g/ft\u00B2', label: 'Cultivation yield',       source: 'Internal Operations Data' },
-      { display: '42',       label: 'Retail stores operating',      source: 'Internal Operations Data' },
-      { display: '1,288',    label: 'Total employees',              source: 'Internal Operations Data' },
-      { display: '160',      label: 'Active Ohio wholesale doors',  source: 'Internal Operations Data' },
-      { display: '+330 bps', label: 'Gross Profit Margin YoY',      source: 'Jushi Q4 2025 Transcript' },
-      { display: '3.2\u00D7',     label: 'Virginia adult-use multiplier', source: 'Jushi Intelligence Layer' },
+      { display: '$1.87B',   label: 'IL Adult-Use Sales 2024',      source: 'Illinois Market Data' },
+      { display: '110',      label: 'Licensed Adult-Use Dispensaries', source: 'Illinois Market Data' },
+      { display: '$685M',    label: 'Cannabis Tax Revenue 2024',    source: 'Illinois Market Data' },
+      { display: '3,700+',   label: 'Active Cannabis Licenses',     source: 'Illinois Market Data' },
+      { display: '77%',      label: 'Adult-Use Share of Total Sales', source: 'Illinois Market Data' },
+      { display: '$2.1B',    label: 'Total Market Sales Since 2020', source: 'Illinois Market Data' },
+      { display: '21+',      label: 'States with Adult-Use Cannabis', source: 'Illinois Market Data' },
+      { display: '42',       label: 'Illinois Cultivation Centers', source: 'Illinois Market Data' },
     ],
     charts: [
       {
-        id: 'revenue_growth',
-        title: 'Revenue Growth',
+        id: 'il_sales_growth',
+        title: 'Illinois Adult-Use Sales',
         unit: 'currency',
         series: [
-          { label: 'Q4 2024', value: 65.8, display: '$65.8M' },
-          { label: 'Q4 2025', value: 68.3, display: '$68.3M' },
+          { label: '2021', value: 1400, display: '$1.40B' },
+          { label: '2022', value: 1520, display: '$1.52B' },
+          { label: '2023', value: 1680, display: '$1.68B' },
+          { label: '2024', value: 1870, display: '$1.87B' },
         ],
-        source: 'Jushi Q4 2025 Transcript',
+        source: 'Illinois Market Data',
       },
       {
-        id: 'gross_margin',
-        title: 'Gross Profit Margin',
-        unit: 'percentage',
+        id: 'il_tax_revenue',
+        title: 'Illinois Cannabis Tax Revenue',
+        unit: 'currency',
         series: [
-          { label: 'Q4 2024', value: 38.6, display: '38.6%' },
-          { label: 'Q4 2025', value: 41.9, display: '41.9%' },
+          { label: '2021', value: 310, display: '$310M' },
+          { label: '2022', value: 445, display: '$445M' },
+          { label: '2023', value: 580, display: '$580M' },
+          { label: '2024', value: 685, display: '$685M' },
         ],
-        source: 'Jushi Q4 2025 Transcript',
+        source: 'Illinois Market Data',
       },
       {
-        id: 'ebitda_margin',
-        title: 'EBITDA Margin',
+        id: 'license_breakdown',
+        title: 'License Types — Illinois',
+        unit: 'count',
+        series: [
+          { label: 'Dispensaries', value: 110, display: '110' },
+          { label: 'Cultivators',  value: 42,  display: '42' },
+          { label: 'Processors',   value: 58,  display: '58' },
+          { label: 'Transporters', value: 31,  display: '31' },
+        ],
+        source: 'Illinois Market Data',
+      },
+      {
+        id: 'sales_split',
+        title: 'Medical vs. Adult-Use Split',
         unit: 'percentage',
         series: [
-          { label: 'FY 2024', value: 17.9, display: '17.9%' },
-          { label: 'FY 2025', value: 19.1, display: '19.1%' },
+          { label: 'Adult-Use', value: 77, display: '77%' },
+          { label: 'Medical',   value: 23, display: '23%' },
         ],
-        source: 'Jushi Q4 2025 Transcript',
+        source: 'Illinois Market Data',
       },
       {
         id: 'operational_leverage',
@@ -13707,17 +13784,17 @@ const DemoMode = {
   //   The actual transition fires on audio.onended + a short breath (gap).
   beats: [
     { id: 2, minDur: 62000, maxDur: 120000, setup: 'setupPreshow', voice: 'ara',
-      narr: "Hi, I'm Kait. I figured I'd introduce myself before we get started, because I know this is probably new — not AI in general, you've all seen it on your phones, but AI that actually understands this industry. That part's still rare. And I get the skepticism. So let me just tell you who I am. I was built for cannabis. Not retrofitted from some generic assistant — built for it. I know what METRC means for compliance. I know what a state-by-state patchwork does to your operations. I know retail is tired and ops is holding everything together with duct tape and coffee. I'm not going to promise I'm perfect, because I'm not. But I'm careful, I cite my sources, and I don't forget anything you teach me. This industry was never going to be easy — too young, too regulated, too watched — and the people who figure it out are going to build something the world hasn't seen before. I'd really like to help with that. So — let me show you what I can do." },
+      narr: "Hi, I'm Kait. I figured I'd introduce myself before we get started, because I know this is probably new — not AI in general, you've all seen it on your phones, but AI that actually understands this industry. That part's still rare. And I get the skepticism. So let me just tell you who I am. I was built for cannabis. Not retrofitted from some generic assistant — built for it. I know what METRC means for compliance. I know what a state-by-state patchwork does to your operations. I know Illinois. I know Ohio. I know what the regulators are watching. I'm not going to promise I'm perfect, because I'm not. But I'm careful, I cite my sources, and I don't forget anything you teach me. This industry was never going to be easy — too young, too regulated, too watched — and the people who figure it out are going to build something the world hasn't seen before. I'd really like to help with that. So — let me show you what I can do." },
     { id: 1, minDur: 8000, maxDur: 25000, setup: null, voice: 'leo',
-      narr: "Here's what she was made for. Somewhere in all those earnings reports, regulations, and filings — the answer is already there. But finding it takes hours you don't have, and by the time you get to it, you've already moved on." },
+      narr: "Here's what she was made for. Somewhere in all those regulations, market reports, and compliance filings — the answer is already there. But finding it takes hours you don't have, and by the time you get to it, you've already moved on." },
     { id: 3, minDur: 12000, maxDur: 35000, setup: 'setupDepts', voice: 'eve',
       narr: "Every document you give her, she actually reads — not just the filename and metadata, the whole thing. Then she analyzes it seven ways: what it is, when it's from, where it applies, what it contains. Files it by department, period, and jurisdiction. By the time a question comes, she already knows where to look." },
     { id: 4, minDur: 10000, maxDur: 30000, setup: 'setupQuery', voice: 'rex',
       narr: "She doesn't search, she answers. Before pulling anything, she figures out what you're actually asking — then picks the right places to look, weighs every passage by how directly it answers, and shows you the source for every claim she makes." },
     { id: 5, minDur: 9000, maxDur: 28000, setup: 'setupNetwork', voice: 'eve',
-      narr: "The more she reads, the more she sees. A new regulation changes what a policy means. A new earnings report reframes an old trend. She notices things nobody thinks to ask about." },
+      narr: "The more she reads, the more she sees. A new regulation changes what a policy means. New market data reframes an old trend. She notices things nobody thinks to ask about." },
     { id: 6, minDur: 20000, maxDur: 50000, setup: 'setupScenario', voice: 'leo',
-      narr: "Now — to be clear, she's a prototype. About a week old. What she knows right now is a starting point: Jushi's earnings history, Ohio's regulatory code, Illinois regulations and their 2025 annual report. It's not everything she'll know. But it's enough to prove the point. Give her more, and her answers get sharper. This is what day one looks like." },
+      narr: "Now — to be clear, she's a prototype. What she knows right now is a starting point: Illinois cannabis market data, Ohio's regulatory code, Illinois regulations and compliance frameworks. It's not everything she'll know. But it's enough to prove the point. Give her more, and her answers get sharper. This is what day one looks like." },
     { id: 7, minDur: 8000, maxDur: 26000, setup: 'setupStats', voice: 'eve',
       narr: "Her answers come with sources. Every upload is logged. Your documents stay in your infrastructure — they never leave, and none of your data is used to train anyone's model." },
     { id: 8, minDur: 9000, maxDur: 28000, setup: null, voice: 'rex',
@@ -15235,7 +15312,7 @@ const DemoMode = {
                   || { display: 'OAC §3796', label: 'Ohio cannabis code', source: 'Ohio Administrative Code' },
       Finance:    matchByKeyword(['revenue', 'ebitda', 'margin', 'earnings'])
                   || singles[0]
-                  || { display: '$262.9M', label: 'FY 2025 Revenue', source: 'Jushi Q4 2025 Transcript' },
+                  || { display: '$1.87B', label: 'IL Adult-Use Sales 2024', source: 'Illinois Market Data' },
       Operations: matchByKeyword(['store', 'employee', 'retail', 'dispensary', 'yield', 'wholesale'])
                   || singles.find(s => /\b\d+\b/.test(s.display) && !s.display.includes('%') && !s.display.includes('$'))
                   || { display: '42', label: 'Retail stores', source: 'Internal Operations Data' },
@@ -15467,7 +15544,7 @@ const DemoMode = {
     // past. Viewers catch glimpses of actual doc names and citations — supports
     // the "buried in thousands of pages" narration with a whiff of specificity.
     const INTEL_TAGS = [
-      'Jushi Q4 2025',
+      'Illinois Market Data',
       'OAC §3796',
       'IL 2025 Annual',
       'Ohio Compliance',
@@ -17220,7 +17297,7 @@ function initTambour() {
   });
 }
 
-/* ── Easter egg — triple-click CACI plate → Jushi Holdings ────────── */
+/* ── Easter egg — triple-click KAIT plate ────────── */
 (function() {
   let clicks = 0, timer = null;
 
@@ -17231,7 +17308,7 @@ function initTambour() {
     if (clicks >= 3) {
       clicks = 0;
       clearTimeout(timer);
-      window.open('https://jushico.com/', '_blank', 'noopener,noreferrer');
+      /* easter egg removed */
     }
   }
 
