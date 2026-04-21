@@ -1073,16 +1073,39 @@ function ffLoop(){
   FF.lastT  = now;
   const s   = FF.speed * dt;
 
-  // WASD movement
-  if(FF.keys['w'] || FF.keys['arrowup'])    viewer.camera.moveForward(s);
-  if(FF.keys['s'] || FF.keys['arrowdown'])  viewer.camera.moveBackward(s);
-  if(FF.keys['a'] || FF.keys['arrowleft'])  viewer.camera.moveLeft(s);
-  if(FF.keys['d'] || FF.keys['arrowright']) viewer.camera.moveRight(s);
-  if(FF.keys['q'])                          viewer.camera.moveUp(s);
-  if(FF.keys['e'])                          viewer.camera.moveDown(s);
-  // Roll
-  if(FF.keys['z'])                          viewer.camera.twistLeft(0.025);
-  if(FF.keys['x'])                          viewer.camera.twistRight(0.025);
+  // ── MOVEMENT ──
+  if(FF.keys['w'] || FF.keys['arrowup'])    viewer.camera.moveForward(s);   // forward
+  if(FF.keys['s'] || FF.keys['arrowdown'])  viewer.camera.moveBackward(s);  // backward
+  if(FF.keys['a'])                          viewer.camera.moveLeft(s);       // strafe left
+  if(FF.keys['d'])                          viewer.camera.moveRight(s);      // strafe right
+  if(FF.keys['q'])                          viewer.camera.moveUp(s);         // rise
+  if(FF.keys['e'])                          viewer.camera.moveDown(s);       // descend
+
+  // ── ROTATION (look/spin) ──
+  // Arrow left/right = spin/yaw (turn left and right, full 360)
+  const turnRate = 0.8 * dt;
+  if(FF.keys['arrowleft']){
+    FF.heading -= turnRate;
+    viewer.camera.setView({ destination: viewer.camera.position,
+      orientation:{ heading: FF.heading, pitch: FF.pitch, roll: viewer.camera.roll }});
+  }
+  if(FF.keys['arrowright']){
+    FF.heading += turnRate;
+    viewer.camera.setView({ destination: viewer.camera.position,
+      orientation:{ heading: FF.heading, pitch: FF.pitch, roll: viewer.camera.roll }});
+  }
+  // Z / X = tilt pitch up / down (look up and down)
+  const pitchRate = 0.8 * dt;
+  if(FF.keys['z']){
+    FF.pitch = Math.min(FF.pitch + pitchRate, Math.PI * 0.48);
+    viewer.camera.setView({ destination: viewer.camera.position,
+      orientation:{ heading: FF.heading, pitch: FF.pitch, roll: viewer.camera.roll }});
+  }
+  if(FF.keys['x']){
+    FF.pitch = Math.max(FF.pitch - pitchRate, -Math.PI * 0.48);
+    viewer.camera.setView({ destination: viewer.camera.position,
+      orientation:{ heading: FF.heading, pitch: FF.pitch, roll: viewer.camera.roll }});
+  }
 
   // Scroll zoom — smooth with decay
   if(Math.abs(FF.zoomVelocity) > 0.1){
