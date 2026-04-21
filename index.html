@@ -10071,7 +10071,8 @@ function saveChatHistory() {
     const MAX_MESSAGES = 50;
     const toSave = chatHistory.slice(-MAX_MESSAGES);
     // Always write SafeStorage for instant restore (prevents crashes)
-    SafeStorage.setItem(chatHistoryKey(), JSON.stringify(toSave));
+    // Wrap with timestamp so 7-day cleanup knows when to delete
+    SafeStorage.setItem(chatHistoryKey(), JSON.stringify({ history: toSave, timestamp: Date.now() }));
     // Persist to server (fire-and-forget) — syncs across devices
     apiFetch('/history/' + encodeURIComponent(dept), {
       method: 'POST',
@@ -10086,7 +10087,10 @@ function loadChatHistory() {
   // Server history is loaded async in bootApp and merged on next saveChatHistory
   try {
     const raw = SafeStorage.getItem(chatHistoryKey());
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    // Handle both new {history, timestamp} format and old plain array format
+    return Array.isArray(parsed) ? parsed : (parsed.history || []);
   } catch(e) { return []; }
 }
 
@@ -13341,11 +13345,15 @@ document.addEventListener('DOMContentLoaded', () => {
   initEditFileModal();
   setupLogin();
   initTambour();
-  // OPTIMIZATION: Lazy load demo mode - defer until browser is idle (saves 100-200ms on page load)
-  if (window.requestIdleCallback) {
-    requestIdleCallback(() => initDemoMode(), { timeout: 3000 });
-  } else {
-    setTimeout(() => initDemoMode(), 500);
+  // OPTIMIZATION: Demo mode loads only when triggered, not on page load
+  // Wire demo buttons directly - init only when user actually clicks
+  const demoTriggerBtn = document.getElementById('lcard-demo-btn');
+  if (demoTriggerBtn) {
+    demoTriggerBtn.addEventListener('click', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      if (!DemoMode.enabled) { initDemoMode(); }
+      DemoMode.start();
+    });
   }
 });
 
