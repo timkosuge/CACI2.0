@@ -4478,7 +4478,7 @@ const BEAT_SPECS = {
     role: 'opening the story — the problem she was built to solve',
     durationSec: '10-15',
     charRange: '180-280',
-    goal: 'Set up the problem Kait was made to solve. Frame it around the cannabis industry generally — regulations, compliance, market data, operations. Do NOT mention any specific company name.', Someone in this industry has answers buried in thousands of documents — earnings reports, regulations, SOPs, filings. Finding the right passage takes hours, often never happens. By the time someone digs it up, the moment has passed. This is the pain. Lead with it.',
+    goal: 'Set up the problem Kait was made to solve. Frame it around the cannabis industry generally — regulations, compliance, market data, operations. Do NOT mention any specific company name. Someone in this industry has answers buried in thousands of documents — regulations, SOPs, filings, market reports. Finding the right passage takes hours, often never happens. By the time someone digs it up, the moment has passed. This is the pain. Lead with it.',
     facts: [
       'Cannabis operators generate huge volumes of documents — regulations, earnings reports, compliance memos, policies, internal filings.',
       'These documents are scattered across different systems and folders.',
