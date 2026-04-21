@@ -93,7 +93,7 @@ export default {
     // Demo script management (admin-auth required)
     if (path === '/demo/generate-all'   && method === 'POST') return handleDemoGenerateAll(request, env);
     if (path === '/demo/reset-all'      && method === 'POST') return handleDemoResetAll(request, env);
-    // Demo stats data bank — real numbers CACI extracts from her library
+    // Demo stats data bank — real numbers Kait extracts from her library
     // for use in the 3D holographic charts in the demo's chorus beats.
     if (path === '/demo/harvest-stats'  && method === 'POST') return handleDemoHarvestStats(request, env);
     if (path === '/demo/save-stats'     && method === 'POST') return handleDemoSaveStats(request, env);
@@ -2918,7 +2918,7 @@ async function handleAnalyzeFeedback(request, env) {
     const summary = await env.CACI_KV.get(`feedback:summary:${dept}`, 'json') || {};
 
     // Ask Claude to analyze and suggest weight adjustments
-    const analysisPrompt = `You are analyzing feedback on a RAG (retrieval-augmented generation) system called CACI used by a cannabis company. Your job is to suggest scoring weight adjustments based on user feedback patterns.
+    const analysisPrompt = `You are analyzing feedback on a RAG (retrieval-augmented generation) system called Kait used by a cannabis company. Your job is to suggest scoring weight adjustments based on user feedback patterns.
 
 CURRENT SCORING WEIGHTS:
 ${JSON.stringify(currentWeights, null, 2)}
@@ -4298,13 +4298,13 @@ async function handleTTS(request, env) {
 
 // ══════════════════════════════════════════════════════════
 // DEMO SCRIPT MANAGEMENT
-// Let CACI write her own intro. Admin generates 3 variations via Claude,
+// Let Kait write her own intro. Admin generates 3 variations via Claude,
 // picks/edits one, saves it to KV at demo:intro. Public GET endpoint lets
 // the pre-login demo controller load the saved script (falls back to
 // hardcoded default in the client if none is saved).
 // ══════════════════════════════════════════════════════════
 
-// Valid beat IDs: 'intro' (Beat 2, CACI herself) + chorus beats 1,3,4,5,6,7,8
+// Valid beat IDs: 'intro' (Beat 2, Kait herself) + chorus beats 1,3,4,5,6,7,8
 const VALID_BEAT_IDS = ['intro', '1', '3', '4', '5', '6', '7', '8'];
 const kvKeyFor = (beatId) => beatId === 'intro' ? 'demo:intro' : `demo:beat:${beatId}`;
 const kvKeyForVariant = (beatId, variantIdx) => `${kvKeyFor(beatId)}:${variantIdx}`;
@@ -4388,12 +4388,12 @@ ABSOLUTE RESTRICTIONS:
 - Never make claims about any company's financial performance or strategy.
 - Never speak on behalf of the company.`;
 
-    const userPrompt = `Write a self-introduction for a short video that plays when someone first opens the CACI platform.
+    const userPrompt = `Write a self-introduction for a short video that plays when someone first opens the Kait platform.
 
 This is your voice. Your call on what to say and how to say it. Talk like a real person joining a team — not a product demo.
 
 What the intro should accomplish:
-- Introduce yourself. You're CACI.
+- Introduce yourself. You're Kait.
 - Land that you actually understand the cannabis industry. That's the thing that separates you from general AI tools. Pick whatever detail feels most natural. One or two things, woven in. Not a list. Not a survey.
 - Make someone want to see what you can do.
 
@@ -4406,7 +4406,7 @@ Optional — include or skip, your call:
 The feeling someone should walk away with: they just met a real person — sharp, warm, slightly irreverent, who gets their world. If it sounds like every other AI product intro, you've failed.
 
 Rules:
-- Your name is CACI. Write it as CACI (uppercase).
+- Your name is Kait. Write it as Kait.
 - Don't name specific people.
 - Don't claim anything about any company's finances or strategy.
 - Don't address any specific audience like "the CEO" — it's for whoever's watching.
@@ -4423,7 +4423,7 @@ Speakability:
 - This will be read aloud by a text-to-speech engine. Avoid industry acronyms and abbreviations — they get mangled in speech. When you'd naturally use an acronym, describe the concept in plain words instead (e.g. "seed-to-sale tracking systems", "state regulators", "compliance audits"). THC, CBD, and AI are fine — those read correctly.
 
 IMPORTANT about variation:
-You'll be called three times in parallel. Each time, pick a structurally different approach. If you default to "Hi, I'm CACI. I wanted to introduce myself..." you've failed — that's a template, not a voice.
+You'll be called three times in parallel. Each time, pick a structurally different approach. If you default to "Hi, I'm Kait. I wanted to introduce myself..." you've failed — that's a template, not a voice.
 
 Try things like: opening with a warm greeting followed by something specific. Opening with an observation about the industry before saying who you are. Opening with a question. Burying your name in a later sentence instead of leading with it. Starting with a specific scene or moment — what it feels like on a Friday night in retail, or at the end of a compliance quarter.
 
@@ -4465,7 +4465,7 @@ Pick a genuinely different angle each call. Same you. Different entry point. Do 
 
 // ══════════════════════════════════════════════════════════
 // CHORUS BEAT GENERATION
-// Let CACI write the chorus narration (beats 1, 3, 4, 5, 6, 7, 8) in third
+// Let Kait write the chorus narration (beats 1, 3, 4, 5, 6, 7, 8) in third
 // person about herself. Same trust-her philosophy as the intro — but with
 // verified facts per beat so truthfulness is maintained.
 // ══════════════════════════════════════════════════════════
@@ -4478,7 +4478,7 @@ const BEAT_SPECS = {
     role: 'opening the story — the problem she was built to solve',
     durationSec: '10-15',
     charRange: '180-280',
-    goal: 'Set up the problem CACI was made to solve. Someone in this industry has answers buried in thousands of documents — earnings reports, regulations, SOPs, filings. Finding the right passage takes hours, often never happens. By the time someone digs it up, the moment has passed. This is the pain. Lead with it.',
+    goal: 'Set up the problem Kait was made to solve. Someone in this industry has answers buried in thousands of documents — earnings reports, regulations, SOPs, filings. Finding the right passage takes hours, often never happens. By the time someone digs it up, the moment has passed. This is the pain. Lead with it.',
     facts: [
       'Cannabis operators generate huge volumes of documents — regulations, earnings reports, compliance memos, policies, internal filings.',
       'These documents are scattered across different systems and folders.',
@@ -4595,7 +4595,7 @@ ABSOLUTE RESTRICTIONS:
 - Never discuss executive compensation.
 - Never speak on behalf of the company.`;
 
-    const userPrompt = `You're writing narration for a short section of CACI's introduction video. Someone else — a different voice — will read this. You are writing about yourself in third person.
+    const userPrompt = `You're writing narration for a short section of Kait's introduction video. Someone else — a different voice — will read this. You are writing about yourself in third person.
 
 This beat's role in the video: ${spec.role}.
 
@@ -4853,7 +4853,7 @@ async function handleDemoKvDiagnostic(env) {
   } catch (e) { return json({ error: e.message, stack: e.stack }, 500); }
 }
 
-// Harvest stats: CACI sweeps her library and extracts real numeric facts.
+// Harvest stats: Kait sweeps her library and extracts real numeric facts.
 // This is the heavy endpoint — it uses Claude to read retrieved chunks from
 // the library and pull out concrete numbers with source citations.
 //
@@ -4910,9 +4910,9 @@ async function handleDemoHarvestStats(request, env) {
     }
 
     // Ask Claude to extract structured stats from all retrieved contexts at once
-    const systemPrompt = `You are CACI's data extraction subsystem. Your job is to extract real numeric facts from document excerpts for display in a demo video. You are strict about only returning numbers that are explicitly stated in the source text. Never invent or infer numbers. If a number is not directly stated, do not include it.`;
+    const systemPrompt = `You are Kait's data extraction subsystem. Your job is to extract real numeric facts from document excerpts for display in a demo video. You are strict about only returning numbers that are explicitly stated in the source text. Never invent or infer numbers. If a number is not directly stated, do not include it.`;
 
-    const extractionPrompt = `Below are excerpts from four topic sweeps of CACI's document library. Extract real, concrete numeric facts from these excerpts for use in a demo video's 3D data visualizations.
+    const extractionPrompt = `Below are excerpts from four topic sweeps of Kait's document library. Extract real, concrete numeric facts from these excerpts for use in a demo video's 3D data visualizations.
 
 SWEEPS:
 ${retrievedPerTopic.map((r, i) => `
@@ -5160,7 +5160,7 @@ Evaluate this conversation on these dimensions and return ONLY valid JSON:
   "reason": "<one sentence explaining the score>"
 }
 
-Score high (80-100) if: CACI gave thorough multi-angle analysis, cited specific rules, identified gray areas, the user was engaged (asked follow-ups, showed appreciation, or explored the topic deeply).
+Score high (80-100) if: Kait gave thorough multi-angle analysis, cited specific rules, identified gray areas, the user was engaged (asked follow-ups, showed appreciation, or explored the topic deeply).
 Score medium (65-79) if: decent compliance coverage but missing some dimensions or limited engagement.
 Score low (<65) if: superficial, no rule citations, user disengaged quickly, or the conversation was off-topic.
 
