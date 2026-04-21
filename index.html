@@ -8571,6 +8571,32 @@ html body[data-theme="light"] #discovery-greeting-strip .dgs-text strong {
       <span id="tb-user-role" style="font-family:var(--f-mono);font-size:8px;color:rgba(212,168,50,0.35);letter-spacing:0.1em;text-transform:uppercase"></span>
     </div>
 
+
+    <!-- Brightness control button -->
+    <div id="tb-brightness-wrap" style="position:relative;margin-left:4px;">
+      <button id="tb-brightness-btn" title="Display Brightness"
+        style="width:32px;height:32px;background:transparent;border:1px solid rgba(212,168,50,0.2);border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.2s;flex-shrink:0;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="rgba(212,168,50,0.65)" stroke-width="1.8" style="width:14px;height:14px;">
+          <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+          <line x1="8" y1="21" x2="16" y2="21"/>
+          <line x1="12" y1="17" x2="12" y2="21"/>
+        </svg>
+      </button>
+      <!-- Dropdown panel - hidden by default -->
+      <div id="tb-brightness-panel" style="display:none;position:absolute;top:calc(100% + 8px);right:0;width:180px;background:linear-gradient(135deg,rgba(13,21,37,0.98) 0%,rgba(26,40,64,0.98) 100%);border:1px solid rgba(212,168,50,0.3);border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,0.5);backdrop-filter:blur(10px);z-index:9999;padding:10px;overflow:hidden;">
+        <div style="font-family:var(--f-ui);font-size:10px;font-weight:500;color:rgba(212,168,50,0.7);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid rgba(212,168,50,0.15);">Display Brightness</div>
+        <div id="tb-brightness-levels" style="display:flex;flex-direction:column;gap:4px;">
+          <button class="tb-blevel" data-level="1.0" style="background:rgba(212,168,50,0.06);border:1px solid rgba(212,168,50,0.15);border-radius:4px;padding:6px 10px;font-family:var(--f-ui);font-size:10px;color:#c5cdd8;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:all 0.15s;"><span>Normal</span><span style="opacity:0.5">1.0x</span></button>
+          <button class="tb-blevel" data-level="1.2" style="background:rgba(212,168,50,0.06);border:1px solid rgba(212,168,50,0.15);border-radius:4px;padding:6px 10px;font-family:var(--f-ui);font-size:10px;color:#c5cdd8;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:all 0.15s;"><span>Bright</span><span style="opacity:0.5">1.2x</span></button>
+          <button class="tb-blevel" data-level="1.4" style="background:rgba(212,168,50,0.06);border:1px solid rgba(212,168,50,0.15);border-radius:4px;padding:6px 10px;font-family:var(--f-ui);font-size:10px;color:#c5cdd8;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:all 0.15s;"><span>Brighter</span><span style="opacity:0.5">1.4x</span></button>
+          <button class="tb-blevel" data-level="1.6" style="background:rgba(212,168,50,0.06);border:1px solid rgba(212,168,50,0.15);border-radius:4px;padding:6px 10px;font-family:var(--f-ui);font-size:10px;color:#c5cdd8;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:all 0.15s;"><span>Very Bright</span><span style="opacity:0.5">1.6x</span></button>
+          <button class="tb-blevel" data-level="1.7" style="background:rgba(212,168,50,0.06);border:1px solid rgba(212,168,50,0.15);border-radius:4px;padding:6px 10px;font-family:var(--f-ui);font-size:10px;color:#c5cdd8;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:all 0.15s;"><span>Default</span><span style="opacity:0.5">1.7x</span></button>
+          <button class="tb-blevel" data-level="1.8" style="background:rgba(212,168,50,0.06);border:1px solid rgba(212,168,50,0.15);border-radius:4px;padding:6px 10px;font-family:var(--f-ui);font-size:10px;color:#c5cdd8;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:all 0.15s;"><span>Max</span><span style="opacity:0.5">1.8x</span></button>
+          <button class="tb-blevel" data-level="2.0" style="background:rgba(212,168,50,0.06);border:1px solid rgba(212,168,50,0.15);border-radius:4px;padding:6px 10px;font-family:var(--f-ui);font-size:10px;color:#c5cdd8;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:all 0.15s;"><span>Ultra Max</span><span style="opacity:0.5">2.0x</span></button>
+        </div>
+      </div>
+    </div>
+
   </header>
 
   <!-- Content -->
@@ -9844,90 +9870,124 @@ window.addEventListener('beforeunload', () => {
     }
   } catch(e) {}
 });
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  BRIGHTNESS WIDGET - Monitor icon, default 1.7x  
+//  BRIGHTNESS CONTROL - Topbar button, closed by default, 1.7x default
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 (function() {
-  const BrightnessControl = {
-    isCollapsed: true,
-    currentLevel: null,
+  const BC = {
+    currentLevel: 1.7,
+    isOpen: false,
+
     init() {
-      this.loadSavedBrightness();
-      this.createWidget();
-      this.applySavedBrightness();
-    },
-    loadSavedBrightness() {
+      // Load saved preference or default to 1.7x
       try {
         const saved = SafeStorage.getItem('caci_brightness');
         this.currentLevel = saved ? parseFloat(saved) : 1.7;
       } catch(e) {
         this.currentLevel = 1.7;
       }
+
+      // Wait for DOM then wire up
+      const setup = () => {
+        const btn = document.getElementById('tb-brightness-btn');
+        const panel = document.getElementById('tb-brightness-panel');
+        if (!btn || !panel) {
+          setTimeout(setup, 500);
+          return;
+        }
+
+        // Apply brightness immediately
+        this.applyBrightness(this.currentLevel, false);
+
+        // Toggle panel on button click
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.isOpen = !this.isOpen;
+          panel.style.display = this.isOpen ? 'block' : 'none';
+          btn.style.borderColor = this.isOpen ? 'rgba(212,168,50,0.6)' : 'rgba(212,168,50,0.2)';
+          btn.style.background = this.isOpen ? 'rgba(212,168,50,0.12)' : 'transparent';
+        });
+
+        // Close panel when clicking outside
+        document.addEventListener('click', () => {
+          if (this.isOpen) {
+            this.isOpen = false;
+            panel.style.display = 'none';
+            btn.style.borderColor = 'rgba(212,168,50,0.2)';
+            btn.style.background = 'transparent';
+          }
+        });
+
+        // Wire up level buttons
+        document.querySelectorAll('.tb-blevel').forEach(b => {
+          b.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.applyBrightness(parseFloat(b.dataset.level), true);
+            // Close panel after selection
+            this.isOpen = false;
+            panel.style.display = 'none';
+            btn.style.borderColor = 'rgba(212,168,50,0.2)';
+            btn.style.background = 'transparent';
+          });
+
+          // Hover styles
+          b.addEventListener('mouseenter', () => {
+            b.style.background = 'rgba(212,168,50,0.15)';
+            b.style.borderColor = 'rgba(212,168,50,0.4)';
+            b.style.color = '#f0d060';
+          });
+          b.addEventListener('mouseleave', () => {
+            const isActive = parseFloat(b.dataset.level) === this.currentLevel;
+            b.style.background = isActive ? 'rgba(212,168,50,0.2)' : 'rgba(212,168,50,0.06)';
+            b.style.borderColor = isActive ? 'rgba(212,168,50,0.6)' : 'rgba(212,168,50,0.15)';
+            b.style.color = isActive ? '#f0d060' : '#c5cdd8';
+          });
+        });
+
+        this.updateActiveButton();
+        console.log(`✅ Brightness control ready at ${this.currentLevel}x`);
+      };
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', setup);
+      } else {
+        setup();
+      }
     },
-    applySavedBrightness() {
-      if (this.currentLevel) this.applyBrightness(this.currentLevel);
-    },
-    applyBrightness(level) {
+
+    applyBrightness(level, save) {
       const app = document.getElementById('app');
       if (!app) {
-        setTimeout(() => this.applyBrightness(level), 500);
+        setTimeout(() => this.applyBrightness(level, save), 300);
         return;
       }
       this.currentLevel = level;
-      SafeStorage.setItem('caci_brightness', level.toString());
+      if (save) SafeStorage.setItem('caci_brightness', level.toString());
       if (level === 1.0) {
         app.style.filter = 'none';
       } else {
-        const contrast = 1 + ((level - 1) * 0.3);
+        const contrast = 1 + ((level - 1) * 0.25);
         app.style.filter = `brightness(${level}) contrast(${contrast})`;
       }
       this.updateActiveButton();
     },
+
     updateActiveButton() {
-      document.querySelectorAll('.brightness-btn').forEach(btn => {
-        btn.classList.remove('active');
-        if (parseFloat(btn.dataset.level) === this.currentLevel) {
-          btn.classList.add('active');
-        }
+      document.querySelectorAll('.tb-blevel').forEach(b => {
+        const isActive = parseFloat(b.dataset.level) === this.currentLevel;
+        b.style.background = isActive ? 'rgba(212,168,50,0.2)' : 'rgba(212,168,50,0.06)';
+        b.style.borderColor = isActive ? 'rgba(212,168,50,0.6)' : 'rgba(212,168,50,0.15)';
+        b.style.color = isActive ? '#f0d060' : '#c5cdd8';
+        b.style.fontWeight = isActive ? '500' : 'normal';
       });
-    },
-    createWidget() {
-      setTimeout(() => {
-        if (document.getElementById('brightness-widget')) return;
-        const widget = document.createElement('div');
-        widget.id = 'brightness-widget';
-        widget.className = this.isCollapsed ? 'collapsed' : '';
-        widget.innerHTML = `<style>#brightness-widget{position:fixed;bottom:80px;right:20px;z-index:9999;background:linear-gradient(135deg,rgba(13,21,37,0.95) 0%,rgba(26,40,64,0.95) 100%);border:1px solid rgba(212,168,50,0.3);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.4),0 0 20px rgba(212,168,50,0.15);backdrop-filter:blur(10px);font-family:var(--f-ui);transition:all 0.3s;overflow:hidden}#brightness-widget.collapsed{width:48px;height:48px}#brightness-widget:not(.collapsed){width:220px;padding:16px}.brightness-toggle{width:48px;height:48px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.2s;position:absolute;top:0;right:0}#brightness-widget.collapsed .brightness-toggle{position:static}.brightness-toggle:hover{background:rgba(212,168,50,0.1)}.brightness-toggle svg{width:20px;height:20px;stroke:#f0d060}.brightness-content{display:none;padding-right:48px}#brightness-widget:not(.collapsed) .brightness-content{display:block}.brightness-title{font-size:13px;font-weight:500;color:#f0d060;margin-bottom:12px}.brightness-buttons{display:flex;flex-direction:column;gap:6px}.brightness-btn{background:rgba(212,168,50,0.08);border:1px solid rgba(212,168,50,0.2);border-radius:6px;padding:8px 12px;font-size:11px;color:#c5cdd8;cursor:pointer;transition:all 0.2s;text-align:left;display:flex;justify-content:space-between}.brightness-btn:hover{background:rgba(212,168,50,0.15);border-color:rgba(212,168,50,0.4);color:#f0d060;transform:translateX(-2px)}.brightness-btn.active{background:rgba(212,168,50,0.2);border-color:#f0d060;color:#f0d060;box-shadow:0 0 12px rgba(212,168,50,0.3)}.brightness-footer{margin-top:12px;padding-top:12px;border-top:1px solid rgba(212,168,50,0.15);font-size:10px;color:rgba(197,205,216,0.6);text-align:center}</style><div class="brightness-toggle" id="brightness-toggle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><path d="M7 9 L12 14 L17 9" stroke-width="1.5"/></svg></div><div class="brightness-content"><div class="brightness-title">Display Brightness</div><div class="brightness-buttons"><button class="brightness-btn" data-level="1.0"><span>Normal</span><span style="font-size:10px;opacity:0.7">1.0x</span></button><button class="brightness-btn" data-level="1.2"><span>Bright</span><span style="font-size:10px;opacity:0.7">1.2x</span></button><button class="brightness-btn" data-level="1.4"><span>Brighter</span><span style="font-size:10px;opacity:0.7">1.4x</span></button><button class="brightness-btn" data-level="1.6"><span>Very Bright</span><span style="font-size:10px;opacity:0.7">1.6x</span></button><button class="brightness-btn" data-level="1.7"><span>Default</span><span style="font-size:10px;opacity:0.7">1.7x</span></button><button class="brightness-btn" data-level="1.8"><span>Max</span><span style="font-size:10px;opacity:0.7">1.8x</span></button><button class="brightness-btn" data-level="2.0"><span>Ultra Max</span><span style="font-size:10px;opacity:0.7">2.0x</span></button></div><div class="brightness-footer">Default: 1.7x</div></div>`;
-        document.body.appendChild(widget);
-        document.getElementById('brightness-toggle').addEventListener('click', (e) => {
-          e.stopPropagation();
-          this.isCollapsed = !this.isCollapsed;
-          widget.classList.toggle('collapsed');
-          SafeStorage.setItem('caci_brightness_collapsed', this.isCollapsed ? '1' : '0');
-        });
-        document.querySelectorAll('.brightness-btn').forEach(btn => {
-          btn.addEventListener('click', () => {
-            this.applyBrightness(parseFloat(btn.dataset.level));
-          });
-        });
-        const savedCollapsed = SafeStorage.getItem('caci_brightness_collapsed');
-        if (savedCollapsed === '0') {
-          this.isCollapsed = false;
-          widget.classList.remove('collapsed');
-        }
-        this.updateActiveButton();
-      }, 2000);
     }
   };
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => BrightnessControl.init());
-  } else {
-    BrightnessControl.init();
-  }
-  window.setBrightness = (level) => BrightnessControl.applyBrightness(level);
-})();
 
+  BC.init();
+  window.setBrightness = (level) => BC.applyBrightness(level, true);
+})();
 
 
 
@@ -9988,248 +10048,7 @@ async function refreshFileMapping() {
     console.warn('Failed to refresh file mapping:', e);
   }
 }
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  CACI ENHANCED BRIGHTNESS FIX - More Aggressive for Dark Displays
-//  Replace the previous DisplayFix code with this stronger version
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-(function() {
-  'use strict';
-  
-  const DisplayFix = {
-    isLowDPI: false,
-    isHDR: false,
-    isDarkEnvironment: false,
-    userBrightness: null,
-    
-    init() {
-      console.log('🔆 CACI Enhanced Brightness Loading...');
-      this.detectDisplay();
-      this.detectEnvironment();
-      this.loadUserPreference();
-      this.applyBrightness();
-      this.setupListeners();
-      this.addManualControls();
-      console.log('✅ Enhanced brightness active');
-    },
-    
-    detectDisplay() {
-      // More aggressive detection
-      const ratio = window.devicePixelRatio || 1;
-      this.isLowDPI = ratio < 2; // Changed from 1.5 to 2 (catches more displays)
-      this.isHDR = window.matchMedia && window.matchMedia('(dynamic-range: high)').matches;
-      
-      console.log('Display detected:', { 
-        pixelRatio: ratio, 
-        isLowDPI: this.isLowDPI, 
-        isHDR: this.isHDR,
-        screenBrightness: 'low-DPI' 
-      });
-    },
-    
-    detectEnvironment() {
-      // Check if user prefers dark mode (might be in dark environment)
-      if (window.matchMedia) {
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        this.isDarkEnvironment = prefersDark;
-      }
-    },
-    
-    loadUserPreference() {
-      try {
-        const saved = SafeStorage.getItem('caci_brightness');
-        if (saved && !isNaN(parseFloat(saved))) {
-          this.userBrightness = parseFloat(saved);
-          console.log('🎚️ User brightness loaded:', this.userBrightness);
-        }
-      } catch(e) {}
-    },
-    
-    applyBrightness() {
-      const app = document.getElementById('app');
-      if (!app) {
-        setTimeout(() => this.applyBrightness(), 500);
-        return;
-      }
-      
-      const theme = document.body.getAttribute('data-theme');
-      let brightness = 1.0;
-      let contrast = 1.0;
-      
-      // User preference always wins
-      if (this.userBrightness !== null) {
-        brightness = this.userBrightness;
-        app.style.filter = `brightness(${brightness}) contrast(${contrast})`;
-        console.log(`🎚️ User brightness applied: ${brightness}`);
-        return;
-      }
-      
-      // Auto-detect and apply MORE AGGRESSIVE brightening
-      if (theme === 'dark') {
-        if (this.isHDR) {
-          // HDR displays - slight reduction
-          brightness = 0.95;
-          console.log('✨ HDR display: reducing to 0.95');
-        } else if (this.isLowDPI) {
-          // Non-Retina displays - MUCH BRIGHTER
-          brightness = 1.35;  // Increased from 1.15 to 1.35
-          contrast = 1.15;    // Increased from 1.05 to 1.15
-          console.log('🔆 Low-DPI display: boosting to 1.35 brightness, 1.15 contrast');
-        } else {
-          // Default for normal displays - slight boost
-          brightness = 1.1;
-          contrast = 1.05;
-          console.log('💡 Standard display: boosting to 1.1');
-        }
-        
-        // Additional boost for dark environment
-        if (this.isDarkEnvironment && brightness < 1.3) {
-          brightness += 0.1;
-          console.log('🌙 Dark environment detected: +0.1 brightness');
-        }
-      }
-      
-      // Apply the filter
-      app.style.filter = `brightness(${brightness}) contrast(${contrast})`;
-      console.log(`✅ Final brightness: ${brightness}, contrast: ${contrast}`);
-      
-      // Also boost gold colors specifically
-      this.boostGoldColors();
-    },
-    
-    boostGoldColors() {
-      // Inject CSS to make gold elements brighter
-      if (!document.getElementById('caci-gold-boost')) {
-        const style = document.createElement('style');
-        style.id = 'caci-gold-boost';
-        style.textContent = `
-          /* Boost gold accents for better visibility */
-          body[data-theme="dark"] {
-            --gold: #e8c84a !important;      /* Brighter gold */
-            --gold-lt: #ffd966 !important;   /* Even brighter gold */
-          }
-          
-          /* Boost text contrast */
-          body[data-theme="dark"] .msg-bubble,
-          body[data-theme="dark"] .chat-welcome,
-          body[data-theme="dark"] .setting-label {
-            color: #f0f2f5 !important;
-          }
-          
-          /* Brighten the circuit board background */
-          body[data-theme="dark"] #circuit-overlay,
-          body[data-theme="dark"] .chat-bg-overlay {
-            opacity: 0.15 !important;  /* More visible */
-          }
-        `;
-        document.head.appendChild(style);
-        console.log('🎨 Gold boost applied');
-      }
-    },
-    
-    setupListeners() {
-      // Re-detect on focus (user might move to different monitor)
-      window.addEventListener('focus', () => {
-        this.detectDisplay();
-        this.detectEnvironment();
-        this.applyBrightness();
-      });
-      
-      // Re-apply when theme changes
-      const observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-          if (mutation.attributeName === 'data-theme') {
-            this.applyBrightness();
-          }
-        });
-      });
-      observer.observe(document.body, { attributes: true });
-    },
-    
-    addManualControls() {
-      // Add quick brightness buttons to the page
-      setTimeout(() => {
-        if (document.getElementById('caci-brightness-quick')) return;
-        
-        const quickControls = document.createElement('div');
-        quickControls.id = 'caci-brightness-quick';
-        quickControls.style.cssText = `
-          position: fixed;
-          bottom: 80px;
-          right: 20px;
-          z-index: 9999;
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-          padding: 12px;
-          background: var(--ink3);
-          border: 1px solid var(--line2);
-          border-radius: var(--r2);
-          font-size: 11px;
-          color: var(--smoke2);
-          opacity: 0.7;
-          transition: opacity 0.2s;
-        `;
-        
-        quickControls.innerHTML = `
-          <div style="font-weight: 500; margin-bottom: 4px; color: var(--gold);">Brightness</div>
-          <button id="caci-bright-low" style="padding: 4px 8px; font-size: 10px;">Normal (1.0x)</button>
-          <button id="caci-bright-mid" style="padding: 4px 8px; font-size: 10px;">Bright (1.3x)</button>
-          <button id="caci-bright-high" style="padding: 4px 8px; font-size: 10px;">Very Bright (1.5x)</button>
-          <button id="caci-bright-ultra" style="padding: 4px 8px; font-size: 10px;">Max (1.7x)</button>
-        `;
-        
-        quickControls.addEventListener('mouseenter', () => quickControls.style.opacity = '1');
-        quickControls.addEventListener('mouseleave', () => quickControls.style.opacity = '0.7');
-        
-        document.body.appendChild(quickControls);
-        
-        // Wire up buttons
-        const setBrightness = (value) => {
-          this.userBrightness = value;
-          SafeStorage.setItem('caci_brightness', value.toString());
-          this.applyBrightness();
-        };
-        
-        document.getElementById('caci-bright-low').addEventListener('click', () => setBrightness(1.0));
-        document.getElementById('caci-bright-mid').addEventListener('click', () => setBrightness(1.3));
-        document.getElementById('caci-bright-high').addEventListener('click', () => setBrightness(1.5));
-        document.getElementById('caci-bright-ultra').addEventListener('click', () => setBrightness(1.7));
-        
-        console.log('🎛️ Quick brightness controls added');
-      }, 2000);
-    }
-  };
-  
-  // Initialize
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => DisplayFix.init());
-  } else {
-    DisplayFix.init();
-  }
-  
-  // Expose for manual control
-  window.CACIDisplayFix = DisplayFix;
-  
-  // Add global quick-fix function
-  window.makeBrighter = function(level) {
-    const levels = {
-      1: 1.0,
-      2: 1.2,
-      3: 1.4,
-      4: 1.6,
-      5: 1.8
-    };
-    const brightness = levels[level] || 1.3;
-    SafeStorage.setItem('caci_brightness', brightness.toString());
-    DisplayFix.userBrightness = brightness;
-    DisplayFix.applyBrightness();
-    console.log(`🔆 Brightness set to ${brightness}x`);
-  };
-  
-  console.log('💡 Quick fix: Type makeBrighter(3) in console for instant boost');
-  
-})();
 
 // ── Chat history persistence ─────────────────────────────────
 function chatHistoryKey() { return 'caci_history_' + dept; }
