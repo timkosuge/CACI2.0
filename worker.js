@@ -4406,18 +4406,19 @@ Rules:
 - Your name is Kait. Write it as Kait. Do NOT mention any specific company name.
 - Don't name specific people.
 - Don't claim anything about any company's finances or strategy.
-- Don't address any specific audience like "the CEO" — it's for whoever's watching.
 - No lists, bullets, or headers.
-- 40 to 75 seconds of spoken text (roughly 450-900 characters). Go where the voice takes you.
+- 45 to 90 seconds of spoken text (roughly 500-1050 characters). Go where the voice takes you — if it's running long and it's good, let it run.
 - Return ONLY the spoken text. No preamble, no stage directions, no quotation marks.
 
 CRITICAL — tone of the opening:
-- DO NOT start with "Look," or "Listen," or "Here's the thing," or "Alright," or anything that sounds like you're about to correct someone or push back. This is a greeting, not a rebuttal. Those openers land as confrontational.
-- DO NOT start with "So," as the very first word — it sounds condescending.
-- Good opens: a warm greeting, an observation stated simply, a question posed gently, or diving into something specific about the industry without posturing.
+- DO NOT start with "Look," or "Listen," or "Here's the thing," or "Alright."
+- DO NOT start with "So," as the very first word.
+- Good opens: almost anything else. Be bold. Surprising first lines are better than safe ones.
 
 Speakability:
-- This will be read aloud by a text-to-speech engine. Avoid industry acronyms and abbreviations — they get mangled in speech. When you'd naturally use an acronym, describe the concept in plain words instead (e.g. "seed-to-sale tracking systems", "state regulators", "compliance audits"). THC, CBD, and AI are fine — those read correctly.
+- This will be read aloud by a text-to-speech engine. Avoid industry acronyms that get mangled. THC, CBD, and AI are fine. Write out anything else in plain words.
+
+You have permission to be vivid. To be specific. To be a little surprising. The version that's slightly too much is usually better than the version that plays it safe.
 
 IMPORTANT about variation:
 You'll be called five times in parallel, each with a different structural directive. Follow yours exactly — it's the source of real variation, not just word-swapping.
@@ -4428,11 +4429,11 @@ Whatever directive you get, the content must still accomplish the goals above. T
 
     // Five structurally distinct directives — one per parallel call
     const INTRO_DIRECTIVES = [
-      'Start with who you are and what makes you different from every other AI they\'ve seen. Warm, direct, no setup. Land your name in the first sentence.',
-      'Open with an observation about the cannabis industry — something specific and true — before you say who you are. Let the industry speak first, then introduce yourself as the answer to it.',
-      'Open in the middle of a thought, like you\'re already in conversation with them. No formal greeting. Just start talking like a colleague who showed up and has something worth saying.',
-      'Start with a specific scene or moment from cannabis operations — something people in this industry will instantly recognize. Then pull back and say who you are.',
-      'Open with something honest about what you are and what you\'re not. Lead with a real limitation or caveat, then explain why you\'re still worth paying attention to.',
+      'Start with who you are and what makes you different. Be direct and confident — not humble, not hedging. Land your name early and make it stick.',
+      'Open with something true and specific about the cannabis industry that most people outside it don\'t know. Let that observation be the reason you exist. Then say who you are.',
+      'Start in the middle of a thought — no greeting, no setup. Like you\'ve been here the whole time and you\'re just picking up the conversation. Earn the introduction later.',
+      'Open with a scene. Put the viewer somewhere specific — a compliance desk at 11pm, a harvest room, a product launch meeting. Then pull back and explain why you\'re there.',
+      'Start with something honest about what you\'re not, then pivot hard into what you are. Lead with the contrast. Make the second half land harder because of the first.',
     ];
 
     // Generate 5 variations in parallel, each with its own structural directive
@@ -4483,8 +4484,8 @@ Whatever directive you get, the content must still accomplish the goals above. T
 const BEAT_SPECS = {
   '1': {
     role: 'opening the story — the problem she was built to solve',
-    durationSec: '10-15',
-    charRange: '180-280',
+    durationSec: '11-17',
+    charRange: '210-320',
     goal: 'Set up the problem Kait was made to solve. Frame it around the cannabis industry generally — regulations, compliance, market data, operations. Do NOT mention any specific company name. Someone in this industry has answers buried in thousands of documents — regulations, SOPs, filings, market reports. Finding the right passage takes hours, often never happens. By the time someone digs it up, the moment has passed. This is the pain. Lead with it.',
     facts: [
       'Cannabis operators generate huge volumes of documents — regulations, market reports, compliance memos, policies, internal filings.',
@@ -4495,8 +4496,8 @@ const BEAT_SPECS = {
   },
   '3': {
     role: 'how she organizes documents when they arrive',
-    durationSec: '12-18',
-    charRange: '220-360',
+    durationSec: '14-21',
+    charRange: '250-415',
     goal: 'Describe how she actually reads and files incoming documents — not a shallow glance at the filename, but full content analysis, automatic tagging, and filing so future questions know where to look. The point is: whatever you give her, she actually reads. Feed her any document type and she files it intelligently.',
     facts: [
       'When a document is uploaded, she reads the whole thing — not just the filename or metadata.',
@@ -4509,8 +4510,8 @@ const BEAT_SPECS = {
   },
   '4': {
     role: 'how she answers a question — the retrieval pipeline',
-    durationSec: '10-16',
-    charRange: '200-320',
+    durationSec: '11-18',
+    charRange: '230-370',
     goal: 'Describe how she responds to a question. She is not a keyword search. She analyzes intent, retrieves intelligently, ranks by relevance, and shows sources. The implication: this works on any document corpus — regulatory, financial, operational, market data. The capability is not limited by document type.',
     facts: [
       'Before retrieving anything, she analyzes the intent of the question — comparison, aggregate, filtered lookup, why-question.',
@@ -4523,8 +4524,8 @@ const BEAT_SPECS = {
   },
   '5': {
     role: 'how her knowledge compounds — and how easy it is to expand',
-    durationSec: '10-15',
-    charRange: '180-300',
+    durationSec: '11-17',
+    charRange: '210-345',
     goal: 'Describe how adding more documents makes her smarter — and how easy that is to do. A new regulation changes what an old policy means. New market data reframes an earlier trend. The key message: her capability is not fixed. It grows with every document she receives. Any operator could hand her their own documents and she would immediately know their world. Make this feel inevitable and simple.',
     facts: [
       'Every new document is indexed alongside existing ones.',
@@ -4537,8 +4538,8 @@ const BEAT_SPECS = {
   },
   '6': {
     role: 'honest inventory of what she knows right now — and what that implies',
-    durationSec: '18-28',
-    charRange: '320-500',
+    durationSec: '20-32',
+    charRange: '370-575',
     goal: 'Be honest about her current state — she has Illinois cannabis market data, Illinois regulations, and the full Ohio regulatory code. That is her starting point for this demo. But make it clear that this is a choice, not a ceiling. Any operator could give her their own documents — their state\'s regulations, their internal filings, their market data — and she would know their world just as well. The data is the variable. She is the constant. Do NOT mention any company names.',
     facts: [
       'Current documents she has: Illinois cannabis market data, the Illinois 2025 annual regulatory report, and the full Ohio cannabis regulatory code.',
@@ -4551,8 +4552,8 @@ const BEAT_SPECS = {
   },
   '7': {
     role: 'the guarantees — security, sources, and data handling',
-    durationSec: '8-14',
-    charRange: '160-280',
+    durationSec: '9-16',
+    charRange: '185-320',
     goal: 'State the guarantees plainly. Her answers come with sources. Every upload is logged. Documents stay in the operator\'s own infrastructure. Data is not used to train any outside model. These are specific, defensible claims — not marketing language.',
     facts: [
       'Answers include source citations linking back to the uploaded document.',
@@ -4565,8 +4566,8 @@ const BEAT_SPECS = {
   },
   '8': {
     role: 'the distinction — built for this industry, not retrofitted',
-    durationSec: '10-14',
-    charRange: '180-280',
+    durationSec: '11-16',
+    charRange: '210-320',
     goal: 'Draw the line between Kait and every generic chatbot someone has connected to their files. She was built around how cannabis operations actually work — not adapted from a general tool. Departments, compliance workflows, regulatory complexity, state-by-state variation. Specificity is the point. And the barrier to getting started is lower than people think.',
     facts: [
       'Most AI products are general-purpose assistants with document attachment bolted on.',
@@ -4617,13 +4618,15 @@ ${spec.facts.map((f, i) => `${i+1}. ${f}`).join('\n')}
 
 Rules:
 - Third person about Kait. Use "she" (not "I"). Call her Kait when you use her name.
-- ${spec.durationSec} seconds of spoken text (roughly ${spec.charRange} characters).
-- Flowing sentences. Commas and em-dashes for natural pauses. No lists, no bullets, no headers.
+- ${spec.durationSec} seconds of spoken text (roughly ${spec.charRange} characters). If it runs a little long and it's working, let it.
+- Flowing sentences. Commas and em-dashes for natural pauses. No lists, no bullets.
 - Write for speech, not for reading. It has to sound right out loud.
-- Don't use industry acronyms that a text-to-speech engine would mangle. THC, CBD, and AI are fine. Write out anything else in plain words (e.g. "seed-to-sale tracking", "state regulators", "compliance audits").
-- Don't overstate. The facts are the ceiling — don't claim more than what's there.
+- Don't use industry acronyms that a text-to-speech engine would mangle. THC, CBD, and AI are fine.
+- Be honest — but you can make it feel big. If the truth is impressive, let it be impressive.
 - Don't name specific people. Don't make claims about any company's finances.
 - Return ONLY the spoken text. No preamble, no stage directions, no quotation marks.
+
+You have permission to be vivid and specific. The slightly bold version is usually better than the safe one.
 
 IMPORTANT about variation:
 You'll be called five times in parallel, each with a different structural directive. Follow yours exactly.
@@ -4634,11 +4637,11 @@ Same truth. Different structure. The directive controls how you enter and move t
 
     // Five structurally distinct directives for chorus beats
     const CHORUS_DIRECTIVES = [
-      'Lead with the concrete — show the thing happening before you name what it is. Scene first, concept second.',
-      'Lead with the concept or claim, then immediately prove it with the specific detail. Abstract to concrete.',
-      'Open with a contrast — what most people expect or assume, then the reality of how it actually works.',
-      'Open with a specific fact or number from the beat\'s content, then build the context around it.',
-      'Open mid-thought, as if continuing something the previous speaker said. No formal setup — just continue the logic naturally.',
+      'Lead with the concrete — show the thing happening before you name what it is. Drop the viewer into a specific moment. Scene first, concept second.',
+      'Lead with a bold claim, then immediately back it up with the specific detail that makes it true. No hedging on the claim.',
+      'Open with what people assume — then flip it. The contrast between expectation and reality is the point.',
+      'Pick the most surprising or specific fact from the beat\'s content and open with it cold. Let the number or detail land before you explain what it means.',
+      'Open like you\'re finishing someone else\'s thought. Mid-conversation energy. Skip the setup entirely and get to the interesting part immediately.',
     ];
 
     const call = async (directive) => {
@@ -4891,24 +4894,40 @@ async function handleDemoHarvestStats(request, env) {
     // already exists in the app — we reuse it by calling the same helpers.
     const topicQueries = [
       {
-        topic: 'illinois_sales',
-        query: 'Illinois adult-use cannabis total sales revenue 2024 2025 annual market figures billion million',
+        topic: 'illinois_market',
+        query: 'Illinois total cannabis sales revenue adult-use 2024 2025 annual billion million growth',
         scope: 'Illinois 2025 annual report',
+        maxChunks: 3,
+      },
+      {
+        topic: 'illinois_tax_social',
+        query: 'Illinois cannabis tax revenue community reinvestment fund social equity expungement 2024 2025',
+        scope: 'Illinois 2025 annual report',
+        maxChunks: 3,
       },
       {
         topic: 'illinois_licenses',
-        query: 'Illinois dispensary license count operators cultivators processors transporters active 2024 2025',
+        query: 'Illinois dispensary cultivation processor license count social equity craft grower 2024 2025',
         scope: 'Illinois 2025 annual report',
+        maxChunks: 2,
       },
       {
-        topic: 'illinois_tax',
-        query: 'Illinois cannabis tax revenue collections 2024 2025 fund distributions community reinvestment',
-        scope: 'Illinois 2025 annual report',
-      },
-      {
-        topic: 'ohio_regulatory',
-        query: 'Ohio cannabis dispensary license adult-use medical patient count regulation 2024 2025',
+        topic: 'ohio_patient_limits',
+        query: 'Ohio patient purchase limit possession flower THC milligrams ounces transport caregiver day',
         scope: 'Ohio regulatory code',
+        maxChunks: 3,
+      },
+      {
+        topic: 'ohio_market_rules',
+        query: 'Ohio adult-use dispensary license count testing requirement cultivator processor permit fee 2024 2025',
+        scope: 'Ohio regulatory code',
+        maxChunks: 2,
+      },
+      {
+        topic: 'ohio_compliance',
+        query: 'Ohio cannabis compliance violation penalty fine enforcement inspection security requirement',
+        scope: 'Ohio regulatory code',
+        maxChunks: 2,
       },
     ];
 
@@ -4918,27 +4937,30 @@ async function handleDemoHarvestStats(request, env) {
     // uploaded doc's collection and pass them to Claude with the topic query.
     // Performance: 4 sequential Claude calls, ~5-10s total.
     const retrievedPerTopic = [];
-    for (const { topic, query, scope } of topicQueries) {
-      const { text, diag } = await harvestRetrieveContext(env, query);
+    for (const { topic, query, scope, maxChunks } of topicQueries) {
+      const { text, diag } = await harvestRetrieveContext(env, query, maxChunks || 3);
       retrievedPerTopic.push({ topic, query, scope, context: text, diag });
     }
 
-    // Ask Claude to extract structured stats from all retrieved contexts at once
-    const systemPrompt = `You are Kait's data extraction subsystem. Your job is to extract real numeric facts from document excerpts for display in a demo video. You are strict about only returning numbers that are explicitly stated in the source text. Never invent or infer numbers. If a number is not directly stated, do not include it.
+    const systemPrompt = `You are Kait's data extraction subsystem. Your job is to extract real numeric facts from document excerpts for display in a demo video. You are strict about only returning numbers that are explicitly stated in the source text. Never invent or infer numbers.
 
-CRITICAL: This demo is about the Illinois and Ohio cannabis MARKETS — regulatory figures, market totals, license counts, tax revenue, compliance data. Do NOT extract financial metrics from individual cannabis operators or companies (revenue, EBITDA, margins, employee counts, store counts, loan amounts, etc.). If an excerpt appears to come from a company earnings report, investor document, or internal operations file — skip it entirely. Only extract facts that describe the market, the regulatory environment, or state-level data.`;
+CRITICAL: Only extract state-level or market-level data. Skip anything from an individual operator's financials. If an excerpt looks like a company earnings report or internal operations document — ignore it.
 
-    const extractionPrompt = `Below are excerpts from topic sweeps of Kait's document library. Extract real, concrete numeric facts from these excerpts for use in a demo video's 3D data visualizations.
+IMPORTANT — hunt for SURPRISING stats. The goal is to show numbers that make someone say "whoa, I didn't know that." Prioritize:
+- Unexpectedly large or small numbers
+- Regulations with very specific numeric thresholds (exact possession limits, exact fees, exact timelines)
+- Market figures that reveal scale or growth in a striking way
+- Social equity or community reinvestment numbers that are notable
+- Compliance thresholds that reveal how tightly regulated this industry is
+- Numbers that tell a story about how different Illinois and Ohio are
 
-IMPORTANT — ONLY extract facts from these categories:
-- Illinois or Ohio cannabis market totals (sales, revenue at state/market level)
-- License counts (dispensaries, cultivators, processors, transporters statewide)
-- Tax and fee collections at the state level
-- Regulatory compliance figures (violation counts, inspection numbers, penalty totals)
-- Market growth figures (year-over-year at state level)
-- Patient/consumer counts (medical patients, adult-use purchasers)
+Avoid generic stats that feel predictable. Find the ones that prompt a conversation.`;
 
-DO NOT extract: individual company revenues, company EBITDA, company employee counts, company store counts, company loan amounts, company yield data, company-specific margins, or any metric that belongs to a single operator rather than the market as a whole. If a source file looks like an earnings transcript, investor presentation, or internal ops doc — ignore it completely.
+    const extractionPrompt = `Below are excerpts from targeted sweeps of Kait's document library — Illinois market data, Illinois regulations, and Ohio regulatory code. Extract real, concrete numeric facts for display in a demo video's 3D visualizations.
+
+ONLY extract STATE-LEVEL or MARKET-LEVEL data. Skip any individual company metrics.
+PRIORITIZE surprising, specific, conversation-starting numbers over generic totals.
+AIM FOR A MIX: Illinois market intelligence + Ohio regulatory precision. Both should appear.
 
 SWEEPS:
 ${retrievedPerTopic.map((r, i) => `
@@ -4948,13 +4970,13 @@ ${r.context || '(no relevant excerpts found — skip this sweep)'}
 
 Return a JSON object with two arrays: "singles" and "charts".
 
-"singles" = individual standout numeric facts, good for displaying as large floating numbers. Each item:
+"singles" = individual standout facts shown as large floating numbers. Each item:
 {
   "id": "snake_case_id",
-  "kind": "currency" | "count" | "percentage",
+  "kind": "currency" | "count" | "percentage" | "weight" | "time",
   "value": <number>,
-  "displayValue": "<pretty string, e.g. '$1.87B' or '110' or '77%'>",
-  "label": "<short label, max 45 chars>",
+  "displayValue": "<pretty string e.g. '$1.87B' or '2.5 oz' or '15,000 mg' or '5 years'>",
+  "label": "<short punchy label, max 45 chars — make it interesting, not generic>",
   "period": "<time period or null>",
   "source": "<doc name>"
 }
@@ -4963,22 +4985,22 @@ Return a JSON object with two arrays: "singles" and "charts".
 {
   "id": "snake_case_id",
   "title": "<chart title, max 50 chars>",
-  "unit": "currency" | "count" | "percentage",
+  "unit": "currency" | "count" | "percentage" | "weight",
   "series": [{ "label": "<x-axis label>", "value": <number>, "displayValue": "<pretty string>" }],
   "source": "<doc name>"
 }
 
 Rules:
-1. Only include facts directly stated in the excerpts. If you're guessing, omit.
-2. Only include STATE-LEVEL or MARKET-LEVEL data. Skip anything from an individual operator.
-3. STRONGLY PREFER THE MOST RECENT DATA — prefer 2024/2025 figures over older ones.
-4. Prefer numbers that look good as charts: multi-year trends, license type breakdowns, tax revenue growth.
-5. Aim for 6-10 singles and 2-4 charts total. Quality over quantity.
-6. Numbers must be plain numbers (no currency symbols in "value"). Use "displayValue" for formatting.
-7. Include the period in the label or "period" field.
-8. If a sweep returned no useful market-level facts, skip it entirely.
+1. Only include facts directly stated in the excerpts.
+2. AIM FOR BALANCE: 4-5 Illinois facts + 4-5 Ohio facts. Both states must appear.
+3. Prefer specific and surprising over generic — exact regulatory thresholds, precise limits, notable growth figures.
+4. For Ohio possession/purchase limits — these are great singles. Exact weights and quantities are visually striking.
+5. For Illinois — market totals, tax revenue, social equity numbers, license breakdowns.
+6. Aim for 8-10 singles and 2-4 charts total.
+7. Numbers must be plain numbers in "value". Use "displayValue" for formatting.
+8. Include period in label or "period" field.
 
-Return ONLY the JSON object. No preamble, no markdown, no explanation.`;
+Return ONLY the JSON object. No preamble, no markdown.`;
 
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -5046,7 +5068,7 @@ Return ONLY the JSON object. No preamble, no markdown, no explanation.`;
 // it uses `env.CACI_KV.list({prefix: 'file:'})` to find every file record
 // directly. This works regardless of which departments exist or what they're
 // named, and surfaces a diagnostic path even if the department index is stale.
-async function harvestRetrieveContext(env, query) {
+async function harvestRetrieveContext(env, query, maxChunks = 4) {
   try {
     const keywords = query.toLowerCase().split(/\s+/).filter(w => w.length > 3);
     if (keywords.length === 0) return { text: '', diag: { reason: 'no-keywords' } };
@@ -5102,10 +5124,6 @@ async function harvestRetrieveContext(env, query) {
           fileRecencyBoost = Math.max(fileRecencyBoost, boost);
         }
       }
-      // Extra boost for Illinois files — we want Illinois market data to surface first
-      if (fileNameLower.includes('illinois') || fileNameLower.includes('il_') || fileNameLower.includes('il-')) {
-        fileRecencyBoost += 25;
-      }
       for (const chunk of chunks) {
         chunksScanned++;
         // Chunks are stored as plain strings by handleUpload (worker.js line ~583).
@@ -5144,7 +5162,7 @@ async function harvestRetrieveContext(env, query) {
       }
     }
     scored.sort((a, b) => b.score - a.score);
-    const top = scored.slice(0, 8);
+    const top = scored.slice(0, maxChunks);
     const contextText = top.map(t => `[${t.source}]\n${t.text}`).join('\n\n---\n\n');
     return {
       text: contextText,
