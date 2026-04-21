@@ -9596,7 +9596,7 @@ html body[data-theme="light"] #discovery-greeting-strip .dgs-text strong {
             <div class="acard-title">Demo Scripts</div>
             <div class="acard-sub">Kait writes all narration for the demo herself. One click generates 5 variants for every beat (intro + 7 chorus beats = 40 scripts). Each show randomly picks one variant per beat, so repeat viewings aren't identical. To refresh everything, generate again — this replaces all stored variants.</div>
             <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;align-items:center">
-              <button class="asave" id="demo-gen-all" style="white-space:nowrap">Generate Full Demo (24 scripts)</button>
+              <button class="asave" id="demo-gen-all" style="white-space:nowrap">Generate Full Demo (40 scripts)</button>
               <button class="asave" id="demo-reset-all" style="background:transparent;border:1px solid rgba(220,90,90,0.5);color:rgba(240,160,160,0.95)">Reset All</button>
               <span id="demo-gen-status" style="font-family:var(--f-mono);font-size:10px;color:var(--smoke3);letter-spacing:.06em"></span>
             </div>
@@ -13390,8 +13390,8 @@ async function generateAllDemoScripts() {
   const btn = $('demo-gen-all');
   const resetBtn = $('demo-reset-all');
   const status = $('demo-gen-status');
-  if (!confirm('Generate 3 variants for all 8 beats (24 scripts total)?\nThis replaces everything currently stored.\nTakes about 30-60 seconds.')) return;
-  if (btn) { btn.disabled = true; btn.textContent = 'Generating all 24 scripts\u2026'; }
+  if (!confirm('Generate 5 variants for all 8 beats (40 scripts total)?\nThis replaces everything currently stored.\nTakes about 60-90 seconds.')) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Generating all 40 scripts\u2026'; }
   if (resetBtn) resetBtn.disabled = true;
   if (status) status.textContent = 'Calling Claude in parallel (this can take a minute)\u2026';
 
@@ -13412,7 +13412,7 @@ async function generateAllDemoScripts() {
   } catch (e) {
     if (status) status.textContent = '\u2717 ' + (e.message || 'Generation failed');
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Generate Full Demo (24 scripts)'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Generate Full Demo (40 scripts)'; }
     if (resetBtn) resetBtn.disabled = false;
   }
 }
