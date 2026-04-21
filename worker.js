@@ -981,8 +981,8 @@ async function handleChat(request, env) {
     // Discovery mode
     if (history.length === 0 && scope === 'all' && !collection && !fileId) {
       const discovery = await buildDiscoveryContext({ dept, env });
-      // OPTIMIZATION: Skip library map on greeting - not shown to user, will build lazily on first query
-      const discLibraryMap = null;
+      // OPTIMIZATION: Build library map in PARALLEL with greeting (not sequentially)
+      const libraryMapPromise = buildLibraryMap({ dept, env });
       const discLibraryPrompt = libraryMapToPrompt(discLibraryMap);
       const system = `You are Caci (pronounced like "Cassie") — the internal AI intelligence assistant for Jushi Holdings. You were built specifically for this team.
 
@@ -1038,18 +1038,17 @@ RESPONSE DEPTH — this is critical:
 ABSOLUTE RESTRICTION — never discuss, reference, or include any information about:
 - Executive compensation, C-suite salaries, bonuses, equity grants, or pay packages for any Jushi leadership or named individuals
 - If asked directly about executive compensation, decline simply: "That's not something I cover — happy to dig into anything else."`;
-      // OPTIMIZATION: Static greeting - instant response, no LLM call
-      // Eliminates 1000-2000ms lag on page load - critical for demos
-      const greetings = [
-        `Hey${displayName ? ' ' + displayName.split(' ')[0] : ''}, I'm Caci—your AI teammate at Jushi, always ready to dig in. What can I help the ${dept} crew with today?`,
-        `Hi${displayName ? ' ' + displayName.split(' ')[0] : ''}, Caci here—built specifically for Jushi, know this place inside out. What's on your mind for ${dept}?`,
-        `What's up${displayName ? ' ' + displayName.split(' ')[0] : ''}? I'm Caci, your internal AI sidekick. What does ${dept} need today?`,
-        `Hey${displayName ? ' ' + displayName.split(' ')[0] : ''}, Caci here—think of me as the teammate who's read every document. How can I help ${dept}?`,
-        `Hi${displayName ? ' ' + displayName.split(' ')[0] : ''}, ready to jump in wherever you need me. What's the ${dept} team working on?`,
-      ];
-      // Rotate greetings by hour (feels fresh without randomness)
-      const greetingIndex = new Date().getHours() % greetings.length;
-      const discResponse = greetings[greetingIndex];
+      // Generate personalized greeting with user's name via LLM
+      const discResponse = await callLLM({
+        model,
+        system,
+        messages: [{ role: 'user', content: message }],
+        maxTokens: 120,
+        stop: ['\n\n'],
+      });
+      // Wait for library map to finish (if greeting finished first)
+      const discLibraryMap = await libraryMapPromise;
+      
       const discRespId = `${dept}:${Date.now()}:${Math.random().toString(36).slice(2,8)}`;
       writeQueryLog(env, { message, dept, username: verifyToken(request, env)?.username || 'unknown', collection: collection || null, retrieval: false, scope: 'discovery' });
       return json({ ok: true, response: discResponse, sources: [], scope: 'discovery', collections: discovery.rawCollections, model: model || 'claude', responseId: discRespId });
@@ -1224,28 +1223,42 @@ Respond in plain text, no headers, no bullets.`;
     let contextDocs = '';
 
     // Always load Internal Reference context docs — injected into every query regardless of scope
+    // OPTIMIZATION: Load all context docs in parallel (not sequentially)
+    // Loads 10-15 files simultaneously instead of one-by-one → 150-300ms faster
     const GLOBAL_CTX_COLLECTION = 'Internal Reference';
     const globalCtxFiles = await env.CACI_KV.get(`ctx:${dept}:${GLOBAL_CTX_COLLECTION}`, 'json') || [];
-    if (globalCtxFiles.length) {
-      const globalCtxTexts = [];
-      for (const f of globalCtxFiles.slice(0, 10)) {
-        const full = await env.CACI_KV.get(`file:${f.id}`, 'json');
-        if (full?.chunks) globalCtxTexts.push(`[Context: ${f.name}]\n${full.chunks.join('\n\n')}`);
-      }
-      if (globalCtxTexts.length) contextDocs = globalCtxTexts.join('\n\n');
-    }
+    const activeCollectionCtxFiles = activeCollection && collection !== GLOBAL_CTX_COLLECTION
+      ? await env.CACI_KV.get(`ctx:${dept}:${collection}`, 'json') || []
+      : [];
 
-    // Also load active collection context docs if scoped to a specific collection
-    if (activeCollection && collection !== GLOBAL_CTX_COLLECTION) {
-      const ctxFiles = await env.CACI_KV.get(`ctx:${dept}:${collection}`, 'json') || [];
-      if (ctxFiles.length) {
-        const ctxTexts = [];
-        for (const f of ctxFiles.slice(0, 5)) {
-          const full = await env.CACI_KV.get(`file:${f.id}`, 'json');
-          if (full?.chunks) ctxTexts.push(`[Context: ${f.name}]\n${full.chunks.join('\n\n')}`);
-        }
-        if (ctxTexts.length) contextDocs = contextDocs ? contextDocs + '\n\n' + ctxTexts.join('\n\n') : ctxTexts.join('\n\n');
+    // Load both global and collection context files simultaneously
+    const [globalFullFiles, ctxFullFiles] = await Promise.all([
+      Promise.all(
+        globalCtxFiles.slice(0, 10).map(f => env.CACI_KV.get(`file:${f.id}`, 'json'))
+      ),
+      Promise.all(
+        activeCollectionCtxFiles.slice(0, 5).map(f => env.CACI_KV.get(`file:${f.id}`, 'json'))
+      )
+    ]);
+
+    // Process global context docs
+    const globalCtxTexts = [];
+    globalFullFiles.forEach((full, i) => {
+      if (full?.chunks) {
+        globalCtxTexts.push(`[Context: ${globalCtxFiles[i].name}]\n${full.chunks.join('\n\n')}`);
       }
+    });
+    if (globalCtxTexts.length) contextDocs = globalCtxTexts.join('\n\n');
+
+    // Process collection context docs
+    const ctxTexts = [];
+    ctxFullFiles.forEach((full, i) => {
+      if (full?.chunks) {
+        ctxTexts.push(`[Context: ${activeCollectionCtxFiles[i].name}]\n${full.chunks.join('\n\n')}`);
+      }
+    });
+    if (ctxTexts.length) {
+      contextDocs = contextDocs ? contextDocs + '\n\n' + ctxTexts.join('\n\n') : ctxTexts.join('\n\n');
     }
 
     const scopeLabel = scope === 'file' ? `the document ${context.focusFile}`
