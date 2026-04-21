@@ -85,6 +85,7 @@ export default {
     // about which keys are configured, never the keys themselves).
     if (path === '/admin/config' && method === 'GET') return handleAdminGet(env);
     if (path === '/tts' && method === 'POST') return handleTTS(request, env);
+    if (path === '/api/map-keys' && method === 'GET') return handleMapKeys(env);
     if (path === '/demo/scripts' && method === 'GET') return handleDemoGetScripts(env);
     if (path === '/demo/stats'   && method === 'GET') return handleDemoGetStats(env);
 
@@ -4884,6 +4885,17 @@ async function handleDemoKvDiagnostic(env) {
 // The result is NOT saved automatically — admin reviews it, edits if needed,
 // then clicks Save. This is the same generate→review→commit pattern we use
 // for scripts.
+// Serve map API keys to the frontend — keys live in Cloudflare secrets,
+// never in GitHub. Only served over HTTPS to your own domain.
+async function handleMapKeys(env) {
+  const cesiumToken  = env.CESIUM_TOKEN  || '';
+  const googleKey    = env.GOOGLE_TILES_KEY || '';
+  if (!cesiumToken && !googleKey) {
+    return json({ error: 'Map keys not configured — add CESIUM_TOKEN and GOOGLE_TILES_KEY to Cloudflare environment variables' }, 500);
+  }
+  return json({ cesiumToken, googleKey });
+}
+
 async function handleDemoHarvestStats(request, env) {
   try {
     const apiKey = (await env.CACI_KV.get('config:ANTHROPIC_API_KEY')) || env.ANTHROPIC_API_KEY;
