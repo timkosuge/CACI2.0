@@ -13,23 +13,34 @@
   .cesium-credit-logoContainer,.cesium-credit-textContainer{display:none!important;}
 
   /* Location label — top center */
+  /* ── LOCATION LABEL PANEL ── */
+  #locPanel{
+    position:fixed;top:20px;left:50%;transform:translateX(-50%);
+    pointer-events:none;z-index:100;
+    text-align:center;
+    background:rgba(0,0,4,0.72);
+    border:1px solid rgba(200,160,50,0.2);
+    backdrop-filter:blur(6px);
+    padding:10px 24px 12px;
+    min-width:280px;max-width:640px;
+    opacity:0;transition:opacity 1.2s ease;
+  }
+  #locPanel.visible{ opacity:1; }
   #locLabel{
-    position:fixed;top:22px;left:50%;transform:translateX(-50%);
-    color:rgba(200,160,50,0);font:300 12px 'Courier New',monospace;
-    letter-spacing:0.4em;pointer-events:none;z-index:100;
-    text-align:center;text-transform:uppercase;
-    transition:color 1.4s ease;
-    text-shadow:0 0 24px rgba(200,160,50,0.35);
+    color:rgba(200,160,50,0.95);
+    font:400 14px 'Courier New',monospace;
+    letter-spacing:0.35em;
+    text-transform:uppercase;
+    text-shadow:0 0 20px rgba(200,160,50,0.4);
+    margin-bottom:5px;
     white-space:nowrap;
   }
-  /* Fact line — below label */
   #locFact{
-    position:fixed;top:46px;left:50%;transform:translateX(-50%);
-    color:rgba(200,160,50,0);font:10px 'Courier New',monospace;
-    letter-spacing:0.15em;pointer-events:none;z-index:100;
-    text-align:center;max-width:700px;
-    transition:color 1.4s ease;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    color:rgba(200,160,50,0.5);
+    font:11px 'Courier New',monospace;
+    letter-spacing:0.1em;
+    line-height:1.6;
+    white-space:normal;
   }
 
   /* Chapter marker — brief flash */
@@ -50,118 +61,135 @@
 
   /* HUD */
   #hud{
-    position:fixed;bottom:12px;left:50%;transform:translateX(-50%);
-    color:rgba(200,160,50,0.3);font:9px 'Courier New',monospace;
+    position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
+    color:rgba(200,160,50,0.4);font:11px 'Courier New',monospace;
     letter-spacing:0.2em;pointer-events:none;z-index:100;
+    background:rgba(0,0,0,0.5);padding:4px 12px;
+  }
+  #tileStatus{
+    position:fixed;top:80px;left:50%;transform:translateX(-50%);
+    color:rgba(100,255,150,0.7);font:10px 'Courier New',monospace;
+    letter-spacing:0.15em;pointer-events:none;z-index:100;
+    background:rgba(0,0,0,0.6);padding:4px 12px;
   }
 
   /* Controls */
-  /* ── CONTROL PANEL ── */
-  #ctrl{
-    position:fixed;bottom:20px;right:20px;
-    display:none;flex-direction:column;gap:0;z-index:100;
-    background:rgba(0,0,4,0.82);
-    border:1px solid rgba(200,160,50,0.25);
-    backdrop-filter:blur(8px);
-    min-width:180px;
-    overflow:hidden;
+  /* ══ DASHBOARD ══ */
+  #dashboard{
+    position:fixed;bottom:0;left:0;right:0;
+    height:72px;
+    background:rgba(0,0,4,0.88);
+    border-top:1px solid rgba(200,160,50,0.2);
+    backdrop-filter:blur(10px);
+    display:none;
+    align-items:center;
+    padding:0 24px;
+    gap:8px;
+    z-index:200;
   }
-  #ctrl-title{
-    padding:10px 16px 8px;
+  #dash-label{
     color:rgba(200,160,50,0.35);
-    font:9px 'Courier New',monospace;
+    font:10px 'Courier New',monospace;
     letter-spacing:0.4em;
-    border-bottom:1px solid rgba(200,160,50,0.1);
+    white-space:nowrap;
+    margin-right:8px;
+    padding-right:16px;
+    border-right:1px solid rgba(200,160,50,0.12);
   }
-  #ctrl-section{
-    padding:8px;
-    display:flex;flex-direction:column;gap:4px;
-  }
-  #ctrl-divider{
-    height:1px;background:rgba(200,160,50,0.08);margin:4px 0;
-  }
-  #ctrl button{
-    background:rgba(255,255,255,0.03);
-    border:1px solid rgba(200,160,50,0.18);
-    color:rgba(200,160,50,0.75);
-    font:11px 'Courier New',monospace;
-    letter-spacing:0.12em;
-    padding:9px 14px;
+  .dash-btn{
+    background:rgba(255,255,255,0.04);
+    border:1px solid rgba(200,160,50,0.22);
+    color:rgba(200,160,50,0.85);
+    font:12px 'Courier New',monospace;
+    letter-spacing:0.1em;
+    padding:10px 18px;
     cursor:pointer;
-    transition:all 0.18s;
-    text-align:left;
+    transition:all 0.15s;
+    white-space:nowrap;
     display:flex;align-items:center;gap:8px;
+    height:44px;
+  }
+  .dash-btn:hover{
+    background:rgba(200,160,50,0.1);
+    border-color:rgba(200,160,50,0.6);
+    color:#c9a832;
+  }
+  .dash-btn .kb{
+    font-size:10px;
+    color:rgba(200,160,50,0.3);
+    border:1px solid rgba(200,160,50,0.15);
+    padding:2px 5px;
+    margin-left:4px;
+  }
+  .dash-sep{
+    width:1px;height:36px;
+    background:rgba(200,160,50,0.1);
+    flex-shrink:0;
+    margin:0 4px;
+  }
+  .dash-btn.fly{
+    color:rgba(100,200,255,0.9);
+    border-color:rgba(100,200,255,0.25);
+  }
+  .dash-btn.fly:hover{
+    background:rgba(100,200,255,0.1);
+    border-color:rgba(100,200,255,0.7);
+    color:rgba(140,220,255,1);
+  }
+  .dash-btn.rec{
+    color:rgba(255,110,110,0.9);
+    border-color:rgba(255,80,80,0.25);
+  }
+  .dash-btn.rec:hover{
+    background:rgba(255,80,80,0.1);
+    border-color:rgba(255,110,110,0.7);
+    color:rgba(255,140,140,1);
+  }
+  #dash-ff-controls{
+    display:none;
+    align-items:center;
+    gap:6px;
+    margin-left:8px;
+    padding-left:16px;
+    border-left:1px solid rgba(100,200,255,0.15);
+  }
+  .ff-key{
+    background:rgba(100,200,255,0.06);
+    border:1px solid rgba(100,200,255,0.25);
+    color:rgba(100,200,255,0.8);
+    font:11px 'Courier New',monospace;
+    padding:6px 10px;
+    min-width:36px;
+    text-align:center;
     white-space:nowrap;
   }
-  #ctrl button:hover{
-    background:rgba(200,160,50,0.08);
-    border-color:rgba(200,160,50,0.5);
-    color:rgba(200,160,50,1);
+  .ff-desc{
+    color:rgba(100,200,255,0.4);
+    font:10px 'Courier New',monospace;
+    letter-spacing:0.1em;
+    margin:0 6px;
   }
-  #ctrl button .kb{
+  #dash-speed{
     margin-left:auto;
-    color:rgba(200,160,50,0.25);
-    font-size:9px;
-    letter-spacing:0.05em;
-  }
-  #ctrl .btn-fly{color:rgba(100,200,255,0.8);border-color:rgba(100,200,255,0.2);}
-  #ctrl .btn-fly:hover{background:rgba(100,200,255,0.08);border-color:rgba(100,200,255,0.5);color:rgba(100,200,255,1);}
-  #ctrl .btn-rec{color:rgba(255,100,100,0.8);border-color:rgba(255,80,80,0.2);}
-  #ctrl .btn-rec:hover{background:rgba(255,80,80,0.08);border-color:rgba(255,100,100,0.5);color:rgba(255,120,120,1);}
-
-  /* Loading */
-  #loading{
-    position:fixed;inset:0;background:#000;
-    display:flex;flex-direction:column;
-    align-items:center;justify-content:center;
-    gap:12px;z-index:999;transition:opacity 1.2s;
-  }
-  #loading h1{color:#c9a832;font:300 13px 'Courier New',monospace;letter-spacing:0.55em;}
-  #loading p{color:rgba(200,160,50,0.3);font:9px 'Courier New',monospace;letter-spacing:0.18em;}
-  #bar{width:180px;height:1px;background:rgba(200,160,50,0.1);}
-  #barFill{height:100%;background:rgba(200,160,50,0.5);width:0%;transition:width 0.35s;}
-
-  /* Arrival card */
-  #arrivalCard{
-    display:none;position:fixed;top:50%;left:50%;
-    transform:translate(-50%,-50%);z-index:300;
-    background:rgba(2,4,10,0.94);
-    border:1px solid rgba(200,160,50,0.35);
-    padding:36px 48px;text-align:center;
-    font-family:'Courier New',monospace;
-    max-width:420px;
-  }
-  #arrivalCard .arr-sub{color:rgba(200,160,50,0.4);font-size:9px;letter-spacing:0.45em;margin-bottom:14px;}
-  #arrivalCard .arr-name{color:#c9a832;font-size:16px;font-weight:300;letter-spacing:0.3em;margin-bottom:5px;}
-  #arrivalCard .arr-addr{color:rgba(200,160,50,0.45);font-size:9px;letter-spacing:0.2em;margin-bottom:22px;}
-  #arrivalCard .arr-stats{color:rgba(180,180,180,0.35);font-size:8px;letter-spacing:0.15em;line-height:2.4;margin-bottom:24px;}
-  #arrivalCard button{
-    background:transparent;border:1px solid rgba(200,160,50,0.35);
-    color:rgba(200,160,50,0.6);font:9px 'Courier New',monospace;
-    letter-spacing:0.22em;padding:10px 26px;cursor:pointer;
+    color:rgba(100,200,255,0.5);
+    font:10px 'Courier New',monospace;
+    letter-spacing:0.15em;
+    white-space:nowrap;
   }
 
-  /* Free fly HUD */
-  #ffHud{
-    display:none;position:fixed;inset:0;pointer-events:none;z-index:200;
-  }
-  #ffLegend{
-    position:absolute;top:16px;left:16px;
-    background:rgba(0,0,0,0.72);border:1px solid rgba(100,200,255,0.25);
-    padding:12px 16px;font:9px 'Courier New',monospace;
-    color:rgba(100,200,255,0.75);letter-spacing:0.14em;line-height:2.3;
-  }
-  #ffInfo{
-    position:absolute;bottom:45px;left:50%;transform:translateX(-50%);
-    color:rgba(100,200,255,0.45);font:9px 'Courier New',monospace;letter-spacing:0.2em;
-  }
+  /* Crosshair — free fly only */
   #crosshair{
-    position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-    width:18px;height:18px;
+    display:none;
+    position:fixed;top:50%;left:50%;
+    transform:translate(-50%,-50%);
+    width:20px;height:20px;
+    pointer-events:none;z-index:201;
   }
-  #crosshair::before,#crosshair::after{content:'';position:absolute;background:rgba(100,200,255,0.28);}
-  #crosshair::before{top:8px;left:0;width:18px;height:1px;}
-  #crosshair::after{top:0;left:8px;width:1px;height:18px;}
+  #crosshair::before,#crosshair::after{
+    content:'';position:absolute;background:rgba(100,200,255,0.35);
+  }
+  #crosshair::before{top:9px;left:0;width:20px;height:1px;}
+  #crosshair::after{top:0;left:9px;width:1px;height:20px;}
 
   /* Record status */
   #recStatus{
@@ -204,29 +232,13 @@
 </div>
 
 <div id="cesiumContainer"></div>
-<div id="locLabel"></div>
-<div id="locFact"></div>
+<div id="locPanel"><div id="locLabel"></div><div id="locFact"></div></div>
 <div id="chapter"></div>
 <div id="progress"></div>
 <div id="hud"></div>
+<div id="tileStatus"></div>
 
-<!-- Free fly overlay -->
-<div id="ffHud">
-  <div id="ffLegend">
-    <div style="color:rgba(100,200,255,1);letter-spacing:0.3em;margin-bottom:5px">FREE FLY</div>
-    W/↑ &nbsp; FORWARD<br>
-    S/↓ &nbsp; BACKWARD<br>
-    A/← &nbsp; LEFT<br>
-    D/→ &nbsp; RIGHT<br>
-    Q &nbsp;&nbsp;&nbsp;&nbsp; UP<br>
-    E &nbsp;&nbsp;&nbsp;&nbsp; DOWN<br>
-    DRAG &nbsp; LOOK<br>
-    SCROLL SPEED<br>
-    <div style="margin-top:6px;color:rgba(100,200,255,0.35)">ESC / F — exit</div>
-  </div>
-  <div id="crosshair"></div>
-  <div id="ffInfo"></div>
-</div>
+
 
 <!-- Arrival -->
 <div id="arrivalCard">
@@ -262,34 +274,50 @@
   <button class="rec-cancel" onclick="document.getElementById('recMenu').style.display='none'">CANCEL</button>
 </div>
 
-<!-- Controls -->
-<div id="ctrl">
-  <div id="ctrl-title">KAIT · MANHATTAN</div>
-  <div id="ctrl-section">
+<!-- Crosshair (free fly) -->
+<div id="crosshair"></div>
 
-    <button onclick="togglePause()" id="pauseBtn">
-      <span>⏸</span> PAUSE <span class="kb">SPACE</span>
-    </button>
-    <button onclick="resetFlight()">
-      <span>↺</span> RESTART <span class="kb">R</span>
-    </button>
-    <button onclick="toggleDayNight()" id="dnBtn">
-      <span>🌙</span> NIGHT MODE <span class="kb">N</span>
-    </button>
+<!-- Dashboard -->
+<div id="dashboard">
+  <div id="dash-label">KAIT · MANHATTAN</div>
 
-    <div id="ctrl-divider"></div>
+  <button class="dash-btn" onclick="togglePause()" id="pauseBtn">
+    ⏸ PAUSE <span class="kb">SPC</span>
+  </button>
+  <button class="dash-btn" onclick="resetFlight()">
+    ↺ RESTART <span class="kb">R</span>
+  </button>
+  <button class="dash-btn" onclick="toggleDayNight()" id="dnBtn">
+    🌙 NIGHT <span class="kb">N</span>
+  </button>
 
-    <button class="btn-fly" onclick="toggleFreefly()" id="ffBtn">
-      <span>🕹</span> FREE FLY <span class="kb">F</span>
-    </button>
+  <div class="dash-sep"></div>
 
-    <div id="ctrl-divider"></div>
+  <button class="dash-btn fly" onclick="toggleFreefly()" id="ffBtn">
+    🕹 FREE FLY <span class="kb">F</span>
+  </button>
 
-    <button class="btn-rec" onclick="document.getElementById('recMenu').style.display='flex'">
-      <span>⏺</span> RECORD VIDEO
-    </button>
-
+  <!-- Free fly controls — shown when active -->
+  <div id="dash-ff-controls">
+    <span class="ff-key">W/↑</span><span class="ff-desc">FWD</span>
+    <span class="ff-key">S/↓</span><span class="ff-desc">BACK</span>
+    <span class="ff-key">A/←</span><span class="ff-desc">LEFT</span>
+    <span class="ff-key">D/→</span><span class="ff-desc">RIGHT</span>
+    <span class="ff-key">Q</span><span class="ff-desc">UP</span>
+    <span class="ff-key">E</span><span class="ff-desc">DOWN</span>
+    <span class="ff-key">DRAG</span><span class="ff-desc">LOOK</span>
+    <span class="ff-key">SCROLL</span><span class="ff-desc">SPEED</span>
+    <span class="ff-key">Q+E</span><span class="ff-desc">SPIN</span>
+    <span class="ff-key">ESC</span><span class="ff-desc">EXIT</span>
   </div>
+
+  <div id="dash-speed"></div>
+
+  <div class="dash-sep" style="margin-left:auto"></div>
+
+  <button class="dash-btn rec" onclick="document.getElementById('recMenu').style.display='flex'">
+    ⏺ RECORD
+  </button>
 </div>
 <div id="recStatus"></div>
 
@@ -302,163 +330,105 @@
 // cam_pitch: gimbal tilt (positive = look up, negative = look down)
 // ══════════════════════════════════════════════════════════════════
 const WP = [
-  // ── COLD OPEN: STATUE OF LIBERTY REVEAL ──
-  // No labels. No context. Just water.
-  {lng:-73.988,lat:40.665,alt:28,cam_hdg:126.4,cam_pitch:-0.9,dur:18,
+  {lng:-74.025,lat:40.668,alt:22,cam_hdg:228.5,cam_pitch:-0.7,dur:4,
    ch:'NEW YORK HARBOR',
-   label:'',fact:'Open Atlantic — no landmarks visible yet'},
-  {lng:-74.018,lat:40.668,alt:22,cam_hdg:214.9,cam_pitch:-0.7,dur:14,
-   label:'',fact:'Approaching from the southeast'},
-  {lng:-74.052,lat:40.674,alt:25,cam_hdg:224.1,cam_pitch:-0.7,dur:12,
-   label:'',fact:'South of Liberty Island — statue just out of frame'},
-  {lng:-74.062,lat:40.684,alt:30,cam_hdg:270.0,cam_pitch:-1.1,dur:12,
-   label:'',fact:'West of the island — open water, New Jersey coast'},
-  {lng:-74.04214,lat:40.68742,alt:40,cam_hdg:315.0,cam_pitch:1.2,dur:16,
+   label:'',fact:'Open harbor'},
+  {lng:-74.055,lat:40.678,alt:22,cam_hdg:242.1,cam_pitch:-0.9,dur:3,
+   label:'',fact:'South of Liberty Island'},
+  {lng:-74.04198,lat:40.68729,alt:35,cam_hdg:315.1,cam_pitch:2.1,dur:5,
    ch:'STATUE OF LIBERTY',
-   label:'STATUE OF LIBERTY',fact:'Gift from France 1886 — 305ft from ground to torch, dedicated October 28 1886'},
-  {lng:-74.032,lat:40.692,alt:45,cam_hdg:253.5,cam_pitch:0.1,dur:14,
-   label:'LIBERTY ISLAND',fact:'Banking northeast — full statue visible, Manhattan skyline emerging ahead'},
-  {lng:-74.018,lat:40.699,alt:35,cam_hdg:10.2,cam_pitch:1.6,dur:12,
-   label:'NEW YORK HARBOR',fact:'Crossing the harbor — Manhattan dead ahead, the journey begins'},
-  {lng:-74.016,lat:40.701,alt:25,cam_hdg:11.6,cam_pitch:1.1,dur:12,
-   label:'BATTERY PARK',fact:'Southern tip of Manhattan — Battery Park, arriving at the island'},
-  // ── CHAPTER 2: FINANCIAL DISTRICT ──
-  {lng:-74.015,lat:40.706,alt:30,cam_hdg:10.2,cam_pitch:34.0,dur:20,
+   label:'STATUE OF LIBERTY',fact:'Gift from France 1886 — 305ft from ground to torch'},
+  {lng:-74.025,lat:40.690,alt:40,cam_hdg:266.9,cam_pitch:0.2,dur:4,
+   label:'',fact:'Banking northeast toward Manhattan'},
+  {lng:-74.017,lat:40.7,alt:30,cam_hdg:9.5,cam_pitch:3.4,dur:12,
+   label:'BATTERY PARK',fact:'Arriving at the southern tip of Manhattan'},
+  {lng:-74.0155,lat:40.704,alt:20,cam_hdg:0.0,cam_pitch:-0.6,dur:14,
    ch:'FINANCIAL DISTRICT',
-   label:'ONE WORLD TRADE CENTER',fact:'Freedom Tower — 1776ft, tallest in Western Hemisphere, rebuilt after September 11'},
-  {lng:-74.013,lat:40.7115,alt:20,cam_hdg:90.0,cam_pitch:-9.0,dur:18,
-   label:'9/11 MEMORIAL',fact:'Twin reflecting pools in the footprints — nearly 3,000 names carved in bronze'},
-  {lng:-74.018,lat:40.7075,alt:25,cam_hdg:90.0,cam_pitch:-1.0,dur:16,
-   label:'WALL STREET',fact:'Looking east down Wall St — NYSE columns visible at the end of the canyon'},
-  {lng:-74.0109,lat:40.704,alt:60,cam_hdg:0.0,cam_pitch:-7.9,dur:20,
-   label:'NEW YORK STOCK EXCHANGE',fact:'Looking north down Broad St — NYSE colonnade at the end, Federal Hall across the street'},
-  {lng:-74.013,lat:40.708,alt:20,cam_hdg:187.5,cam_pitch:-4.4,dur:14,
-   label:'CHARGING BULL',fact:"Di Modica's Charging Bull 1989 — looking down at the sculpture from above"},
-  // ── CHAPTER 3: CIVIC CENTER ──
-  {lng:-74.003,lat:40.706,alt:15,cam_hdg:93.6,cam_pitch:2.7,dur:16,
-   ch:'CIVIC CENTER',
-   label:'BROOKLYN BRIDGE',fact:'Looking east through the span — 276ft Gothic towers, cables fanning overhead'},
-  {lng:-73.997,lat:40.703,alt:30,cam_hdg:4.8,cam_pitch:10.2,dur:14,
-   label:'BROOKLYN BRIDGE TOWER',fact:'Looking up at the 276ft tower from below — Gothic arches, suspension cables'},
-  {lng:-74.005,lat:40.711,alt:18,cam_hdg:32.2,cam_pitch:-0.7,dur:14,
-   label:'CITY HALL',fact:'City Hall 1812 — looking north at the facade from the park'},
-  // ── CHAPTER 4: CHINATOWN ──
-  {lng:-73.998,lat:40.7183,alt:22,cam_hdg:0.0,cam_pitch:-3.1,dur:18,
+   label:'WEST ST · WATERFRONT',fact:'Heading north on West St — Hudson River on the left, Financial District on the right'},
+  {lng:-74.0155,lat:40.713,alt:22,cam_hdg:106.4,cam_pitch:-3.2,dur:18,
+   label:'9/11 MEMORIAL · ONE WTC',fact:'Camera looks right at One WTC rising — 9/11 Memorial pools visible in the plaza'},
+  {lng:-74.0155,lat:40.723,alt:18,cam_hdg:0.0,cam_pitch:-0.8,dur:14,
+   label:'HUDSON RIVER PIERS',fact:'Looking north up West St — piers on the left, TriBeCa on the right'},
+  {lng:-74.0002,lat:40.7183,alt:18,cam_hdg:90.0,cam_pitch:-1.2,dur:18,
    ch:'CHINATOWN',
-   label:'CHINATOWN · CANAL ST',fact:'Looking north up Canal St — most densely populated neighborhood in the US'},
-  {lng:-73.9968,lat:40.7195,alt:15,cam_hdg:0.0,cam_pitch:-3.1,dur:14,
-   label:'LITTLE ITALY · MULBERRY ST',fact:'Looking north up Mulberry St — heart of old Little Italy, San Gennaro festival'},
-  // ── CHAPTER 5: SOHO ──
-  {lng:-73.998,lat:40.722,alt:18,cam_hdg:0.0,cam_pitch:-1.5,dur:18,
+   label:'CANAL ST · CHINATOWN',fact:'Looking east down Canal St — Chinatown on both sides, most densely populated neighborhood in the US'},
+  {lng:-74.0002,lat:40.724,alt:18,cam_hdg:11.7,cam_pitch:-1.1,dur:16,
    ch:'SOHO',
-   label:'SOHO · BROADWAY',fact:'Looking north up Broadway — cast iron facades lining both sides, 1860s architecture'},
-  {lng:-74.007,lat:40.719,alt:80,cam_hdg:0.0,cam_pitch:-90.0,dur:14,
-   label:'TRIBECA',fact:'Looking straight down at cobblestone streets — Triangle Below Canal'},
-  // ── CHAPTER 6: GREENWICH VILLAGE ──
-  {lng:-73.9981,lat:40.728,alt:20,cam_hdg:0.0,cam_pitch:-1.8,dur:18,
+   label:'BROADWAY · SOHO',fact:"Looking north up Broadway through SoHo — world's largest collection of cast iron architecture"},
+  {lng:-73.9987,lat:40.732,alt:15,cam_hdg:3.0,cam_pitch:-0.8,dur:14,
    ch:'GREENWICH VILLAGE',
-   label:'WASHINGTON SQUARE PARK',fact:'Looking north toward the marble arch — NYU buildings frame the view beyond'},
-  {lng:-74.0015,lat:40.7315,alt:12,cam_hdg:270.0,cam_pitch:-1.0,dur:14,
-   label:'WEST VILLAGE · BLEECKER ST',fact:'Looking west down Bleecker St — pre-grid streets, brownstones, Stonewall Inn nearby'},
-  // ── CHAPTER 7: HIGH LINE ──
-  {lng:-74.0048,lat:40.738,alt:18,cam_hdg:3.5,cam_pitch:-0.3,dur:18,
-   ch:'THE HIGH LINE',
-   label:'HIGH LINE · MEATPACKING',fact:'Looking north along the elevated rail path — city streets 30ft below on both sides'},
-  {lng:-74.0013,lat:40.748,alt:15,cam_hdg:1.6,cam_pitch:-1.0,dur:14,
-   label:'CHELSEA',fact:'Looking north up 10th Ave — Hudson Yards supertalls visible ahead on the horizon'},
-  // ── CHAPTER 8: HUDSON YARDS ──
-  {lng:-74.004,lat:40.752,alt:15,cam_hdg:43.3,cam_pitch:7.0,dur:18,
-   ch:'HUDSON YARDS',
-   label:'THE VESSEL · HUDSON YARDS',fact:'Looking up at The Vessel from below — 154 flights of copper lattice stairs'},
-  // ── CHAPTER 9: HELL'S KITCHEN ──
-  {lng:-74.003,lat:40.764,alt:22,cam_hdg:75.2,cam_pitch:-1.8,dur:14,
-   ch:"HELL'S KITCHEN",
-   label:'USS INTREPID · PIER 86',fact:'Looking along the flight deck — Space Shuttle Enterprise visible, WWII aircraft carrier'},
-  {lng:-73.9945,lat:40.764,alt:15,cam_hdg:180.0,cam_pitch:-0.9,dur:14,
-   label:"HELL'S KITCHEN · 9TH AVE",fact:'Looking south down 9th Ave — deep street canyon, theater district ahead'},
-  // ── CHAPTER 10: 42ND STREET ──
-  {lng:-73.996,lat:40.7572,alt:15,cam_hdg:106.5,cam_pitch:-0.5,dur:20,
-   ch:'42ND STREET',
-   label:'42ND ST — ENTERING THE CANYON',fact:'Looking east down 42nd St — the full canyon length, Grand Central visible at the far end'},
-  {lng:-73.9855,lat:40.754,alt:15,cam_hdg:0.0,cam_pitch:-1.0,dur:20,
-   label:'42ND ST · TIMES SQUARE CROSSING',fact:'Looking north up 7th Ave — the Times Square canyon of light opening ahead'},
-  {lng:-73.987,lat:40.754,alt:25,cam_hdg:91.9,cam_pitch:-4.3,dur:16,
-   label:'BRYANT PARK',fact:'Looking east — NY Public Library lions visible, Bryant Park below, Chrysler ahead'},
-  {lng:-73.985,lat:40.753,alt:20,cam_hdg:92.9,cam_pitch:-0.4,dur:16,
-   label:'GRAND CENTRAL TERMINAL',fact:'Looking east at the Beaux-Arts facade — 44 platforms below, Chrysler spire above'},
-  // ── CHAPTER 11: ART DECO MIDTOWN ──
-  {lng:-73.97,lat:40.756,alt:15,cam_hdg:225.9,cam_pitch:15.6,dur:18,
-   ch:'ART DECO MIDTOWN',
-   label:'CHRYSLER BUILDING',fact:'Looking up at the eagle gargoyles — 61st floor, stainless steel Art Deco crown above'},
-  {lng:-73.97,lat:40.753,alt:150,cam_hdg:258.5,cam_pitch:12.6,dur:14,
-   label:'CHRYSLER BUILDING · CROWN',fact:'Rising alongside — looking at the sunburst stainless steel crown, 1046ft'},
-  {lng:-73.9765,lat:40.751,alt:15,cam_hdg:0.0,cam_pitch:-0.6,dur:14,
-   label:'PARK AVENUE',fact:'Looking north up Park Avenue — dead straight canyon, MetLife Building straddles it ahead'},
-  // ── CHAPTER 12: TIMES SQUARE ──
-  {lng:-73.9855,lat:40.752,alt:18,cam_hdg:0.0,cam_pitch:-0.9,dur:22,
+   label:'BROADWAY · GREENWICH VILLAGE',fact:'Looking north — Washington Square Park arch visible ahead on the right'},
+  {lng:-73.9897,lat:40.7395,alt:20,cam_hdg:0.0,cam_pitch:-6.4,dur:16,
+   label:'FLATIRON BUILDING',fact:'Looking north at the Flatiron — 1902 triangular icon where Broadway crosses 5th Ave at 23rd St'},
+  {lng:-73.988,lat:40.746,alt:18,cam_hdg:0.0,cam_pitch:-1.2,dur:14,
+   label:'HERALD SQUARE',fact:"Looking north up Broadway — Macy's on the right, Empire State Building visible ahead"},
+  {lng:-73.9855,lat:40.752,alt:18,cam_hdg:0.0,cam_pitch:-0.9,dur:20,
    ch:'TIMES SQUARE',
-   label:'TIMES SQUARE — ENTERING',fact:'Looking north up Broadway — signs rising on both sides, canyon of light ahead'},
+   label:'TIMES SQUARE · APPROACHING',fact:'Looking north up Broadway — Times Square canyon of light opening ahead'},
   {lng:-73.9856,lat:40.757,alt:15,cam_hdg:0.0,cam_pitch:43.3,dur:18,
-   label:'TIMES SQUARE · ONE TIMES SQUARE',fact:"Looking up at One Times Square — where the ball drops every New Year's Eve since 1907"},
-  {lng:-73.982,lat:40.759,alt:15,cam_hdg:270.0,cam_pitch:-0.2,dur:14,
-   label:'BROADWAY THEATER DISTRICT',fact:'Looking west down 45th St — marquees on both sides, 41 Broadway theaters within walking distance'},
-  // ── CHAPTER 13: ROCKEFELLER CENTER ──
-  {lng:-73.9787,lat:40.76,alt:60,cam_hdg:180.0,cam_pitch:-19.1,dur:18,
-   ch:'ROCKEFELLER CENTER',
-   label:'ROCKEFELLER CENTER · 30 ROCK',fact:'Looking down at the plaza from above — ice rink below, 30 Rock tower rising'},
-  {lng:-73.971,lat:40.759,alt:25,cam_hdg:267.1,cam_pitch:9.7,dur:14,
-   label:"ST PATRICK'S CATHEDRAL",fact:'Looking west at the 330ft spires — Neo-Gothic 1879, faces Rockefeller Center'},
-  // ── CHAPTER 14: FIFTH AVENUE ──
-  {lng:-73.978,lat:40.758,alt:15,cam_hdg:1.3,cam_pitch:-0.5,dur:16,
-   ch:'FIFTH AVENUE',
-   label:'5TH AVENUE — LOOKING NORTH',fact:'Looking north up 5th Ave — Central Park visible in the far distance, most expensive retail street'},
-  // ── CHAPTER 15: MUSEUM MILE ──
-  {lng:-73.969,lat:40.779,alt:20,cam_hdg:90.0,cam_pitch:-0.6,dur:16,
-   ch:'MUSEUM MILE',
-   label:'THE METROPOLITAN MUSEUM',fact:'Looking at the Met facade from across 5th Ave — largest art museum in Western Hemisphere'},
-  // ── CHAPTER 16: CENTRAL PARK ──
-  {lng:-73.974,lat:40.772,alt:8,cam_hdg:43.8,cam_pitch:-0.5,dur:18,
-   ch:'CENTRAL PARK',
-   label:'CENTRAL PARK · THE LAKE',fact:'Skimming the lake surface — Bethesda Terrace ahead, NYC skyline framed behind the trees'},
-  {lng:-73.974,lat:40.7742,alt:6,cam_hdg:90.0,cam_pitch:-0.7,dur:14,
-   label:'BETHESDA FOUNTAIN',fact:'Looking at the Angel of the Waters fountain — most iconic spot in Central Park'},
-  {lng:-73.977,lat:40.776,alt:8,cam_hdg:84.6,cam_pitch:-0.7,dur:14,
-   label:'BOW BRIDGE',fact:'Looking through the cast iron arch — 1862, most photographed bridge in Central Park'},
-  {lng:-73.972,lat:40.776,alt:15,cam_hdg:274.3,cam_pitch:-2.9,dur:14,
-   label:'STRAWBERRY FIELDS',fact:'Looking west — Strawberry Fields memorial, Dakota Building where John Lennon lived on the left'},
-  // ── CHAPTER 17: UPPER WEST SIDE ──
-  {lng:-73.982,lat:40.77,alt:25,cam_hdg:180.0,cam_pitch:-1.3,dur:14,
-   ch:'UPPER WEST SIDE',
-   label:'COLUMBUS CIRCLE',fact:'Looking south — Central Park South, Billionaires Row supertalls visible ahead'},
-  {lng:-73.984,lat:40.773,alt:20,cam_hdg:230.4,cam_pitch:-12.9,dur:14,
-   label:'LINCOLN CENTER',fact:'Looking down at the Lincoln Center plaza — Metropolitan Opera House at center'},
-  // ── CHAPTER 18: BILLIONAIRES ROW ──
-  {lng:-73.981,lat:40.762,alt:20,cam_hdg:358.1,cam_pitch:38.9,dur:20,
+   label:'ONE TIMES SQUARE',fact:'Looking up at One Times Square — NYE ball drop since 1907, billboard canyon above'},
+  {lng:-73.9862,lat:40.76,alt:15,cam_hdg:0.0,cam_pitch:-1.0,dur:16,
+   label:'BROADWAY THEATER DISTRICT',fact:'Looking north up 7th Ave — 41 Broadway theaters on the side streets, marquees visible'},
+  {lng:-73.981,lat:40.7642,alt:18,cam_hdg:90.0,cam_pitch:-2.3,dur:16,
    ch:"BILLIONAIRES' ROW",
-   label:"BILLIONAIRES' ROW · 57TH ST",fact:"Looking up 432 Park Ave — 1396ft, world's most slender skyscraper, 24:1 height-to-width ratio"},
-  // ── CHAPTER 19: THE CROSSING ──
-  {lng:-74.007,lat:40.758,alt:300,cam_hdg:90.0,cam_pitch:-3.6,dur:18,
+   label:"57TH ST · BILLIONAIRES' ROW",fact:'Looking east down 57th St — 432 Park Ave (1396ft) and Central Park Tower (1550ft) ahead'},
+  {lng:-73.9757,lat:40.766,alt:18,cam_hdg:0.0,cam_pitch:-0.8,dur:16,
+   label:'5TH AVENUE',fact:'Looking north up 5th Ave — Central Park ahead, most expensive retail street in the world'},
+  {lng:-73.9737,lat:40.778,alt:20,cam_hdg:82.6,cam_pitch:-0.3,dur:16,
+   ch:'MUSEUM MILE',
+   label:'THE METROPOLITAN MUSEUM',fact:'Looking east at the Met facade — largest art museum in the Western Hemisphere'},
+  {lng:-73.9715,lat:40.7735,alt:8,cam_hdg:17.9,cam_pitch:-3.5,dur:16,
+   ch:'CENTRAL PARK',
+   label:'CENTRAL PARK · THE LAKE',fact:'Skimming the lake surface — Bethesda Terrace ahead, NYC skyline framed in the treeline'},
+  {lng:-73.9742,lat:40.7762,alt:8,cam_hdg:0.0,cam_pitch:-71.6,dur:14,
+   label:'BOW BRIDGE',fact:'1862 cast iron — most photographed bridge in Central Park, 87 feet across The Lake'},
+  {lng:-73.9755,lat:40.7762,alt:12,cam_hdg:180.0,cam_pitch:-4.0,dur:12,
+   label:'STRAWBERRY FIELDS',fact:'John Lennon memorial — looking south, the Dakota Building where he lived is behind us'},
+  {lng:-73.9822,lat:40.7682,alt:25,cam_hdg:180.0,cam_pitch:-1.6,dur:14,
+   ch:'UPPER WEST SIDE',
+   label:'COLUMBUS CIRCLE',fact:'Looking south down Broadway — Central Park South, the full Midtown skyline ahead'},
+  {lng:-74.0011,lat:40.7648,alt:20,cam_hdg:180.0,cam_pitch:-1.0,dur:14,
+   label:'WEST SIDE HIGHWAY',fact:'Heading south on West Side Highway — Hudson River on the right'},
+  {lng:-74.0011,lat:40.754,alt:18,cam_hdg:239.5,cam_pitch:17.1,dur:16,
+   ch:'HUDSON YARDS',
+   label:'HUDSON YARDS · THE VESSEL',fact:'Looking at The Vessel — 154 interconnected flights of copper lattice stairs'},
+  {lng:-74.0011,lat:40.764,alt:20,cam_hdg:42.2,cam_pitch:-3.8,dur:14,
+   label:'USS INTREPID · PIER 86',fact:'Looking east at the flight deck — Space Shuttle Enterprise, WWII aircraft carrier'},
+  {lng:-74.0011,lat:40.7572,alt:18,cam_hdg:90.0,cam_pitch:-0.5,dur:20,
+   ch:'42ND STREET',
+   label:'42ND ST — THE GREAT CANYON',fact:'Looking east down 42nd St — the full canyon length, Grand Central visible at the far end'},
+  {lng:-73.9907,lat:40.7572,alt:15,cam_hdg:90.0,cam_pitch:-0.7,dur:16,
+   label:'42ND ST · PORT AUTHORITY',fact:'Looking east past Port Authority — Times Square lights ahead, canyon narrows'},
+  {lng:-73.98,lat:40.7572,alt:15,cam_hdg:141.2,cam_pitch:-1.3,dur:14,
+   label:'BRYANT PARK',fact:'Bryant Park on the right — NY Public Library lions, Chrysler Building visible ahead'},
+  {lng:-73.9772,lat:40.7572,alt:18,cam_hdg:163.2,cam_pitch:16.0,dur:16,
+   label:'GRAND CENTRAL · CHRYSLER',fact:'Looking at the Chrysler eagle gargoyles — Grand Central Terminal below, Art Deco crown above'},
+  {lng:-73.9774,lat:40.755,alt:20,cam_hdg:180.0,cam_pitch:-0.7,dur:16,
+   label:'PARK AVENUE',fact:'Looking south down Park Avenue — dead straight canyon, MetLife Building straddles the avenue'},
+  {lng:-73.9757,lat:40.7489,alt:18,cam_hdg:266.2,cam_pitch:19.7,dur:18,
+   label:'EMPIRE STATE BUILDING',fact:'Looking west at the Empire State Building crown — 1454ft Art Deco icon, King Kong climbed this'},
+  {lng:-73.9897,lat:40.742,alt:18,cam_hdg:180.0,cam_pitch:-0.8,dur:14,
+   label:'BROADWAY SOUTH',fact:'Looking south down Broadway — heading back toward the tip of the island'},
+  {lng:-74.0155,lat:40.73,alt:20,cam_hdg:180.0,cam_pitch:-0.5,dur:14,
    ch:'CROSSING THE HUDSON',
-   label:'FAREWELL MANHATTAN',fact:'Looking east at the full island — every neighborhood we flew through visible'},
-  {lng:-74.013,lat:40.76,alt:10,cam_hdg:282.5,cam_pitch:-0.6,dur:14,
-   label:'HUDSON RIVER',fact:'Crossing at water level — Manhattan behind, New Jersey ahead'},
+   label:'DEPARTING MANHATTAN',fact:'Heading south on West St — Hudson River on the right, leaving Manhattan'},
+  {lng:-74.013,lat:40.71,alt:12,cam_hdg:317.8,cam_pitch:-0.5,dur:14,
+   label:'HUDSON RIVER',fact:'Crossing at low altitude — Manhattan behind, New Jersey ahead'},
   {lng:-74.022,lat:40.768,alt:55,cam_hdg:126.7,cam_pitch:-0.1,dur:16,
-   label:'WEEHAWKEN · NJ',fact:'Looking back east at the Manhattan skyline from New Jersey — the full island visible'},
-  // ── CHAPTER 20: HOME ──
-  {lng:-74.025,lat:40.785,alt:65,cam_hdg:0.0,cam_pitch:-2.2,dur:14,
+   label:'WEEHAWKEN · NJ',fact:'Looking back east at the full Manhattan skyline — every neighborhood we flew through visible'},
+  {lng:-74.025,lat:40.8,alt:65,cam_hdg:0.0,cam_pitch:-1.7,dur:14,
    ch:'NEW JERSEY',
-   label:'NEW JERSEY TURNPIKE',fact:'Looking north — Little Ferry 3 miles ahead, almost home'},
+   label:'NEW JERSEY',fact:'Heading north — Little Ferry 3 miles ahead'},
   {lng:-74.032,lat:40.84,alt:22,cam_hdg:355.7,cam_pitch:-1.1,dur:14,
-   label:'US ROUTE 46',fact:'Looking north up Route 46 — destination on the right, 0.4 miles'},
+   label:'US ROUTE 46',fact:'US Route 46 — destination on the right'},
   {lng:-74.033,lat:40.847,alt:12,cam_hdg:303.5,cam_pitch:-9.9,dur:14,
-   label:'415 US-46',fact:'Looking at the destination — 14 miles from Battery Park, journey almost complete'},
-  {lng:-74.033,lat:40.85,alt:60,cam_hdg:186.2,cam_pitch:-10.0,dur:18,
+   label:'415 US-46',fact:'Arriving at destination — 14 miles from Battery Park'},
+  {lng:-74.033,lat:40.852,alt:60,cam_hdg:183.6,cam_pitch:-5.9,dur:18,
    ch:'HOME',
-   label:'BEYOND HELLO · LITTLE FERRY NJ',fact:'Home — looking down at Beyond Hello, Battery Park to Little Ferry'},
+   label:'BEYOND HELLO · LITTLE FERRY NJ',fact:'Home — Battery Park to Little Ferry, the full journey'},
   {lng:-74.033,lat:40.845,alt:220,cam_hdg:162.8,cam_pitch:-0.8,dur:20,
    label:'THE JOURNEY COMPLETE',fact:'Manhattan on the horizon — 14 miles, 20 neighborhoods, one continuous flight home'},
 ];
-
 
 const TOTAL = WP.reduce((s,w)=>s+w.dur,0);
 let viewer, flying=false, paused=false, rafId=null;
@@ -487,15 +457,14 @@ function showLabel(label, fact, ch){
 
   if(label && label!==lastLabel){
     lastLabel=label;
-    lEl.style.color='rgba(200,160,50,0.8)';
-    fEl.style.color='rgba(200,160,50,0.38)';
+    const panel=document.getElementById('locPanel');
     lEl.textContent=label;
     fEl.textContent=fact||'';
+    if(panel) panel.classList.add('visible');
     if(labelTimer)clearTimeout(labelTimer);
     labelTimer=setTimeout(()=>{
-      lEl.style.color='rgba(200,160,50,0)';
-      fEl.style.color='rgba(200,160,50,0)';
-    }, 4500);
+      if(panel) panel.classList.remove('visible');
+    }, 5500);
   }
 
   if(ch && ch!==lastCh){
@@ -527,6 +496,14 @@ async function init(){
     infoBox:false,selectionIndicator:false,
     shadows:false,requestRenderMode:false,targetFrameRate:60,
   });
+
+  // Disable Cesium's default keyboard handler so our hotkeys work
+  viewer.scene.screenSpaceCameraController.enableInputs = true;
+  if(viewer.cesiumWidget && viewer.cesiumWidget._keyboardEventHandler){
+    viewer.cesiumWidget._keyboardEventHandler.destroy();
+  }
+  // Also remove Cesium's canvas focus stealing
+  viewer.canvas.setAttribute('tabindex', '-1');
 
   applyTimeOfDay();
   viewer.scene.fog.enabled=true;
@@ -560,11 +537,12 @@ async function init(){
   setLoad('LOADING PHOTOREALISTIC TILES',50);
   try{
     if(googleKey){
-      const ts=await Cesium.Cesium3DTileset.fromUrl(
+      window._googleTileset = await Cesium.Cesium3DTileset.fromUrl(
         `https://tile.googleapis.com/v1/3dtiles/root.json?key=${googleKey}`,
-        {showCreditsOnScreen:false,maximumScreenSpaceError:1.0,preloadWhenHidden:true}
+        {showCreditsOnScreen:false,maximumScreenSpaceError:1.5,preloadWhenHidden:true,
+         skipLevelOfDetail:false,preferLeaves:true}
       );
-      viewer.scene.primitives.add(ts);
+      viewer.scene.primitives.add(window._googleTileset);
       viewer.scene.globe.show=false;
     }else{
       const osm=await Cesium.createOsmBuildingsAsync();
@@ -576,31 +554,60 @@ async function init(){
     try{viewer.scene.primitives.add(await Cesium.createOsmBuildingsAsync());}catch(e2){}
   }
 
-  // Park at start and WAIT for tiles to actually load
-  // Don't launch until scene is genuinely ready
+  // Park camera at start position
   setCameraWP(WP[0], 0);
-  setLoad('LOADING TILES — PLEASE WAIT', 82);
 
+  // Widen FOV temporarily to blast-load tiles around start position
+  if(viewer.camera.frustum.fov !== undefined){
+    viewer.camera.frustum.fov = Cesium.Math.toRadians(120);
+  }
+
+  setLoad('WARMING TILE CACHE', 82);
+
+  // Wait for the ACTUAL Google tileset to load, not the globe
   await new Promise(resolve => {
+    const deadline = performance.now() + 30000;
     let stable = 0;
-    const NEED = 20; // must be stable for 20 consecutive frames
-    const deadline = performance.now() + 40000; // max 40s wait
+    const NEED = 8;
+
     function check() {
       viewer.scene.render();
-      const ready = viewer.scene.globe.tilesLoaded &&
-                    viewer.scene.globe.loadingDescendantsCount === 0;
-      if (ready) {
+
+      const ts = window._googleTileset;
+      if(!ts){ requestAnimationFrame(check); return; }
+
+      // Check the 3D tileset's own loading state
+      const tilesLoading = ts.statistics ? ts.statistics.numberOfTilesWithContentReady : 0;
+      const pending = ts._requestedTiles ? ts._requestedTiles.length : 0;
+
+      // Primary check: tileset says it's ready AND has loaded some tiles
+      const hasContent = tilesLoading > 5;
+      const notPending = pending === 0;
+
+      if(hasContent && notPending){
         stable++;
-        const pct = 82 + Math.floor((stable / NEED) * 16);
-        setLoad('LOADING TILES — PLEASE WAIT', Math.min(pct, 98));
-        if (stable >= NEED) { setTimeout(resolve, 1000); return; } // 1s extra for shader compile
+        setLoad(`TILES LOADED — ${tilesLoading} ready`, 82 + Math.min(stable * 2, 16));
+        if(stable >= NEED){
+          // Restore normal FOV
+          if(viewer.camera.frustum.fov !== undefined){
+            viewer.camera.frustum.fov = Cesium.Math.toRadians(60);
+          }
+          setTimeout(resolve, 500);
+          return;
+        }
       } else {
         stable = 0;
-        // Show progress based on how many tiles are still loading
-        const loading = viewer.scene.globe.loadingDescendantsCount || 0;
-        setLoad(`LOADING TILES — ${loading} remaining`, 85);
+        setLoad(`LOADING — ${tilesLoading} tiles ready`, 85);
       }
-      if (performance.now() > deadline) { resolve(); return; }
+
+      if(performance.now() > deadline){
+        setLoad('LAUNCHING', 99);
+        if(viewer.camera.frustum.fov !== undefined){
+          viewer.camera.frustum.fov = Cesium.Math.toRadians(60);
+        }
+        resolve();
+        return;
+      }
       requestAnimationFrame(check);
     }
     requestAnimationFrame(check);
@@ -612,7 +619,7 @@ async function init(){
   const ld=document.getElementById('loading');
   ld.style.opacity='0';
   setTimeout(()=>{ld.style.display='none';},1200);
-  document.getElementById('ctrl').style.display='flex';
+  document.getElementById('dashboard').style.display='flex';
   beginFlight();
 }
 
@@ -678,8 +685,8 @@ const GHOST_LEAD = 20; // seconds ahead
 
 async function initGhost(cesiumToken, googleKey) {
   const ghostCanvas = document.createElement('canvas');
-  ghostCanvas.width = 320; ghostCanvas.height = 180; // tiny — just enough to trigger tile loads
-  ghostCanvas.style.display = 'none';
+  ghostCanvas.width = 1; ghostCanvas.height = 1;
+  ghostCanvas.style.cssText = 'position:fixed;top:-10px;left:-10px;width:1px;height:1px;opacity:0;pointer-events:none;';
   document.body.appendChild(ghostCanvas);
 
   Cesium.Ion.defaultAccessToken = cesiumToken;
@@ -847,6 +854,14 @@ function interpAndSet(elapsed){
   const mins=Math.floor(elapsed/60), secs=Math.floor(elapsed%60);
   document.getElementById('hud').textContent=
     `${mins}:${String(secs).padStart(2,'0')} · ${Math.floor(CAM.alt)}m · ${Math.floor(loopT/TOTAL*100)}%`;
+  // Live tile debug
+  const ts=window._googleTileset;
+  if(ts&&ts.statistics){
+    const ready=ts.statistics.numberOfTilesWithContentReady;
+    const pending=ts._requestedTiles?ts._requestedTiles.length:0;
+    document.getElementById('tileStatus').textContent=
+      `TILES: ${ready} ready · ${pending} pending`;
+  }
   return {loopT,si,a};
 }
 
@@ -904,10 +919,21 @@ function toggleFreefly(){ffActive?exitFF():enterFF();}
 function enterFF(){
   ffActive=true;
   if(!paused)togglePause();
-  document.getElementById('ffHud').style.display='block';
-  document.getElementById('ffBtn').textContent='🔴 EXIT FREE FLY';
-  document.getElementById('ffBtn').style.color='rgba(255,100,100,0.85)';
+  document.getElementById('dash-ff-controls').style.display='flex';
+  document.getElementById('crosshair').style.display='block';
+  document.getElementById('ffBtn').textContent='🔴 EXIT';
+  document.getElementById('ffBtn').style.color='rgba(255,100,100,0.9)';
   document.getElementById('pauseBtn').disabled=true;
+
+  // Disable Cesium's camera controller so it doesn't fight us
+  viewer.scene.screenSpaceCameraController.enableInputs=false;
+
+  // Force focus to body so keyboard events fire reliably
+  viewer.canvas.blur();
+  document.body.focus();
+  document.body.setAttribute('tabindex','0');
+  document.body.focus();
+
   viewer.canvas.addEventListener('mousedown',ffMD);
   viewer.canvas.addEventListener('mouseup',ffMU);
   viewer.canvas.addEventListener('mousemove',ffMV);
@@ -919,13 +945,18 @@ function enterFF(){
 function exitFF(){
   ffActive=false;ffKeys={};
   if(ffRafId)cancelAnimationFrame(ffRafId);
+
+  // Re-enable Cesium's camera controller
+  viewer.scene.screenSpaceCameraController.enableInputs=true;
+
   viewer.canvas.removeEventListener('mousedown',ffMD);
   viewer.canvas.removeEventListener('mouseup',ffMU);
   viewer.canvas.removeEventListener('mousemove',ffMV);
   viewer.canvas.removeEventListener('wheel',ffWH);
-  document.getElementById('ffHud').style.display='none';
+  document.getElementById('dash-ff-controls').style.display='none';
+  document.getElementById('crosshair').style.display='none';
   document.getElementById('ffBtn').textContent='🕹 FREE FLY';
-  document.getElementById('ffBtn').style.color='rgba(100,200,255,0.6)';
+  document.getElementById('ffBtn').style.color='';
   document.getElementById('pauseBtn').disabled=false;
 }
 
@@ -954,11 +985,14 @@ function ffRun(){
   if(ffKeys['d']||ffKeys['arrowright']) viewer.camera.moveRight(s*0.8);
   if(ffKeys['q']) viewer.camera.moveUp(s);
   if(ffKeys['e']) viewer.camera.moveDown(s);
+  // Spin / roll — Z and X keys
+  if(ffKeys['z']) viewer.camera.twistLeft(0.02);
+  if(ffKeys['x']) viewer.camera.twistRight(0.02);
   const moving=Object.values(ffKeys).some(Boolean)||ffMouseDown;
   if(moving){
     const h=Math.round(viewer.camera.positionCartographic.height);
     document.getElementById('ffInfo').textContent=
-      `${Math.round(ffSpeed)}m/s · ${h}m alt`;
+      `${Math.round(ffSpeed)} m/s · ${h}m`;
   }
   ffRafId=requestAnimationFrame(ffRun);
 }
@@ -970,10 +1004,19 @@ function waitTilesLoaded(ms=15000){
     let stable=0;
     function check(){
       viewer.scene.render();
-      const ok=viewer.scene.globe.tilesLoaded&&
-               viewer.scene.globe.loadingDescendantsCount===0;
-      if(ok){stable++;if(stable>=6){viewer.scene.render();viewer.scene.render();resolve();return;}}
-      else stable=0;
+      const ts=window._googleTileset;
+      const tilesReady = ts && ts.statistics ? ts.statistics.numberOfTilesWithContentReady : 0;
+      const pending = ts && ts._requestedTiles ? ts._requestedTiles.length : 0;
+      const ok = tilesReady > 5 && pending === 0;
+      if(ok){
+        stable++;
+        if(stable>=6){
+          viewer.scene.render();
+          viewer.scene.render();
+          resolve();
+          return;
+        }
+      } else { stable=0; }
       if(performance.now()-t0>ms){viewer.scene.render();resolve();return;}
       requestAnimationFrame(check);
     }
@@ -1070,18 +1113,34 @@ async function stopRec(){
 }
 
 // ── KEYBOARD ──
-window.addEventListener('keydown',e=>{
-  if(ffActive){
-    ffKeys[e.key.toLowerCase()]=true;
-    if(e.key==='Escape'){exitFF();return;}
+// Use capture:true so we intercept before Cesium does
+// Also attach to document not window for broader coverage
+// Triple-layer keyboard capture to defeat Cesium's event eating
+function handleKey(e, isDown){
+  const k = e.key.toLowerCase();
+  if(isDown && ffActive){
+    ffKeys[k]=true;
+    if(e.key==='Escape'){exitFF();}
+    e.stopImmediatePropagation();
+    e.preventDefault();
     return;
   }
+  if(!isDown && ffActive){
+    ffKeys[k]=false;
+    return;
+  }
+  if(!isDown) return;
+  // Normal hotkeys
   if(e.key===' '){e.preventDefault();togglePause();}
-  if(e.key==='r'||e.key==='R')resetFlight();
-  if(e.key==='n'||e.key==='N')toggleDayNight();
-  if(e.key==='f'||e.key==='F')toggleFreefly();
-});
-window.addEventListener('keyup',e=>{if(ffActive)ffKeys[e.key.toLowerCase()]=false;});
+  else if(k==='r'){e.preventDefault();resetFlight();}
+  else if(k==='n'){e.preventDefault();toggleDayNight();}
+  else if(k==='f'){e.preventDefault();toggleFreefly();}
+}
+
+document.addEventListener('keydown', e=>handleKey(e,true),  {capture:true});
+document.addEventListener('keyup',   e=>handleKey(e,false), {capture:true});
+window.addEventListener('keydown',   e=>handleKey(e,true),  {capture:true});
+window.addEventListener('keyup',     e=>handleKey(e,false), {capture:true});
 window.addEventListener('resize',()=>{if(viewer&&!recording)viewer.resize();});
 window.addEventListener('load',()=>{
   const wait=setInterval(()=>{
