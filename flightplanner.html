@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>KAIT Flight Planner</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#0a0a12; color:#c9a832; font-family:'Courier New',monospace; display:flex; height:100vh; overflow:hidden; }
+#map { flex:1; filter:invert(1) hue-rotate(180deg) brightness(0.82) contrast(1.1) saturate(0.6); }
+
+#panel {
+  width:300px; background:rgba(2,2,10,0.98);
+  border-left:1px solid rgba(200,160,50,0.2);
+  display:flex; flex-direction:column; filter:none; z-index:1000;
+}
+#panel-header { padding:14px 14px 10px; border-bottom:1px solid rgba(200,160,50,0.12); }
+#panel-header h1 { font-size:11px; letter-spacing:0.45em; color:#c9a832; }
+#panel-header p  { font-size:9px; color:rgba(200,160,50,0.3); margin-top:4px; letter-spacing:0.1em; }
+
+#mode-bar { display:flex; border-bottom:1px solid rgba(200,160,50,0.1); }
+.mode-btn { flex:1; padding:8px 4px; font-size:9px; letter-spacing:0.1em; text-align:center; cursor:pointer; color:rgba(200,160,50,0.35); background:none; border:none; border-bottom:2px solid transparent; transition:all 0.15s; }
+.mode-btn.on { color:#c9a832; border-bottom-color:#c9a832; background:rgba(200,160,50,0.06); }
+
+#instructions { padding:8px 14px; font-size:9px; color:rgba(200,160,50,0.4); letter-spacing:0.08em; border-bottom:1px solid rgba(200,160,50,0.08); line-height:1.8; }
+
+#wp-list { flex:1; overflow-y:auto; }
+#wp-list::-webkit-scrollbar { width:3px; }
+#wp-list::-webkit-scrollbar-thumb { background:rgba(200,160,50,0.2); }
+
+.wp-row {
+  display:flex; align-items:center; gap:8px;
+  padding:7px 10px; border-bottom:1px solid rgba(200,160,50,0.06);
+  cursor:pointer; transition:background 0.12s;
+}
+.wp-row:hover { background:rgba(200,160,50,0.05); }
+.wp-row.sel { background:rgba(200,160,50,0.1); border-left:2px solid #c9a832; }
+.wp-num { font-size:9px; color:rgba(200,160,50,0.3); width:18px; }
+.wp-name { flex:1; font-size:10px; color:rgba(200,160,50,0.85); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.wp-alt { font-size:9px; color:rgba(200,160,50,0.35); }
+.wp-del { font-size:11px; color:rgba(255,80,80,0.4); cursor:pointer; padding:0 4px; }
+.wp-del:hover { color:rgba(255,80,80,0.9); }
+
+#bottom-bar {
+  border-top:1px solid rgba(200,160,50,0.12);
+  padding:10px 14px; display:flex; flex-direction:column; gap:8px;
+}
+#stats { font-size:9px; color:rgba(200,160,50,0.35); letter-spacing:0.1em; }
+.action-row { display:flex; gap:6px; }
+.btn {
+  flex:1; padding:9px 8px; font-size:9px; letter-spacing:0.15em;
+  background:rgba(200,160,50,0.06); border:1px solid rgba(200,160,50,0.25);
+  color:rgba(200,160,50,0.8); cursor:pointer; transition:all 0.15s;
+}
+.btn:hover { background:rgba(200,160,50,0.12); border-color:#c9a832; color:#c9a832; }
+.btn.red { border-color:rgba(255,80,80,0.25); color:rgba(255,100,100,0.7); }
+.btn.red:hover { background:rgba(255,80,80,0.1); border-color:rgba(255,80,80,0.6); color:#ff8080; }
+.btn.green { border-color:rgba(100,255,150,0.25); color:rgba(100,255,150,0.7); }
+.btn.green:hover { background:rgba(100,255,150,0.08); border-color:rgba(100,255,150,0.6); color:#80ffaa; }
+
+#export-box {
+  display:none; position:absolute; top:10px; left:10px; right:310px;
+  background:rgba(2,2,10,0.95); border:1px solid rgba(200,160,50,0.3);
+  padding:14px; z-index:2000; font-size:9px; letter-spacing:0.05em;
+  max-height:80vh; overflow-y:auto;
+}
+#export-box h3 { color:#c9a832; letter-spacing:0.3em; margin-bottom:10px; font-size:10px; }
+#export-text { color:rgba(200,160,50,0.7); white-space:pre; font-size:8px; line-height:1.6; }
+#export-close { position:absolute; top:10px; right:10px; cursor:pointer; color:rgba(200,160,50,0.5); font-size:14px; }
+
+#alt-editor {
+  display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+  background:rgba(2,2,10,0.97); border:1px solid rgba(200,160,50,0.35);
+  padding:20px; z-index:3000; min-width:260px;
+}
+#alt-editor h3 { font-size:10px; letter-spacing:0.3em; color:rgba(200,160,50,0.6); margin-bottom:14px; }
+#alt-editor input, #alt-editor select {
+  width:100%; padding:8px; background:rgba(200,160,50,0.06);
+  border:1px solid rgba(200,160,50,0.25); color:#c9a832;
+  font:11px 'Courier New',monospace; margin-bottom:10px;
+}
+#alt-editor label { font-size:9px; color:rgba(200,160,50,0.4); display:block; margin-bottom:4px; letter-spacing:0.1em; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="export-box">
+  <h3>EXPORT WAYPOINTS</h3>
+  <span id="export-close" onclick="document.getElementById('export-box').style.display='none'">✕</span>
+  <div id="export-text"></div>
+</div>
+<div id="alt-editor">
+  <h3>EDIT WAYPOINT</h3>
+  <label>NAME</label>
+  <input id="ae-name" type="text" placeholder="Waypoint name">
+  <label>ALTITUDE (meters)</label>
+  <input id="ae-alt" type="number" value="25" min="5" max="500">
+  <label>DURATION (seconds)</label>
+  <input id="ae-dur" type="number" value="16" min="4" max="60">
+  <label>CAMERA PITCH</label>
+  <select id="ae-pitch">
+    <option value="30">+30° Looking steeply UP</option>
+    <option value="15">+15° Looking up</option>
+    <option value="5">+5° Slightly up</option>
+    <option value="-5" selected>-5° Near level</option>
+    <option value="-15">-15° Looking down at street</option>
+    <option value="-25">-25° Steep street view</option>
+    <option value="-40">-40° Looking steeply down</option>
+  </select>
+  <div class="action-row">
+    <button class="btn" onclick="saveEdit()">✓ SAVE</button>
+    <button class="btn red" onclick="document.getElementById('alt-editor').style.display='none'">✕ CANCEL</button>
+  </div>
+</div>
+
+<div id="panel">
+  <div id="panel-header">
+    <h1>KAIT · FLIGHT PLANNER</h1>
+    <p>BUILD YOUR FLIGHT PATH</p>
+  </div>
+  <div id="mode-bar">
+    <button class="mode-btn on" id="btn-plan" onclick="setMode('plan')">✏ PLAN</button>
+    <button class="mode-btn" id="btn-view" onclick="setMode('view')">👁 VIEW</button>
+  </div>
+  <div id="instructions">
+    <b style="color:rgba(200,160,50,0.7)">PLAN MODE:</b><br>
+    Click map → add waypoint<br>
+    Click landmark star → add that location<br>
+    Click waypoint dot → edit/delete<br>
+    Drag waypoint → reposition
+  </div>
+  <div id="wp-list"></div>
+  <div id="bottom-bar">
+    <div id="stats">0 waypoints · 0s · 0.0min</div>
+    <div class="action-row">
+      <button class="btn" onclick="loadDefault()">↺ LOAD DEFAULT</button>
+      <button class="btn red" onclick="clearAll()">✕ CLEAR ALL</button>
+    </div>
+    <div class="action-row">
+      <button class="btn green" onclick="exportWP()">⬇ EXPORT JS</button>
+      <button class="btn" onclick="copyToClipboard()">⎘ COPY</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── MAP ──
+const map = L.map('map',{zoomControl:true}).setView([40.74,-74.00],13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+  attribution:'© OpenStreetMap', maxZoom:19
+}).addTo(map);
+
+// ── FAMOUS LANDMARKS ──
+const LANDMARKS = [
+  // Harbor
+  {name:'STATUE OF LIBERTY',       lat:40.68924, lng:-74.04456, cat:'harbor',  note:'Start here — face is toward SE'},
+  {name:'ELLIS ISLAND',            lat:40.69930, lng:-74.03947, cat:'harbor',  note:'Immigration museum'},
+  {name:'BATTERY PARK',            lat:40.70033, lng:-74.01700, cat:'downtown',note:'Southern tip of Manhattan'},
+  // Downtown
+  {name:'ONE WORLD TRADE CENTER',  lat:40.71277, lng:-74.01338, cat:'downtown',note:'1776ft — tallest in Western Hemisphere'},
+  {name:'9/11 MEMORIAL',           lat:40.71173, lng:-74.01334, cat:'downtown',note:'Twin reflecting pools'},
+  {name:'NYSE — WALL STREET',      lat:40.70690, lng:-74.01090, cat:'downtown',note:'Broad St canyon shot'},
+  {name:'CHARGING BULL',           lat:40.70570, lng:-74.01340, cat:'downtown',note:'Bowling Green'},
+  {name:'BROOKLYN BRIDGE',         lat:40.70620, lng:-73.99690, cat:'downtown',note:'1883 suspension bridge'},
+  {name:'CITY HALL',               lat:40.71280, lng:-74.00600, cat:'downtown',note:'1812 — oldest in continuous use'},
+  // SoHo/Village
+  {name:'CANAL ST — CHINATOWN',    lat:40.71870, lng:-74.00020, cat:'soho',    note:'Most densely populated nbhd'},
+  {name:'SOHO — BROADWAY',         lat:40.72400, lng:-73.99920, cat:'soho',    note:'Cast iron architecture'},
+  {name:'WASHINGTON SQUARE PARK',  lat:40.73081, lng:-73.99735, cat:'village', note:'NYU campus, marble arch 1892'},
+  {name:'HIGH LINE — NORTH END',   lat:40.75400, lng:-74.00480, cat:'village', note:'Elevated park on freight rail'},
+  {name:'STONEWALL INN',           lat:40.73363, lng:-74.00230, cat:'village', note:'Birthplace of LGBTQ+ rights movement'},
+  {name:'FLATIRON BUILDING',       lat:40.74105, lng:-73.98970, cat:'midtown', note:'1902 triangular icon — Broadway/5th/23rd'},
+  // Midtown
+  {name:'EMPIRE STATE BUILDING',   lat:40.74844, lng:-73.98566, cat:'midtown', note:'1454ft Art Deco, King Kong'},
+  {name:'TIMES SQUARE',            lat:40.75800, lng:-73.98550, cat:'midtown', note:'50M visitors/year, 5000+ billboards'},
+  {name:'ONE TIMES SQUARE',        lat:40.75730, lng:-73.98560, cat:'midtown', note:'NYE ball drop building since 1907'},
+  {name:'GRAND CENTRAL TERMINAL',  lat:40.75270, lng:-73.97720, cat:'midtown', note:'1913 Beaux-Arts, 44 platforms'},
+  {name:'CHRYSLER BUILDING',       lat:40.75180, lng:-73.97520, cat:'midtown', note:'1930 Art Deco crown, eagle gargoyles'},
+  {name:'ROCKEFELLER CENTER',      lat:40.75870, lng:-73.97870, cat:'midtown', note:'30 Rock, NBC, Top of the Rock'},
+  {name:"ST PATRICK'S CATHEDRAL",  lat:40.75880, lng:-73.97620, cat:'midtown', note:'1879 Neo-Gothic, 330ft spires'},
+  {name:'432 PARK AVE',            lat:40.76150, lng:-73.97167, cat:'midtown', note:'1396ft — most slender skyscraper'},
+  {name:'CENTRAL PARK TOWER',      lat:40.76630, lng:-73.98070, cat:'midtown', note:'1550ft — tallest residential on Earth'},
+  {name:'THE VESSEL',              lat:40.75360, lng:-74.00200, cat:'midtown', note:'154 flights of copper lattice stairs'},
+  {name:'USS INTREPID',            lat:40.76450, lng:-74.00050, cat:'midtown', note:'WWII carrier, Space Shuttle Enterprise'},
+  // Upper / Park
+  {name:'CENTRAL PARK — THE LAKE', lat:40.77420, lng:-73.97120, cat:'park',   note:'Bethesda Fountain, Bow Bridge nearby'},
+  {name:'BOW BRIDGE',              lat:40.77630, lng:-73.97420, cat:'park',   note:'1862 cast iron, most photographed'},
+  {name:'STRAWBERRY FIELDS',       lat:40.77620, lng:-73.97550, cat:'park',   note:'John Lennon memorial'},
+  {name:'METROPOLITAN MUSEUM',     lat:40.77940, lng:-73.96350, cat:'park',   note:'Largest art museum in W. Hemisphere'},
+  {name:'COLUMBUS CIRCLE',         lat:40.76820, lng:-73.98220, cat:'park',   note:'Gateway to Central Park'},
+  {name:'LINCOLN CENTER',          lat:40.77250, lng:-73.98480, cat:'park',   note:"World's largest performing arts complex"},
+  // NJ / Home
+  {name:'WEEHAWKEN — DUEL SITE',   lat:40.76880, lng:-74.02200, cat:'nj',    note:'Aaron Burr shot Hamilton here 1804'},
+  {name:'BEYOND HELLO — LITTLE FERRY', lat:40.84720, lng:-74.03340, cat:'nj',note:'415 US-46 — the destination'},
+];
+
+const CAT_COLORS = {
+  harbor:'#4af', downtown:'#fa4', soho:'#f84', village:'#af4',
+  midtown:'#f4a', park:'#4fa', nj:'#aaf'
+};
+
+let mode = 'plan';
+let waypoints = [];
+let selIdx = -1;
+let editIdx = -1;
+let pathLine = null;
+const wpMarkers = [];
+const lmMarkers = [];
+
+// ── DRAW LANDMARKS ──
+LANDMARKS.forEach((lm,i) => {
+  const color = CAT_COLORS[lm.cat] || '#888';
+  const icon = L.divIcon({
+    className:'',
+    html:`<div title="${lm.name}" style="
+      width:16px;height:16px;
+      background:${color}33;
+      border:1.5px solid ${color};
+      border-radius:3px;
+      display:flex;align-items:center;justify-content:center;
+      font-size:8px;cursor:pointer;
+      color:${color};font-weight:bold;
+    ">★</div>`,
+    iconSize:[16,16], iconAnchor:[8,8]
+  });
+  const m = L.marker([lm.lat,lm.lng],{icon, zIndexOffset:100}).addTo(map);
+  m.bindTooltip(`<b>${lm.name}</b><br><span style="font-size:10px;color:#888">${lm.note}</span>`, {
+    className:'', direction:'top', offset:[0,-10]
+  });
+  m.on('click', e=>{
+    if(mode==='plan'){
+      L.DomEvent.stopPropagation(e);
+      addWP(lm.lat, lm.lng, lm.name, 25);
+    }
+  });
+  lmMarkers.push(m);
+});
+
+// ── MAP CLICK — ADD WAYPOINT ──
+map.on('click', e=>{
+  if(mode!=='plan') return;
+  addWP(e.latlng.lat, e.latlng.lng, '', 25);
+});
+
+function addWP(lat, lng, name='', alt=25, dur=16, pitch=-10) {
+  waypoints.push({lat,lng,name,alt,dur,pitch});
+  renderAll();
+  // Open editor for new unnamed points
+  if(!name) openEditor(waypoints.length-1);
+}
+
+function renderAll() {
+  // Clear old markers
+  wpMarkers.forEach(m=>{ map.removeLayer(m); });
+  wpMarkers.length=0;
+
+  // Draw path line
+  if(pathLine) map.removeLayer(pathLine);
+  if(waypoints.length>1){
+    pathLine = L.polyline(waypoints.map(w=>[w.lat,w.lng]),{
+      color:'rgba(200,160,50,0.7)', weight:3, dashArray:'5 8'
+    }).addTo(map);
+  }
+
+  // Draw colored segments
+  for(let i=0;i<waypoints.length-1;i++){
+    const a=waypoints[i],b=waypoints[i+1];
+    L.polyline([[a.lat,a.lng],[b.lat,b.lng]],{
+      color:altColor((a.alt+b.alt)/2), weight:4, opacity:0.8
+    }).addTo(map);
+    wpMarkers.push({_leaflet_id:null}); // placeholder to clear later - simplified
+  }
+
+  // Draw waypoint markers
+  waypoints.forEach((wp,i)=>{
+    const color = altColor(wp.alt);
+    const sel = i===selIdx;
+    const icon = L.divIcon({
+      className:'',
+      html:`<div style="
+        width:${sel?28:22}px;height:${sel?28:22}px;border-radius:50%;
+        background:${sel?'#c9a832':color};
+        border:${sel?'3px solid #fff':'2px solid rgba(0,0,0,0.5)'};
+        color:${sel?'#000':'#000'};
+        font:bold ${sel?10:8}px Courier New;
+        display:flex;align-items:center;justify-content:center;
+        cursor:pointer;
+        box-shadow:0 0 ${sel?12:6}px ${color}${sel?'ff':'88'};
+        transition:all 0.15s;
+      ">${i+1}</div>`,
+      iconSize:[sel?28:22,sel?28:22],
+      iconAnchor:[sel?14:11,sel?14:11]
+    });
+    const m = L.marker([wp.lat,wp.lng],{icon, draggable:true, zIndexOffset:500}).addTo(map);
+    m.on('click', e=>{
+      L.DomEvent.stopPropagation(e);
+      selIdx=i;
+      renderAll();
+      buildList();
+      if(mode==='plan') openEditor(i);
+    });
+    m.on('dragend', e=>{
+      const ll=e.target.getLatLng();
+      waypoints[i].lat=ll.lat;
+      waypoints[i].lng=ll.lng;
+      renderAll();
+      buildList();
+    });
+
+    // Label
+    if(wp.name){
+      L.tooltip({permanent:true,direction:'top',offset:[0,-14],className:''})
+        .setContent(`<span style="font:8px Courier New;color:#c9a832;background:rgba(0,0,4,0.8);padding:1px 4px">${wp.name}</span>`)
+        .setLatLng([wp.lat,wp.lng])
+        .addTo(map);
+    }
+    wpMarkers.push(m);
+  });
+
+  buildList();
+  updateStats();
+}
+
+function altColor(alt){
+  if(alt<30)  return '#64c8ff';
+  if(alt<80)  return '#c9a832';
+  if(alt<200) return '#ff8c32';
+  return '#ff5050';
+}
+
+function buildList(){
+  const list=document.getElementById('wp-list');
+  list.innerHTML='';
+  waypoints.forEach((wp,i)=>{
+    const div=document.createElement('div');
+    div.className='wp-row'+(i===selIdx?' sel':'');
+    div.innerHTML=`
+      <span class="wp-num">${String(i+1).padStart(2,'0')}</span>
+      <span class="wp-name">${wp.name||'(unnamed)'}</span>
+      <span class="wp-alt">${wp.alt}m</span>
+      <span class="wp-del" onclick="deleteWP(${i},event)">✕</span>`;
+    div.onclick=()=>{ selIdx=i; renderAll(); map.setView([wp.lat,wp.lng],Math.max(map.getZoom(),15)); };
+    list.appendChild(div);
+  });
+}
+
+function updateStats(){
+  const total=waypoints.reduce((s,w)=>s+w.dur,0);
+  document.getElementById('stats').textContent=
+    `${waypoints.length} waypoints · ${total}s · ${(total/60).toFixed(1)}min`;
+}
+
+function deleteWP(i,e){
+  e.stopPropagation();
+  waypoints.splice(i,1);
+  if(selIdx>=waypoints.length) selIdx=waypoints.length-1;
+  renderAll();
+}
+
+function clearAll(){
+  if(waypoints.length && !confirm('Clear all waypoints?')) return;
+  waypoints=[];selIdx=-1;
+  wpMarkers.forEach(m=>{ try{map.removeLayer(m);}catch(e){} });
+  wpMarkers.length=0;
+  if(pathLine){map.removeLayer(pathLine);pathLine=null;}
+  buildList();updateStats();
+}
+
+// ── EDITOR ──
+function openEditor(i){
+  editIdx=i;
+  const wp=waypoints[i];
+  document.getElementById('ae-name').value=wp.name||'';
+  document.getElementById('ae-alt').value=wp.alt||25;
+  document.getElementById('ae-dur').value=wp.dur||16;
+  document.getElementById('ae-pitch').value=wp.pitch||-5;
+  document.getElementById('alt-editor').style.display='block';
+}
+function saveEdit(){
+  const i=editIdx;
+  waypoints[i].name  = document.getElementById('ae-name').value;
+  waypoints[i].alt   = parseInt(document.getElementById('ae-alt').value)||25;
+  waypoints[i].dur   = parseInt(document.getElementById('ae-dur').value)||16;
+  waypoints[i].pitch = parseFloat(document.getElementById('ae-pitch').value)||-5;
+  document.getElementById('alt-editor').style.display='none';
+  renderAll();
+}
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') document.getElementById('alt-editor').style.display='none'; });
+
+// ── MODE ──
+function setMode(m){
+  mode=m;
+  document.getElementById('btn-plan').classList.toggle('on',m==='plan');
+  document.getElementById('btn-view').classList.toggle('on',m==='view');
+  document.getElementById('instructions').style.display=m==='plan'?'block':'none';
+}
+
+// ── EXPORT ──
+function exportWP(){
+  let js='const WP = [\n';
+  waypoints.forEach((wp,i)=>{
+    // Compute camera heading toward next waypoint if unnamed
+    let hdg=0;
+    if(i<waypoints.length-1){
+      const nx=waypoints[i+1];
+      const dlng=(nx.lng-wp.lng)*0.7547*111320;
+      const dlat=(nx.lat-wp.lat)*111320;
+      hdg=Math.round(Math.atan2(dlng,dlat)*180/Math.PI*10)/10;
+      if(hdg<0)hdg+=360;
+    }
+    js+=`  {lng:${wp.lng.toFixed(6)},lat:${wp.lat.toFixed(6)},alt:${wp.alt},`;
+    js+=`cam_hdg:${hdg},cam_pitch:${wp.pitch},dur:${wp.dur},\n`;
+    js+=`   label:${JSON.stringify(wp.name||'')},fact:''},\n`;
+  });
+  js+='];\n';
+  document.getElementById('export-text').textContent=js;
+  document.getElementById('export-box').style.display='block';
+}
+
+function copyToClipboard(){
+  let js='const WP = [\n';
+  waypoints.forEach((wp,i)=>{
+    let hdg=0;
+    if(i<waypoints.length-1){
+      const nx=waypoints[i+1];
+      const dlng=(nx.lng-wp.lng)*0.7547*111320;
+      const dlat=(nx.lat-wp.lat)*111320;
+      hdg=Math.round(Math.atan2(dlng,dlat)*180/Math.PI*10)/10;
+      if(hdg<0)hdg+=360;
+    }
+    js+=`  {lng:${wp.lng.toFixed(6)},lat:${wp.lat.toFixed(6)},alt:${wp.alt},cam_hdg:${hdg},cam_pitch:${wp.pitch},dur:${wp.dur},label:${JSON.stringify(wp.name||'')},fact:''},\n`;
+  });
+  js+='];\n';
+  navigator.clipboard.writeText(js).then(()=>alert('Copied to clipboard!'));
+}
+
+// ── DEFAULT PATH: Times Square → Little Ferry ──
+function loadDefault(){
+  if(waypoints.length && !confirm('Replace current path?')) return;
+  waypoints = [
+    {lat:40.75800,lng:-73.98550,name:'TIMES SQUARE',          alt:25, dur:20,pitch:-5},
+    {lat:40.76424,lng:-73.98803,name:'7TH AVE · THEATER DIST',alt:20, dur:16,pitch:-10},
+    {lat:40.76424,lng:-73.98803,name:"57TH ST · BILLIONAIRES",alt:22, dur:16,pitch:15},
+    {lat:40.76820,lng:-73.98220,name:'COLUMBUS CIRCLE',       alt:25, dur:14,pitch:-10},
+    {lat:40.77250,lng:-73.98480,name:'LINCOLN CENTER',        alt:20, dur:14,pitch:-8},
+    {lat:40.75360,lng:-74.00200,name:'HUDSON YARDS · VESSEL', alt:25, dur:16,pitch:20},
+    {lat:40.76450,lng:-74.00050,name:'USS INTREPID',          alt:22, dur:14,pitch:-5},
+    {lat:40.75654,lng:-73.99874,name:'42ND ST CANYON START',  alt:18, dur:20,pitch:-12},
+    {lat:40.75654,lng:-73.98045,name:'42ND · BRYANT PARK',    alt:16, dur:16,pitch:-12},
+    {lat:40.75270,lng:-73.97220,name:'GRAND CENTRAL',         alt:18, dur:16,pitch:-8},
+    {lat:40.76000,lng:-74.01300,name:'HUDSON RIVER CROSSING', alt:15, dur:14,pitch:-5},
+    {lat:40.76800,lng:-74.02200,name:'WEEHAWKEN NJ',          alt:55, dur:14,pitch:-15},
+    {lat:40.80000,lng:-74.02500,name:'NJ TURNPIKE NORTH',     alt:65, dur:12,pitch:-10},
+    {lat:40.84000,lng:-74.03200,name:'US ROUTE 46',           alt:25, dur:12,pitch:-8},
+    {lat:40.84720,lng:-74.03340,name:'BEYOND HELLO · LITTLE FERRY',alt:45,dur:18,pitch:-25},
+  ];
+  selIdx=-1;
+  renderAll();
+  map.setView([40.76,-73.99],13);
+}
+
+// Load default on start
+loadDefault();
+</script>
+</body>
+</html>
