@@ -63,7 +63,27 @@
 <div id="ctrl">
   <button onclick="togglePause()" id="pauseBtn">⏸ PAUSE</button>
   <button onclick="resetFlight()">↺ RESTART</button>
+  <button onclick="toggleDayNight()" id="dayNightBtn">🌙 NIGHT</button>
+  <button onclick="showRecMenu()" id="recBtn" style="border-color:rgba(255,80,80,0.4);color:rgba(255,120,120,0.7)">⏺ RECORD</button>
 </div>
+
+<div id="recMenu" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:998;flex-direction:column;align-items:center;justify-content:center;gap:16px;">
+  <h2 style="color:#c9a832;font:300 14px 'Courier New',monospace;letter-spacing:0.5em">FRAME RECORDER</h2>
+  <p style="color:rgba(200,160,50,0.5);font:10px 'Courier New',monospace;letter-spacing:0.15em;max-width:380px;text-align:center;line-height:2">
+    Renders frame-by-frame at fixed rate. Each frame saved as PNG.<br>
+    Stitch with: ffmpeg -framerate 30 -i frame_%04d.png -c:v libx264 -crf 16 -pix_fmt yuv420p manhattan.mp4<br><br>
+    WARNING: 5.5min @ 30fps = ~9,900 frames. Allow 60-90 min render time.
+  </p>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+    <button onclick="startRecord(1920,1080,30)" style="background:rgba(0,0,0,0.6);border:1px solid rgba(200,160,50,0.4);color:rgba(200,160,50,0.8);font:10px 'Courier New',monospace;letter-spacing:0.15em;padding:10px 18px;cursor:pointer">1080p · 30fps</button>
+    <button onclick="startRecord(2560,1440,30)" style="background:rgba(0,0,0,0.6);border:1px solid rgba(200,160,50,0.4);color:rgba(200,160,50,0.8);font:10px 'Courier New',monospace;letter-spacing:0.15em;padding:10px 18px;cursor:pointer">2K · 30fps</button>
+    <button onclick="startRecord(3840,2160,30)" style="background:rgba(0,0,0,0.6);border:1px solid rgba(200,160,50,0.4);color:rgba(200,160,50,0.8);font:10px 'Courier New',monospace;letter-spacing:0.15em;padding:10px 18px;cursor:pointer">4K · 30fps</button>
+    <button onclick="startRecord(3840,2160,60)" style="background:rgba(0,0,0,0.6);border:1px solid rgba(200,160,50,0.4);color:rgba(200,160,50,0.8);font:10px 'Courier New',monospace;letter-spacing:0.15em;padding:10px 18px;cursor:pointer">4K · 60fps ⚡</button>
+  </div>
+  <button onclick="hideRecMenu()" style="background:transparent;border:1px solid rgba(200,160,50,0.2);color:rgba(200,160,50,0.4);font:10px 'Courier New',monospace;letter-spacing:0.2em;padding:8px 20px;cursor:pointer">CANCEL</button>
+</div>
+
+<div id="recStatus" style="display:none;position:fixed;top:16px;right:16px;background:rgba(180,20,20,0.85);color:#fff;font:11px 'Courier New',monospace;letter-spacing:0.15em;padding:10px 16px;z-index:999;border-radius:2px"></div>
 
 <script>
 // ══════════════════════════════════════════════════════════════
@@ -538,11 +558,197 @@ function resetFlight(){
   beginFlight();
 }
 
+// ── DAY / NIGHT TOGGLE ──
+let isNight = true;
+function toggleDayNight(){
+  isNight = !isNight;
+  const d = new Date();
+  // Night = 3am UTC (11pm NYC), Day = 18:00 UTC (2pm NYC)
+  d.setUTCHours(isNight ? 3 : 14, 0, 0, 0);
+  if(viewer){
+    viewer.clock.currentTime = Cesium.JulianDate.fromDate(d);
+    viewer.scene.skyAtmosphere.brightnessShift = isNight ? -0.45 : 0.1;
+  }
+  document.getElementById('dayNightBtn').textContent = isNight ? '🌙 NIGHT' : '☀️ DAY';
+}
+
+// ── RECORDER ──
+let recording = false;
+let recFrameIdx = 0;
+let recTotalFrames = 0;
+let recFPS = 30;
+let recDirHandle = null;
+let origCanvasSize = null;
+
+function showRecMenu(){ document.getElementById('recMenu').style.display='flex'; }
+function hideRecMenu(){ document.getElementById('recMenu').style.display='none'; }
+
+async function startRecord(w, h, fps){
+  hideRecMenu();
+
+  if(!window.showDirectoryPicker){
+    alert('Frame recording requires Chrome or Edge (File System Access API).\nFirefox and Safari are not supported.');
+    return;
+  }
+
+  const totalSec = TOTAL;
+  const totalFrames = Math.round(totalSec * fps);
+  const estGB = ((w * h * 4 * totalFrames) / 1e9).toFixed(1);
+
+  const ok = confirm(
+    `Record ${w}×${h} @ ${fps}fps?\n` +
+    `${totalFrames} frames · ~${(totalSec/60).toFixed(1)} minutes\n` +
+    `Estimated disk: ~${estGB} GB raw PNGs\n\n` +
+    `Stitch command after recording:\n` +
+    `ffmpeg -framerate ${fps} -i frame_%04d.png -c:v libx264 -crf 16 -pix_fmt yuv420p manhattan_${isNight?'night':'day'}.mp4\n\n` +
+    `Pick a folder to save frames into.`
+  );
+  if(!ok) return;
+
+  try{
+    recDirHandle = await window.showDirectoryPicker({mode:'readwrite'});
+  }catch(e){ return; }
+
+  // Write README
+  try{
+    const readme = `KAIT Manhattan Flight — ${w}x${h} @ ${fps}fps ${isNight?'NIGHT':'DAY'}
+Frames: ${totalFrames}
+Stitch: ffmpeg -framerate ${fps} -i frame_%04d.png -c:v libx264 -crf 16 -pix_fmt yuv420p manhattan.mp4
+ProRes: ffmpeg -framerate ${fps} -i frame_%04d.png -c:v prores_ks -profile:v 3 -pix_fmt yuv422p10le manhattan.mov
+`;
+    const rh = await recDirHandle.getFileHandle('README.txt',{create:true});
+    const rw = await rh.createWritable();
+    await rw.write(readme); await rw.close();
+  }catch(e){}
+
+  recording = true;
+  recFrameIdx = 0;
+  recFPS = fps;
+  recTotalFrames = totalFrames;
+
+  // Resize canvas
+  origCanvasSize = {
+    w: viewer.canvas.width,
+    h: viewer.canvas.height,
+    pr: viewer.resolutionScale
+  };
+  viewer.resolutionScale = 1.0;
+  viewer.canvas.width = w;
+  viewer.canvas.height = h;
+  viewer.scene.requestRender();
+  viewer.camera.frustum.aspectRatio = w/h;
+
+  // Reset flight to start
+  startT = performance.now();
+  pauseOffset = 0;
+
+  if(rafId) cancelAnimationFrame(rafId);
+  document.getElementById('recStatus').style.display='block';
+  recordFrame();
+}
+
+const captureCanvas = document.createElement('canvas');
+const captureCtx = captureCanvas.getContext('2d');
+
+async function recordFrame(){
+  if(!recording) return;
+
+  // Use deterministic time — frame index / fps
+  const frameSec = recFrameIdx / recFPS;
+
+  // If we've recorded all frames, stop
+  if(recFrameIdx >= recTotalFrames){
+    await stopRecord();
+    return;
+  }
+
+  // Set camera to deterministic position for this frame
+  const loopT = frameSec % TOTAL;
+  let segStart=0, si=0;
+  for(let i=0;i<WP.length-1;i++){
+    if(loopT<segStart+WP[i].dur){si=i;break;}
+    segStart+=WP[i].dur; si=i+1;
+  }
+  si=Math.min(si,WP.length-2);
+  const a=WP[si], b=WP[(si+1)%WP.length];
+  const segT=ease(Math.max(0,Math.min(1,(loopT-segStart)/a.dur)));
+
+  const lng=a.lng+(b.lng-a.lng)*segT;
+  const lat=a.lat+(b.lat-a.lat)*segT;
+  const alt=a.alt+(b.alt-a.alt)*segT;
+  const camHdg=lerpAngle(a.cam_hdg,b.cam_hdg,segT);
+  const camPitch=a.cam_pitch+(b.cam_pitch-a.cam_pitch)*segT;
+
+  // Same micro-movement but deterministic (based on frameSec not real time)
+  const t=frameSec;
+  const mLng  =Math.sin(t*0.47)*0.000052+Math.sin(t*1.23)*0.000019;
+  const mLat  =Math.cos(t*0.53)*0.000041+Math.cos(t*1.41)*0.000016;
+  const mHdg  =Math.sin(t*0.29)*1.8+Math.sin(t*0.71)*0.7+Math.sin(t*1.87)*0.3;
+  const mPitch=Math.sin(t*0.41)*1.1+Math.sin(t*0.93)*0.4;
+  const mRoll =Math.sin(t*0.34)*0.6+Math.sin(t*0.81)*0.2;
+
+  viewer.camera.setView({
+    destination:Cesium.Cartesian3.fromDegrees(lng+mLng,lat+mLat,alt),
+    orientation:{
+      heading:Cesium.Math.toRadians(camHdg+mHdg),
+      pitch:Cesium.Math.toRadians(camPitch+mPitch),
+      roll:Cesium.Math.toRadians(mRoll),
+    }
+  });
+
+  // Force render
+  viewer.scene.render();
+
+  // Capture frame
+  captureCanvas.width = viewer.canvas.width;
+  captureCanvas.height = viewer.canvas.height;
+  captureCtx.drawImage(viewer.canvas, 0, 0);
+
+  const blob = await new Promise(res => captureCanvas.toBlob(res, 'image/png'));
+  const name = 'frame_' + String(recFrameIdx).padStart(5,'0') + '.png';
+  try{
+    const fh = await recDirHandle.getFileHandle(name,{create:true});
+    const fw = await fh.createWritable();
+    await fw.write(blob); await fw.close();
+  }catch(e){
+    console.error('Frame write failed:', name, e);
+    document.getElementById('recStatus').textContent = 'WRITE ERROR — ' + e.message;
+    recording = false;
+    return;
+  }
+
+  recFrameIdx++;
+  const pct = Math.floor((recFrameIdx/recTotalFrames)*100);
+  const minLeft = Math.floor((recTotalFrames-recFrameIdx)/(recFPS*2)); // rough estimate
+  document.getElementById('recStatus').textContent =
+    `⏺ RECORDING ${recFrameIdx}/${recTotalFrames} · ${pct}% · ~${minLeft}min left`;
+
+  // Next frame
+  requestAnimationFrame(recordFrame);
+}
+
+async function stopRecord(){
+  recording = false;
+  document.getElementById('recStatus').textContent = '✓ RECORDING COMPLETE — check your folder';
+  setTimeout(()=>{ document.getElementById('recStatus').style.display='none'; }, 8000);
+
+  // Restore canvas
+  if(origCanvasSize){
+    viewer.resolutionScale = origCanvasSize.pr;
+    viewer.canvas.width = origCanvasSize.w;
+    viewer.canvas.height = origCanvasSize.h;
+    viewer.scene.requestRender();
+    origCanvasSize = null;
+  }
+  recDirHandle = null;
+}
+
 window.addEventListener('keydown',e=>{
   if(e.key===' '){e.preventDefault();togglePause();}
-  if(e.key==='r'||e.key==='R')resetFlight();
+  if(e.key==='r'||e.key==='R') resetFlight();
+  if(e.key==='d'||e.key==='D') toggleDayNight();
 });
-window.addEventListener('resize',()=>{if(viewer)viewer.resize();});
+window.addEventListener('resize',()=>{if(viewer&&!recording)viewer.resize();});
 window.addEventListener('load',()=>{
   const wait=setInterval(()=>{
     if(typeof Cesium!=='undefined'){clearInterval(wait);init();}
