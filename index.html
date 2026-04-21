@@ -13345,13 +13345,14 @@ document.addEventListener('DOMContentLoaded', () => {
   initEditFileModal();
   setupLogin();
   initTambour();
-  // OPTIMIZATION: Demo mode loads only when triggered, not on page load
-  // Wire demo buttons directly - init only when user actually clicks
-  const demoTriggerBtn = document.getElementById('lcard-demo-btn');
-  if (demoTriggerBtn) {
-    demoTriggerBtn.addEventListener('click', (e) => {
+  // Show demo button only on ?demo=1 URL - full init only when clicked
+  if (new URLSearchParams(window.location.search).get('demo') === '1') {
+    const prompt = document.getElementById('lcard-demo-prompt');
+    if (prompt) prompt.classList.add('active');
+    const btn = document.getElementById('lcard-demo-btn');
+    if (btn) btn.addEventListener('click', (e) => {
       e.preventDefault(); e.stopPropagation();
-      if (!DemoMode.enabled) { initDemoMode(); }
+      initDemoMode();
       DemoMode.start();
     });
   }
