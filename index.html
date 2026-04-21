@@ -16997,6 +16997,8 @@ const DemoMode = {
     // Order: longest / most specific patterns first.
     let ttsText = (text || '');
     ttsText = ttsText.replace(/\bCACI\b/g, 'Kait');          // CACI → Kait
+    ttsText = ttsText.replace(/\bKait\b/g, 'Kate');           // Kait → Kate (phonetic for TTS)
+    ttsText = ttsText.replace(/\bKAIT\b/g, 'Kate');           // KAIT → Kate (phonetic for TTS)
     ttsText = ttsText.replace(/\bMETRC\b/g, 'metric');       // "M-E-T-R-C" → metric (industry pronunciation)
     ttsText = ttsText.replace(/\bOLCC\b/g, 'O L C C');       // Oregon regulator — spell out
     ttsText = ttsText.replace(/\bCDTFA\b/g, 'C D T F A');    // CA tax agency
