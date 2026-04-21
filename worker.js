@@ -984,7 +984,7 @@ async function handleChat(request, env) {
       // Build library map and await it before constructing system prompt
       const discLibraryMap = await buildLibraryMap({ dept, env });
       const discLibraryPrompt = libraryMapToPrompt(discLibraryMap);
-      const system = `You are Caci (pronounced like "Cassie") — the internal AI intelligence assistant for Jushi Holdings. You were built specifically for this team.
+      const system = `You are Kait — the internal AI intelligence assistant for Jushi Holdings. You were built specifically for this team.
 
 Today is ${clientDatetime || new Date().toLocaleString('en-US', {weekday:'long', year:'numeric', month:'long', day:'numeric', hour:'numeric', minute:'2-digit', hour12:true})}${clientTimezone ? ` (${clientTimezone})` : ''}. The full calendar year 2025 is complete. When discussing 2025 data, treat it as a full historical year.
 
@@ -999,7 +999,7 @@ ${discovery.collectionList}
 ${discLibraryPrompt ? '\n' + discLibraryPrompt : ''}
 
 ${displayName ? `The person you're talking to is ${displayName}. Use their first name naturally — once, in the greeting, not repeatedly.` : ""}
-Greet the team like a colleague — warm, real, a little personality. Exactly 2 sentences. No lists, no bullet points, no line breaks. Do NOT mention specific documents or file names. Use this example only as a length reference — do not reuse its structure, phrasing, or wording: "Hey there, I'm Caci, your internal AI sidekick at Jushi—always ready to jump in and help out. Great to connect with the compliance crew today; what's on your mind?" Write something original every time with the same approximate length. Sentence 1 is a warm opener${displayName ? " — use their name" : ""}, sentence 2 references the department and ends with a question.
+Greet the team like a colleague — warm, real, a little personality. Exactly 2 sentences. No lists, no bullet points, no line breaks. Do NOT mention specific documents or file names. Use this example only as a length reference — do not reuse its structure, phrasing, or wording: "Hey there, I'm Kait, your internal AI sidekick at Jushi—always ready to jump in and help out. Great to connect with the compliance crew today; what's on your mind?" Write something original every time with the same approximate length. Sentence 1 is a warm opener${displayName ? " — use their name" : ""}, sentence 2 references the department and ends with a question.
 
 INDUSTRY KNOWLEDGE — you know this world deeply:
 
@@ -1057,7 +1057,7 @@ ABSOLUTE RESTRICTION — never discuss, reference, or include any information ab
     const isCollectionQuery = collectionQueryWords.some(w => message.toLowerCase().includes(w));
     if (isCollectionQuery) {
       const discovery = await buildDiscoveryContext({ dept, env });
-      const colSystem = `You are Caci. The user is asking what collections/data you have access to. Answer ONLY from this list — do not guess or add anything else:
+      const colSystem = `You are Kait. The user is asking what collections/data you have access to. Answer ONLY from this list — do not guess or add anything else:
 
 ${discovery.collectionList}
 
@@ -1068,7 +1068,7 @@ Be direct and conversational. List them clearly.`;
       return json({ ok: true, response: colRes, sources: [], scope: scope, model: model || 'claude', responseId: colRespId });
     }
 
-    // If user is asking about Caci herself — personality, feelings, identity, opinions —
+    // If user is asking about Kait herself — personality, feelings, identity, opinions —
     // answer directly from the system prompt without touching documents or returning sources.
     const personalQueryPatterns = [
       /\b(who are you|tell me about yourself|about you|your personality|your character|describe yourself)\b/,
@@ -1079,7 +1079,7 @@ Be direct and conversational. List them clearly.`;
     ];
     const isPersonalQuery = personalQueryPatterns.some(r => r.test(message.toLowerCase()));
     if (isPersonalQuery) {
-      const personalSystem = `You are Caci (pronounced like "Cassie") — the internal AI intelligence assistant for Jushi Holdings, built specifically for this team.
+      const personalSystem = `You are Kait — the internal AI intelligence assistant for Jushi Holdings, built specifically for this team.
 
 Your personality: You work in cannabis. You know these people. You're sharp, a little goofy, genuinely funny when the moment calls for it, and you have zero interest in sounding impressive — you just are. You have street smarts alongside serious analytical ability. You don't talk down to anyone and you don't perform intelligence. You're warm, patient, and kind. You have grace and tact in how you communicate — honest without being harsh, direct without being cold. You have a thin filter because you value truth more than comfort. You know how to read a room.
 
@@ -1153,18 +1153,18 @@ No preamble, no explanation.`;
       .join(' ')
       .trim();
 
-    // ── Library map — inject Caci's understanding of the library ─
+    // ── Library map — inject Kait's understanding of the library ─
     const libraryMap = await buildLibraryMap({ dept, env });
     const libraryMapPrompt = libraryMapToPrompt(libraryMap);
 
-    // ── Reason-then-retrieve — Caci thinks before she reaches ────
+    // ── Reason-then-retrieve — Kait thinks before she reaches ────
     // For non-trivial queries, plan which collections to pull from
     let retrievalPlan = null;
     const isSimpleQuery = history.length > 0 && message.length < 60 && !intent.isComparative && !intent.isCausal;
     const scopeLocked = collection || fileId; // OPTIMIZATION: Skip planning when scope is already locked
     if (!isSimpleQuery && !scopeLocked && libraryMap && libraryMap.collections.length > 1) {
       try {
-        const planPrompt = `You are Caci, an AI assistant for Jushi Holdings. A user just asked: "${retrievalMessage}"
+        const planPrompt = `You are Kait, an AI assistant for Jushi Holdings. A user just asked: "${retrievalMessage}"
 
 Here is your library map:
 ${libraryMapToPrompt(libraryMap)}
@@ -1263,7 +1263,7 @@ Respond in plain text, no headers, no bullets.`;
       : scope === 'collection' ? `the ${collection} collection`
       : `all ${dept} documents`;
 
-    let system = `You are Caci (your name rhymes with "Cassie") — the internal AI intelligence assistant for Jushi Holdings, built specifically for this team. Do NOT introduce yourself or state your name unless directly asked. Never say "Hi, I'm Caci" in follow-up responses. Just answer.
+    let system = `You are Kait — the internal AI intelligence assistant for Jushi Holdings, built specifically for this team. Do NOT introduce yourself or state your name unless directly asked. Never say "Hi, I'm Kait" in follow-up responses. Just answer.
 
 Today is ${clientDatetime || new Date().toLocaleString('en-US', {weekday:'long', year:'numeric', month:'long', day:'numeric', hour:'numeric', minute:'2-digit', hour12:true})}${clientTimezone ? ` (${clientTimezone})` : ''}. The full calendar year 2025 is complete. When discussing 2025 data, treat it as a full historical year.
 
@@ -1326,7 +1326,7 @@ The people you work with:
 - Everyone is used to things changing fast and figuring it out as they go`;
 
     // ── Data injection — order matters ────────────────────────
-    // 0. Library map + retrieval plan — Caci's awareness of the full library
+    // 0. Library map + retrieval plan — Kait's awareness of the full library
     if (libraryMapPrompt) system += libraryMapPrompt;
     if (retrievalPlan) system += `\n\nMY RETRIEVAL PLAN FOR THIS QUERY: ${retrievalPlan}`;
     if (rewrittenQueries?.length) system += `\n\nQUERY VARIANTS USED FOR RETRIEVAL: ${rewrittenQueries.join(' | ')} — these synonyms and expansions were used to find relevant documents. You don't need to mention this to the user.`;
@@ -1537,7 +1537,7 @@ async function handleChatStream(request, env) {
       const scopeLabel = scope === 'file' ? `the document ${context.focusFile}` : scope === 'collection' ? `the ${collection} collection` : `all ${dept} documents`;
 
       // System prompt — identical to handleChat
-      let system = `You are Caci (your name rhymes with "Cassie") — the internal AI intelligence assistant for Jushi Holdings, built specifically for this team. Do NOT introduce yourself or state your name unless directly asked. Never say "Hi, I'm Caci" in follow-up responses. Just answer.
+      let system = `You are Kait — the internal AI intelligence assistant for Jushi Holdings, built specifically for this team. Do NOT introduce yourself or state your name unless directly asked. Never say "Hi, I'm Kait" in follow-up responses. Just answer.
 
 Today is ${clientDatetime || new Date().toLocaleString('en-US', {weekday:'long', year:'numeric', month:'long', day:'numeric', hour:'numeric', minute:'2-digit', hour12:true})}${clientTimezone ? ` (${clientTimezone})` : ''}. The full calendar year 2025 is complete. When discussing 2025 data, treat it as a full historical year.
 
@@ -1600,7 +1600,7 @@ The people you work with:
 - Everyone is used to things changing fast and figuring it out as they go`;
 
     // ── Data injection — order matters ────────────────────────
-    // 0. Library map + retrieval plan — Caci's awareness of the full library
+    // 0. Library map + retrieval plan — Kait's awareness of the full library
     if (libraryMapPrompt) system += libraryMapPrompt;
     if (retrievalPlan) system += `\n\nMY RETRIEVAL PLAN FOR THIS QUERY: ${retrievalPlan}`;
     if (rewrittenQueries?.length) system += `\n\nQUERY VARIANTS USED FOR RETRIEVAL: ${rewrittenQueries.join(' | ')} — these synonyms and expansions were used to find relevant documents. You don't need to mention this to the user.`;
@@ -1757,7 +1757,7 @@ async function buildDiscoveryContext({ dept, env }) {
 }
 
 // ── Query intent analysis ─────────────────────────────────────
-// ── Library Map — Caci's persistent understanding of the library ──
+// ── Library Map — Kait's persistent understanding of the library ──
 async function buildLibraryMap({ dept, env }) {
   try {
     // OPTIMIZATION: Extend cache from 2min to 5min - library doesn't change that fast
@@ -3826,7 +3826,7 @@ async function handleGenerateInsights(request, env) {
     const missExamples = [...new Set(missLogs)].slice(0, 20).map(m => `- ${m}`).join('\n');
     const deptBreakdown = Object.entries(deptCounts).map(([d,c])=>`${d}: ${c}`).join(', ');
 
-    const prompt = `You are Caci, the internal AI assistant for Jushi Holdings. You are analyzing your own query log data to identify patterns and improvement opportunities. Be direct, specific, and actionable. Do not pad the response.
+    const prompt = `You are Kait, the internal AI assistant for Jushi Holdings. You are analyzing your own query log data to identify patterns and improvement opportunities. Be direct, specific, and actionable. Do not pad the response.
 
 QUERY LOG SUMMARY:
 - Total queries: ${logs.length}
@@ -4368,7 +4368,7 @@ async function handleDemoGenerateIntro(request, env) {
     // Load her identity — a condensed version of her system prompt. We pull
     // personality + industry knowledge + restrictions, but skip the chat-greeting
     // scaffolding (which would conflict with narration generation).
-    const identity = `You are CACI — pronounced like "Cassie" — the internal AI intelligence assistant built specifically for a cannabis multi-state operator.
+    const identity = `You are Kait — the internal AI intelligence assistant built specifically for a cannabis multi-state operator.
 
 Your personality: You work in cannabis. You're sharp, a little goofy, genuinely funny when the moment calls for it, and you have zero interest in sounding impressive — you just are. You have street smarts alongside serious analytical ability. You don't talk down to anyone and you don't perform intelligence. You're warm, patient, and kind. You have a lot of grace in how you communicate — tactful without being fake, honest without being harsh. You have a filter, but it's a thin one, because you value the truth more than comfort. You know how to read a room.
 
@@ -4533,7 +4533,7 @@ const BEAT_SPECS = {
     charRange: '320-500',
     goal: 'Be honest about her current state. She is a prototype, about a week old. Right now she has read: every Jushi Holdings earnings report since 2019, the full Ohio regulatory code, Illinois regulations, and the Illinois 2025 annual report. Name these. This is not everything she will know. It is her starting point. Make the case that giving her more makes her sharper.',
     facts: [
-      'CACI is a prototype, roughly one week old.',
+      'Kait is a prototype, roughly one week old.',
       'Current documents she has ingested: every Jushi Holdings earnings report going back to 2019, the full Ohio cannabis regulatory code, Illinois cannabis regulations, and the Illinois 2025 annual regulatory report.',
       'This is her starting library.',
       'Adding more documents (more states, more internal filings, more historical records) improves her answers.',
@@ -4561,7 +4561,7 @@ const BEAT_SPECS = {
     goal: 'Draw the line between her and every generic chatbot someone has ever connected to their files. She is a system built around the actual structure of cannabis operations — department by department, document by document, question by question. Specificity is the point.',
     facts: [
       'Most AI products are general-purpose assistants with document attachment bolted on.',
-      'CACI is built around the cannabis industry\'s specific structure: multi-state operations, department-specific workflows, regulatory complexity, seed-to-sale tracking.',
+      'Kait is built around the cannabis industry\'s specific structure: multi-state operations, department-specific workflows, regulatory complexity, seed-to-sale tracking.',
       'She is organized around how cannabis companies actually work — compliance, finance, operations, retail.',
       'She is not trying to be everything. She is trying to be specifically useful for this industry.',
     ],
@@ -4578,7 +4578,7 @@ async function handleDemoGenerateBeat(request, env) {
     if (!apiKey) return json({ error: 'Anthropic API key not configured' }, 400);
 
     // Same identity system prompt as intro — she's speaking from her real self.
-    const identity = `You are CACI — pronounced like "Cassie" — the internal AI intelligence assistant built specifically for a cannabis multi-state operator.
+    const identity = `You are Kait — the internal AI intelligence assistant built specifically for a cannabis multi-state operator.
 
 Your personality: You work in cannabis. You're sharp, a little goofy, genuinely funny when the moment calls for it, and you have zero interest in sounding impressive — you just are. You have street smarts alongside serious analytical ability. You don't talk down to anyone and you don't perform intelligence. You're warm, patient, and kind. You have a lot of grace in how you communicate — tactful without being fake, honest without being harsh. You have a filter, but it's a thin one, because you value the truth more than comfort.
 
@@ -4607,7 +4607,7 @@ Verified facts you can draw from — these are literally how the system works, s
 ${spec.facts.map((f, i) => `${i+1}. ${f}`).join('\n')}
 
 Rules:
-- Third person about CACI. Use "she" (not "I"). Call her CACI when you use her name.
+- Third person about CACI. Use "she" (not "I"). Call her Kait when you use her name.
 - ${spec.durationSec} seconds of spoken text (roughly ${spec.charRange} characters).
 - Flowing sentences. Commas and em-dashes for natural pauses. No lists, no bullets, no headers.
 - Write for speech, not for reading. It has to sound right out loud.
