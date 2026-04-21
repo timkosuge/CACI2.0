@@ -10215,7 +10215,7 @@ window.addEventListener('beforeunload', () => {
       }
     },
 
-    // Background: targets background canvas only - never sidebar or topbar
+    // Background: targets background canvas AND sidebar - never topbar
     applyBg(level, save) {
       this.bgLevel = level;
       if (save) SafeStorage.setItem(this.bgKey(), level.toString());
@@ -10223,6 +10223,9 @@ window.addEventListener('beforeunload', () => {
       ['.chat-bg-overlay', '#app-glimmer'].forEach(sel => {
         document.querySelectorAll(sel).forEach(el => el.style.filter = f);
       });
+      // Sidebar brightness — but only in dark mode, light mode handles its own styling
+      const sidebar = document.getElementById('sidebar');
+      if (sidebar && this.theme() === 'dark') sidebar.style.filter = f;
     },
 
     // Text/content: targets chat content area only
