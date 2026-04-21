@@ -67,112 +67,122 @@
   }
 
   /* Controls */
-  /* ── CONTROL PANEL ── */
-  #ctrl{
-    position:fixed;bottom:20px;right:20px;
-    display:none;flex-direction:column;gap:0;z-index:100;
-    background:rgba(0,0,4,0.82);
-    border:1px solid rgba(200,160,50,0.25);
-    backdrop-filter:blur(8px);
-    min-width:180px;
-    overflow:hidden;
+  /* ══ DASHBOARD ══ */
+  #dashboard{
+    position:fixed;bottom:0;left:0;right:0;
+    height:72px;
+    background:rgba(0,0,4,0.88);
+    border-top:1px solid rgba(200,160,50,0.2);
+    backdrop-filter:blur(10px);
+    display:none;
+    align-items:center;
+    padding:0 24px;
+    gap:8px;
+    z-index:200;
   }
-  #ctrl-title{
-    padding:10px 16px 8px;
+  #dash-label{
     color:rgba(200,160,50,0.35);
-    font:9px 'Courier New',monospace;
+    font:10px 'Courier New',monospace;
     letter-spacing:0.4em;
-    border-bottom:1px solid rgba(200,160,50,0.1);
+    white-space:nowrap;
+    margin-right:8px;
+    padding-right:16px;
+    border-right:1px solid rgba(200,160,50,0.12);
   }
-  #ctrl-section{
-    padding:8px;
-    display:flex;flex-direction:column;gap:4px;
-  }
-  #ctrl-divider{
-    height:1px;background:rgba(200,160,50,0.08);margin:4px 0;
-  }
-  #ctrl button{
-    background:rgba(255,255,255,0.03);
-    border:1px solid rgba(200,160,50,0.18);
-    color:rgba(200,160,50,0.75);
-    font:11px 'Courier New',monospace;
-    letter-spacing:0.12em;
-    padding:9px 14px;
+  .dash-btn{
+    background:rgba(255,255,255,0.04);
+    border:1px solid rgba(200,160,50,0.22);
+    color:rgba(200,160,50,0.85);
+    font:12px 'Courier New',monospace;
+    letter-spacing:0.1em;
+    padding:10px 18px;
     cursor:pointer;
-    transition:all 0.18s;
-    text-align:left;
+    transition:all 0.15s;
+    white-space:nowrap;
     display:flex;align-items:center;gap:8px;
+    height:44px;
+  }
+  .dash-btn:hover{
+    background:rgba(200,160,50,0.1);
+    border-color:rgba(200,160,50,0.6);
+    color:#c9a832;
+  }
+  .dash-btn .kb{
+    font-size:10px;
+    color:rgba(200,160,50,0.3);
+    border:1px solid rgba(200,160,50,0.15);
+    padding:2px 5px;
+    margin-left:4px;
+  }
+  .dash-sep{
+    width:1px;height:36px;
+    background:rgba(200,160,50,0.1);
+    flex-shrink:0;
+    margin:0 4px;
+  }
+  .dash-btn.fly{
+    color:rgba(100,200,255,0.9);
+    border-color:rgba(100,200,255,0.25);
+  }
+  .dash-btn.fly:hover{
+    background:rgba(100,200,255,0.1);
+    border-color:rgba(100,200,255,0.7);
+    color:rgba(140,220,255,1);
+  }
+  .dash-btn.rec{
+    color:rgba(255,110,110,0.9);
+    border-color:rgba(255,80,80,0.25);
+  }
+  .dash-btn.rec:hover{
+    background:rgba(255,80,80,0.1);
+    border-color:rgba(255,110,110,0.7);
+    color:rgba(255,140,140,1);
+  }
+  #dash-ff-controls{
+    display:none;
+    align-items:center;
+    gap:6px;
+    margin-left:8px;
+    padding-left:16px;
+    border-left:1px solid rgba(100,200,255,0.15);
+  }
+  .ff-key{
+    background:rgba(100,200,255,0.06);
+    border:1px solid rgba(100,200,255,0.25);
+    color:rgba(100,200,255,0.8);
+    font:11px 'Courier New',monospace;
+    padding:6px 10px;
+    min-width:36px;
+    text-align:center;
     white-space:nowrap;
   }
-  #ctrl button:hover{
-    background:rgba(200,160,50,0.08);
-    border-color:rgba(200,160,50,0.5);
-    color:rgba(200,160,50,1);
+  .ff-desc{
+    color:rgba(100,200,255,0.4);
+    font:10px 'Courier New',monospace;
+    letter-spacing:0.1em;
+    margin:0 6px;
   }
-  #ctrl button .kb{
+  #dash-speed{
     margin-left:auto;
-    color:rgba(200,160,50,0.25);
-    font-size:9px;
-    letter-spacing:0.05em;
-  }
-  #ctrl .btn-fly{color:rgba(100,200,255,0.8);border-color:rgba(100,200,255,0.2);}
-  #ctrl .btn-fly:hover{background:rgba(100,200,255,0.08);border-color:rgba(100,200,255,0.5);color:rgba(100,200,255,1);}
-  #ctrl .btn-rec{color:rgba(255,100,100,0.8);border-color:rgba(255,80,80,0.2);}
-  #ctrl .btn-rec:hover{background:rgba(255,80,80,0.08);border-color:rgba(255,100,100,0.5);color:rgba(255,120,120,1);}
-
-  /* Loading */
-  #loading{
-    position:fixed;inset:0;background:#000;
-    display:flex;flex-direction:column;
-    align-items:center;justify-content:center;
-    gap:12px;z-index:999;transition:opacity 1.2s;
-  }
-  #loading h1{color:#c9a832;font:300 13px 'Courier New',monospace;letter-spacing:0.55em;}
-  #loading p{color:rgba(200,160,50,0.3);font:9px 'Courier New',monospace;letter-spacing:0.18em;}
-  #bar{width:180px;height:1px;background:rgba(200,160,50,0.1);}
-  #barFill{height:100%;background:rgba(200,160,50,0.5);width:0%;transition:width 0.35s;}
-
-  /* Arrival card */
-  #arrivalCard{
-    display:none;position:fixed;top:50%;left:50%;
-    transform:translate(-50%,-50%);z-index:300;
-    background:rgba(2,4,10,0.94);
-    border:1px solid rgba(200,160,50,0.35);
-    padding:36px 48px;text-align:center;
-    font-family:'Courier New',monospace;
-    max-width:420px;
-  }
-  #arrivalCard .arr-sub{color:rgba(200,160,50,0.4);font-size:9px;letter-spacing:0.45em;margin-bottom:14px;}
-  #arrivalCard .arr-name{color:#c9a832;font-size:16px;font-weight:300;letter-spacing:0.3em;margin-bottom:5px;}
-  #arrivalCard .arr-addr{color:rgba(200,160,50,0.45);font-size:9px;letter-spacing:0.2em;margin-bottom:22px;}
-  #arrivalCard .arr-stats{color:rgba(180,180,180,0.35);font-size:8px;letter-spacing:0.15em;line-height:2.4;margin-bottom:24px;}
-  #arrivalCard button{
-    background:transparent;border:1px solid rgba(200,160,50,0.35);
-    color:rgba(200,160,50,0.6);font:9px 'Courier New',monospace;
-    letter-spacing:0.22em;padding:10px 26px;cursor:pointer;
+    color:rgba(100,200,255,0.5);
+    font:10px 'Courier New',monospace;
+    letter-spacing:0.15em;
+    white-space:nowrap;
   }
 
-  /* Free fly HUD */
-  #ffHud{
-    display:none;position:fixed;inset:0;pointer-events:none;z-index:200;
-  }
-  #ffLegend{
-    position:absolute;top:16px;left:16px;
-    background:rgba(0,0,0,0.72);border:1px solid rgba(100,200,255,0.25);
-    padding:12px 16px;font:9px 'Courier New',monospace;
-    color:rgba(100,200,255,0.75);letter-spacing:0.14em;line-height:2.3;
-  }
-  #ffInfo{
-    position:absolute;bottom:45px;left:50%;transform:translateX(-50%);
-    color:rgba(100,200,255,0.45);font:9px 'Courier New',monospace;letter-spacing:0.2em;
-  }
+  /* Crosshair — free fly only */
   #crosshair{
-    position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-    width:18px;height:18px;
+    display:none;
+    position:fixed;top:50%;left:50%;
+    transform:translate(-50%,-50%);
+    width:20px;height:20px;
+    pointer-events:none;z-index:201;
   }
-  #crosshair::before,#crosshair::after{content:'';position:absolute;background:rgba(100,200,255,0.28);}
-  #crosshair::before{top:8px;left:0;width:18px;height:1px;}
-  #crosshair::after{top:0;left:8px;width:1px;height:18px;}
+  #crosshair::before,#crosshair::after{
+    content:'';position:absolute;background:rgba(100,200,255,0.35);
+  }
+  #crosshair::before{top:9px;left:0;width:20px;height:1px;}
+  #crosshair::after{top:0;left:9px;width:1px;height:20px;}
 
   /* Record status */
   #recStatus{
@@ -220,23 +230,7 @@
 <div id="progress"></div>
 <div id="hud"></div>
 
-<!-- Free fly overlay -->
-<div id="ffHud">
-  <div id="ffLegend">
-    <div style="color:rgba(100,200,255,1);letter-spacing:0.3em;margin-bottom:5px">FREE FLY</div>
-    W/↑ &nbsp; FORWARD<br>
-    S/↓ &nbsp; BACKWARD<br>
-    A/← &nbsp; LEFT<br>
-    D/→ &nbsp; RIGHT<br>
-    Q &nbsp;&nbsp;&nbsp;&nbsp; UP<br>
-    E &nbsp;&nbsp;&nbsp;&nbsp; DOWN<br>
-    DRAG &nbsp; LOOK<br>
-    SCROLL SPEED<br>
-    <div style="margin-top:6px;color:rgba(100,200,255,0.35)">ESC / F — exit</div>
-  </div>
-  <div id="crosshair"></div>
-  <div id="ffInfo"></div>
-</div>
+
 
 <!-- Arrival -->
 <div id="arrivalCard">
@@ -272,34 +266,50 @@
   <button class="rec-cancel" onclick="document.getElementById('recMenu').style.display='none'">CANCEL</button>
 </div>
 
-<!-- Controls -->
-<div id="ctrl">
-  <div id="ctrl-title">KAIT · MANHATTAN</div>
-  <div id="ctrl-section">
+<!-- Crosshair (free fly) -->
+<div id="crosshair"></div>
 
-    <button onclick="togglePause()" id="pauseBtn">
-      <span>⏸</span> PAUSE <span class="kb">SPACE</span>
-    </button>
-    <button onclick="resetFlight()">
-      <span>↺</span> RESTART <span class="kb">R</span>
-    </button>
-    <button onclick="toggleDayNight()" id="dnBtn">
-      <span>🌙</span> NIGHT MODE <span class="kb">N</span>
-    </button>
+<!-- Dashboard -->
+<div id="dashboard">
+  <div id="dash-label">KAIT · MANHATTAN</div>
 
-    <div id="ctrl-divider"></div>
+  <button class="dash-btn" onclick="togglePause()" id="pauseBtn">
+    ⏸ PAUSE <span class="kb">SPC</span>
+  </button>
+  <button class="dash-btn" onclick="resetFlight()">
+    ↺ RESTART <span class="kb">R</span>
+  </button>
+  <button class="dash-btn" onclick="toggleDayNight()" id="dnBtn">
+    🌙 NIGHT <span class="kb">N</span>
+  </button>
 
-    <button class="btn-fly" onclick="toggleFreefly()" id="ffBtn">
-      <span>🕹</span> FREE FLY <span class="kb">F</span>
-    </button>
+  <div class="dash-sep"></div>
 
-    <div id="ctrl-divider"></div>
+  <button class="dash-btn fly" onclick="toggleFreefly()" id="ffBtn">
+    🕹 FREE FLY <span class="kb">F</span>
+  </button>
 
-    <button class="btn-rec" onclick="document.getElementById('recMenu').style.display='flex'">
-      <span>⏺</span> RECORD VIDEO
-    </button>
-
+  <!-- Free fly controls — shown when active -->
+  <div id="dash-ff-controls">
+    <span class="ff-key">W/↑</span><span class="ff-desc">FWD</span>
+    <span class="ff-key">S/↓</span><span class="ff-desc">BACK</span>
+    <span class="ff-key">A/←</span><span class="ff-desc">LEFT</span>
+    <span class="ff-key">D/→</span><span class="ff-desc">RIGHT</span>
+    <span class="ff-key">Q</span><span class="ff-desc">UP</span>
+    <span class="ff-key">E</span><span class="ff-desc">DOWN</span>
+    <span class="ff-key">DRAG</span><span class="ff-desc">LOOK</span>
+    <span class="ff-key">SCROLL</span><span class="ff-desc">SPEED</span>
+    <span class="ff-key">Q+E</span><span class="ff-desc">SPIN</span>
+    <span class="ff-key">ESC</span><span class="ff-desc">EXIT</span>
   </div>
+
+  <div id="dash-speed"></div>
+
+  <div class="dash-sep" style="margin-left:auto"></div>
+
+  <button class="dash-btn rec" onclick="document.getElementById('recMenu').style.display='flex'">
+    ⏺ RECORD
+  </button>
 </div>
 <div id="recStatus"></div>
 
@@ -563,7 +573,7 @@ async function init(){
   const ld=document.getElementById('loading');
   ld.style.opacity='0';
   setTimeout(()=>{ld.style.display='none';},1200);
-  document.getElementById('ctrl').style.display='flex';
+  document.getElementById('dashboard').style.display='flex';
   beginFlight();
 }
 
@@ -855,9 +865,10 @@ function toggleFreefly(){ffActive?exitFF():enterFF();}
 function enterFF(){
   ffActive=true;
   if(!paused)togglePause();
-  document.getElementById('ffHud').style.display='block';
-  document.getElementById('ffBtn').textContent='🔴 EXIT FREE FLY';
-  document.getElementById('ffBtn').style.color='rgba(255,100,100,0.85)';
+  document.getElementById('dash-ff-controls').style.display='flex';
+  document.getElementById('crosshair').style.display='block';
+  document.getElementById('ffBtn').textContent='🔴 EXIT';
+  document.getElementById('ffBtn').style.color='rgba(255,100,100,0.9)';
   document.getElementById('pauseBtn').disabled=true;
   viewer.canvas.addEventListener('mousedown',ffMD);
   viewer.canvas.addEventListener('mouseup',ffMU);
@@ -874,9 +885,10 @@ function exitFF(){
   viewer.canvas.removeEventListener('mouseup',ffMU);
   viewer.canvas.removeEventListener('mousemove',ffMV);
   viewer.canvas.removeEventListener('wheel',ffWH);
-  document.getElementById('ffHud').style.display='none';
+  document.getElementById('dash-ff-controls').style.display='none';
+  document.getElementById('crosshair').style.display='none';
   document.getElementById('ffBtn').textContent='🕹 FREE FLY';
-  document.getElementById('ffBtn').style.color='rgba(100,200,255,0.6)';
+  document.getElementById('ffBtn').style.color='';
   document.getElementById('pauseBtn').disabled=false;
 }
 
@@ -905,11 +917,14 @@ function ffRun(){
   if(ffKeys['d']||ffKeys['arrowright']) viewer.camera.moveRight(s*0.8);
   if(ffKeys['q']) viewer.camera.moveUp(s);
   if(ffKeys['e']) viewer.camera.moveDown(s);
+  // Spin / roll — Z and X keys
+  if(ffKeys['z']) viewer.camera.twistLeft(0.02);
+  if(ffKeys['x']) viewer.camera.twistRight(0.02);
   const moving=Object.values(ffKeys).some(Boolean)||ffMouseDown;
   if(moving){
     const h=Math.round(viewer.camera.positionCartographic.height);
     document.getElementById('ffInfo').textContent=
-      `${Math.round(ffSpeed)}m/s · ${h}m alt`;
+      `${Math.round(ffSpeed)} m/s · ${h}m`;
   }
   ffRafId=requestAnimationFrame(ffRun);
 }
