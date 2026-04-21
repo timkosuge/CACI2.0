@@ -1081,6 +1081,10 @@ function ffLoop(){
   if(FF.keys['q'])                          viewer.camera.moveUp(s);         // rise
   if(FF.keys['e'])                          viewer.camera.moveDown(s);       // descend
 
+  // ── BARREL ROLL — [ and ] ──
+  if(FF.keys['['])  viewer.camera.twistLeft(0.04);
+  if(FF.keys[']'])  viewer.camera.twistRight(0.04);
+
   // ── ROTATION (look/spin) ──
   // Arrow left/right = spin/yaw (turn left and right, full 360)
   const turnRate = 0.8 * dt;
