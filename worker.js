@@ -4898,47 +4898,48 @@ async function handleDemoHarvestStats(request, env) {
         query: 'Illinois total cannabis sales revenue adult-use 2024 2025 annual billion million growth',
         scope: 'Illinois 2025 annual report',
         maxChunks: 3,
+        sourceFilter: ['illinois'],
       },
       {
-        topic: 'illinois_tax_social',
-        query: 'Illinois cannabis tax revenue community reinvestment fund social equity expungement 2024 2025',
+        topic: 'illinois_social_equity',
+        query: 'Illinois cannabis social equity community reinvestment expungement license diversity applicant 2024 2025',
         scope: 'Illinois 2025 annual report',
         maxChunks: 3,
+        sourceFilter: ['illinois'],
       },
       {
         topic: 'illinois_licenses',
-        query: 'Illinois dispensary cultivation processor license count social equity craft grower 2024 2025',
+        query: 'Illinois dispensary cultivation processor craft grower license count permits issued active 2024 2025',
         scope: 'Illinois 2025 annual report',
         maxChunks: 2,
+        sourceFilter: ['illinois'],
       },
       {
         topic: 'ohio_patient_limits',
         query: 'Ohio patient purchase limit possession flower THC milligrams ounces transport caregiver day',
         scope: 'Ohio regulatory code',
         maxChunks: 3,
+        sourceFilter: ['ohio', 'oh_', 'oh-', 'oh 1301', 'oh rp', 'oh_1301', 'oh_rp'],
       },
       {
-        topic: 'ohio_market_rules',
-        query: 'Ohio adult-use dispensary license count testing requirement cultivator processor permit fee 2024 2025',
+        topic: 'ohio_market_structure',
+        query: 'Ohio adult-use dispensary license count testing cultivator processor permit fee application',
         scope: 'Ohio regulatory code',
-        maxChunks: 2,
+        maxChunks: 3,
+        sourceFilter: ['ohio', 'oh_', 'oh-', 'oh 1301', 'oh rp', 'oh_1301', 'oh_rp'],
       },
       {
         topic: 'ohio_compliance',
-        query: 'Ohio cannabis compliance violation penalty fine enforcement inspection security requirement',
+        query: 'Ohio cannabis compliance penalty fine violation inspection security surveillance record retention',
         scope: 'Ohio regulatory code',
         maxChunks: 2,
+        sourceFilter: ['ohio', 'oh_', 'oh-', 'oh 1301', 'oh rp', 'oh_1301', 'oh_rp'],
       },
     ];
 
-    // Retrieve chunks for each query. The retrieval function lives in the
-    // app but we need a lightweight version here — query KV for relevant chunks.
-    // For this harvest we use a simpler approach: read all chunks from each
-    // uploaded doc's collection and pass them to Claude with the topic query.
-    // Performance: 4 sequential Claude calls, ~5-10s total.
     const retrievedPerTopic = [];
-    for (const { topic, query, scope, maxChunks } of topicQueries) {
-      const { text, diag } = await harvestRetrieveContext(env, query, maxChunks || 3);
+    for (const { topic, query, scope, maxChunks, sourceFilter } of topicQueries) {
+      const { text, diag } = await harvestRetrieveContext(env, query, maxChunks || 3, sourceFilter || null);
       retrievedPerTopic.push({ topic, query, scope, context: text, diag });
     }
 
@@ -5068,7 +5069,7 @@ Return ONLY the JSON object. No preamble, no markdown.`;
 // it uses `env.CACI_KV.list({prefix: 'file:'})` to find every file record
 // directly. This works regardless of which departments exist or what they're
 // named, and surfaces a diagnostic path even if the department index is stale.
-async function harvestRetrieveContext(env, query, maxChunks = 4) {
+async function harvestRetrieveContext(env, query, maxChunks = 4, sourceFilter = null) {
   try {
     const keywords = query.toLowerCase().split(/\s+/).filter(w => w.length > 3);
     if (keywords.length === 0) return { text: '', diag: { reason: 'no-keywords' } };
@@ -5106,6 +5107,9 @@ async function harvestRetrieveContext(env, query, maxChunks = 4) {
       if (chunks.length > 0) filesWithChunks++;
       const fileName = fileRec.name || fileRec.filename || fileRec.id || fkey.name;
       const fileNameLower = fileName.toLowerCase();
+
+      // If a source filter is set, only scan files matching that filter
+      if (sourceFilter && !sourceFilter.some(p => fileNameLower.includes(p))) continue;
 
       // Skip operator-specific financial/earnings documents — we only want
       // market-level and regulatory data for the demo stats display.
