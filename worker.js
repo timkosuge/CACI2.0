@@ -4892,24 +4892,24 @@ async function handleDemoHarvestStats(request, env) {
     // already exists in the app — we reuse it by calling the same helpers.
     const topicQueries = [
       {
-        topic: 'revenue',
-        query: '2024 2025 total cannabis sales revenue adult-use medical Illinois market annual figures',
+        topic: 'illinois_sales',
+        query: 'Illinois adult-use cannabis total sales revenue 2024 2025 annual market figures billion million',
         scope: 'Illinois 2025 annual report',
       },
       {
-        topic: 'licensing',
-        query: '2025 current dispensary license count operators active medical adult-use',
+        topic: 'illinois_licenses',
+        query: 'Illinois dispensary license count operators cultivators processors transporters active 2024 2025',
         scope: 'Illinois 2025 annual report',
       },
       {
-        topic: 'regulatory',
-        query: '2025 2024 compliance requirements testing regulation sections chapters rules',
-        scope: 'Ohio regulatory code, Illinois regulations',
+        topic: 'illinois_tax',
+        query: 'Illinois cannabis tax revenue collections 2024 2025 fund distributions community reinvestment',
+        scope: 'Illinois 2025 annual report',
       },
       {
-        topic: 'collections',
-        query: '2024 2025 cannabis tax revenue collections fund distributions community reinvestment Illinois',
-        scope: 'Illinois 2025 annual report',
+        topic: 'ohio_regulatory',
+        query: 'Ohio cannabis dispensary license adult-use medical patient count regulation 2024 2025',
+        scope: 'Ohio regulatory code',
       },
     ];
 
@@ -5079,6 +5079,15 @@ async function harvestRetrieveContext(env, query) {
       if (chunks.length > 0) filesWithChunks++;
       const fileName = fileRec.name || fileRec.filename || fileRec.id || fkey.name;
       const fileNameLower = fileName.toLowerCase();
+
+      // Skip operator-specific financial/earnings documents — we only want
+      // market-level and regulatory data for the demo stats display.
+      const SKIP_PATTERNS = [
+        'jushi', 'intelligence_layer', 'earnings', 'transcript', 'investor',
+        'annual_report_operator', '10-k', '10k', 'quarterly', 'q1_', 'q2_',
+        'q3_', 'q4_', 'fy20', 'fy21', 'fy22', 'fy23', 'fy24', 'fy25',
+      ];
+      if (SKIP_PATTERNS.some(p => fileNameLower.includes(p))) continue;
       // File-level recency boost: if the filename mentions a year, apply that boost
       // to every chunk from this file. This pushes docs like "Jushi 2025 Q4" ahead
       // of "Jushi 2022 Q4" even if the 2022 doc has more numeric density.
