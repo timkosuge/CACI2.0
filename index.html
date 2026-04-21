@@ -4390,27 +4390,29 @@ body[data-theme="light"] .login-frame-box {
 .msg.user { flex-direction: row; align-self: flex-start; max-width: 88%; }
 .msg.ai { max-width: 90%; }
 .msg-av {
-  width: 28px; height: 28px;
-  border-radius: 3px;
+  width: 32px; height: 32px;
+  border-radius: 4px;
   display: flex; align-items: center; justify-content: center;
-  font-family: var(--f-mono);
-  font-size: 9px;
-  font-weight: 500;
-  letter-spacing: 0.05em;
+  font-family: var(--f-ui);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   flex-shrink: 0;
   margin-top: 2px;
+  text-transform: uppercase;
 }
 .msg.user .msg-av {
   background: linear-gradient(135deg, var(--gold-metal-2) 0%, var(--gold-metal-3) 50%, var(--gold-metal-4) 100%);
   color: var(--ink);
   box-shadow: 0 1px 4px rgba(212,168,50,0.35);
+  font-size: 11px;
 }
 .msg.ai .msg-av {
   background: var(--ink3);
   color: var(--gold-lt);
   border: 1px solid var(--line2);
-  font-size: 8px;
-  letter-spacing: 0.1em;
+  font-size: 9px;
+  letter-spacing: 0.06em;
 }
 .msg-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .msg-scope {
@@ -11491,7 +11493,7 @@ async function sendChat() {
     // Create a live bubble for streaming text
     const msgEl = document.createElement('div');
     msgEl.className = 'msg ai';
-    const streamAv = 'CACI';
+    const streamAv = 'Kait';
     const streamSc = body.scope && body.scope !== 'all' ? `<div class="msg-scope">Scope: ${body.scope === 'collection' ? chatCollection : body.scope}</div>` : '';
     msgEl.innerHTML = `<div class="msg-av">${streamAv}</div><div class="msg-body">${streamSc}<div class="msg-bubble" id="stream-bubble-${Date.now()}"></div></div>`;
     $('chat-msgs').appendChild(msgEl);
@@ -11570,7 +11572,7 @@ function appendMsg(role, text, sources, scope, model = '', responseId = '', imag
   const el = document.createElement('div');
   el.className = 'msg ' + role;
   const displayName = sessionStorage.getItem('caci_displayname') || '';
-  const av = role === 'user' ? (getInitials(displayName) || 'YOU') : 'CACI';
+  const av = role === 'user' ? (getInitials(displayName) || 'YOU') : 'Kait';
   const imgHtml = (role === 'user' && imageDataUrl) ? `<img class="msg-image" src="${imageDataUrl}" alt="attached image"/>` : '';
   
   // Make sources clickable - each source becomes a link that opens the document viewer
@@ -12445,7 +12447,7 @@ function deleteResponse(id) {
 function appendTyping() {
   const el = document.createElement('div');
   el.className = 'msg ai';
-  el.innerHTML = `<div class="msg-av">CACI</div><div class="msg-body"><div class="msg-bubble"><div class="typing-wrap"><div class="td"></div><div class="td"></div><div class="td"></div></div></div></div>`;
+  el.innerHTML = `<div class="msg-av">Kait</div><div class="msg-body"><div class="msg-bubble"><div class="typing-wrap"><div class="td"></div><div class="td"></div><div class="td"></div></div></div></div>`;
   $('chat-msgs').appendChild(el);
   el.scrollIntoView({block:'end', behavior:'smooth'});
   return el;
