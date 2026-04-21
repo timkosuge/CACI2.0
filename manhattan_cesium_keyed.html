@@ -665,10 +665,19 @@ function applyTimeOfDay(){
   viewer.clock.currentTime=Cesium.JulianDate.fromDate(d);
   viewer.clock.shouldAnimate=false;
   viewer.scene.skyAtmosphere.show=true;
-  viewer.scene.skyAtmosphere.brightnessShift=isNight?-0.45:0.05;
-  viewer.scene.skyAtmosphere.saturationShift=isNight?0.15:0.0;
+  viewer.scene.skyAtmosphere.brightnessShift=isNight?-0.85:0.05;  // much darker
+  viewer.scene.skyAtmosphere.saturationShift=isNight?-0.5:0.0;    // desaturate sky
+  viewer.scene.skyAtmosphere.hueShift=isNight?0.0:0.0;
   viewer.scene.skyBox.show=true;
   viewer.scene.moon.show=isNight;
+  // Also darken the globe/tiles directly
+  if(window._googleTileset){
+    window._googleTileset.luminanceAtZenith = isNight ? 0.025 : 0.5;
+  }
+  viewer.scene.globe.atmosphereLightIntensity = isNight ? 2.0 : 10.0;
+  viewer.scene.globe.atmosphereRayleighCoefficient = isNight ?
+    new Cesium.Cartesian3(1.36e-3, 3.0e-3, 6.6e-3) :
+    new Cesium.Cartesian3(5.5e-6, 13.0e-6, 28.4e-6);
 }
 
 function toggleDayNight(){
