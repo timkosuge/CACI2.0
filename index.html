@@ -257,119 +257,110 @@ body:not([data-theme="light"]) .theme-toggle .theme-toggle-moon { display: none;
    Uses !important on background because the original #sidebar rule sets
    heavy inset dark shadows that compete visually. */
 body[data-theme="light"] #sidebar {
-  background: #EEF2F7 !important;
+  background: linear-gradient(180deg, #0d1525 0%, #0a101e 100%) !important;
   box-shadow:
-    inset -1px 0 0 rgba(30, 58, 95, 0.12),
-    2px 0 8px rgba(30, 58, 95, 0.06) !important;
+    inset -1px 0 0 rgba(212,168,50,0.15),
+    4px 0 16px rgba(0,0,0,0.25) !important;
 }
-/* Kill the scanline overlay in light mode — it's invisible on dark,
-   but on light bg it creates unwanted striping */
 body[data-theme="light"] #sidebar::after {
   display: none !important;
 }
-/* Force all sidebar inner regions to transparent so they inherit the
-   sidebar's light bg, instead of accidentally pulling any dark treatment. */
 body[data-theme="light"] .sb-nav,
 body[data-theme="light"] .sb-depts,
 body[data-theme="light"] .sb-footer {
   background: transparent !important;
 }
-/* And explicitly clear any backgrounds on the inner nav/dept areas */
 body[data-theme="light"] #sb-nav,
 body[data-theme="light"] #sb-depts {
   background: transparent !important;
 }
 body[data-theme="light"] #sidebar::before {
-  /* Kill the gold glimmering right edge — too loud on a light bg */
   background: linear-gradient(180deg,
     transparent 0%,
-    rgba(30, 58, 95, 0.15) 30%,
-    rgba(30, 58, 95, 0.25) 50%,
-    rgba(30, 58, 95, 0.15) 70%,
+    rgba(212,168,50,0.20) 30%,
+    rgba(212,168,50,0.35) 50%,
+    rgba(212,168,50,0.20) 70%,
     transparent 100%
   );
-  opacity: 0.55;
+  opacity: 0.6;
 }
 
-/* Sidebar toggle chevron button */
+/* Sidebar toggle chevron */
 body[data-theme="light"] #sb-toggle {
-  background: linear-gradient(90deg, #FFFFFF 0%, #F5F7FA 100%);
-  border-color: rgba(30, 58, 95, 0.30);
-  color: rgba(30, 58, 95, 0.70);
+  background: linear-gradient(90deg, #0d1525 0%, #0a101e 100%);
+  border-color: rgba(212,168,50,0.25);
+  color: rgba(212,168,50,0.70);
 }
 body[data-theme="light"] #sb-toggle:hover {
-  color: var(--gold);
-  border-color: var(--line3);
+  color: rgba(212,168,50,1.0);
+  border-color: rgba(212,168,50,0.50);
 }
 
-/* Sidebar header (the CACI brand area at top) — stays premium dark as an
-   anchor, matching the login card treatment. Small dark "badge" on the
-   light sidebar. */
+/* Sidebar header — keep dark, matches overall sidebar */
 body[data-theme="light"] .sb-header {
   background: linear-gradient(160deg, #0a0f1c 0%, #050810 100%);
 }
 
-/* Nav items — translucent gold text doesn't read on light; use deep steel */
+/* Nav items — gold text on dark sidebar */
 body[data-theme="light"] .nav-btn {
-  color: rgba(30, 58, 95, 0.80);
+  color: rgba(212,168,50,0.65);
 }
 body[data-theme="light"] .nav-btn:hover {
-  background: rgba(30, 58, 95, 0.06);
-  color: rgba(30, 58, 95, 0.95);
-  border-color: rgba(30, 58, 95, 0.15);
-  box-shadow: 0 1px 3px rgba(30, 58, 95, 0.08);
+  background: rgba(212,168,50,0.08);
+  color: rgba(212,168,50,0.95);
+  border-color: rgba(212,168,50,0.18);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
 }
 body[data-theme="light"] .nav-btn.active {
-  background: rgba(30, 58, 95, 0.08);
-  color: #1E3A5F;
-  text-shadow: none;
+  background: rgba(212,168,50,0.12);
+  color: #e8c84a;
+  text-shadow: 0 0 12px rgba(212,168,50,0.3);
   border-color: transparent;
-  border-bottom-color: rgba(30, 58, 95, 0.25);
-  box-shadow:
-    inset 0 1px 3px rgba(30, 58, 95, 0.10),
-    0 1px 0 rgba(255, 255, 255, 0.5);
+  border-bottom-color: rgba(212,168,50,0.30);
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
 }
 body[data-theme="light"] .nav-btn::before {
-  background: linear-gradient(90deg, transparent, #3B6FA8, #1E3A5F, transparent);
+  background: linear-gradient(90deg, transparent, rgba(212,168,50,0.6), rgba(212,168,50,0.4), transparent);
 }
 
-/* Department buttons (lower sidebar section) — same treatment */
+/* Department label */
+body[data-theme="light"] .sb-divider,
+body[data-theme="light"] .sb-section-label,
+body[data-theme="light"] .sb-dept-label {
+  color: rgba(212,168,50,0.40) !important;
+  border-color: rgba(212,168,50,0.12) !important;
+}
+
+/* Department buttons */
 body[data-theme="light"] .dept-btn {
-  color: rgba(30, 58, 95, 0.72);
+  color: rgba(212,168,50,0.60);
 }
 body[data-theme="light"] .dept-btn:hover {
-  color: rgba(30, 58, 95, 0.95);
-  border-color: rgba(30, 58, 95, 0.12);
-  box-shadow: 0 1px 2px rgba(30, 58, 95, 0.06);
+  color: rgba(212,168,50,0.90);
+  border-color: rgba(212,168,50,0.15);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
 }
 body[data-theme="light"] .dept-btn.active {
-  color: #1E3A5F;
-  text-shadow: none;
-  border-bottom-color: rgba(30, 58, 95, 0.22);
-  box-shadow:
-    inset 0 1px 3px rgba(30, 58, 95, 0.08),
-    0 1px 0 rgba(255, 255, 255, 0.4);
+  color: #e8c84a;
+  text-shadow: 0 0 10px rgba(212,168,50,0.25);
+  border-bottom-color: rgba(212,168,50,0.28);
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.15);
 }
 body[data-theme="light"] .dept-btn::before {
-  background: linear-gradient(90deg, transparent, #3B6FA8, transparent);
+  background: linear-gradient(90deg, transparent, rgba(212,168,50,0.5), transparent);
 }
 
-/* Sidebar footer — the small user card + model chip at bottom */
+/* Sidebar footer */
 body[data-theme="light"] .sb-footer {
-  border-top: 1px solid rgba(30, 58, 95, 0.14);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.5),
-    0 -1px 2px rgba(30, 58, 95, 0.04);
+  border-top: 1px solid rgba(212,168,50,0.15);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
 }
 
-/* Topbar — was a dark gradient with gold bottom border. Now a clean
-   white bar with subtle steel-blue border. */
+/* Topbar — dark in light mode to match sidebar */
 body[data-theme="light"] #topbar {
-  background: linear-gradient(180deg, #FFFFFF 0%, #F5F7FA 100%);
-  border-bottom: 1px solid rgba(30, 58, 95, 0.12);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 1),
-    0 2px 8px rgba(30, 58, 95, 0.04);
+  background: linear-gradient(180deg, #0d1525 0%, #0a101e 100%);
+  border-bottom: 1px solid rgba(212,168,50,0.18);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.3);
 }
 
 /* Bottom chat input bar — was dark with gold accent border.
@@ -936,188 +927,129 @@ body[data-theme="light"] .online-dot {
   background: #22C55E !important;
 }
 
-/* Any remaining dark panels that might still be black */
-body[data-theme="light"] .bg-panel,
-body[data-theme="light"] .panel-dark,
-body[data-theme="light"] .dark-panel {
-  background: #FFFFFF !important;
-  color: #0F172A !important;
-  border-color: rgba(30, 58, 95, 0.15) !important;
-}
+/* ── Light mode: dark chrome with gold accents throughout ── */
 
-/* ── Light mode fix wave 3 — elements still invisible from screenshot ── */
+/* Topbar logo and module */
+body[data-theme="light"] .tb-logo { color: #c9a832 !important; }
+body[data-theme="light"] .tb-module { color: rgba(212,168,50,0.55) !important; }
+body[data-theme="light"] .tb-sep { background: linear-gradient(180deg, transparent, rgba(212,168,50,0.25), transparent) !important; }
 
-/* Topbar logo (CACI text) and module label (Intelligence) */
-body[data-theme="light"] .tb-logo {
-  color: #1E3A5F !important;
+/* Topbar chips */
+body[data-theme="light"] #tb-dept,
+body[data-theme="light"] #tb-status,
+body[data-theme="light"] #tb-user,
+body[data-theme="light"] #tb-user-chip,
+body[data-theme="light"] .topbar-dept,
+body[data-theme="light"] .topbar-status,
+body[data-theme="light"] .topbar-user,
+body[data-theme="light"] .tb-pill,
+body[data-theme="light"] .dept-chip,
+body[data-theme="light"] .tb-status,
+body[data-theme="light"] .tb-model-chip {
+  background: rgba(4,6,14,0.70) !important;
+  color: rgba(212,168,50,0.80) !important;
+  border: 1px solid rgba(212,168,50,0.22) !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3) !important;
 }
-body[data-theme="light"] .tb-module {
-  color: rgba(30, 58, 95, 0.65) !important;
-}
-body[data-theme="light"] .tb-sep {
-  background: linear-gradient(180deg, transparent, rgba(30, 58, 95, 0.20), transparent) !important;
-}
+body[data-theme="light"] .dept-chip .dc-name,
+body[data-theme="light"] .dept-chip .dc-caret,
+body[data-theme="light"] .tb-status .tb-status-text,
+body[data-theme="light"] .tb-model-chip .tmc-name { color: rgba(212,168,50,0.80) !important; }
+body[data-theme="light"] #tb-user-chip { background: rgba(4,6,14,0.70) !important; border-color: rgba(212,168,50,0.22) !important; }
+body[data-theme="light"] #tb-user-chip svg { color: rgba(212,168,50,0.55) !important; }
+body[data-theme="light"] #tb-user-name { color: rgba(212,168,50,0.80) !important; }
+body[data-theme="light"] #tb-user-role { color: rgba(212,168,50,0.45) !important; }
 
-/* Scope bar (CONTEXT | ALL FILES | collection pills) */
-body[data-theme="light"] .scope-bar {
-  background: transparent !important;
-  border-color: rgba(30, 58, 95, 0.12) !important;
-}
-body[data-theme="light"] .scope-btn {
-  color: rgba(30, 58, 95, 0.55) !important;
-  border-color: rgba(30, 58, 95, 0.15) !important;
-  background: #FFFFFF !important;
-}
-body[data-theme="light"] .scope-btn.active {
-  color: #1E3A5F !important;
-  background: rgba(30, 58, 95, 0.08) !important;
-  border-color: rgba(30, 58, 95, 0.25) !important;
-}
-body[data-theme="light"] .scope-btn:hover {
-  color: #1E3A5F !important;
-  background: rgba(30, 58, 95, 0.05) !important;
-}
-/* Collection name pills next to scope buttons */
-body[data-theme="light"] .col-pill,
-body[data-theme="light"] .scope-pill,
-body[data-theme="light"] .coll-tab {
-  color: rgba(30, 58, 95, 0.65) !important;
-  border-color: rgba(30, 58, 95, 0.15) !important;
-  background: #FFFFFF !important;
-}
-
-/* Switch Collection / col-picker button */
-body[data-theme="light"] .col-picker-btn,
-body[data-theme="light"] #col-picker-btn {
-  background: #FFFFFF !important;
-  color: #1E3A5F !important;
-  border-color: rgba(30, 58, 95, 0.22) !important;
-}
-body[data-theme="light"] .col-picker-btn:hover {
-  background: rgba(30, 58, 95, 0.05) !important;
-  border-color: rgba(30, 58, 95, 0.35) !important;
-}
-body[data-theme="light"] .col-picker-dropdown {
-  background: #FFFFFF !important;
-  border-color: rgba(30, 58, 95, 0.18) !important;
-  box-shadow: 0 8px 24px rgba(30, 58, 95, 0.12) !important;
-}
-
-/* Chat bar (bottom input area) */
-body[data-theme="light"] #chat-bar,
-body[data-theme="light"] .chat-bar {
-  background: #FFFFFF !important;
-  border-top: 1px solid rgba(30, 58, 95, 0.12) !important;
-}
-body[data-theme="light"] .chat-bar-inner {
-  background: transparent !important;
-}
-body[data-theme="light"] #chat-ta,
-body[data-theme="light"] .chat-ta {
-  background: transparent !important;
-  color: #0F172A !important;
-}
-body[data-theme="light"] #chat-ta::placeholder,
-body[data-theme="light"] .chat-ta::placeholder {
-  color: rgba(30, 58, 95, 0.38) !important;
-}
-
-/* Brightness button and theme toggle in topbar (our new buttons) */
+/* Brightness and theme toggle */
 body[data-theme="light"] #tb-brightness-btn {
-  background: #FFFFFF !important;
-  border-color: rgba(30, 58, 95, 0.22) !important;
+  background: rgba(4,6,14,0.70) !important;
+  border-color: rgba(212,168,50,0.22) !important;
 }
-body[data-theme="light"] #tb-brightness-btn svg {
-  stroke: rgba(30, 58, 95, 0.65) !important;
-}
-body[data-theme="light"] #tb-brightness-btn:hover {
-  background: rgba(30, 58, 95, 0.05) !important;
-  border-color: rgba(30, 58, 95, 0.40) !important;
-}
+body[data-theme="light"] #tb-brightness-btn svg { stroke: rgba(212,168,50,0.65) !important; }
+body[data-theme="light"] #tb-brightness-btn:hover { background: rgba(212,168,50,0.12) !important; border-color: rgba(212,168,50,0.45) !important; }
 body[data-theme="light"] #tb-brightness-panel {
-  background: linear-gradient(135deg, #FFFFFF 0%, #F5F7FA 100%) !important;
-  border-color: rgba(30, 58, 95, 0.20) !important;
-  box-shadow: 0 8px 24px rgba(30, 58, 95, 0.12) !important;
+  background: linear-gradient(135deg, #0d1525 0%, #0a101e 100%) !important;
+  border-color: rgba(212,168,50,0.25) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4) !important;
 }
 body[data-theme="light"] #tb-brightness-panel span,
 body[data-theme="light"] #tb-bg-val,
-body[data-theme="light"] #tb-text-val {
-  color: rgba(30, 58, 95, 0.65) !important;
-}
-body[data-theme="light"] #theme-toggle {
-  background: #FFFFFF !important;
-  border-color: rgba(30, 58, 95, 0.22) !important;
-}
-body[data-theme="light"] #theme-toggle svg {
-  stroke: rgba(30, 58, 95, 0.65) !important;
-}
-body[data-theme="light"] #theme-toggle:hover {
-  background: rgba(30, 58, 95, 0.05) !important;
-  border-color: rgba(30, 58, 95, 0.40) !important;
-}
+body[data-theme="light"] #tb-sidebar-val,
+body[data-theme="light"] #tb-text-val { color: rgba(212,168,50,0.65) !important; }
+body[data-theme="light"] #theme-toggle { background: rgba(4,6,14,0.70) !important; border-color: rgba(212,168,50,0.22) !important; }
+body[data-theme="light"] #theme-toggle svg { stroke: rgba(212,168,50,0.65) !important; }
+body[data-theme="light"] #theme-toggle:hover { background: rgba(212,168,50,0.12) !important; border-color: rgba(212,168,50,0.45) !important; }
 
-/* Sidebar nav section label (DEPARTMENT) */
-body[data-theme="light"] .sb-divider,
-body[data-theme="light"] .sb-section-label,
-body[data-theme="light"] .sb-dept-label {
-  color: rgba(30, 58, 95, 0.45) !important;
-  border-color: rgba(30, 58, 95, 0.12) !important;
-}
+/* Scope bar */
+body[data-theme="light"] .scope-bar { background: transparent !important; border-color: rgba(212,168,50,0.15) !important; }
+body[data-theme="light"] .scope-btn { background: rgba(4,6,14,0.60) !important; color: rgba(212,168,50,0.60) !important; border-color: rgba(212,168,50,0.18) !important; }
+body[data-theme="light"] .scope-btn.active { background: rgba(212,168,50,0.15) !important; color: #e8c84a !important; border-color: rgba(212,168,50,0.35) !important; }
+body[data-theme="light"] .scope-btn:hover { background: rgba(212,168,50,0.10) !important; color: rgba(212,168,50,0.90) !important; }
+body[data-theme="light"] .col-pill,
+body[data-theme="light"] .scope-pill { background: rgba(4,6,14,0.55) !important; color: rgba(212,168,50,0.65) !important; border-color: rgba(212,168,50,0.18) !important; }
 
-/* Action buttons below AI responses (LISTEN, DOWNLOAD, SAVE, COPY, SHARP, MISSED, INCOMPLETE) */
-body[data-theme="light"] .msg-actions {
-  background: transparent !important;
-}
+/* Switch Collection */
+body[data-theme="light"] .col-picker-btn,
+body[data-theme="light"] #col-picker-btn { background: rgba(4,6,14,0.65) !important; color: rgba(212,168,50,0.75) !important; border-color: rgba(212,168,50,0.22) !important; }
+body[data-theme="light"] .col-picker-btn:hover { background: rgba(212,168,50,0.12) !important; border-color: rgba(212,168,50,0.40) !important; }
+body[data-theme="light"] .col-picker-dropdown { background: #0d1525 !important; border-color: rgba(212,168,50,0.20) !important; box-shadow: 0 8px 24px rgba(0,0,0,0.4) !important; }
+
+/* Chat bar */
+body[data-theme="light"] #chat-bar,
+body[data-theme="light"] .chat-bar { background: rgba(4,6,14,0.80) !important; border-top: 1px solid rgba(212,168,50,0.15) !important; }
+body[data-theme="light"] .chat-bar-inner { background: transparent !important; }
+body[data-theme="light"] #chat-ta,
+body[data-theme="light"] .chat-ta { background: transparent !important; color: rgba(212,168,50,0.85) !important; }
+body[data-theme="light"] #chat-ta::placeholder,
+body[data-theme="light"] .chat-ta::placeholder { color: rgba(212,168,50,0.30) !important; }
+
+/* Action buttons */
+body[data-theme="light"] .msg-actions { background: transparent !important; }
 body[data-theme="light"] .msg-action-btn,
-body[data-theme="light"] .action-btn {
-  background: #FFFFFF !important;
-  color: rgba(30, 58, 95, 0.70) !important;
-  border-color: rgba(30, 58, 95, 0.18) !important;
-}
-body[data-theme="light"] .fb-btn,
-body[data-theme="light"] .feedback-btn {
-  background: #FFFFFF !important;
-  border-color: rgba(30, 58, 95, 0.18) !important;
-  color: rgba(30, 58, 95, 0.65) !important;
-}
-/* Keep red/green feedback buttons colored */
-body[data-theme="light"] .fb-btn.sharp,
-body[data-theme="light"] .fb-btn[data-fb="sharp"] {
-  color: #15803D !important;
-  border-color: rgba(21, 128, 61, 0.30) !important;
-}
-body[data-theme="light"] .fb-btn.missed,
-body[data-theme="light"] .fb-btn[data-fb="missed"] {
-  color: #991B1B !important;
-  border-color: rgba(153, 27, 27, 0.30) !important;
-}
-body[data-theme="light"] .fb-btn.incomplete,
-body[data-theme="light"] .fb-btn[data-fb="incomplete"] {
-  color: #B45309 !important;
-  border-color: rgba(180, 83, 9, 0.30) !important;
-}
+body[data-theme="light"] .action-btn { background: rgba(4,6,14,0.70) !important; color: rgba(212,168,50,0.70) !important; border-color: rgba(212,168,50,0.20) !important; }
+body[data-theme="light"] .msg-action-btn:hover { background: rgba(212,168,50,0.12) !important; color: #e8c84a !important; border-color: rgba(212,168,50,0.40) !important; }
 
-/* Claude/model label under response */
+/* Feedback buttons */
+body[data-theme="light"] .fb-btn,
+body[data-theme="light"] .feedback-btn { background: rgba(4,6,14,0.65) !important; border-color: rgba(212,168,50,0.18) !important; color: rgba(212,168,50,0.65) !important; }
+body[data-theme="light"] .fb-btn.sharp,
+body[data-theme="light"] .fb-btn[data-fb="sharp"] { color: #4ade80 !important; border-color: rgba(74,222,128,0.35) !important; }
+body[data-theme="light"] .fb-btn.missed,
+body[data-theme="light"] .fb-btn[data-fb="missed"] { color: #f87171 !important; border-color: rgba(248,113,113,0.35) !important; }
+body[data-theme="light"] .fb-btn.incomplete,
+body[data-theme="light"] .fb-btn[data-fb="incomplete"] { color: #fbbf24 !important; border-color: rgba(251,191,36,0.35) !important; }
+
+/* Send, mic, attach */
+body[data-theme="light"] .send-btn { background: rgba(212,168,50,0.18) !important; border: 1px solid rgba(212,168,50,0.40) !important; color: #c9a832 !important; }
+body[data-theme="light"] .send-btn:hover { background: rgba(212,168,50,0.28) !important; border-color: rgba(212,168,50,0.60) !important; }
+body[data-theme="light"] .mic-btn { background: rgba(4,6,14,0.70) !important; border: 1px solid rgba(212,168,50,0.22) !important; color: rgba(212,168,50,0.70) !important; }
+body[data-theme="light"] .img-attach-btn { background: rgba(4,6,14,0.70) !important; border: 1px solid rgba(212,168,50,0.22) !important; color: rgba(212,168,50,0.60) !important; }
+
+/* Model pill */
+body[data-theme="light"] .model-pill { background: rgba(4,6,14,0.80) !important; border: 1px solid rgba(212,168,50,0.22) !important; color: rgba(212,168,50,0.75) !important; }
+
+/* Sidebar user block */
+body[data-theme="light"] #sb-user-block > div { border-top: 1px solid rgba(212,168,50,0.15) !important; }
+body[data-theme="light"] #sb-user-block > div > div:first-child { background: rgba(212,168,50,0.08) !important; border: 1px solid rgba(212,168,50,0.20) !important; }
+body[data-theme="light"] #sb-user-block > div > div:first-child span { color: rgba(212,168,50,0.85) !important; }
+body[data-theme="light"] #sb-user-block > div > div:nth-child(2) > div:first-child { color: rgba(212,168,50,0.85) !important; }
+body[data-theme="light"] #sb-user-block > div > div:nth-child(2) > div:nth-child(2) { color: rgba(212,168,50,0.45) !important; }
+body[data-theme="light"] #sb-user-block button { border-color: rgba(212,168,50,0.22) !important; }
+body[data-theme="light"] #sb-user-block button svg * { stroke: rgba(212,168,50,0.65) !important; }
+
+/* Model/source labels */
 body[data-theme="light"] .msg-model,
 body[data-theme="light"] .model-label,
-body[data-theme="light"] .msg-provider {
-  color: rgba(30, 58, 95, 0.45) !important;
-}
-
-/* Sources line under responses */
+body[data-theme="light"] .msg-provider { color: rgba(212,168,50,0.40) !important; }
 body[data-theme="light"] .msg-sources a,
-body[data-theme="light"] .source-link {
-  color: rgba(30, 58, 95, 0.60) !important;
-}
-body[data-theme="light"] .msg-sources a:hover {
-  color: #1E3A5F !important;
-}
-
-/* SOURCES label */
+body[data-theme="light"] .source-link { color: rgba(212,168,50,0.55) !important; }
+body[data-theme="light"] .msg-sources a:hover { color: rgba(212,168,50,0.85) !important; }
 body[data-theme="light"] .sources-label,
-body[data-theme="light"] .msg-sources-label {
-  color: rgba(30, 58, 95, 0.45) !important;
-}
+body[data-theme="light"] .msg-sources-label { color: rgba(212,168,50,0.40) !important; }
+
+/* Status dot stays green */
+body[data-theme="light"] .status-dot.online,
+body[data-theme="light"] .online-dot { background: #22C55E !important; }
 
 /* ── Login ─────────────────────────────────────────────── */
 #login-screen {
@@ -8781,6 +8713,20 @@ html body[data-theme="light"] #discovery-greeting-strip .dgs-text strong {
         </div>
         <!-- Divider -->
         <div style="border-top:1px solid rgba(212,168,50,0.1);margin-bottom:14px;"></div>
+        <!-- Sidebar slider -->
+        <div style="margin-bottom:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;">
+            <span style="font-family:var(--f-ui);font-size:10px;font-weight:500;color:rgba(212,168,50,0.7);letter-spacing:0.1em;text-transform:uppercase;">Sidebar</span>
+            <span id="tb-sidebar-val" style="font-family:var(--f-mono);font-size:10px;color:rgba(212,168,50,0.5);">1.0x</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:7px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="rgba(212,168,50,0.35)" stroke-width="2" style="width:10px;height:10px;flex-shrink:0;"><circle cx="12" cy="12" r="3"/><line x1="12" y1="3" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="21"/><line x1="3" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="21" y2="12"/></svg>
+            <input id="tb-sidebar-slider" class="bc-slider" type="range" min="0.5" max="4.0" step="0.05" value="1.0">
+            <svg viewBox="0 0 24 24" fill="none" stroke="rgba(212,168,50,0.65)" stroke-width="2" style="width:13px;height:13px;flex-shrink:0;"><circle cx="12" cy="12" r="4"/><line x1="12" y1="3" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="21"/><line x1="3" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="21" y2="12"/></svg>
+          </div>
+        </div>
+        <!-- Divider -->
+        <div style="border-top:1px solid rgba(212,168,50,0.1);margin-bottom:14px;"></div>
         <!-- Text slider -->
         <div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;">
@@ -10094,51 +10040,57 @@ window.addEventListener('beforeunload', () => {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 (function() {
-  // Defaults per theme — adjust these once you dial in the right values
+  // Defaults per theme
   const DEFAULTS = {
-    dark:  { bg: 1.0, text: 1.0 },
-    light: { bg: 1.0, text: 1.0 },
+    dark:  { bg: 1.0, sidebar: 1.0, text: 1.0 },
+    light: { bg: 1.0, sidebar: 1.0, text: 1.0 },
   };
 
   const BC = {
-    bgLevel:   1.0,
-    textLevel: 1.0,
-    isOpen:    false,
+    bgLevel:      1.0,
+    sidebarLevel: 1.0,
+    textLevel:    1.0,
+    isOpen:       false,
 
-    // Returns current theme: 'dark' or 'light'
     theme() {
       return document.body.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
     },
 
-    // Storage keys scoped to current theme
-    bgKey()   { return `caci_brightness_bg_${this.theme()}`; },
-    textKey() { return `caci_brightness_text_${this.theme()}`; },
+    bgKey()      { return `caci_brightness_bg_${this.theme()}`; },
+    sidebarKey() { return `caci_brightness_sidebar_${this.theme()}`; },
+    textKey()    { return `caci_brightness_text_${this.theme()}`; },
 
-    // Load saved values for current theme and apply them
     loadAndApply() {
       const t = this.theme();
       try {
-        const savedBg   = SafeStorage.getItem(`caci_brightness_bg_${t}`);
-        const savedText = SafeStorage.getItem(`caci_brightness_text_${t}`);
-        this.bgLevel   = savedBg   ? parseFloat(savedBg)   : DEFAULTS[t].bg;
-        this.textLevel = savedText ? parseFloat(savedText) : DEFAULTS[t].text;
+        const savedBg      = SafeStorage.getItem(`caci_brightness_bg_${t}`);
+        const savedSidebar = SafeStorage.getItem(`caci_brightness_sidebar_${t}`);
+        const savedText    = SafeStorage.getItem(`caci_brightness_text_${t}`);
+        this.bgLevel      = savedBg      ? parseFloat(savedBg)      : DEFAULTS[t].bg;
+        this.sidebarLevel = savedSidebar ? parseFloat(savedSidebar) : DEFAULTS[t].sidebar;
+        this.textLevel    = savedText    ? parseFloat(savedText)    : DEFAULTS[t].text;
       } catch(e) {
-        this.bgLevel   = DEFAULTS[t].bg;
-        this.textLevel = DEFAULTS[t].text;
+        this.bgLevel      = DEFAULTS[t].bg;
+        this.sidebarLevel = DEFAULTS[t].sidebar;
+        this.textLevel    = DEFAULTS[t].text;
       }
 
-      // Update sliders to reflect loaded values
       const bgSlider  = document.getElementById('tb-bg-slider');
+      const sbSlider  = document.getElementById('tb-sidebar-slider');
       const txtSlider = document.getElementById('tb-text-slider');
       const bgVal     = document.getElementById('tb-bg-val');
+      const sbVal     = document.getElementById('tb-sidebar-val');
       const txtVal    = document.getElementById('tb-text-val');
-      if (bgSlider)  { bgSlider.value  = this.bgLevel;   this.updateSliderTrack(bgSlider); }
-      if (txtSlider) { txtSlider.value = this.textLevel; this.updateSliderTrack(txtSlider); }
-      if (bgVal)     bgVal.textContent  = this.bgLevel.toFixed(2)   + 'x';
-      if (txtVal)    txtVal.textContent = this.textLevel.toFixed(2) + 'x';
 
-      // Apply
+      if (bgSlider)  { bgSlider.value  = this.bgLevel;      this.updateSliderTrack(bgSlider); }
+      if (sbSlider)  { sbSlider.value  = this.sidebarLevel; this.updateSliderTrack(sbSlider); }
+      if (txtSlider) { txtSlider.value = this.textLevel;    this.updateSliderTrack(txtSlider); }
+      if (bgVal)  bgVal.textContent  = this.bgLevel.toFixed(2)      + 'x';
+      if (sbVal)  sbVal.textContent  = this.sidebarLevel.toFixed(2) + 'x';
+      if (txtVal) txtVal.textContent = this.textLevel.toFixed(2)    + 'x';
+
       this.applyBg(this.bgLevel, false);
+      this.applySidebar(this.sidebarLevel, false);
       this.applyText(this.textLevel, false);
     },
 
@@ -10147,20 +10099,17 @@ window.addEventListener('beforeunload', () => {
         const btn       = document.getElementById('tb-brightness-btn');
         const panel     = document.getElementById('tb-brightness-panel');
         const bgSlider  = document.getElementById('tb-bg-slider');
+        const sbSlider  = document.getElementById('tb-sidebar-slider');
         const txtSlider = document.getElementById('tb-text-slider');
         const bgVal     = document.getElementById('tb-bg-val');
+        const sbVal     = document.getElementById('tb-sidebar-val');
         const txtVal    = document.getElementById('tb-text-val');
         if (!btn || !panel || !bgSlider || !txtSlider) { setTimeout(setup, 500); return; }
 
-        // Load settings for current theme and apply
         this.loadAndApply();
 
-        // When theme changes, reload settings for the new theme
-        window.addEventListener('caci-theme-changed', () => {
-          this.loadAndApply();
-        });
+        window.addEventListener('caci-theme-changed', () => { this.loadAndApply(); });
 
-        // Toggle panel
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
           this.isOpen = !this.isOpen;
@@ -10169,7 +10118,6 @@ window.addEventListener('beforeunload', () => {
           btn.style.background  = this.isOpen ? 'rgba(212,168,50,0.12)' : 'transparent';
         });
 
-        // Close on outside click
         document.addEventListener('click', () => {
           if (this.isOpen) {
             this.isOpen = false;
@@ -10179,7 +10127,6 @@ window.addEventListener('beforeunload', () => {
           }
         });
 
-        // Prevent panel close when interacting with sliders
         panel.addEventListener('click', (e) => e.stopPropagation());
 
         // Background slider
@@ -10194,6 +10141,21 @@ window.addEventListener('beforeunload', () => {
           e.stopPropagation();
           this.applyBg(parseFloat(bgSlider.value), true);
         });
+
+        // Sidebar slider
+        if (sbSlider) {
+          sbSlider.addEventListener('input', (e) => {
+            e.stopPropagation();
+            const level = parseFloat(sbSlider.value);
+            if (sbVal) sbVal.textContent = level.toFixed(2) + 'x';
+            this.updateSliderTrack(sbSlider);
+            this.applySidebar(level, false);
+          });
+          sbSlider.addEventListener('change', (e) => {
+            e.stopPropagation();
+            this.applySidebar(parseFloat(sbSlider.value), true);
+          });
+        }
 
         // Text slider
         txtSlider.addEventListener('input', (e) => {
@@ -10216,39 +10178,37 @@ window.addEventListener('beforeunload', () => {
       }
     },
 
-    // Background: controls image opacity and dark wash - no filter = no blotching
+    // Background: opacity-based, no blotching
     applyBg(level, save) {
       this.bgLevel = level;
       if (save) SafeStorage.setItem(this.bgKey(), level.toString());
-      // Convert level (0.5-4.0) to meaningful opacity ranges
-      // level 1.0 = default (image opacity 0.45, wash at full)
-      // level > 1.0 = brighter (more image, less wash)
-      // level < 1.0 = darker (less image, more wash)
-      const normalized = (level - 0.5) / (4.0 - 0.5); // 0 to 1
-      const imgOpacity  = Math.min(1.0, 0.40 + (normalized * 0.60)); // 0.40 to 1.0
-      const washOpacity = Math.max(0.0, 0.8 - (normalized * 1.0));   // 0.8 to 0.0
-
-      // Apply to image layer (::before via CSS var)
+      const normalized  = (level - 0.5) / (4.0 - 0.5);
+      const imgOpacity  = Math.min(1.0, 0.20 + (normalized * 0.80));
+      const washOpacity = Math.max(0.0, 0.8 - (normalized * 1.0));
       document.querySelectorAll('.chat-bg-overlay').forEach(el => {
         el.style.setProperty('--bg-img-opacity', imgOpacity.toString());
         el.style.setProperty('--bg-wash-opacity', washOpacity.toString());
       });
+    },
 
-      // Sidebar brightness in dark mode - keep filter here since sidebar is solid color not image
+    // Sidebar: independent brightness filter
+    applySidebar(level, save) {
+      this.sidebarLevel = level;
+      if (save) SafeStorage.setItem(this.sidebarKey(), level.toString());
       const sidebar = document.getElementById('sidebar');
       if (sidebar && this.theme() === 'dark') {
-        const sidebarBrightness = 0.6 + (normalized * 0.8); // 0.6 to 1.4
-        sidebar.style.filter = `brightness(${sidebarBrightness.toFixed(2)})`;
+        sidebar.style.filter = level === 1.0 ? 'none' : `brightness(${level})`;
+      } else if (sidebar) {
+        sidebar.style.filter = 'none'; // light mode handles sidebar separately
       }
     },
 
-    // Text/content: gentle brightness on content area only
+    // Text/content: gentle brightness on content area
     applyText(level, save) {
       this.textLevel = level;
       if (save) SafeStorage.setItem(this.textKey(), level.toString());
       const content = document.getElementById('content');
       if (content) {
-        // Use a gentler range - stays close to 1.0 to avoid washing out text
         const clamped = Math.max(0.5, Math.min(2.0, level));
         content.style.filter = clamped === 1.0 ? 'none' : `brightness(${clamped})`;
       }
@@ -10264,10 +10224,9 @@ window.addEventListener('beforeunload', () => {
   };
 
   BC.init();
-
-  // Console helpers
-  window.setBgBrightness   = (l) => BC.applyBg(l, true);
-  window.setTextBrightness = (l) => BC.applyText(l, true);
+  window.setBgBrightness      = (l) => BC.applyBg(l, true);
+  window.setSidebarBrightness = (l) => BC.applySidebar(l, true);
+  window.setTextBrightness    = (l) => BC.applyText(l, true);
 })();
 
 
