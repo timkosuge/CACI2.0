@@ -5059,8 +5059,14 @@ async function harvestRetrieveContext(env, query) {
       return { text: '', diag: { reason: 'no-file-records', filesFound: 0 } };
     }
 
-    const MAX_FILES_TO_SCAN = 30;
-    const sampleFiles = fileKeys.slice(0, MAX_FILES_TO_SCAN);
+    const MAX_FILES_TO_SCAN = 60;
+    const allFiles = fileKeys.slice(0, MAX_FILES_TO_SCAN);
+
+    // Priority pass: always scan Illinois and Ohio files first regardless of KV order
+    const PRIORITY_PATTERNS = ['illinois', 'ohio', 'il_', 'oh_', 'il-', 'oh-', 'cannabis_report', 'annual_report', 'regulation'];
+    const priorityFiles = allFiles.filter(f => PRIORITY_PATTERNS.some(p => f.name.toLowerCase().includes(p)));
+    const otherFiles = allFiles.filter(f => !PRIORITY_PATTERNS.some(p => f.name.toLowerCase().includes(p)));
+    const sampleFiles = [...priorityFiles, ...otherFiles];
 
     const scored = [];
     let chunksScanned = 0;
@@ -5095,6 +5101,10 @@ async function harvestRetrieveContext(env, query) {
         if (fileNameLower.includes(year)) {
           fileRecencyBoost = Math.max(fileRecencyBoost, boost);
         }
+      }
+      // Extra boost for Illinois files — we want Illinois market data to surface first
+      if (fileNameLower.includes('illinois') || fileNameLower.includes('il_') || fileNameLower.includes('il-')) {
+        fileRecencyBoost += 25;
       }
       for (const chunk of chunks) {
         chunksScanned++;
