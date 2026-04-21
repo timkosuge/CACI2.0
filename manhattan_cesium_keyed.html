@@ -999,7 +999,11 @@ function enterFF(){
   viewer.canvas.addEventListener('mousemove', ffMV);
   viewer.canvas.addEventListener('wheel',     ffWH, {passive:true});
 
-  FF.lastT = performance.now();
+  FF.lastT   = performance.now();
+  // Sync rotation state from current camera so drag starts correctly
+  FF.heading = viewer.camera.heading;
+  FF.pitch   = viewer.camera.pitch;
+  FF.zoomVelocity = 0;
   ffLoop();
 }
 
@@ -1020,17 +1024,46 @@ function exitFF(){
   document.getElementById('pauseBtn').disabled=false;
 }
 
-function ffMD(e){ FF.mouseDown=true; FF.lastX=e.clientX; FF.lastY=e.clientY; }
-function ffMU(){ FF.mouseDown=false; }
+// Accumulated heading/pitch for true 360 rotation
+FF.heading = 0;
+FF.pitch   = 0;
+FF.zoomVelocity = 0; // for smooth scroll zoom
+
+function ffMD(e){
+  FF.mouseDown=true;
+  FF.lastX=e.clientX;
+  FF.lastY=e.clientY;
+  e.preventDefault();
+}
+function ffMU(e){ FF.mouseDown=false; }
 function ffMV(e){
   if(!FF.mouseDown) return;
-  const dx=e.clientX-FF.lastX, dy=e.clientY-FF.lastY;
-  FF.lastX=e.clientX; FF.lastY=e.clientY;
-  viewer.camera.lookRight(dx*0.003);
-  viewer.camera.lookUp(-dy*0.003);
+  const dx = e.clientX - FF.lastX;
+  const dy = e.clientY - FF.lastY;
+  FF.lastX = e.clientX;
+  FF.lastY = e.clientY;
+
+  // Accumulate heading and pitch — full 360 on both axes
+  FF.heading += dx * 0.003;
+  FF.pitch   -= dy * 0.003;
+  // Clamp pitch to avoid flipping upside down (optional — remove for true 360)
+  // FF.pitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, FF.pitch));
+
+  // Apply immediately for responsive feel
+  viewer.camera.setView({
+    destination: viewer.camera.position,
+    orientation: {
+      heading: FF.heading,
+      pitch:   FF.pitch,
+      roll:    viewer.camera.roll,
+    }
+  });
+  e.preventDefault();
 }
+
 function ffWH(e){
-  FF.speed = Math.max(5, Math.min(800, FF.speed - e.deltaY*0.1));
+  // Scroll = zoom (move along view direction)
+  FF.zoomVelocity -= e.deltaY * 0.5;
 }
 
 function ffLoop(){
@@ -1040,16 +1073,31 @@ function ffLoop(){
   FF.lastT  = now;
   const s   = FF.speed * dt;
 
+  // WASD movement
   if(FF.keys['w'] || FF.keys['arrowup'])    viewer.camera.moveForward(s);
   if(FF.keys['s'] || FF.keys['arrowdown'])  viewer.camera.moveBackward(s);
   if(FF.keys['a'] || FF.keys['arrowleft'])  viewer.camera.moveLeft(s);
   if(FF.keys['d'] || FF.keys['arrowright']) viewer.camera.moveRight(s);
   if(FF.keys['q'])                          viewer.camera.moveUp(s);
   if(FF.keys['e'])                          viewer.camera.moveDown(s);
+  // Roll
   if(FF.keys['z'])                          viewer.camera.twistLeft(0.025);
   if(FF.keys['x'])                          viewer.camera.twistRight(0.025);
 
-  // Update speed display
+  // Scroll zoom — smooth with decay
+  if(Math.abs(FF.zoomVelocity) > 0.1){
+    viewer.camera.moveForward(FF.zoomVelocity * dt * 60);
+    FF.zoomVelocity *= 0.88; // friction
+  }
+
+  // Sync heading/pitch from camera after WASD moves
+  // so mouse drag stays in sync with keyboard movement
+  if(!FF.mouseDown){
+    FF.heading = viewer.camera.heading;
+    FF.pitch   = viewer.camera.pitch;
+  }
+
+  // Update dashboard speed display
   const spd = document.getElementById('dash-speed');
   if(spd){
     const h = Math.round(viewer.camera.positionCartographic.height);
