@@ -311,7 +311,7 @@ body[data-theme="light"] .sb-header {
 
 /* Nav items — translucent gold text doesn't read on light; use deep steel */
 body[data-theme="light"] .nav-btn {
-  color: rgba(30, 58, 95, 0.62);
+  color: rgba(30, 58, 95, 0.80);
 }
 body[data-theme="light"] .nav-btn:hover {
   background: rgba(30, 58, 95, 0.06);
@@ -335,10 +335,10 @@ body[data-theme="light"] .nav-btn::before {
 
 /* Department buttons (lower sidebar section) — same treatment */
 body[data-theme="light"] .dept-btn {
-  color: rgba(30, 58, 95, 0.55);
+  color: rgba(30, 58, 95, 0.72);
 }
 body[data-theme="light"] .dept-btn:hover {
-  color: rgba(30, 58, 95, 0.90);
+  color: rgba(30, 58, 95, 0.95);
   border-color: rgba(30, 58, 95, 0.12);
   box-shadow: 0 1px 2px rgba(30, 58, 95, 0.06);
 }
@@ -10195,18 +10195,13 @@ window.addEventListener('beforeunload', () => {
       this.bgLevel = level;
       if (save) SafeStorage.setItem('caci_brightness_bg', level.toString());
       const f = level === 1.0 ? 'none' : `brightness(${level})`;
-      // Target background elements only
+      // Target background elements only - never sidebar or topbar
       ['.chat-bg-overlay', '#app-glimmer'].forEach(sel => {
         document.querySelectorAll(sel).forEach(el => el.style.filter = f);
       });
-      // Sidebar and topbar background (not their text)
-      const sidebar = document.getElementById('sidebar');
-      const topbar  = document.getElementById('topbar');
-      if (sidebar) sidebar.style.filter = f;
-      if (topbar)  topbar.style.filter  = f;
     },
 
-    // Text/content: targets chat messages, content panels
+    // Text/content: targets chat messages area only
     applyText(level, save) {
       this.textLevel = level;
       if (save) SafeStorage.setItem('caci_brightness_text', level.toString());
