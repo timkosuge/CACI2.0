@@ -13352,9 +13352,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const prompt = document.getElementById('lcard-demo-prompt');
     if (prompt) prompt.classList.add('active');
     const btn = document.getElementById('lcard-demo-btn');
-    if (btn) btn.addEventListener('click', (e) => {
+    if (btn) btn.addEventListener('click', async (e) => {
       e.preventDefault(); e.stopPropagation();
-      initDemoMode();
+      await DemoMode.init(); // loads scripts/stats before starting
       DemoMode.start();
     });
   }
