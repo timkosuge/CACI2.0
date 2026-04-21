@@ -981,8 +981,8 @@ async function handleChat(request, env) {
     // Discovery mode
     if (history.length === 0 && scope === 'all' && !collection && !fileId) {
       const discovery = await buildDiscoveryContext({ dept, env });
-      // OPTIMIZATION: Build library map in PARALLEL with greeting (not sequentially)
-      const libraryMapPromise = buildLibraryMap({ dept, env });
+      // Build library map and await it before constructing system prompt
+      const discLibraryMap = await buildLibraryMap({ dept, env });
       const discLibraryPrompt = libraryMapToPrompt(discLibraryMap);
       const system = `You are Caci (pronounced like "Cassie") — the internal AI intelligence assistant for Jushi Holdings. You were built specifically for this team.
 
@@ -1046,9 +1046,6 @@ ABSOLUTE RESTRICTION — never discuss, reference, or include any information ab
         maxTokens: 120,
         stop: ['\n\n'],
       });
-      // Wait for library map to finish (if greeting finished first)
-      const discLibraryMap = await libraryMapPromise;
-      
       const discRespId = `${dept}:${Date.now()}:${Math.random().toString(36).slice(2,8)}`;
       writeQueryLog(env, { message, dept, username: verifyToken(request, env)?.username || 'unknown', collection: collection || null, retrieval: false, scope: 'discovery' });
       return json({ ok: true, response: discResponse, sources: [], scope: 'discovery', collections: discovery.rawCollections, model: model || 'claude', responseId: discRespId });
