@@ -2,416 +2,303 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Manhattan — Photorealistic 3D</title>
-<script src="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Cesium.js" defer></script>
+<title>Manhattan Night Flight</title>
+<script src="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Cesium.js"></script>
 <link href="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
-  #cesiumContainer { width: 100%; height: 100%; }
-
-  /* Hide all Cesium UI chrome — pure cinematic view */
-  .cesium-widget-credits,
-  .cesium-credit-container,
-  .cesium-credit-logoContainer,
-  .cesium-credit-textContainer { display: none !important; }
-
-  /* API key overlay — shown until key is entered */
-  #keyOverlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.92);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    z-index: 9999;
-    font-family: 'Courier New', monospace;
-    gap: 18px;
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{width:100%;height:100%;overflow:hidden;background:#000;}
+  #cesiumContainer{width:100%;height:100%;}
+  .cesium-widget-credits,.cesium-credit-container,
+  .cesium-credit-logoContainer,.cesium-credit-textContainer{display:none!important;}
+  #hud{
+    position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+    color:rgba(200,160,50,0.45);font:10px/1 'Courier New',monospace;
+    letter-spacing:0.22em;pointer-events:none;z-index:100;
+    text-transform:uppercase;
   }
-  #keyOverlay h2 {
-    color: #c9a832;
-    font-size: 18px;
-    letter-spacing: 0.25em;
-    font-weight: 300;
+  #ctrl{
+    position:fixed;bottom:18px;right:18px;z-index:100;
+    display:flex;gap:8px;
   }
-  #keyOverlay p {
-    color: rgba(200,180,130,0.6);
-    font-size: 12px;
-    letter-spacing: 0.1em;
-    max-width: 440px;
-    text-align: center;
-    line-height: 1.8;
+  #ctrl button{
+    background:rgba(0,0,0,0.55);border:1px solid rgba(200,160,50,0.35);
+    color:rgba(200,160,50,0.7);font:10px 'Courier New',monospace;
+    letter-spacing:0.18em;padding:7px 14px;cursor:pointer;
+    transition:all 0.2s;
   }
-  #keyOverlay input {
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(200,160,50,0.4);
-    color: #f5e398;
-    font-family: 'Courier New', monospace;
-    font-size: 13px;
-    padding: 10px 18px;
-    width: 360px;
-    outline: none;
-    letter-spacing: 0.08em;
+  #ctrl button:hover{border-color:rgba(200,160,50,0.8);color:rgba(200,160,50,1);}
+  #loading{
+    position:fixed;inset:0;background:#000;display:flex;
+    flex-direction:column;align-items:center;justify-content:center;
+    gap:16px;z-index:999;transition:opacity 1s;
   }
-  #keyOverlay input::placeholder { color: rgba(200,160,50,0.3); }
-  #keyOverlay button {
-    background: transparent;
-    border: 1px solid rgba(200,160,50,0.6);
-    color: #c9a832;
-    font-family: 'Courier New', monospace;
-    font-size: 11px;
-    letter-spacing: 0.3em;
-    padding: 10px 32px;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-  #keyOverlay button:hover {
-    background: rgba(200,160,50,0.08);
-    border-color: rgba(200,160,50,0.9);
-  }
-  #keyOverlay a {
-    color: rgba(200,160,50,0.5);
-    font-size: 11px;
-    letter-spacing: 0.1em;
-    text-decoration: none;
-  }
-  #keyOverlay a:hover { color: rgba(200,160,50,0.8); }
-
-  /* Status */
-  #status {
-    position: fixed;
-    bottom: 16px;
-    left: 50%;
-    transform: translateX(-50%);
-    color: rgba(200,160,50,0.4);
-    font: 10px/1 'Courier New', monospace;
-    letter-spacing: 0.2em;
-    pointer-events: none;
-    z-index: 100;
-  }
-
-  /* Play/pause */
-  #controls {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    z-index: 100;
-    display: none;
-    gap: 10px;
-  }
-  #controls button {
-    background: rgba(0,0,0,0.6);
-    border: 1px solid rgba(200,160,50,0.4);
-    color: rgba(200,160,50,0.8);
-    font-family: 'Courier New', monospace;
-    font-size: 10px;
-    letter-spacing: 0.2em;
-    padding: 8px 16px;
-    cursor: pointer;
-  }
-  #controls button:hover { border-color: rgba(200,160,50,0.8); }
+  #loading h1{color:#c9a832;font:300 16px 'Courier New',monospace;letter-spacing:0.4em;}
+  #loading p{color:rgba(200,160,50,0.4);font:11px 'Courier New',monospace;letter-spacing:0.15em;}
+  #bar{width:220px;height:1px;background:rgba(200,160,50,0.15);}
+  #barFill{height:100%;background:rgba(200,160,50,0.6);width:0%;transition:width 0.3s;}
 </style>
 </head>
 <body>
-
-<!-- Keys are hardcoded below — no input needed -->
-
+<div id="loading">
+  <h1>MANHATTAN</h1>
+  <div id="bar"><div id="barFill"></div></div>
+  <p id="loadMsg">FETCHING KEYS</p>
+</div>
 <div id="cesiumContainer"></div>
-<div id="status">INITIALIZING</div>
-<div id="controls">
-  <button onclick="togglePause()">⏸ PAUSE</button>
+<div id="hud"></div>
+<div id="ctrl">
+  <button onclick="togglePause()" id="pauseBtn">⏸ PAUSE</button>
   <button onclick="resetFlight()">↺ RESTART</button>
 </div>
 
 <script>
 // ── FLIGHT PATH ──
-// Real GPS coordinates through Manhattan at drone altitude
-// Camera moves through actual Midtown streets at ~300-600ft AGL
-const FLIGHT_PLAN = [
-  // Each waypoint: [longitude, latitude, altitude_meters, heading, pitch, duration_sec]
-  // Approach from southeast — full skyline ahead
-  { lng: -73.940, lat: 40.730, alt: 800,  hdg: 310, pitch: -12, dur: 8  },
-  // Descending toward Midtown, Empire State ahead
-  { lng: -73.960, lat: 40.745, alt: 450,  hdg: 295, pitch: -8,  dur: 7  },
-  // Entry into Midtown canyon — 34th St corridor
-  { lng: -73.978, lat: 40.748, alt: 180,  hdg: 270, pitch: -4,  dur: 6  },
-  // Deep in canyon — looking up at Empire State Building
-  { lng: -73.983, lat: 40.749, alt: 120,  hdg: 340, pitch: 15,  dur: 5  },
-  // Banking north up 5th Avenue — towers on both sides
-  { lng: -73.984, lat: 40.752, alt: 150,  hdg: 5,   pitch: -2,  dur: 6  },
-  // Mid-block Midtown — tight between skyscrapers
-  { lng: -73.981, lat: 40.758, alt: 110,  hdg: 350, pitch: 8,   dur: 5  },
-  // Rising — reveal of full skyline looking south
-  { lng: -73.979, lat: 40.762, alt: 280,  hdg: 175, pitch: -15, dur: 6  },
-  // Banking west — Hudson River view, city to the right
-  { lng: -73.972, lat: 40.760, alt: 350,  hdg: 250, pitch: -10, dur: 6  },
-  // Sweeping south past Columbus Circle
-  { lng: -73.981, lat: 40.768, alt: 220,  hdg: 200, pitch: -5,  dur: 5  },
-  // Low over Central Park South — skyscrapers lining the south edge
-  { lng: -73.975, lat: 40.765, alt: 140,  hdg: 110, pitch: 5,   dur: 5  },
-  // Dive toward Bryant Park — midtown canyon ahead
-  { lng: -73.983, lat: 40.754, alt: 100,  hdg: 290, pitch: 2,   dur: 5  },
-  // Looking up at One Vanderbilt / Grand Central cluster
-  { lng: -73.978, lat: 40.752, alt: 90,   hdg: 320, pitch: 20,  dur: 5  },
-  // Pull back to high aerial — full Manhattan island
-  { lng: -73.960, lat: 40.750, alt: 900,  hdg: 290, pitch: -20, dur: 8  },
+// Real GPS coordinates. Every waypoint is on an actual NYC street.
+// Altitude in meters AGL. Heading in degrees. Pitch in degrees (negative = looking down).
+// Duration in seconds for each segment.
+const WP = [
+  // Harbor approach from south — full skyline silhouette
+  {lng:-74.016,lat:40.688,alt:420,hdg:358,pitch:-10,dur:9,name:'HARBOR APPROACH'},
+  // Descend toward One WTC — tower rises from the dark
+  {lng:-74.013,lat:40.703,alt:240,hdg:5,pitch:-14,dur:7,name:'ONE WTC DESCENT'},
+  // Street level Financial District — banking east between towers
+  {lng:-74.007,lat:40.712,alt:95,hdg:52,pitch:2,dur:6,name:'FINANCIAL DISTRICT'},
+  // Turn north onto Broadway — canyon opens ahead
+  {lng:-73.998,lat:40.719,alt:72,hdg:2,pitch:-1,dur:7,name:'BROADWAY CANYON'},
+  // Flatiron — Broadway widens, building dead ahead
+  {lng:-73.990,lat:40.740,alt:58,hdg:358,pitch:4,dur:6,name:'FLATIRON DISTRICT'},
+  // Drift east then north — entering Midtown grid
+  {lng:-73.986,lat:40.748,alt:52,hdg:15,pitch:-2,dur:5,name:'HERALD SQUARE'},
+  // Empire State — fly directly past it, looking up
+  {lng:-73.986,lat:40.750,alt:48,hdg:355,pitch:12,dur:4,name:'EMPIRE STATE'},
+  // Bank east onto 42nd St — the great crosstown canyon
+  {lng:-73.988,lat:40.756,alt:44,hdg:82,pitch:3,dur:6,name:'42ND ST WEST'},
+  // Deep in 42nd St — Grand Central / Chrysler ahead
+  {lng:-73.979,lat:40.757,alt:42,hdg:76,pitch:6,dur:5,name:'42ND ST CANYON'},
+  // Hard bank north onto Park Avenue — the money shot
+  // Park Ave is dead straight with Helmsley, MetLife, Grand Central
+  {lng:-73.977,lat:40.754,alt:50,hdg:358,pitch:-3,dur:7,name:'PARK AVE CANYON'},
+  // Rockefeller Center area — tight between towers
+  {lng:-73.978,lat:40.759,alt:45,hdg:330,pitch:5,dur:5,name:'ROCKEFELLER CTR'},
+  // Bank hard west through Times Square
+  {lng:-73.984,lat:40.758,alt:62,hdg:265,pitch:-2,dur:5,name:'TIMES SQUARE'},
+  // Sweep north up 7th Ave — rising
+  {lng:-73.984,lat:40.762,alt:88,hdg:5,pitch:-6,dur:5,name:'7TH AVE NORTH'},
+  // Billionaires Row — 57th St, banking east, supertalls above
+  {lng:-73.981,lat:40.764,alt:75,hdg:85,pitch:14,dur:5,name:'BILLIONAIRES ROW'},
+  // One57 / 432 Park area — looking straight up
+  {lng:-73.979,lat:40.765,alt:68,hdg:30,pitch:22,dur:4,name:'432 PARK CANYON'},
+  // Columbus Circle — bank south, Central Park to the left
+  {lng:-73.982,lat:40.768,alt:110,hdg:188,pitch:-8,dur:5,name:'COLUMBUS CIRCLE'},
+  // Grand reveal — rise fast looking south down the island
+  {lng:-73.977,lat:40.763,alt:480,hdg:178,pitch:-18,dur:7,name:'GRAND AERIAL'},
+  // Hudson Yards sweep — banking west over the river
+  {lng:-73.999,lat:40.754,alt:320,hdg:240,pitch:-12,dur:6,name:'HUDSON YARDS'},
   // Loop back to start
-  { lng: -73.940, lat: 40.730, alt: 800,  hdg: 310, pitch: -12, dur: 6  },
+  {lng:-74.016,lat:40.688,alt:420,hdg:358,pitch:-10,dur:8,name:'LOOP'},
 ];
 
-let viewer = null;
-let flying = false;
-let paused = false;
-let flightStart = 0;
-let flightTotal = 0;
-let animFrame = null;
+// Total duration
+const TOTAL = WP.reduce((s,w) => s+w.dur, 0);
 
-// Precompute total duration
-FLIGHT_PLAN.forEach(wp => flightTotal += wp.dur);
+let viewer, flying=false, paused=false, rafId=null, startT=0, pauseOffset=0;
 
-async function startFlight() {
-  document.getElementById('status').textContent = 'FETCHING KEYS...';
+function setLoad(msg, pct) {
+  document.getElementById('loadMsg').textContent = msg;
+  document.getElementById('barFill').style.width = pct+'%';
+}
 
-  // Keys served from Cloudflare worker — never stored in HTML or GitHub
-  let token = '', googleKey = '';
+async function init() {
+  setLoad('FETCHING KEYS', 10);
+
+  // Fetch keys from worker
+  let cesiumToken='', googleKey='';
   try {
-    const res = await fetch('https://caci-worker.timtkosuge.workers.dev/api/map-keys');
-    if (res.ok) {
-      const keys = await res.json();
-      token     = keys.cesiumToken  || '';
-      googleKey = keys.googleKey    || '';
-    } else {
-      document.getElementById('status').textContent = 'KEY FETCH FAILED — check worker';
-      return;
-    }
-  } catch (e) {
-    document.getElementById('status').textContent = 'KEY FETCH ERROR: ' + e.message;
-    return;
-  }
+    const r = await fetch('https://caci-worker.timtkosuge.workers.dev/api/map-keys');
+    if(r.ok){ const k=await r.json(); cesiumToken=k.cesiumToken||''; googleKey=k.googleKey||''; }
+    else { setLoad('KEY FETCH FAILED', 0); return; }
+  } catch(e) { setLoad('KEY ERROR: '+e.message, 0); return; }
 
-  if (!token) {
-    document.getElementById('status').textContent = 'NO CESIUM TOKEN — add to Cloudflare env vars';
-    return;
-  }
+  if(!cesiumToken){ setLoad('NO CESIUM TOKEN', 0); return; }
 
-  document.getElementById('status').textContent = 'LOADING TILES...';
+  setLoad('INITIALIZING RENDERER', 25);
+  Cesium.Ion.defaultAccessToken = cesiumToken;
 
-  // Set Cesium token
-  Cesium.Ion.defaultAccessToken = token;
-
-  // Initialize Cesium viewer — stripped down for cinematic mode
-  viewer = new Cesium.Viewer('cesiumContainer', {
-    // No imagery by default — will use Google 3D tiles
-    baseLayerPicker: false,
-    geocoder: false,
-    homeButton: false,
-    sceneModePicker: false,
-    navigationHelpButton: false,
-    animation: false,
-    timeline: false,
-    fullscreenButton: false,
-    infoBox: false,
-    selectionIndicator: false,
-    shadows: false,
-    // High quality rendering
-    requestRenderMode: false,
-    targetFrameRate: 60,
+  viewer = new Cesium.Viewer('cesiumContainer',{
+    baseLayerPicker:false, geocoder:false, homeButton:false,
+    sceneModePicker:false, navigationHelpButton:false,
+    animation:false, timeline:false, fullscreenButton:false,
+    infoBox:false, selectionIndicator:false,
+    shadows:false, requestRenderMode:false, targetFrameRate:60,
   });
 
-  // ── ATMOSPHERE & LIGHTING ──
-  // Set time to night — 10pm NYC local
-  const now = Cesium.JulianDate.now();
-  // Offset to approximately 10pm ET (UTC-4 in summer)
-  const nightTime = Cesium.JulianDate.addHours(now, -4, new Cesium.JulianDate());
-  // Find a time when NYC is in darkness — set to 2am UTC (10pm ET)
-  const date = new Date();
-  date.setUTCHours(2, 0, 0, 0);
-  viewer.clock.currentTime = Cesium.JulianDate.fromDate(date);
-  viewer.clock.shouldAnimate = false; // freeze time — no sun movement
+  // ── NIGHT TIME ──
+  // Set to 11pm NYC (3am UTC next day)
+  const d = new Date();
+  d.setUTCHours(3,0,0,0);
+  viewer.clock.currentTime = Cesium.JulianDate.fromDate(d);
+  viewer.clock.shouldAnimate = false;
 
-  // Atmosphere settings for dramatic night sky
+  // ── ATMOSPHERE ──
   viewer.scene.skyAtmosphere.show = true;
-  viewer.scene.skyAtmosphere.hueShift = 0.0;
-  viewer.scene.skyAtmosphere.saturationShift = 0.1;
-  viewer.scene.skyAtmosphere.brightnessShift = -0.3;
-
-  // Stars
+  viewer.scene.skyAtmosphere.brightnessShift = -0.5;
+  viewer.scene.skyAtmosphere.saturationShift = 0.2;
   viewer.scene.skyBox.show = true;
+  viewer.scene.moon.show = true;
 
-  // Fog — subtle atmospheric haze
+  // Subtle night fog
   viewer.scene.fog.enabled = true;
-  viewer.scene.fog.density = 0.0002;
-  viewer.scene.fog.minimumBrightness = 0.05;
+  viewer.scene.fog.density = 0.00015;
+  viewer.scene.fog.minimumBrightness = 0.03;
 
-  // High quality anti-aliasing
+  // High quality
   viewer.scene.postProcessStages.fxaa.enabled = true;
+  viewer.scene.globe.maximumScreenSpaceError = 1.5;
+
+  setLoad('LOADING PHOTOREALISTIC TILES', 50);
 
   // ── GOOGLE PHOTOREALISTIC 3D TILES ──
-  async function loadTiles() {
-    try {
-      let tileset;
-
-      if (googleKey) {
-        // Google Maps Photorealistic 3D Tiles — real building textures
-        tileset = await Cesium.Cesium3DTileset.fromUrl(
-          `https://tile.googleapis.com/v1/3dtiles/root.json?key=${googleKey}`,
-          {
-            showCreditsOnScreen: false,
-          }
-        );
-        document.getElementById('status').textContent = 'GOOGLE 3D TILES LOADED';
-      } else {
-        // Fallback: Cesium OSM Buildings — still 3D but no photo textures
-        tileset = await Cesium.createOsmBuildingsAsync();
-        document.getElementById('status').textContent = 'OSM BUILDINGS LOADED (add Google key for photo textures)';
-      }
-
-      viewer.scene.primitives.add(tileset);
-
-      // Start flight after tiles load
-      setTimeout(() => {
-        document.getElementById('status').textContent = 'MANHATTAN · DRONE FLIGHT';
-        document.getElementById('controls').style.display = 'flex';
-        beginFlight();
-      }, 2000);
-
-    } catch (err) {
-      console.error('Tile load error:', err);
-      document.getElementById('status').textContent = 'TILE ERROR — check API key. Loading OSM fallback...';
-      // Fallback to OSM
-      try {
-        const osm = await Cesium.createOsmBuildingsAsync();
-        viewer.scene.primitives.add(osm);
-        setTimeout(beginFlight, 1500);
-      } catch(e) {
-        document.getElementById('status').textContent = 'ERROR: ' + e.message;
-      }
+  try {
+    let tileset;
+    if(googleKey){
+      tileset = await Cesium.Cesium3DTileset.fromUrl(
+        `https://tile.googleapis.com/v1/3dtiles/root.json?key=${googleKey}`,
+        { showCreditsOnScreen:false }
+      );
+      // Disable the globe terrain underneath — tiles handle everything
+      viewer.scene.globe.show = false;
+    } else {
+      tileset = await Cesium.createOsmBuildingsAsync();
     }
+    viewer.scene.primitives.add(tileset);
+    setLoad('TILES LOADED — PREPARING FLIGHT', 80);
+  } catch(e) {
+    setLoad('TILE ERROR: '+e.message, 0);
+    console.error(e);
+    // Fallback
+    try {
+      const osm = await Cesium.createOsmBuildingsAsync();
+      viewer.scene.primitives.add(osm);
+    } catch(e2){}
   }
 
-  loadTiles();
-}
+  // Brief pause for tiles to start loading
+  await new Promise(r => setTimeout(r, 2500));
 
-function beginFlight() {
-  flying = true;
-  paused = false;
-  flightStart = performance.now();
-  flyFrame();
-}
+  setLoad('LAUNCHING', 100);
+  await new Promise(r => setTimeout(r, 600));
 
-function togglePause() {
-  paused = !paused;
-  document.querySelector('#controls button').textContent = paused ? '▶ PLAY' : '⏸ PAUSE';
-  if (!paused) {
-    // Adjust start time to account for pause
-    flightStart = performance.now() - pausedAt;
-    flyFrame();
-  } else {
-    pausedAt = performance.now() - flightStart;
-    if (animFrame) cancelAnimationFrame(animFrame);
-  }
-}
+  // Fade out loading screen
+  const loading = document.getElementById('loading');
+  loading.style.opacity = '0';
+  setTimeout(()=>{ loading.style.display='none'; }, 1000);
 
-function resetFlight() {
-  paused = false;
-  document.querySelector('#controls button').textContent = '⏸ PAUSE';
+  document.getElementById('ctrl').style.display='flex';
   beginFlight();
 }
 
-let pausedAt = 0;
+function ease(t){ return t<0.5?2*t*t:-1+(4-2*t)*t; }
 
-function easeInOut(t) {
-  return t < 0.5 ? 2*t*t : -1 + (4 - 2*t) * t;
+function lerpAngle(a, b, t){
+  let d = b - a;
+  while(d > 180) d -= 360;
+  while(d < -180) d += 360;
+  return a + d * t;
 }
 
-function flyFrame() {
-  if (!flying || paused) return;
+function beginFlight(){
+  flying=true; paused=false;
+  startT = performance.now();
+  pauseOffset = 0;
+  fly();
+}
 
-  const elapsed = (performance.now() - flightStart) / 1000;
-  const loopT = elapsed % flightTotal;
+function fly(){
+  if(!flying||paused){ return; }
+  const now = performance.now();
+  const elapsed = (now - startT - pauseOffset) / 1000;
+  const loopT = elapsed % TOTAL;
 
-  // Find current segment
-  let segStart = 0;
-  let segIdx = 0;
-  for (let i = 0; i < FLIGHT_PLAN.length; i++) {
-    const wp = FLIGHT_PLAN[i];
-    if (loopT < segStart + wp.dur) {
-      segIdx = i;
-      break;
-    }
-    segStart += wp.dur;
+  // Find segment
+  let segStart=0, segIdx=0;
+  for(let i=0;i<WP.length-1;i++){
+    if(loopT < segStart+WP[i].dur){ segIdx=i; break; }
+    segStart += WP[i].dur;
+    segIdx = i+1;
   }
+  segIdx = Math.min(segIdx, WP.length-2);
 
-  const wpA = FLIGHT_PLAN[segIdx];
-  const wpB = FLIGHT_PLAN[(segIdx + 1) % FLIGHT_PLAN.length];
-  const segT = easeInOut(Math.max(0, Math.min(1, (loopT - segStart) / wpA.dur)));
+  const a = WP[segIdx];
+  const b = WP[(segIdx+1)%WP.length];
+  const segT = ease(Math.max(0,Math.min(1,(loopT-segStart)/a.dur)));
 
-  // Interpolate position
-  const lng = wpA.lng + (wpB.lng - wpA.lng) * segT;
-  const lat = wpA.lat + (wpB.lat - wpA.lat) * segT;
-  const alt = wpA.alt + (wpB.alt - wpA.alt) * segT;
-  const hdg = wpA.hdg + (wpB.hdg - wpA.hdg) * segT;
-  const pitch = wpA.pitch + (wpB.pitch - wpA.pitch) * segT;
+  const lng   = a.lng  + (b.lng-a.lng)*segT;
+  const lat   = a.lat  + (b.lat-a.lat)*segT;
+  const alt   = a.alt  + (b.alt-a.alt)*segT;
+  const hdg   = lerpAngle(a.hdg, b.hdg, segT);
+  const pitch = a.pitch + (b.pitch-a.pitch)*segT;
 
-  // Add subtle organic camera movement — drone micro-jitter
+  // Organic drone micro-movement — subtle, not screensaver-y
   const t = elapsed;
-  const microLng = Math.sin(t * 0.7) * 0.00008 + Math.sin(t * 1.3) * 0.00004;
-  const microLat = Math.cos(t * 0.8) * 0.00006 + Math.cos(t * 1.5) * 0.00003;
-  const microHdg = Math.sin(t * 0.4) * 1.2 + Math.sin(t * 0.9) * 0.6;
-  const microPitch = Math.sin(t * 0.5) * 0.8;
-  const microRoll = Math.sin(t * 0.6) * 0.4;
+  const mLng   = Math.sin(t*0.53)*0.000055 + Math.sin(t*1.17)*0.000022;
+  const mLat   = Math.cos(t*0.61)*0.000044 + Math.cos(t*1.43)*0.000018;
+  const mHdg   = Math.sin(t*0.31)*1.4 + Math.sin(t*0.77)*0.6;
+  const mPitch = Math.sin(t*0.44)*0.9;
+  const mRoll  = Math.sin(t*0.38)*0.5;
 
-  // Apply camera
   viewer.camera.setView({
-    destination: Cesium.Cartesian3.fromDegrees(
-      lng + microLng,
-      lat + microLat,
-      alt
-    ),
-    orientation: {
-      heading: Cesium.Math.toRadians(hdg + microHdg),
-      pitch: Cesium.Math.toRadians(pitch + microPitch),
-      roll: Cesium.Math.toRadians(microRoll),
+    destination: Cesium.Cartesian3.fromDegrees(lng+mLng, lat+mLat, alt),
+    orientation:{
+      heading: Cesium.Math.toRadians(hdg+mHdg),
+      pitch:   Cesium.Math.toRadians(pitch+mPitch),
+      roll:    Cesium.Math.toRadians(mRoll),
     }
   });
 
-  // Update status
-  const pct = Math.floor((loopT / flightTotal) * 100);
-  const locations = [
-    'APPROACHING MIDTOWN', 'DESCENDING TO MANHATTAN', 'ENTERING 34TH ST CORRIDOR',
-    'EMPIRE STATE DISTRICT', '5TH AVENUE CANYON', 'MIDTOWN TOWERS',
-    'SKYLINE REVEAL', 'HUDSON RIVER VIEW', 'COLUMBUS CIRCLE',
-    'CENTRAL PARK SOUTH', 'BRYANT PARK APPROACH', 'GRAND CENTRAL CLUSTER',
-    'AERIAL PULLBACK', 'LOOPING'
-  ];
-  document.getElementById('status').textContent =
-    `${locations[segIdx] || 'MANHATTAN'} · ${Math.floor(alt)}m AGL`;
+  // HUD
+  const pct = Math.floor((loopT/TOTAL)*100);
+  document.getElementById('hud').textContent =
+    `${a.name} · ${Math.floor(alt)}m · ${pct}%`;
 
-  animFrame = requestAnimationFrame(flyFrame);
+  rafId = requestAnimationFrame(fly);
 }
 
-// Handle resize
-window.addEventListener('resize', () => {
-  if (viewer) viewer.resize();
-});
-
-// Keyboard shortcuts
-window.addEventListener('keydown', e => {
-  if (e.key === ' ') togglePause();
-  if (e.key === 'r' || e.key === 'R') resetFlight();
-});
-
-// Auto-start — wait for Cesium to fully initialize
-function waitForCesium() {
-  if (typeof Cesium !== 'undefined' && Cesium.Viewer) {
-    startFlight();
+function togglePause(){
+  if(paused){
+    paused=false;
+    pauseOffset += performance.now() - pauseStart;
+    document.getElementById('pauseBtn').textContent='⏸ PAUSE';
+    fly();
   } else {
-    setTimeout(waitForCesium, 100);
+    paused=true;
+    pauseStart=performance.now();
+    document.getElementById('pauseBtn').textContent='▶ PLAY';
+    if(rafId) cancelAnimationFrame(rafId);
   }
 }
-window.addEventListener('load', waitForCesium);
+let pauseStart=0;
+
+function resetFlight(){
+  paused=false;
+  document.getElementById('pauseBtn').textContent='⏸ PAUSE';
+  if(rafId) cancelAnimationFrame(rafId);
+  beginFlight();
+}
+
+window.addEventListener('keydown', e=>{
+  if(e.key===' '){ e.preventDefault(); togglePause(); }
+  if(e.key==='r'||e.key==='R') resetFlight();
+});
+
+window.addEventListener('resize',()=>{ if(viewer) viewer.resize(); });
+
+// Boot
+window.addEventListener('load', ()=>{
+  const wait = setInterval(()=>{
+    if(typeof Cesium!=='undefined'){ clearInterval(wait); init(); }
+  }, 80);
+});
 </script>
 </body>
 </html>
