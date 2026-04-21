@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>KAIT — Manhattan Flight</title>
+<title>KAIT — New York to Little Ferry</title>
 <script src="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Cesium.js"></script>
 <link href="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
 <style>
@@ -12,414 +12,486 @@
   .cesium-widget-credits,.cesium-credit-container,
   .cesium-credit-logoContainer,.cesium-credit-textContainer{display:none!important;}
 
-  #hud{
-    position:fixed;bottom:18px;left:50%;transform:translateX(-50%);
-    color:rgba(200,160,50,0.5);font:10px/1 'Courier New',monospace;
-    letter-spacing:0.2em;pointer-events:none;z-index:100;
-    text-align:center;
-  }
-  #landmark{
-    position:fixed;top:20px;left:50%;transform:translateX(-50%);
-    color:rgba(200,160,50,0);font:300 13px 'Courier New',monospace;
-    letter-spacing:0.35em;pointer-events:none;z-index:100;
+  /* Location label — top center */
+  #locLabel{
+    position:fixed;top:22px;left:50%;transform:translateX(-50%);
+    color:rgba(200,160,50,0);font:300 12px 'Courier New',monospace;
+    letter-spacing:0.4em;pointer-events:none;z-index:100;
     text-align:center;text-transform:uppercase;
-    transition:color 1.5s ease, opacity 1.5s ease;
-    text-shadow:0 0 20px rgba(200,160,50,0.4);
+    transition:color 1.4s ease;
+    text-shadow:0 0 24px rgba(200,160,50,0.35);
+    white-space:nowrap;
+  }
+  /* Fact line — below label */
+  #locFact{
+    position:fixed;top:46px;left:50%;transform:translateX(-50%);
+    color:rgba(200,160,50,0);font:10px 'Courier New',monospace;
+    letter-spacing:0.15em;pointer-events:none;z-index:100;
+    text-align:center;max-width:700px;
+    transition:color 1.4s ease;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   }
 
+  /* Chapter marker — brief flash */
+  #chapter{
+    position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+    color:rgba(200,160,50,0);font:300 28px 'Courier New',monospace;
+    letter-spacing:0.5em;pointer-events:none;z-index:101;
+    text-align:center;text-transform:uppercase;
+    transition:color 0.5s ease, opacity 0.5s ease;
+  }
+
+  /* Progress bar */
+  #progress{
+    position:fixed;bottom:0;left:0;height:2px;
+    background:rgba(200,160,50,0.4);width:0%;
+    transition:width 0.5s linear;z-index:100;
+  }
+
+  /* HUD */
+  #hud{
+    position:fixed;bottom:12px;left:50%;transform:translateX(-50%);
+    color:rgba(200,160,50,0.3);font:9px 'Courier New',monospace;
+    letter-spacing:0.2em;pointer-events:none;z-index:100;
+  }
+
+  /* Controls */
   #ctrl{
-    position:fixed;bottom:18px;right:18px;
-    display:none;flex-direction:column;gap:6px;z-index:100;
+    position:fixed;bottom:14px;right:14px;
+    display:none;flex-direction:column;gap:5px;z-index:100;
   }
   #ctrl button{
-    background:rgba(0,0,0,0.6);border:1px solid rgba(200,160,50,0.3);
-    color:rgba(200,160,50,0.7);font:9px 'Courier New',monospace;
-    letter-spacing:0.2em;padding:6px 12px;cursor:pointer;
-    transition:all 0.2s;text-align:left;
+    background:rgba(0,0,0,0.65);border:1px solid rgba(200,160,50,0.28);
+    color:rgba(200,160,50,0.65);font:9px 'Courier New',monospace;
+    letter-spacing:0.18em;padding:6px 12px;cursor:pointer;
+    transition:all 0.2s;
   }
-  #ctrl button:hover{border-color:rgba(200,160,50,0.8);color:rgba(200,160,50,1);}
+  #ctrl button:hover{border-color:rgba(200,160,50,0.7);color:#c9a832;}
 
+  /* Loading */
   #loading{
     position:fixed;inset:0;background:#000;
     display:flex;flex-direction:column;
     align-items:center;justify-content:center;
-    gap:14px;z-index:999;transition:opacity 1.2s;
+    gap:12px;z-index:999;transition:opacity 1.2s;
   }
-  #loading h1{color:#c9a832;font:300 14px 'Courier New',monospace;letter-spacing:0.5em;}
-  #bar{width:200px;height:1px;background:rgba(200,160,50,0.12);}
-  #barFill{height:100%;background:rgba(200,160,50,0.55);width:0%;transition:width 0.4s;}
-  #loadMsg{color:rgba(200,160,50,0.35);font:10px 'Courier New',monospace;letter-spacing:0.18em;}
+  #loading h1{color:#c9a832;font:300 13px 'Courier New',monospace;letter-spacing:0.55em;}
+  #loading p{color:rgba(200,160,50,0.3);font:9px 'Courier New',monospace;letter-spacing:0.18em;}
+  #bar{width:180px;height:1px;background:rgba(200,160,50,0.1);}
+  #barFill{height:100%;background:rgba(200,160,50,0.5);width:0%;transition:width 0.35s;}
+
+  /* Arrival card */
+  #arrivalCard{
+    display:none;position:fixed;top:50%;left:50%;
+    transform:translate(-50%,-50%);z-index:300;
+    background:rgba(2,4,10,0.94);
+    border:1px solid rgba(200,160,50,0.35);
+    padding:36px 48px;text-align:center;
+    font-family:'Courier New',monospace;
+    max-width:420px;
+  }
+  #arrivalCard .arr-sub{color:rgba(200,160,50,0.4);font-size:9px;letter-spacing:0.45em;margin-bottom:14px;}
+  #arrivalCard .arr-name{color:#c9a832;font-size:16px;font-weight:300;letter-spacing:0.3em;margin-bottom:5px;}
+  #arrivalCard .arr-addr{color:rgba(200,160,50,0.45);font-size:9px;letter-spacing:0.2em;margin-bottom:22px;}
+  #arrivalCard .arr-stats{color:rgba(180,180,180,0.35);font-size:8px;letter-spacing:0.15em;line-height:2.4;margin-bottom:24px;}
+  #arrivalCard button{
+    background:transparent;border:1px solid rgba(200,160,50,0.35);
+    color:rgba(200,160,50,0.6);font:9px 'Courier New',monospace;
+    letter-spacing:0.22em;padding:10px 26px;cursor:pointer;
+  }
+
+  /* Free fly HUD */
+  #ffHud{
+    display:none;position:fixed;inset:0;pointer-events:none;z-index:200;
+  }
+  #ffLegend{
+    position:absolute;top:16px;left:16px;
+    background:rgba(0,0,0,0.72);border:1px solid rgba(100,200,255,0.25);
+    padding:12px 16px;font:9px 'Courier New',monospace;
+    color:rgba(100,200,255,0.75);letter-spacing:0.14em;line-height:2.3;
+  }
+  #ffInfo{
+    position:absolute;bottom:45px;left:50%;transform:translateX(-50%);
+    color:rgba(100,200,255,0.45);font:9px 'Courier New',monospace;letter-spacing:0.2em;
+  }
+  #crosshair{
+    position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    width:18px;height:18px;
+  }
+  #crosshair::before,#crosshair::after{content:'';position:absolute;background:rgba(100,200,255,0.28);}
+  #crosshair::before{top:8px;left:0;width:18px;height:1px;}
+  #crosshair::after{top:0;left:8px;width:1px;height:18px;}
+
+  /* Record status */
+  #recStatus{
+    display:none;position:fixed;top:14px;right:14px;
+    background:rgba(160,20,20,0.88);color:#fff;
+    font:10px 'Courier New',monospace;letter-spacing:0.14em;
+    padding:9px 14px;z-index:999;
+  }
+
+  /* Record menu */
+  #recMenu{
+    display:none;position:fixed;inset:0;
+    background:rgba(0,0,0,0.92);z-index:998;
+    flex-direction:column;align-items:center;justify-content:center;gap:14px;
+  }
+  #recMenu h2{color:#c9a832;font:300 13px 'Courier New',monospace;letter-spacing:0.5em;}
+  #recMenu p{color:rgba(200,160,50,0.4);font:9px 'Courier New',monospace;
+    letter-spacing:0.13em;max-width:420px;text-align:center;line-height:2.1;}
+  .rec-preset{
+    background:rgba(0,0,0,0.6);border:1px solid rgba(200,160,50,0.35);
+    color:rgba(200,160,50,0.75);font:9px 'Courier New',monospace;
+    letter-spacing:0.14em;padding:9px 16px;cursor:pointer;
+    transition:all 0.2s;
+  }
+  .rec-preset:hover{border-color:rgba(200,160,50,0.8);color:#c9a832;}
+  #recMenu .rec-row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;}
+  #recMenu .rec-cancel{
+    background:transparent;border:1px solid rgba(200,160,50,0.18);
+    color:rgba(200,160,50,0.35);font:9px 'Courier New',monospace;
+    letter-spacing:0.2em;padding:7px 18px;cursor:pointer;
+  }
 </style>
 </head>
 <body>
-<!-- FREE FLY HUD -->
-<div id="freeflyHud" style="display:none;position:fixed;inset:0;pointer-events:none;z-index:200;">
-  <!-- Controls legend -->
-  <div style="position:absolute;top:18px;left:18px;background:rgba(0,0,0,0.7);border:1px solid rgba(100,200,255,0.3);padding:14px 18px;font:10px 'Courier New',monospace;color:rgba(100,200,255,0.8);letter-spacing:0.15em;line-height:2.2;">
-    <div style="color:rgba(100,200,255,1);letter-spacing:0.3em;margin-bottom:6px">FREE FLY MODE</div>
-    W / ↑ &nbsp;&nbsp; FORWARD<br>
-    S / ↓ &nbsp;&nbsp; BACKWARD<br>
-    A / ← &nbsp;&nbsp; STRAFE LEFT<br>
-    D / → &nbsp;&nbsp; STRAFE RIGHT<br>
-    Q &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; UP<br>
-    E &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; DOWN<br>
-    MOUSE DRAG &nbsp; LOOK<br>
-    SCROLL &nbsp;&nbsp;&nbsp;&nbsp; SPEED<br>
-    <div style="margin-top:8px;color:rgba(100,200,255,0.4)">ESC / F — back to path</div>
-  </div>
-  <!-- Speed indicator -->
-  <div id="ffSpeed" style="position:absolute;bottom:50px;left:50%;transform:translateX(-50%);color:rgba(100,200,255,0.5);font:10px 'Courier New',monospace;letter-spacing:0.2em;"></div>
-  <!-- Crosshair -->
-  <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:20px;height:20px;pointer-events:none;">
-    <div style="position:absolute;top:9px;left:0;width:20px;height:1px;background:rgba(100,200,255,0.3)"></div>
-    <div style="position:absolute;top:0;left:9px;width:1px;height:20px;background:rgba(100,200,255,0.3)"></div>
-  </div>
-</div>
 
 <div id="loading">
-  <h1>KAIT · MANHATTAN</h1>
+  <h1>NEW YORK · LITTLE FERRY</h1>
   <div id="bar"><div id="barFill"></div></div>
   <p id="loadMsg">FETCHING KEYS</p>
 </div>
+
 <div id="cesiumContainer"></div>
-<div id="landmark"></div>
+<div id="locLabel"></div>
+<div id="locFact"></div>
+<div id="chapter"></div>
+<div id="progress"></div>
 <div id="hud"></div>
+
+<!-- Free fly overlay -->
+<div id="ffHud">
+  <div id="ffLegend">
+    <div style="color:rgba(100,200,255,1);letter-spacing:0.3em;margin-bottom:5px">FREE FLY</div>
+    W/↑ &nbsp; FORWARD<br>
+    S/↓ &nbsp; BACKWARD<br>
+    A/← &nbsp; LEFT<br>
+    D/→ &nbsp; RIGHT<br>
+    Q &nbsp;&nbsp;&nbsp;&nbsp; UP<br>
+    E &nbsp;&nbsp;&nbsp;&nbsp; DOWN<br>
+    DRAG &nbsp; LOOK<br>
+    SCROLL SPEED<br>
+    <div style="margin-top:6px;color:rgba(100,200,255,0.35)">ESC / F — exit</div>
+  </div>
+  <div id="crosshair"></div>
+  <div id="ffInfo"></div>
+</div>
+
+<!-- Arrival -->
+<div id="arrivalCard">
+  <div class="arr-sub">YOU HAVE ARRIVED</div>
+  <div class="arr-name">BEYOND HELLO</div>
+  <div class="arr-addr">415 US-46 · LITTLE FERRY, NJ 07643</div>
+  <div class="arr-stats">
+    Started at Battery Park, Manhattan<br>
+    Financial District · Chinatown · SoHo<br>
+    Greenwich Village · High Line · Hudson Yards<br>
+    42nd St · Times Square · Rockefeller Center<br>
+    5th Ave · Museum Mile · Central Park<br>
+    Crossed the Hudson River<br>
+    ──────────────<br>
+    ~14 miles · 6.8 minutes cinematic
+  </div>
+  <button onclick="document.getElementById('arrivalCard').style.display='none';resetFlight();">
+    ↺ FLY AGAIN
+  </button>
+</div>
+
+<!-- Record menu -->
+<div id="recMenu">
+  <h2>FRAME RECORDER</h2>
+  <p>Renders frame-by-frame. Waits for full tile load before each capture.<br>
+  Stitch: ffmpeg -framerate 30 -i frame_%05d.png -c:v libx264 -crf 16 -pix_fmt yuv420p journey.mp4</p>
+  <div class="rec-row">
+    <button class="rec-preset" onclick="startRecord(1920,1080,30)">1080p · 30fps</button>
+    <button class="rec-preset" onclick="startRecord(2560,1440,30)">2K · 30fps</button>
+    <button class="rec-preset" onclick="startRecord(3840,2160,30)">4K · 30fps</button>
+    <button class="rec-preset" onclick="startRecord(3840,2160,60)">4K · 60fps</button>
+  </div>
+  <button class="rec-cancel" onclick="document.getElementById('recMenu').style.display='none'">CANCEL</button>
+</div>
+
+<!-- Controls -->
 <div id="ctrl">
   <button onclick="togglePause()" id="pauseBtn">⏸ PAUSE</button>
   <button onclick="resetFlight()">↺ RESTART</button>
-  <button onclick="toggleDayNight()" id="dayNightBtn">🌙 NIGHT</button>
-  <button onclick="toggleFreefly()" id="freeflyBtn" style="border-color:rgba(100,200,255,0.4);color:rgba(100,200,255,0.7)">🕹 FREE FLY</button>
-  <button onclick="showRecMenu()" id="recBtn" style="border-color:rgba(255,80,80,0.4);color:rgba(255,120,120,0.7)">⏺ RECORD</button>
+  <button onclick="toggleDayNight()" id="dnBtn">🌙 NIGHT</button>
+  <button onclick="toggleFreefly()" id="ffBtn" style="border-color:rgba(100,200,255,0.3);color:rgba(100,200,255,0.6)">🕹 FREE FLY</button>
+  <button onclick="document.getElementById('recMenu').style.display='flex'" style="border-color:rgba(255,80,80,0.3);color:rgba(255,100,100,0.6)">⏺ RECORD</button>
 </div>
-
-<div id="recMenu" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:998;flex-direction:column;align-items:center;justify-content:center;gap:16px;">
-  <h2 style="color:#c9a832;font:300 14px 'Courier New',monospace;letter-spacing:0.5em">FRAME RECORDER</h2>
-  <p style="color:rgba(200,160,50,0.5);font:10px 'Courier New',monospace;letter-spacing:0.15em;max-width:380px;text-align:center;line-height:2">
-    Renders frame-by-frame at fixed rate. Each frame saved as PNG.<br>
-    Stitch with: ffmpeg -framerate 30 -i frame_%04d.png -c:v libx264 -crf 16 -pix_fmt yuv420p manhattan.mp4<br><br>
-    WARNING: 5.5min @ 30fps = ~9,900 frames. Allow 60-90 min render time.
-  </p>
-  <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
-    <button onclick="startRecord(1920,1080,30)" style="background:rgba(0,0,0,0.6);border:1px solid rgba(200,160,50,0.4);color:rgba(200,160,50,0.8);font:10px 'Courier New',monospace;letter-spacing:0.15em;padding:10px 18px;cursor:pointer">1080p · 30fps</button>
-    <button onclick="startRecord(2560,1440,30)" style="background:rgba(0,0,0,0.6);border:1px solid rgba(200,160,50,0.4);color:rgba(200,160,50,0.8);font:10px 'Courier New',monospace;letter-spacing:0.15em;padding:10px 18px;cursor:pointer">2K · 30fps</button>
-    <button onclick="startRecord(3840,2160,30)" style="background:rgba(0,0,0,0.6);border:1px solid rgba(200,160,50,0.4);color:rgba(200,160,50,0.8);font:10px 'Courier New',monospace;letter-spacing:0.15em;padding:10px 18px;cursor:pointer">4K · 30fps</button>
-    <button onclick="startRecord(3840,2160,60)" style="background:rgba(0,0,0,0.6);border:1px solid rgba(200,160,50,0.4);color:rgba(200,160,50,0.8);font:10px 'Courier New',monospace;letter-spacing:0.15em;padding:10px 18px;cursor:pointer">4K · 60fps ⚡</button>
-  </div>
-  <button onclick="hideRecMenu()" style="background:transparent;border:1px solid rgba(200,160,50,0.2);color:rgba(200,160,50,0.4);font:10px 'Courier New',monospace;letter-spacing:0.2em;padding:8px 20px;cursor:pointer">CANCEL</button>
-</div>
-
-<div id="recStatus" style="display:none;position:fixed;top:16px;right:16px;background:rgba(180,20,20,0.85);color:#fff;font:11px 'Courier New',monospace;letter-spacing:0.15em;padding:10px 16px;z-index:999;border-radius:2px"></div>
+<div id="recStatus"></div>
 
 <script>
-// ══════════════════════════════════════════════════════════════
-// FLIGHT PATH — Little Ferry NJ → GW Bridge → Manhattan → Times Square
-// 37 waypoints, 5.5 minutes, all verified street/airspace positions
-// Each waypoint: drone GPS position + camera gimbal orientation
-// Gimbal heading/pitch are INDEPENDENT of drone heading
-// ══════════════════════════════════════════════════════════════
-
+// ══════════════════════════════════════════════════════════════════
+// FLIGHT PATH — Battery Park NYC → Little Ferry NJ
+// Your November walk, reversed and made cinematic
+// 45 waypoints · ~7 minutes
+// cam_hdg: where the GIMBAL points (independent of drone direction)
+// cam_pitch: gimbal tilt (positive = look up, negative = look down)
+// ══════════════════════════════════════════════════════════════════
 const WP = [
-  // ── ACT 1: LITTLE FERRY NJ ──
-  // Quiet suburb at night. Contrast = the whole point.
-  {lng:-74.040,lat:40.852,alt:22, drone_hdg:120,
-   cam_hdg:120,cam_pitch:-8,  dur:12,
-   label:'LITTLE FERRY, NJ',
-   note:'Residential streets at night — the calm before Manhattan'},
+  // ── CHAPTER 1: SOUTHERN TIP ──
+  {lng:-74.017,lat:40.700,alt:35, cam_hdg:170,cam_pitch:-8,  dur:12,
+   ch:'THE SOUTHERN TIP',
+   label:'BATTERY PARK · MANHATTAN',
+   fact:'Southernmost point of Manhattan — Statue of Liberty 1.5 miles across the harbor'},
+  {lng:-74.020,lat:40.695,alt:28, cam_hdg:200,cam_pitch:-5,  dur:10,
+   label:'STATUE OF LIBERTY',
+   fact:'Lady Liberty — gift from France, 1886, 305ft from ground to torch, 25M visitors since opening'},
+  {lng:-74.013,lat:40.701,alt:22, cam_hdg:90, cam_pitch:-3,  dur:8,
+   label:'STATEN ISLAND FERRY TERMINAL',
+   fact:'Free ferry runs every 30 minutes — 70,000 riders/day, best free view of the skyline'},
 
-  {lng:-74.035,lat:40.849,alt:28, drone_hdg:100,
-   cam_hdg:80,cam_pitch:-12,  dur:10,
-   label:'',
-   note:'Low over NJ streets, camera drifts left looking down avenue'},
+  // ── CHAPTER 2: FINANCIAL DISTRICT ──
+  {lng:-74.013,lat:40.712,alt:55, cam_hdg:30, cam_pitch:15,  dur:10,
+   ch:'FINANCIAL DISTRICT',
+   label:'ONE WORLD TRADE CENTER',
+   fact:'Freedom Tower — 1776ft, tallest building in Western Hemisphere, rebuilt after September 11'},
+  {lng:-74.011,lat:40.712,alt:35, cam_hdg:355,cam_pitch:-12, dur:9,
+   label:'9/11 MEMORIAL',
+   fact:'Twin reflecting pools in the footprints of the towers — nearly 3,000 names carved in bronze'},
+  {lng:-74.010,lat:40.707,alt:20, cam_hdg:85, cam_pitch:3,   dur:9,
+   label:'WALL STREET · NYSE',
+   fact:'NYSE — $25 trillion market cap, named for a Dutch wooden wall built in 1653 to repel invasion'},
+  {lng:-74.013,lat:40.706,alt:16, cam_hdg:30, cam_pitch:-5,  dur:8,
+   label:'CHARGING BULL',
+   fact:"Arturo Di Modica's Charging Bull (1989) — placed illegally overnight, now permanent city landmark"},
+  {lng:-74.010,lat:40.706,alt:22, cam_hdg:355,cam_pitch:2,   dur:8,
+   label:'BROAD STREET',
+   fact:'Federal Hall — where George Washington was inaugurated as first US President, April 30, 1789'},
 
-  // ── ACT 2: RISE TOWARD PALISADES ──
-  // Palisades: 100m basalt cliffs along Hudson, formed 200M years ago
-  {lng:-74.020,lat:40.845,alt:55, drone_hdg:140,
-   cam_hdg:90,cam_pitch:-15,  dur:10,
-   label:'PALISADES CLIFFS',
-   note:'Rising over NJ suburbs, Palisades cliffs ahead'},
+  // ── CHAPTER 3: CIVIC CENTER ──
+  {lng:-73.997,lat:40.706,alt:42, cam_hdg:110,cam_pitch:-5,  dur:9,
+   ch:'CIVIC CENTER',
+   label:'BROOKLYN BRIDGE',
+   fact:'Brooklyn Bridge — 1883, first steel-wire suspension bridge, took 14 years and 27 lives to build'},
+  {lng:-74.004,lat:40.713,alt:32, cam_hdg:355,cam_pitch:-5,  dur:8,
+   label:'CITY HALL',
+   fact:'City Hall — 1812, oldest continuously used city hall in the United States'},
 
-  {lng:-74.005,lat:40.838,alt:140, drone_hdg:160,
-   cam_hdg:200,cam_pitch:-20, dur:10,
-   label:'',
-   note:'Palisades summit — 100m basalt cliffs, Manhattan visible across river'},
+  // ── CHAPTER 4: CHINATOWN & LITTLE ITALY ──
+  {lng:-73.999,lat:40.717,alt:20, cam_hdg:358,cam_pitch:-2,  dur:9,
+   ch:'CHINATOWN',
+   label:'CHINATOWN · CANAL STREET',
+   fact:'Most densely populated neighborhood in the US — 100,000 residents in 2 square miles'},
+  {lng:-73.997,lat:40.719,alt:16, cam_hdg:355,cam_pitch:0,   dur:8,
+   label:'LITTLE ITALY · MULBERRY ST',
+   fact:"Mulberry St — heart of old Little Italy, San Gennaro festival every September since 1926"},
 
-  // ── ACT 3: GRAND SCALE REVEAL ──
-  // First moment the full Manhattan island is visible
-  // This is the WOW moment — zoom out to 800m, both sides of Hudson
-  {lng:-73.998,lat:40.820,alt:800, drone_hdg:175,
-   cam_hdg:175,cam_pitch:-18, dur:14,
-   label:'MANHATTAN ISLAND',
-   note:'GRAND SCALE — full island visible, Hudson & East River, all 5 boroughs'},
+  // ── CHAPTER 5: SOHO & TRIBECA ──
+  {lng:-74.000,lat:40.724,alt:22, cam_hdg:358,cam_pitch:-3,  dur:9,
+   ch:'SOHO',
+   label:'SOHO · BROADWAY',
+   fact:"SoHo — world's largest collection of cast iron architecture, 1860s-1880s industrial buildings"},
+  {lng:-74.007,lat:40.719,alt:28, cam_hdg:20, cam_pitch:-5,  dur:8,
+   label:'TRIBECA',
+   fact:'TriBeCa — Triangle Below Canal, cobblestone streets, most expensive neighborhood in NYC'},
 
-  // ── ACT 4: GW BRIDGE APPROACH & FLY-UNDER ──
-  // George Washington Bridge: opened 1931, longest suspension bridge at the time
-  // 14 lanes, 4,760ft main span, 604ft towers
-  {lng:-73.975,lat:40.855,alt:180, drone_hdg:185,
-   cam_hdg:170,cam_pitch:-8,  dur:10,
-   label:'GEORGE WASHINGTON BRIDGE',
-   note:'GW Bridge — 14 lanes, 4760ft span, opened 1931'},
+  // ── CHAPTER 6: GREENWICH VILLAGE ──
+  {lng:-73.998,lat:40.731,alt:18, cam_hdg:355,cam_pitch:-3,  dur:9,
+   ch:'GREENWICH VILLAGE',
+   label:'WASHINGTON SQUARE PARK',
+   fact:'Washington Square Park — NYU campus surrounds it, marble arch built 1892, famous chess hustlers'},
+  {lng:-74.003,lat:40.733,alt:16, cam_hdg:280,cam_pitch:-2,  dur:8,
+   label:'WEST VILLAGE · BLEECKER ST',
+   fact:'Stonewall Inn on Christopher St — 1969 uprising here launched the modern LGBTQ+ rights movement'},
 
-  {lng:-73.968,lat:40.851,alt:72, drone_hdg:175,
-   cam_hdg:175,cam_pitch:12,  dur:8,
-   label:'FLYING UNDER GW BRIDGE',
-   note:'Under the lower deck — camera looks up through the structure'},
+  // ── CHAPTER 7: HIGH LINE & MEATPACKING ──
+  {lng:-74.006,lat:40.742,alt:25, cam_hdg:358,cam_pitch:-5,  dur:9,
+   ch:'THE HIGH LINE',
+   label:'HIGH LINE · MEATPACKING DISTRICT',
+   fact:'High Line — 1.45 mile elevated park on a decommissioned 1930s freight railway, 8M visitors/year'},
+  {lng:-74.003,lat:40.748,alt:28, cam_hdg:5,  cam_pitch:-3,  dur:8,
+   label:'CHELSEA',
+   fact:'Chelsea — 500+ art galleries concentrated in one neighborhood, Chelsea Market in old Nabisco factory'},
 
-  // ── ACT 5: WASHINGTON HEIGHTS — MANHATTAN ENTRY ──
-  // Northernmost neighborhood, high ground, Dominican culture
-  // Fort Tryon Park + The Cloisters (medieval art museum) nearby
-  {lng:-73.940,lat:40.845,alt:55, drone_hdg:185,
-   cam_hdg:200,cam_pitch:-5,  dur:10,
-   label:'WASHINGTON HEIGHTS',
-   note:'Northern Manhattan — high ground, diverse neighborhood, The Cloisters nearby'},
+  // ── CHAPTER 8: HUDSON YARDS ──
+  {lng:-74.002,lat:40.753,alt:42, cam_hdg:90, cam_pitch:10,  dur:9,
+   ch:'HUDSON YARDS',
+   label:'HUDSON YARDS · THE VESSEL',
+   fact:'The Vessel — 154 interconnected flights of stairs, The Edge sky deck highest outdoor deck in hemisphere'},
 
-  // ── ACT 6: AERIAL — CENTRAL PARK FROM NORTH ──
-  // Pull up for context — show the city/park relationship
-  {lng:-73.958,lat:40.800,alt:500, drone_hdg:180,
-   cam_hdg:175,cam_pitch:-22, dur:10,
-   label:'CENTRAL PARK FROM ABOVE',
-   note:'843 acres of park surrounded by the most valuable real estate on earth'},
+  // ── CHAPTER 9: HELL'S KITCHEN ──
+  {lng:-74.001,lat:40.764,alt:28, cam_hdg:90, cam_pitch:5,   dur:8,
+   ch:"HELL'S KITCHEN",
+   label:'USS INTREPID · PIER 86',
+   fact:'USS Intrepid — WWII aircraft carrier, Space Shuttle Enterprise on flight deck, Cold War submarine'},
+  {lng:-73.995,lat:40.760,alt:20, cam_hdg:358,cam_pitch:-2,  dur:8,
+   label:"HELL'S KITCHEN · 9TH AVE",
+   fact:"Hell's Kitchen — working class neighborhood turned trendy, 9th Ave International Food Festival"},
 
-  // ── ACT 7: UPPER WEST SIDE DESCENT ──
-  // Lincoln Center: world's largest performing arts complex (opened 1962)
-  // Broadway cuts diagonally through the grid here
-  {lng:-73.985,lat:40.773,alt:50, drone_hdg:182,
-   cam_hdg:100,cam_pitch:-3,  dur:9,
-   label:'LINCOLN CENTER',
-   note:'Lincoln Center for Performing Arts — world largest, camera looks left at plaza'},
-
-  // ── ACT 8: CENTRAL PARK — GAPSTOW BRIDGE ──
-  // Gapstow Bridge: 1896 stone arch over The Pond
-  // Most photographed bridge in Central Park
-  // Iconic Manhattan skyline reflection in the water
-  {lng:-73.977,lat:40.768,alt:15, drone_hdg:200,
-   cam_hdg:180,cam_pitch:-5,  dur:8,
-   label:'CENTRAL PARK — THE POND',
-   note:'Iconic skyline reflection in The Pond, Gapstow Bridge ahead'},
-
-  {lng:-73.976,lat:40.768,alt:6,  drone_hdg:195,
-   cam_hdg:195,cam_pitch:18,  dur:6,
-   label:'GAPSTOW BRIDGE',
-   note:'1896 stone arch — camera looks UP through the arch as we pass under'},
-
-  {lng:-73.975,lat:40.767,alt:14, drone_hdg:190,
-   cam_hdg:120,cam_pitch:-5,  dur:7,
-   label:'',
-   note:'Exit bridge — Plaza Hotel visible, Grand Army Plaza ahead'},
-
-  // ── ACT 9: COLUMBUS CIRCLE / CENTRAL PARK SOUTH ──
-  // Most expensive zip code in America
-  // Supertalls visible: Central Park Tower (1550ft), One57 (1004ft)
-  {lng:-73.982,lat:40.768,alt:42, drone_hdg:175,
-   cam_hdg:90,cam_pitch:15,   dur:8,
-   label:'COLUMBUS CIRCLE',
-   note:'Central Park South — most expensive real estate on Earth, supertalls loom right'},
-
-  // ── ACT 10: BILLIONAIRES ROW — 57TH ST ──
-  // 432 Park Ave: 1396ft, 24:1 height-to-width ratio — most slender skyscraper
-  // Central Park Tower: 1550ft — tallest residential building in world
-  // Steinway Tower: 1428ft
-  // One57: 1004ft — nicknamed "The Billionaire Building"
-  {lng:-73.981,lat:40.764,alt:50, drone_hdg:88,
-   cam_hdg:88,cam_pitch:20,   dur:10,
-   label:'BILLIONAIRES ROW — 57TH ST',
-   note:'432 Park (1396ft), Central Park Tower (1550ft) — tallest residential buildings on Earth'},
-
-  {lng:-73.978,lat:40.765,alt:45, drone_hdg:75,
-   cam_hdg:340,cam_pitch:25,  dur:8,
-   label:'432 PARK AVE',
-   note:'World most slender skyscraper — 24:1 height-to-width ratio — camera tilts to ceiling'},
-
-  // ── ACT 11: ROCKEFELLER CENTER ──
-  // 30 Rock: 70 floors, Top of the Rock observatory
-  // NBC Studios, SNL filmed here since 1975
-  // Radio City Music Hall (6th Ave) — 6,000 seat art deco theater
-  // Famous Christmas tree — 75ft Norway spruce every December
-  {lng:-73.979,lat:40.759,alt:40, drone_hdg:355,
-   cam_hdg:270,cam_pitch:5,   dur:9,
-   label:'ROCKEFELLER CENTER',
-   note:'30 Rock — NBC Studios, SNL since 1975, Radio City Music Hall on left'},
-
-  // ── ACT 12: 42ND ST CANYON — THE MONEY SHOT ──
-  // Most famous street in the world
-  // Port Authority Bus Terminal (west) — busiest bus terminal on Earth
-  // Times Square (Broadway crossing at 42nd & 7th)
-  // Bryant Park — NYC's outdoor living room
-  // NY Public Library — Beaux-Arts, 1911, lions Patience & Fortitude
-  // Grand Central Terminal — 1913 Beaux-Arts, 44 platforms
-  // Chrysler Building — 1930 Art Deco crown
-  {lng:-73.993,lat:40.757,alt:38, drone_hdg:88,
-   cam_hdg:88,cam_pitch:8,    dur:8,
-   label:'42ND ST — ENTERING THE CANYON',
-   note:'Most famous crosstown street — Port Authority on right, canyon opens ahead'},
-
-  {lng:-73.987,lat:40.757,alt:36, drone_hdg:85,
-   cam_hdg:355,cam_pitch:5,   dur:8,
-   label:'42ND & TIMES SQUARE',
-   note:'Broadway diagonal crosses here — camera pivots to look north up 7th Ave'},
-
-  {lng:-73.983,lat:40.754,alt:34, drone_hdg:82,
-   cam_hdg:0,cam_pitch:-3,    dur:8,
+  // ── CHAPTER 10: 42ND STREET ──
+  {lng:-73.993,lat:40.757,alt:30, cam_hdg:88, cam_pitch:3,   dur:9,
+   ch:'42ND STREET',
+   label:'42ND ST · PORT AUTHORITY',
+   fact:'Port Authority Bus Terminal — busiest bus terminal in Western Hemisphere, 230,000 passengers/day'},
+  {lng:-73.987,lat:40.757,alt:28, cam_hdg:355,cam_pitch:5,   dur:9,
+   label:'42ND ST · TIMES SQUARE',
+   fact:'Where Broadway crosses 42nd St — the bowtie. TKTS discount theater booth on the red steps'},
+  {lng:-73.983,lat:40.754,alt:26, cam_hdg:82, cam_pitch:3,   dur:8,
    label:'BRYANT PARK',
-   note:'Bryant Park right, NY Public Library lions on left — camera looks ahead down canyon'},
+   fact:'Bryant Park — fashion week runway, winter ice rink, NY Public Library lions Patience and Fortitude'},
+  {lng:-73.977,lat:40.752,alt:30, cam_hdg:60, cam_pitch:10,  dur:9,
+   label:'GRAND CENTRAL · CHRYSLER',
+   fact:'Grand Central Terminal — 1913 Beaux-Arts, 44 platforms, busiest station in world by number of platforms'},
 
-  {lng:-73.978,lat:40.753,alt:38, drone_hdg:80,
-   cam_hdg:60,cam_pitch:18,   dur:8,
-   label:'GRAND CENTRAL — CHRYSLER',
-   note:'Grand Central Terminal facade left, Chrysler spire ahead right — camera tilts up'},
-
-  // ── ACT 13: CHRYSLER BUILDING CLOSE PASS ──
-  // 1930 Art Deco masterpiece — 1046ft with spire
-  // Stainless steel sunburst crown, eagle gargoyles at 61st floor
-  // Briefly tallest building in world (for 11 months, 1930)
-  // Many consider it the most beautiful skyscraper ever built
-  {lng:-73.975,lat:40.752,alt:55, drone_hdg:340,
-   cam_hdg:300,cam_pitch:30,  dur:9,
+  // ── CHAPTER 11: ART DECO MIDTOWN ──
+  {lng:-73.975,lat:40.752,alt:52, cam_hdg:340,cam_pitch:28,  dur:9,
+   ch:'ART DECO MIDTOWN',
    label:'CHRYSLER BUILDING',
-   note:'1930 Art Deco crown — eagle gargoyles, sunburst spire, tallest for 11 months in 1930'},
+   fact:'Chrysler Building — 1930, eagle gargoyles at 61st floor, stainless steel crown, 77 floors of Art Deco'},
+  {lng:-73.977,lat:40.757,alt:32, cam_hdg:358,cam_pitch:-2,  dur:9,
+   label:'PARK AVENUE',
+   fact:'Park Avenue — most prestigious address in America, MetLife Building straddles the avenue at 45th St'},
 
-  // ── ACT 14: PARK AVE CANYON ──
-  // Park Ave: divided boulevard, most prestigious address
-  // Helmsley Building: 1929, gold pyramid cap (34 stories but looks larger)
-  // MetLife Building: 1963, 808ft, straddles the avenue
-  {lng:-73.977,lat:40.754,alt:42, drone_hdg:358,
-   cam_hdg:358,cam_pitch:-2,  dur:10,
-   label:'PARK AVE CANYON',
-   note:'Dead straight north — Helmsley Building gold cap ahead, MetLife straddles the avenue'},
-
-  // ── ACT 15: EMPIRE STATE BUILDING ORBIT ──
-  // 1931 Art Deco, 1454ft with antenna
-  // Mooring mast designed for zeppelins (never used)
-  // Lit in different colors for different occasions
-  // 102 floors, 1576 steps, observation deck on 86th floor
-  // King Kong (1933) — still the definitive NYC image
-  {lng:-73.992,lat:40.749,alt:65, drone_hdg:45,
-   cam_hdg:65,cam_pitch:22,   dur:8,
-   label:'EMPIRE STATE BUILDING',
-   note:'Orbiting — 1454ft Art Deco icon, mooring mast for zeppelins, King Kong'},
-
-  {lng:-73.986,lat:40.745,alt:80, drone_hdg:350,
-   cam_hdg:10,cam_pitch:25,   dur:8,
-   label:'EMPIRE STATE — SOUTH FACE',
-   note:'Looking up at the Art Deco crown from south — camera tracks the spire'},
-
-  {lng:-73.980,lat:40.749,alt:70, drone_hdg:280,
-   cam_hdg:270,cam_pitch:18,  dur:7,
-   label:'EMPIRE STATE — EAST SIDE',
-   note:'East face orbit — Midtown canyon visible, Chrysler in background'},
-
-  // ── ACT 16: HERALD SQUARE ──
-  // 34th & Broadway — Macy's flagship: 2.2M sq ft, world's largest dept store
-  // Broadway diagonal creates triangular block here
-  {lng:-73.988,lat:40.749,alt:38, drone_hdg:200,
-   cam_hdg:180,cam_pitch:-3,  dur:8,
-   label:'HERALD SQUARE',
-   note:"Macy's flagship — 2.2M sq ft, world's largest department store"},
-
-  // ── ACT 17: BROADWAY SOUTH — FLATIRON ──
-  // Flatiron: 1902, 285ft, triangular (Broadway cuts diagonally at 23rd St)
-  // Daniel Burnham architect — called "a stingy piece of pie" when built
-  // Madison Square Park: 6.2 acres, original home of Madison Square Garden
-  {lng:-73.990,lat:40.742,alt:32, drone_hdg:185,
-   cam_hdg:185,cam_pitch:5,   dur:9,
-   label:'FLATIRON BUILDING',
-   note:'1902 triangular icon — Broadway/5th Ave cross at 23rd St, Madison Square Park right'},
-
-  {lng:-73.990,lat:40.739,alt:28, drone_hdg:175,
-   cam_hdg:355,cam_pitch:8,   dur:8,
-   label:'',
-   note:'Camera looks BACK at Flatiron corner as we pass — the iconic triangular slice'},
-
-  // ── ACT 18: UNION SQUARE ──
-  // Historic protest and gathering space since 1882
-  // Farmers market 4 days/week — largest in NYC
-  // Major transit hub (4, 5, 6, L, N, Q, R, W trains)
-  {lng:-73.990,lat:40.736,alt:35, drone_hdg:2,
-   cam_hdg:350,cam_pitch:-5,  dur:8,
-   label:'UNION SQUARE',
-   note:'Historic protest space since 1882 — camera looks back south down Broadway'},
-
-  // ── ACT 19: BROADWAY NORTH — TIMES SQUARE APPROACH ──
-  {lng:-73.988,lat:40.748,alt:40, drone_hdg:8,
-   cam_hdg:8,cam_pitch:3,     dur:8,
-   label:'BROADWAY HEADING NORTH',
-   note:'Back up Broadway — grid spreads below, Times Square ahead'},
-
-  {lng:-73.987,lat:40.754,alt:38, drone_hdg:5,
-   cam_hdg:5,cam_pitch:5,     dur:8,
-   label:'APPROACHING TIMES SQUARE',
-   note:'Coming up from 42nd — billboard glow begins, camera looks up Broadway'},
-
-  // ── ACT 20: TIMES SQUARE — THE FINALE ──
-  // 50 million visitors per year — most visited tourist attraction on Earth
-  // 5,000+ LED billboards — most densely lit place on the planet
-  // TKTS booth, NASDAQ tower, One Times Square (NYE ball drop since 1907)
-  // 40+ Broadway theaters within walking distance
-  // "The Crossroads of the World"
-  {lng:-73.986,lat:40.757,alt:32, drone_hdg:358,
-   cam_hdg:358,cam_pitch:12,  dur:10,
+  // ── CHAPTER 12: TIMES SQUARE ──
+  {lng:-73.985,lat:40.758,alt:28, cam_hdg:358,cam_pitch:8,   dur:10,
+   ch:'TIMES SQUARE',
    label:'TIMES SQUARE',
-   note:'"The Crossroads of the World" — 50M visitors/year, 5000+ LED billboards'},
+   fact:'Crossroads of the World — 50 million visitors/year, 5,000+ LED billboards, 40+ Broadway theaters nearby'},
+  {lng:-73.984,lat:40.760,alt:26, cam_hdg:358,cam_pitch:5,   dur:8,
+   label:'BROADWAY THEATER DISTRICT',
+   fact:'Broadway — 41 professional theaters, born here in 1750, Hamilton/Wicked/Phantom have all played these stages'},
 
-  {lng:-73.985,lat:40.760,alt:38, drone_hdg:10,
-   cam_hdg:270,cam_pitch:8,   dur:8,
-   label:'TIMES SQUARE — THEATER DISTRICT',
-   note:'Camera sweeps left — 40+ Broadway theaters, NASDAQ tower, One Times Square'},
+  // ── CHAPTER 13: ROCKEFELLER CENTER ──
+  {lng:-73.979,lat:40.759,alt:32, cam_hdg:270,cam_pitch:5,   dur:9,
+   ch:'ROCKEFELLER CENTER',
+   label:'ROCKEFELLER CENTER · 30 ROCK',
+   fact:'30 Rock — NBC Studios, SNL filmed here since 1975, Top of the Rock, iconic Christmas tree every December'},
+  {lng:-73.976,lat:40.759,alt:26, cam_hdg:180,cam_pitch:-5,  dur:8,
+   label:"ST PATRICK'S CATHEDRAL",
+   fact:"St Patrick's Cathedral — 1879 Neo-Gothic, 330ft spires, seats 2,400, faces Rockefeller Center across 5th Ave"},
 
-  // ── ACT 21: GRAND FINALE RISE ──
-  // Rise fast — reveal the full scale of what we just flew through
-  {lng:-73.984,lat:40.762,alt:200, drone_hdg:175,
-   cam_hdg:175,cam_pitch:-18, dur:8,
-   label:'RISING',
-   note:'Fast ascent — Midtown panorama opens up, Hudson and East River both visible'},
+  // ── CHAPTER 14: FIFTH AVENUE ──
+  {lng:-73.977,lat:40.762,alt:28, cam_hdg:358,cam_pitch:-3,  dur:9,
+   ch:'FIFTH AVENUE',
+   label:'5TH AVENUE',
+   fact:'Most expensive retail street in the world — Bergdorf Goodman, Tiffany & Co, Saks, Trump Tower'},
 
-  {lng:-73.980,lat:40.758,alt:550, drone_hdg:175,
-   cam_hdg:175,cam_pitch:-25, dur:10,
-   label:'MIDTOWN MANHATTAN',
-   note:'Full Midtown — every building we flew through now visible below'},
+  // ── CHAPTER 15: MUSEUM MILE ──
+  {lng:-73.963,lat:40.779,alt:32, cam_hdg:270,cam_pitch:-3,  dur:9,
+   ch:'MUSEUM MILE',
+   label:'MUSEUM MILE · THE MET',
+   fact:'9 world-class museums along 5th Ave — the Met has 1.5M sq ft and 1.5 million objects in its collection'},
 
-  {lng:-73.975,lat:40.750,alt:950, drone_hdg:178,
-   cam_hdg:178,cam_pitch:-30, dur:12,
-   label:'MANHATTAN — TIP TO TIP',
-   note:'Full island — from Washington Heights to Battery Park, both rivers, harbor'},
+  // ── CHAPTER 16: CENTRAL PARK ──
+  {lng:-73.971,lat:40.774,alt:18, cam_hdg:270,cam_pitch:-5,  dur:9,
+   ch:'CENTRAL PARK',
+   label:'CENTRAL PARK · BETHESDA FOUNTAIN',
+   fact:'843 acres — designed by Olmsted & Vaux, 1858, 42M visitors/year, most visited urban park on Earth'},
+  {lng:-73.974,lat:40.776,alt:10, cam_hdg:200,cam_pitch:5,   dur:8,
+   label:'BOW BRIDGE',
+   fact:'Bow Bridge — 1862 cast iron, most photographed bridge in Central Park, 87 feet long'},
+  {lng:-73.975,lat:40.776,alt:16, cam_hdg:270,cam_pitch:-3,  dur:8,
+   label:'STRAWBERRY FIELDS',
+   fact:"Strawberry Fields — John Lennon memorial, the Dakota Building where he lived and was shot is on the left"},
+
+  // ── CHAPTER 17: UPPER WEST SIDE ──
+  {lng:-73.982,lat:40.768,alt:32, cam_hdg:180,cam_pitch:-8,  dur:8,
+   ch:'UPPER WEST SIDE',
+   label:'COLUMBUS CIRCLE',
+   fact:'Columbus Circle — gateway to Central Park, CNN HQ, Time Warner Center, most trafficked intersection in NYC'},
+  {lng:-73.985,lat:40.773,alt:28, cam_hdg:180,cam_pitch:-5,  dur:8,
+   label:'LINCOLN CENTER',
+   fact:"Lincoln Center — world's largest performing arts complex, Metropolitan Opera, NY Philharmonic, Juilliard"},
+
+  // ── CHAPTER 18: BILLIONAIRES ROW ──
+  {lng:-73.981,lat:40.764,alt:42, cam_hdg:88, cam_pitch:22,  dur:10,
+   ch:"BILLIONAIRES' ROW",
+   label:"BILLIONAIRES' ROW · 57TH ST",
+   fact:'432 Park Ave (1396ft) · Central Park Tower (1550ft tallest residential on Earth) · Steinway Tower (1428ft)'},
+
+  // ── CHAPTER 19: THE CROSSING ──
+  {lng:-74.010,lat:40.760,alt:22, cam_hdg:270,cam_pitch:-8,  dur:10,
+   ch:'CROSSING THE HUDSON',
+   label:'HUDSON RIVER',
+   fact:'Hudson River — 315 miles long, named for Henry Hudson 1609, forms the NY/NJ border'},
+  {lng:-74.022,lat:40.768,alt:52, cam_hdg:100,cam_pitch:-12, dur:9,
+   label:'WEEHAWKEN · NJ',
+   fact:'Weehawken — Aaron Burr shot Alexander Hamilton in a duel here on July 11, 1804'},
+
+  // ── CHAPTER 20: HOME ──
+  {lng:-74.025,lat:40.785,alt:62, cam_hdg:355,cam_pitch:-8,  dur:8,
+   ch:'NEW JERSEY',
+   label:'NEW JERSEY TURNPIKE',
+   fact:'Heading north — Route 46 ahead, Little Ferry 3 miles'},
+  {lng:-74.032,lat:40.840,alt:32, cam_hdg:5,  cam_pitch:-5,  dur:8,
+   label:'US ROUTE 46 · LITTLE FERRY',
+   fact:'US Route 46 — destination on the right, 0.4 miles ahead'},
+  {lng:-74.033,lat:40.847,alt:15, cam_hdg:2,  cam_pitch:-3,  dur:7,
+   label:'415 US-46',
+   fact:'Arriving at destination'},
+  {lng:-74.0334,lat:40.8472,alt:28,cam_hdg:180,cam_pitch:-20,dur:12,
+   ch:'HOME',
+   label:'BEYOND HELLO · LITTLE FERRY NJ',
+   fact:'14 miles from Battery Park · every neighborhood in between'},
 ];
 
-// ══════════════════════════════════════════════════════════════
-// GIMBAL SYSTEM
-// Camera heading/pitch are separate from drone heading
-// Smooth interpolation between waypoint camera orientations
-// Micro-movement simulates physical gimbal/drone physics
-// ══════════════════════════════════════════════════════════════
-
-const TOTAL = WP.reduce((s,w) => s+w.dur, 0);
+const TOTAL = WP.reduce((s,w)=>s+w.dur,0);
 let viewer, flying=false, paused=false, rafId=null;
 let startT=0, pauseOffset=0, pauseStart=0;
-let lastLabel='', labelTimeout=null;
+let isNight=true;
+let lastLabel='', lastCh='', labelTimer=null, chTimer=null;
 
-function setLoad(msg, pct){
+// ── RECORDING STATE ──
+let recording=false, recFrameIdx=0, recTotalFrames=0, recFPS=30, recDirHandle=null, origSize=null;
+const capCanvas=document.createElement('canvas');
+const capCtx=capCanvas.getContext('2d');
+
+// ── FREE FLY STATE ──
+let ffActive=false, ffSpeed=30, ffKeys={}, ffMouseDown=false;
+let ffLastX=0, ffLastY=0, ffRafId=null, ffLastT=0;
+
+function setLoad(msg,pct){
   document.getElementById('loadMsg').textContent=msg;
   document.getElementById('barFill').style.width=pct+'%';
 }
 
-function showLabel(text){
-  const el=document.getElementById('landmark');
-  if(!text||text===lastLabel) return;
-  lastLabel=text;
-  el.style.color='rgba(200,160,50,0.75)';
-  if(labelTimeout) clearTimeout(labelTimeout);
-  labelTimeout=setTimeout(()=>{
-    el.style.color='rgba(200,160,50,0)';
-  }, 3500);
-  el.textContent=text;
+function showLabel(label, fact, ch){
+  const lEl=document.getElementById('locLabel');
+  const fEl=document.getElementById('locFact');
+  const cEl=document.getElementById('chapter');
+
+  if(label && label!==lastLabel){
+    lastLabel=label;
+    lEl.style.color='rgba(200,160,50,0.8)';
+    fEl.style.color='rgba(200,160,50,0.38)';
+    lEl.textContent=label;
+    fEl.textContent=fact||'';
+    if(labelTimer)clearTimeout(labelTimer);
+    labelTimer=setTimeout(()=>{
+      lEl.style.color='rgba(200,160,50,0)';
+      fEl.style.color='rgba(200,160,50,0)';
+    }, 4500);
+  }
+
+  if(ch && ch!==lastCh){
+    lastCh=ch;
+    cEl.textContent=ch;
+    cEl.style.color='rgba(200,160,50,0.55)';
+    if(chTimer)clearTimeout(chTimer);
+    chTimer=setTimeout(()=>{ cEl.style.color='rgba(200,160,50,0)'; }, 2200);
+  }
 }
 
 async function init(){
-  setLoad('FETCHING KEYS', 10);
-  let cesiumToken='', googleKey='';
+  setLoad('FETCHING KEYS',10);
+  let cesiumToken='',googleKey='';
   try{
     const r=await fetch('https://caci-worker.timtkosuge.workers.dev/api/map-keys');
     if(r.ok){const k=await r.json();cesiumToken=k.cesiumToken||'';googleKey=k.googleKey||'';}
     else{setLoad('KEY FETCH FAILED',0);return;}
-  }catch(e){setLoad('KEY ERROR: '+e.message,0);return;}
+  }catch(e){setLoad('KEY ERROR',0);return;}
   if(!cesiumToken){setLoad('NO CESIUM TOKEN',0);return;}
 
   setLoad('INITIALIZING',25);
@@ -433,72 +505,117 @@ async function init(){
     shadows:false,requestRenderMode:false,targetFrameRate:60,
   });
 
-  // ── NIGHT — 11pm NYC (3am UTC) ──
-  const d=new Date();d.setUTCHours(3,0,0,0);
-  viewer.clock.currentTime=Cesium.JulianDate.fromDate(d);
-  viewer.clock.shouldAnimate=false;
-
-  // ── ATMOSPHERE ──
-  viewer.scene.skyAtmosphere.show=true;
-  viewer.scene.skyAtmosphere.brightnessShift=-0.45;
-  viewer.scene.skyAtmosphere.saturationShift=0.15;
-  viewer.scene.skyBox.show=true;
-  viewer.scene.moon.show=true;
+  applyTimeOfDay();
   viewer.scene.fog.enabled=true;
-  viewer.scene.fog.density=0.00012;
+  viewer.scene.fog.density=0.00010;
   viewer.scene.fog.minimumBrightness=0.02;
   viewer.scene.postProcessStages.fxaa.enabled=true;
   viewer.scene.globe.maximumScreenSpaceError=1.0;
 
   setLoad('LOADING PHOTOREALISTIC TILES',50);
-
   try{
     if(googleKey){
-      const tileset=await Cesium.Cesium3DTileset.fromUrl(
+      const ts=await Cesium.Cesium3DTileset.fromUrl(
         `https://tile.googleapis.com/v1/3dtiles/root.json?key=${googleKey}`,
         {showCreditsOnScreen:false,maximumScreenSpaceError:1.0,preloadWhenHidden:true}
       );
-      viewer.scene.primitives.add(tileset);
+      viewer.scene.primitives.add(ts);
       viewer.scene.globe.show=false;
-    } else {
+    }else{
       const osm=await Cesium.createOsmBuildingsAsync();
       viewer.scene.primitives.add(osm);
     }
-    setLoad('PRELOADING STARTING AREA',80);
+    setLoad('PRELOADING TILES',80);
   }catch(e){
-    setLoad('TILE ERROR: '+e.message,0);
-    console.error(e);
-    try{const osm=await Cesium.createOsmBuildingsAsync();viewer.scene.primitives.add(osm);}catch(e2){}
+    console.error(e);setLoad('TILE ERROR: '+e.message,0);
+    try{viewer.scene.primitives.add(await Cesium.createOsmBuildingsAsync());}catch(e2){}
   }
 
-  // Park camera at start, let tiles load
-  viewer.camera.setView({
-    destination:Cesium.Cartesian3.fromDegrees(WP[0].lng,WP[0].lat,WP[0].alt+200),
-    orientation:{
-      heading:Cesium.Math.toRadians(WP[0].cam_hdg),
-      pitch:Cesium.Math.toRadians(WP[0].cam_pitch),
-      roll:0
-    }
-  });
+  // Park at start, let tiles load
+  setCameraWP(WP[0],0);
   await new Promise(r=>setTimeout(r,5000));
-
   setLoad('LAUNCHING',100);
   await new Promise(r=>setTimeout(r,500));
 
-  const loading=document.getElementById('loading');
-  loading.style.opacity='0';
-  setTimeout(()=>{loading.style.display='none';},1200);
+  const ld=document.getElementById('loading');
+  ld.style.opacity='0';
+  setTimeout(()=>{ld.style.display='none';},1200);
   document.getElementById('ctrl').style.display='flex';
   beginFlight();
 }
 
-function ease(t){return t<0.5?2*t*t:-1+(4-2*t)*t;}
+function applyTimeOfDay(){
+  if(!viewer)return;
+  const d=new Date();
+  d.setUTCHours(isNight?3:14,0,0,0);
+  viewer.clock.currentTime=Cesium.JulianDate.fromDate(d);
+  viewer.clock.shouldAnimate=false;
+  viewer.scene.skyAtmosphere.show=true;
+  viewer.scene.skyAtmosphere.brightnessShift=isNight?-0.45:0.05;
+  viewer.scene.skyAtmosphere.saturationShift=isNight?0.15:0.0;
+  viewer.scene.skyBox.show=true;
+  viewer.scene.moon.show=isNight;
+}
 
+function toggleDayNight(){
+  isNight=!isNight;
+  applyTimeOfDay();
+  document.getElementById('dnBtn').textContent=isNight?'🌙 NIGHT':'☀️ DAY';
+}
+
+function ease(t){return t<0.5?2*t*t:-1+(4-2*t)*t;}
 function lerpAngle(a,b,t){
-  let d=b-a;
-  while(d>180)d-=360;
-  while(d<-180)d+=360;
-  return a+d*t;
+  let d=b-a;while(d>180)d-=360;while(d<-180)d+=360;return a+d*t;
+}
+
+function getState(elapsed){
+  const loopT=elapsed%TOTAL;
+  let segStart=0,si=0;
+  for(let i=0;i<WP.length-1;i++){
+    if(loopT<segStart+WP[i].dur){si=i;break;}
+    segStart+=WP[i].dur;si=i+1;
+  }
+  si=Math.min(si,WP.length-2);
+  const a=WP[si],b=WP[(si+1)%WP.length];
+  const segT=ease(Math.max(0,Math.min(1,(loopT-segStart)/a.dur)));
+  return {a,b,segT,loopT,si};
+}
+
+function setCameraWP(wp, t){
+  // t = elapsed time for deterministic micro-movement
+  const mLng=Math.sin(t*0.47)*0.000048+Math.sin(t*1.21)*0.000018;
+  const mLat=Math.cos(t*0.53)*0.000038+Math.cos(t*1.39)*0.000014;
+  const mHdg=Math.sin(t*0.29)*1.6+Math.sin(t*0.71)*0.65+Math.sin(t*1.83)*0.25;
+  const mPitch=Math.sin(t*0.41)*0.9+Math.sin(t*0.91)*0.35;
+  const mRoll=Math.sin(t*0.34)*0.5+Math.sin(t*0.79)*0.18;
+  viewer.camera.setView({
+    destination:Cesium.Cartesian3.fromDegrees(wp.lng+mLng,wp.lat+mLat,wp.alt),
+    orientation:{
+      heading:Cesium.Math.toRadians(wp.cam_hdg+mHdg),
+      pitch:Cesium.Math.toRadians(wp.cam_pitch+mPitch),
+      roll:Cesium.Math.toRadians(mRoll),
+    }
+  });
+}
+
+function interpAndSet(elapsed){
+  const {a,b,segT,loopT,si}=getState(elapsed);
+  const wp={
+    lng:a.lng+(b.lng-a.lng)*segT,
+    lat:a.lat+(b.lat-a.lat)*segT,
+    alt:a.alt+(b.alt-a.alt)*segT,
+    cam_hdg:lerpAngle(a.cam_hdg,b.cam_hdg,segT),
+    cam_pitch:a.cam_pitch+(b.cam_pitch-a.cam_pitch)*segT,
+  };
+  setCameraWP(wp,elapsed);
+  showLabel(a.label,a.fact,a.ch);
+  // Progress bar
+  document.getElementById('progress').style.width=(loopT/TOTAL*100)+'%';
+  // HUD
+  const mins=Math.floor(elapsed/60), secs=Math.floor(elapsed%60);
+  document.getElementById('hud').textContent=
+    `${mins}:${String(secs).padStart(2,'0')} · ${Math.floor(wp.alt)}m · ${Math.floor(loopT/TOTAL*100)}%`;
+  return {loopT,si,a};
 }
 
 function beginFlight(){
@@ -509,65 +626,30 @@ function beginFlight(){
 
 function fly(){
   if(!flying||paused)return;
-  const now=performance.now();
-  const elapsed=(now-startT-pauseOffset)/1000;
-  const loopT=elapsed%TOTAL;
+  const elapsed=(performance.now()-startT-pauseOffset)/1000;
+  const {loopT,si,a}=interpAndSet(elapsed);
 
-  // Find segment
-  let segStart=0,si=0;
-  for(let i=0;i<WP.length-1;i++){
-    if(loopT<segStart+WP[i].dur){si=i;break;}
-    segStart+=WP[i].dur;
-    si=i+1;
+  // Check arrival at store (last waypoint)
+  if(elapsed>=TOTAL){
+    flying=false;
+    setTimeout(()=>{document.getElementById('arrivalCard').style.display='block';},800);
+    return;
   }
-  si=Math.min(si,WP.length-2);
-
-  const a=WP[si], b=WP[(si+1)%WP.length];
-  const raw=(loopT-segStart)/a.dur;
-  const segT=ease(Math.max(0,Math.min(1,raw)));
-
-  // ── DRONE POSITION ──
-  const lng=a.lng+(b.lng-a.lng)*segT;
-  const lat=a.lat+(b.lat-a.lat)*segT;
-  const alt=a.alt+(b.alt-a.alt)*segT;
-
-  // ── GIMBAL CAMERA — independent heading/pitch ──
-  const camHdg=lerpAngle(a.cam_hdg,b.cam_hdg,segT);
-  const camPitch=a.cam_pitch+(b.cam_pitch-a.cam_pitch)*segT;
-
-  // ── ORGANIC MICRO-MOVEMENT ──
-  // Simulates drone physics — different frequencies for each axis
-  const t=elapsed;
-  const mLng   = Math.sin(t*0.47)*0.000052+Math.sin(t*1.23)*0.000019;
-  const mLat   = Math.cos(t*0.53)*0.000041+Math.cos(t*1.41)*0.000016;
-  const mHdg   = Math.sin(t*0.29)*1.8+Math.sin(t*0.71)*0.7+Math.sin(t*1.87)*0.3;
-  const mPitch = Math.sin(t*0.41)*1.1+Math.sin(t*0.93)*0.4;
-  const mRoll  = Math.sin(t*0.34)*0.6+Math.sin(t*0.81)*0.2;
-
-  viewer.camera.setView({
-    destination:Cesium.Cartesian3.fromDegrees(lng+mLng,lat+mLat,alt),
-    orientation:{
-      heading:Cesium.Math.toRadians(camHdg+mHdg),
-      pitch:  Cesium.Math.toRadians(camPitch+mPitch),
-      roll:   Cesium.Math.toRadians(mRoll),
-    }
-  });
-
-  // ── LANDMARK LABELS ──
-  if(a.label) showLabel(a.label);
-
-  // ── HUD ──
-  const pct=Math.floor((loopT/TOTAL)*100);
-  document.getElementById('hud').textContent=
-    `${Math.floor(alt)}m · ${Math.floor(elapsed/60)}:${String(Math.floor(elapsed%60)).padStart(2,'0')} · ${pct}%`;
 
   rafId=requestAnimationFrame(fly);
 }
 
+function resetFlight(){
+  paused=false;document.getElementById('pauseBtn').textContent='⏸ PAUSE';
+  document.getElementById('arrivalCard').style.display='none';
+  if(rafId)cancelAnimationFrame(rafId);
+  lastLabel='';lastCh='';
+  beginFlight();
+}
+
 function togglePause(){
   if(paused){
-    paused=false;
-    pauseOffset+=performance.now()-pauseStart;
+    paused=false;pauseOffset+=performance.now()-pauseStart;
     document.getElementById('pauseBtn').textContent='⏸ PAUSE';
     fly();
   }else{
@@ -576,371 +658,187 @@ function togglePause(){
     if(rafId)cancelAnimationFrame(rafId);
   }
 }
-function resetFlight(){
-  paused=false;
-  document.getElementById('pauseBtn').textContent='⏸ PAUSE';
-  if(rafId)cancelAnimationFrame(rafId);
-  beginFlight();
+
+// ── FREE FLY ──
+function toggleFreefly(){ffActive?exitFF():enterFF();}
+
+function enterFF(){
+  ffActive=true;
+  if(!paused)togglePause();
+  document.getElementById('ffHud').style.display='block';
+  document.getElementById('ffBtn').textContent='🔴 EXIT FREE FLY';
+  document.getElementById('ffBtn').style.color='rgba(255,100,100,0.85)';
+  document.getElementById('pauseBtn').disabled=true;
+  viewer.canvas.addEventListener('mousedown',ffMD);
+  viewer.canvas.addEventListener('mouseup',ffMU);
+  viewer.canvas.addEventListener('mousemove',ffMV);
+  viewer.canvas.addEventListener('wheel',ffWH,{passive:true});
+  ffLastT=performance.now();
+  ffRun();
 }
 
-// ── DAY / NIGHT TOGGLE ──
-let isNight = true;
-function toggleDayNight(){
-  isNight = !isNight;
-  const d = new Date();
-  // Night = 3am UTC (11pm NYC), Day = 18:00 UTC (2pm NYC)
-  d.setUTCHours(isNight ? 3 : 14, 0, 0, 0);
-  if(viewer){
-    viewer.clock.currentTime = Cesium.JulianDate.fromDate(d);
-    viewer.scene.skyAtmosphere.brightnessShift = isNight ? -0.45 : 0.1;
+function exitFF(){
+  ffActive=false;ffKeys={};
+  if(ffRafId)cancelAnimationFrame(ffRafId);
+  viewer.canvas.removeEventListener('mousedown',ffMD);
+  viewer.canvas.removeEventListener('mouseup',ffMU);
+  viewer.canvas.removeEventListener('mousemove',ffMV);
+  viewer.canvas.removeEventListener('wheel',ffWH);
+  document.getElementById('ffHud').style.display='none';
+  document.getElementById('ffBtn').textContent='🕹 FREE FLY';
+  document.getElementById('ffBtn').style.color='rgba(100,200,255,0.6)';
+  document.getElementById('pauseBtn').disabled=false;
+}
+
+function ffMD(e){ffMouseDown=true;ffLastX=e.clientX;ffLastY=e.clientY;}
+function ffMU(){ffMouseDown=false;}
+function ffMV(e){
+  if(!ffMouseDown)return;
+  const dx=e.clientX-ffLastX,dy=e.clientY-ffLastY;
+  ffLastX=e.clientX;ffLastY=e.clientY;
+  viewer.camera.lookRight(dx*0.003);
+  viewer.camera.lookUp(-dy*0.003);
+}
+function ffWH(e){
+  ffSpeed=Math.max(5,Math.min(600,ffSpeed-e.deltaY*0.08));
+}
+
+function ffRun(){
+  if(!ffActive)return;
+  const now=performance.now();
+  const dt=Math.min((now-ffLastT)/1000,0.1);
+  ffLastT=now;
+  const s=ffSpeed*dt;
+  if(ffKeys['w']||ffKeys['arrowup'])    viewer.camera.moveForward(s);
+  if(ffKeys['s']||ffKeys['arrowdown'])  viewer.camera.moveBackward(s);
+  if(ffKeys['a']||ffKeys['arrowleft'])  viewer.camera.moveLeft(s*0.8);
+  if(ffKeys['d']||ffKeys['arrowright']) viewer.camera.moveRight(s*0.8);
+  if(ffKeys['q']) viewer.camera.moveUp(s);
+  if(ffKeys['e']) viewer.camera.moveDown(s);
+  const moving=Object.values(ffKeys).some(Boolean)||ffMouseDown;
+  if(moving){
+    const h=Math.round(viewer.camera.positionCartographic.height);
+    document.getElementById('ffInfo').textContent=
+      `${Math.round(ffSpeed)}m/s · ${h}m alt`;
   }
-  document.getElementById('dayNightBtn').textContent = isNight ? '🌙 NIGHT' : '☀️ DAY';
+  ffRafId=requestAnimationFrame(ffRun);
 }
 
 // ── RECORDER ──
-let recording = false;
-let recFrameIdx = 0;
-let recTotalFrames = 0;
-let recFPS = 30;
-let recDirHandle = null;
-let origCanvasSize = null;
-
-function showRecMenu(){ document.getElementById('recMenu').style.display='flex'; }
-function hideRecMenu(){ document.getElementById('recMenu').style.display='none'; }
-
-async function startRecord(w, h, fps){
-  hideRecMenu();
-
-  if(!window.showDirectoryPicker){
-    alert('Frame recording requires Chrome or Edge (File System Access API).\nFirefox and Safari are not supported.');
-    return;
-  }
-
-  const totalSec = TOTAL;
-  const totalFrames = Math.round(totalSec * fps);
-  const estGB = ((w * h * 4 * totalFrames) / 1e9).toFixed(1);
-
-  const ok = confirm(
-    `Record ${w}×${h} @ ${fps}fps?\n` +
-    `${totalFrames} frames · ~${(totalSec/60).toFixed(1)} minutes\n` +
-    `Estimated disk: ~${estGB} GB raw PNGs\n\n` +
-    `Stitch command after recording:\n` +
-    `ffmpeg -framerate ${fps} -i frame_%04d.png -c:v libx264 -crf 16 -pix_fmt yuv420p manhattan_${isNight?'night':'day'}.mp4\n\n` +
-    `Pick a folder to save frames into.`
-  );
-  if(!ok) return;
-
-  try{
-    recDirHandle = await window.showDirectoryPicker({mode:'readwrite'});
-  }catch(e){ return; }
-
-  // Write README
-  try{
-    const readme = `KAIT Manhattan Flight — ${w}x${h} @ ${fps}fps ${isNight?'NIGHT':'DAY'}
-Frames: ${totalFrames}
-Stitch: ffmpeg -framerate ${fps} -i frame_%04d.png -c:v libx264 -crf 16 -pix_fmt yuv420p manhattan.mp4
-ProRes: ffmpeg -framerate ${fps} -i frame_%04d.png -c:v prores_ks -profile:v 3 -pix_fmt yuv422p10le manhattan.mov
-`;
-    const rh = await recDirHandle.getFileHandle('README.txt',{create:true});
-    const rw = await rh.createWritable();
-    await rw.write(readme); await rw.close();
-  }catch(e){}
-
-  recording = true;
-  recFrameIdx = 0;
-  recFPS = fps;
-  recTotalFrames = totalFrames;
-
-  // Resize canvas
-  origCanvasSize = {
-    w: viewer.canvas.width,
-    h: viewer.canvas.height,
-    pr: viewer.resolutionScale
-  };
-  viewer.resolutionScale = 1.0;
-  viewer.canvas.width = w;
-  viewer.canvas.height = h;
-  viewer.scene.requestRender();
-  viewer.camera.frustum.aspectRatio = w/h;
-
-  // Reset flight to start
-  startT = performance.now();
-  pauseOffset = 0;
-
-  if(rafId) cancelAnimationFrame(rafId);
-  document.getElementById('recStatus').style.display='block';
-  recordFrame();
-}
-
-const captureCanvas = document.createElement('canvas');
-const captureCtx = captureCanvas.getContext('2d');
-
-// Wait for Cesium tiles to fully load before capturing
-// Polls tilesLoaded + loadProgress, waits until both confirm complete render
-// Also renders multiple frames to flush shader compilation artifacts
-function waitForTilesLoaded(timeoutMs = 15000){
-  return new Promise(resolve => {
-    const start = performance.now();
-    let stableFrames = 0;
-    const STABLE_NEEDED = 6; // must be stable for N consecutive frames
-
+function waitTilesLoaded(ms=15000){
+  return new Promise(resolve=>{
+    const t0=performance.now();
+    let stable=0;
     function check(){
-      // Force a render cycle
       viewer.scene.render();
-
-      const tilesLoaded = viewer.scene.globe.tilesLoaded;
-      const loadProgress = viewer.scene.globe.loadingDescendantsCount === 0;
-      const tileQueue = viewer.scene.primitives.length > 0;
-
-      if(tilesLoaded && loadProgress){
-        stableFrames++;
-        if(stableFrames >= STABLE_NEEDED){
-          // One final render pass to ensure shaders are compiled
-          viewer.scene.render();
-          viewer.scene.render();
-          resolve();
-          return;
-        }
-      } else {
-        stableFrames = 0;
-      }
-
-      // Timeout safety — don't wait forever on a slow tile
-      if(performance.now() - start > timeoutMs){
-        // Still capture — best we have
-        viewer.scene.render();
-        resolve();
-        return;
-      }
-
+      const ok=viewer.scene.globe.tilesLoaded&&
+               viewer.scene.globe.loadingDescendantsCount===0;
+      if(ok){stable++;if(stable>=6){viewer.scene.render();viewer.scene.render();resolve();return;}}
+      else stable=0;
+      if(performance.now()-t0>ms){viewer.scene.render();resolve();return;}
       requestAnimationFrame(check);
     }
     requestAnimationFrame(check);
   });
 }
 
-async function recordFrame(){
-  if(!recording) return;
-
-  const frameSec = recFrameIdx / recFPS;
-
-  if(recFrameIdx >= recTotalFrames){
-    await stopRecord();
-    return;
+async function startRecord(w,h,fps){
+  document.getElementById('recMenu').style.display='none';
+  if(!window.showDirectoryPicker){
+    alert('Requires Chrome or Edge for File System Access API.');return;
   }
+  const totalFrames=Math.round(TOTAL*fps);
+  const ok=confirm(
+    `Record ${w}×${h} @ ${fps}fps · ${totalFrames} frames\n`+
+    `~${(TOTAL/60).toFixed(1)} min flight · allow several hours render time\n\n`+
+    `Stitch: ffmpeg -framerate ${fps} -i frame_%05d.png -c:v libx264 -crf 16 -pix_fmt yuv420p journey_${isNight?'night':'day'}.mp4\n\n`+
+    `Pick a folder to save frames into.`
+  );
+  if(!ok)return;
+  try{recDirHandle=await window.showDirectoryPicker({mode:'readwrite'});}catch(e){return;}
 
-  // ── Position camera for this frame ──
-  const loopT = frameSec % TOTAL;
-  let segStart=0, si=0;
-  for(let i=0;i<WP.length-1;i++){
-    if(loopT<segStart+WP[i].dur){si=i;break;}
-    segStart+=WP[i].dur; si=i+1;
-  }
-  si=Math.min(si,WP.length-2);
-  const a=WP[si], b=WP[(si+1)%WP.length];
-  const segT=ease(Math.max(0,Math.min(1,(loopT-segStart)/a.dur)));
-
-  const lng=a.lng+(b.lng-a.lng)*segT;
-  const lat=a.lat+(b.lat-a.lat)*segT;
-  const alt=a.alt+(b.alt-a.alt)*segT;
-  const camHdg=lerpAngle(a.cam_hdg,b.cam_hdg,segT);
-  const camPitch=a.cam_pitch+(b.cam_pitch-a.cam_pitch)*segT;
-
-  const t=frameSec;
-  const mLng  =Math.sin(t*0.47)*0.000052+Math.sin(t*1.23)*0.000019;
-  const mLat  =Math.cos(t*0.53)*0.000041+Math.cos(t*1.41)*0.000016;
-  const mHdg  =Math.sin(t*0.29)*1.8+Math.sin(t*0.71)*0.7+Math.sin(t*1.87)*0.3;
-  const mPitch=Math.sin(t*0.41)*1.1+Math.sin(t*0.93)*0.4;
-  const mRoll =Math.sin(t*0.34)*0.6+Math.sin(t*0.81)*0.2;
-
-  viewer.camera.setView({
-    destination:Cesium.Cartesian3.fromDegrees(lng+mLng,lat+mLat,alt),
-    orientation:{
-      heading:Cesium.Math.toRadians(camHdg+mHdg),
-      pitch:Cesium.Math.toRadians(camPitch+mPitch),
-      roll:Cesium.Math.toRadians(mRoll),
-    }
-  });
-
-  // ── WAIT FOR FULL TILE RENDER ──
-  // This is the key — don't capture until tiles are loaded
-  // Timeout: 15s per frame (slow internet) — captures best available after that
-  document.getElementById('recStatus').textContent =
-    `⏳ LOADING TILES · frame ${recFrameIdx+1}/${recTotalFrames}`;
-
-  await waitForTilesLoaded(15000);
-
-  // ── CAPTURE ──
-  captureCanvas.width  = viewer.canvas.width;
-  captureCanvas.height = viewer.canvas.height;
-  captureCtx.drawImage(viewer.canvas, 0, 0);
-
-  const blob = await new Promise(res => captureCanvas.toBlob(res, 'image/png'));
-  const name = 'frame_' + String(recFrameIdx).padStart(5,'0') + '.png';
-
+  // Write README
   try{
-    const fh = await recDirHandle.getFileHandle(name,{create:true});
-    const fw = await fh.createWritable();
-    await fw.write(blob);
-    await fw.close();
+    const rh=await recDirHandle.getFileHandle('README.txt',{create:true});
+    const rw=await rh.createWritable();
+    await rw.write(`KAIT Journey — ${w}x${h}@${fps}fps ${isNight?'NIGHT':'DAY'}\nFrames: ${totalFrames}\nStitch: ffmpeg -framerate ${fps} -i frame_%05d.png -c:v libx264 -crf 16 -pix_fmt yuv420p journey.mp4\n`);
+    await rw.close();
+  }catch(e){}
+
+  recording=true;recFrameIdx=0;recFPS=fps;recTotalFrames=totalFrames;
+  origSize={w:viewer.canvas.width,h:viewer.canvas.height,pr:viewer.resolutionScale};
+  viewer.resolutionScale=1.0;
+  viewer.canvas.width=w;viewer.canvas.height=h;
+  viewer.scene.requestRender();
+  document.getElementById('recStatus').style.display='block';
+  recFrame();
+}
+
+async function recFrame(){
+  if(!recording)return;
+  if(recFrameIdx>=recTotalFrames){await stopRec();return;}
+
+  const frameSec=recFrameIdx/recFPS;
+  const {a,b,segT}=getState(frameSec);
+  const wp={
+    lng:a.lng+(b.lng-a.lng)*segT,
+    lat:a.lat+(b.lat-a.lat)*segT,
+    alt:a.alt+(b.alt-a.alt)*segT,
+    cam_hdg:lerpAngle(a.cam_hdg,b.cam_hdg,segT),
+    cam_pitch:a.cam_pitch+(b.cam_pitch-a.cam_pitch)*segT,
+  };
+  setCameraWP(wp,frameSec);
+
+  document.getElementById('recStatus').textContent=
+    `⏳ LOADING · frame ${recFrameIdx+1}/${recTotalFrames}`;
+  await waitTilesLoaded(15000);
+
+  capCanvas.width=viewer.canvas.width;
+  capCanvas.height=viewer.canvas.height;
+  capCtx.drawImage(viewer.canvas,0,0);
+
+  const blob=await new Promise(r=>capCanvas.toBlob(r,'image/png'));
+  const name='frame_'+String(recFrameIdx).padStart(5,'0')+'.png';
+  try{
+    const fh=await recDirHandle.getFileHandle(name,{create:true});
+    const fw=await fh.createWritable();
+    await fw.write(blob);await fw.close();
   }catch(e){
-    console.error('Frame write failed:', name, e);
-    document.getElementById('recStatus').textContent = 'WRITE ERROR — ' + e.message;
-    recording = false;
-    return;
+    document.getElementById('recStatus').textContent='WRITE ERROR: '+e.message;
+    recording=false;return;
   }
-
   recFrameIdx++;
-  const pct = Math.floor((recFrameIdx/recTotalFrames)*100);
-  document.getElementById('recStatus').textContent =
-    `⏺ CAPTURED ${recFrameIdx}/${recTotalFrames} · ${pct}% · tiles fully loaded`;
-
-  // Next frame — no rAF delay, go immediately
-  // (the tile wait IS the pacing — no need for additional delay)
-  recordFrame();
+  const pct=Math.floor(recFrameIdx/recTotalFrames*100);
+  document.getElementById('recStatus').textContent=
+    `⏺ ${recFrameIdx}/${recTotalFrames} · ${pct}% · tiles fully loaded`;
+  recFrame();
 }
 
-async function stopRecord(){
-  recording = false;
-  document.getElementById('recStatus').textContent = '✓ RECORDING COMPLETE — check your folder';
-  setTimeout(()=>{ document.getElementById('recStatus').style.display='none'; }, 8000);
-
-  // Restore canvas
-  if(origCanvasSize){
-    viewer.resolutionScale = origCanvasSize.pr;
-    viewer.canvas.width = origCanvasSize.w;
-    viewer.canvas.height = origCanvasSize.h;
-    viewer.scene.requestRender();
-    origCanvasSize = null;
+async function stopRec(){
+  recording=false;
+  document.getElementById('recStatus').textContent='✓ COMPLETE — check your folder';
+  setTimeout(()=>{document.getElementById('recStatus').style.display='none';},8000);
+  if(origSize){
+    viewer.resolutionScale=origSize.pr;
+    viewer.canvas.width=origSize.w;viewer.canvas.height=origSize.h;
+    viewer.scene.requestRender();origSize=null;
   }
-  recDirHandle = null;
+  recDirHandle=null;
 }
 
-// ── FREE FLY MODE ──
-let freeflyActive = false;
-let ffSpeed = 25; // meters per second
-let ffKeys = {};
-let ffMouseDown = false;
-let ffLastMouseX = 0, ffLastMouseY = 0;
-let ffAnimId = null;
-let ffLastTime = 0;
-
-function toggleFreefly(){
-  if(freeflyActive){
-    exitFreefly();
-  } else {
-    enterFreefly();
-  }
-}
-
-function enterFreefly(){
-  freeflyActive = true;
-  // Pause the scripted flight
-  if(!paused){ paused = true; pauseStart = performance.now(); }
-  if(rafId) cancelAnimationFrame(rafId);
-
-  // Enable Cesium's built-in mouse look
-  viewer.scene.screenSpaceCameraController.enableRotate = true;
-  viewer.scene.screenSpaceCameraController.enableTranslate = true;
-  viewer.scene.screenSpaceCameraController.enableZoom = true;
-  viewer.scene.screenSpaceCameraController.enableTilt = true;
-  viewer.scene.screenSpaceCameraController.enableLook = true;
-
-  document.getElementById('freeflyHud').style.display = 'block';
-  document.getElementById('freeflyBtn').textContent = '🔴 EXIT FREE FLY';
-  document.getElementById('freeflyBtn').style.color = 'rgba(255,100,100,0.9)';
-  document.getElementById('freeflyBtn').style.borderColor = 'rgba(255,100,100,0.5)';
-  document.getElementById('pauseBtn').disabled = true;
-
-  // Lock pointer for mouse look
-  viewer.canvas.addEventListener('mousedown', ffOnMouseDown);
-  viewer.canvas.addEventListener('mouseup', ffOnMouseUp);
-  viewer.canvas.addEventListener('mousemove', ffOnMouseMove);
-  viewer.canvas.addEventListener('wheel', ffOnWheel);
-
-  ffLastTime = performance.now();
-  ffLoop();
-}
-
-function exitFreefly(){
-  freeflyActive = false;
-  ffKeys = {};
-  if(ffAnimId) cancelAnimationFrame(ffAnimId);
-
-  viewer.canvas.removeEventListener('mousedown', ffOnMouseDown);
-  viewer.canvas.removeEventListener('mouseup', ffOnMouseUp);
-  viewer.canvas.removeEventListener('mousemove', ffOnMouseMove);
-  viewer.canvas.removeEventListener('wheel', ffOnWheel);
-
-  document.getElementById('freeflyHud').style.display = 'none';
-  document.getElementById('freeflyBtn').textContent = '🕹 FREE FLY';
-  document.getElementById('freeflyBtn').style.color = 'rgba(100,200,255,0.7)';
-  document.getElementById('freeflyBtn').style.borderColor = 'rgba(100,200,255,0.4)';
-  document.getElementById('pauseBtn').disabled = false;
-}
-
-function ffOnMouseDown(e){ ffMouseDown = true; ffLastMouseX = e.clientX; ffLastMouseY = e.clientY; }
-function ffOnMouseUp(){ ffMouseDown = false; }
-function ffOnMouseMove(e){
-  if(!ffMouseDown) return;
-  const dx = e.clientX - ffLastMouseX;
-  const dy = e.clientY - ffLastMouseY;
-  ffLastMouseX = e.clientX;
-  ffLastMouseY = e.clientY;
-  const sensitivity = 0.003;
-  viewer.camera.lookRight(dx * sensitivity);
-  viewer.camera.lookUp(-dy * sensitivity);
-}
-function ffOnWheel(e){
-  ffSpeed = Math.max(5, Math.min(500, ffSpeed - e.deltaY * 0.1));
-  document.getElementById('ffSpeed').textContent = `SPEED: ${Math.round(ffSpeed)}m/s`;
-}
-
-function ffLoop(){
-  if(!freeflyActive) return;
-  const now = performance.now();
-  const dt = Math.min((now - ffLastTime) / 1000, 0.1); // seconds, capped
-  ffLastTime = now;
-
-  const spd = ffSpeed * dt;
-  const spd_h = spd * 0.7; // slightly slower horizontal
-
-  // Forward/back
-  if(ffKeys['w'] || ffKeys['arrowup'])   viewer.camera.moveForward(spd);
-  if(ffKeys['s'] || ffKeys['arrowdown']) viewer.camera.moveBackward(spd);
-  // Strafe
-  if(ffKeys['a'] || ffKeys['arrowleft']) viewer.camera.moveLeft(spd_h);
-  if(ffKeys['d'] || ffKeys['arrowright'])viewer.camera.moveRight(spd_h);
-  // Altitude
-  if(ffKeys['q']) viewer.camera.moveUp(spd);
-  if(ffKeys['e']) viewer.camera.moveDown(spd);
-
-  // Speed display
-  const anyMoving = Object.values(ffKeys).some(Boolean);
-  if(anyMoving){
-    document.getElementById('ffSpeed').textContent =
-      `SPEED: ${Math.round(ffSpeed)}m/s · ALT: ${Math.round(viewer.camera.positionCartographic.height)}m`;
-  }
-
-  ffAnimId = requestAnimationFrame(ffLoop);
-}
-
+// ── KEYBOARD ──
 window.addEventListener('keydown',e=>{
-  if(freeflyActive){
-    ffKeys[e.key.toLowerCase()] = true;
-    if(e.key==='Escape'){ exitFreefly(); return; }
-    // Block space/r in freefly
-    if(e.key===' '||e.key==='r'||e.key==='R') return;
+  if(ffActive){
+    ffKeys[e.key.toLowerCase()]=true;
+    if(e.key==='Escape'){exitFF();return;}
+    return;
   }
   if(e.key===' '){e.preventDefault();togglePause();}
-  if(e.key==='r'||e.key==='R') resetFlight();
-  if(e.key==='n'||e.key==='N') toggleDayNight();
-  if(e.key==='f'||e.key==='F') toggleFreefly();
+  if(e.key==='r'||e.key==='R')resetFlight();
+  if(e.key==='n'||e.key==='N')toggleDayNight();
+  if(e.key==='f'||e.key==='F')toggleFreefly();
 });
-
-window.addEventListener('keyup',e=>{
-  if(freeflyActive) ffKeys[e.key.toLowerCase()] = false;
-});
+window.addEventListener('keyup',e=>{if(ffActive)ffKeys[e.key.toLowerCase()]=false;});
 window.addEventListener('resize',()=>{if(viewer&&!recording)viewer.resize();});
 window.addEventListener('load',()=>{
   const wait=setInterval(()=>{
