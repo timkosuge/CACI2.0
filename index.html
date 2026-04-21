@@ -15462,13 +15462,6 @@ const DemoMode = {
     this.cinema = C;
     resize();
 
-    // DOM beats hidden — cinema handles all visuals
-    document.querySelectorAll('.demo-beat').forEach(b => {
-      if (b.dataset.beat && b.dataset.beat !== '2' && b.dataset.beat !== '9') {
-        b.style.display = 'none';
-      }
-    });
-
     return C;
   },
 
@@ -15701,7 +15694,7 @@ const DemoMode = {
       const b8 = C.beatObjects[8];
       if (b8 && b8.group.visible) {
         const fade = Math.min(1, tSec < 1 ? tSec : 1) * globalFade;
-        const b8d = beat8Group.userData;
+        const b8d = b8.group.userData;
         const assembleProgress = Math.min(1, tSec / 4.0);
         const positions = b8d.wpGeom.attributes.position.array;
         const formation = b8d.formationPos;
@@ -15717,7 +15710,7 @@ const DemoMode = {
         b8d.wordPoints.material.opacity = fade * 0.9;
 
         // Subtitle fades in after particles assemble
-        beat8Group.children.forEach(child => {
+        b8.group.children.forEach(child => {
           if (child !== b8d.wordPoints) {
             child.material.opacity = Math.max(0, (tSec - 2) / 2) * fade * 0.8;
           }
