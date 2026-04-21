@@ -442,8 +442,7 @@ const capCanvas=document.createElement('canvas');
 const capCtx=capCanvas.getContext('2d');
 
 // ── FREE FLY STATE ──
-let ffActive=false, ffSpeed=30, ffKeys={}, ffMouseDown=false;
-let ffLastX=0, ffLastY=0, ffRafId=null, ffLastT=0;
+// FF state managed by FF object above
 
 function setLoad(msg,pct){
   document.getElementById('loadMsg').textContent=msg;
@@ -495,6 +494,13 @@ async function init(){
     animation:false,timeline:false,fullscreenButton:false,
     infoBox:false,selectionIndicator:false,
     shadows:false,requestRenderMode:false,targetFrameRate:60,
+    contextOptions:{
+      webgl:{
+        powerPreference:'high-performance',
+        antialias:true,
+        preserveDrawingBuffer:true,
+      }
+    }
   });
 
   // Disable Cesium's default keyboard handler so our hotkeys work
@@ -502,8 +508,22 @@ async function init(){
   if(viewer.cesiumWidget && viewer.cesiumWidget._keyboardEventHandler){
     viewer.cesiumWidget._keyboardEventHandler.destroy();
   }
-  // Also remove Cesium's canvas focus stealing
   viewer.canvas.setAttribute('tabindex', '-1');
+
+  // ── SCENE RENDER OPTIMIZATIONS ──
+  viewer.scene.globe.maximumScreenSpaceError = 2;
+  viewer.scene.globe.tileCacheSize = 1000;
+  viewer.scene.globe.preloadAncestors = true;
+  viewer.scene.globe.preloadSiblings = true;
+  viewer.scene.preloadFlightDestinations = true;  // built-in flight preloader
+  viewer.scene.requestRenderMode = false;          // always render, never skip frames
+  viewer.scene.maximumRenderTimeChange = Infinity; // don't throttle
+  viewer.scene.fog.enabled = true;
+  viewer.scene.fog.density = 0.00015;             // light fog masks unloaded tile edges
+  viewer.scene.fog.minimumBrightness = 0.03;
+  viewer.scene.postProcessStages.fxaa.enabled = true;
+  // High-performance rendering
+  viewer.scene.globe.enableLighting = false;       // faster without lighting calc
 
   applyTimeOfDay();
   viewer.scene.fog.enabled=true;
@@ -539,9 +559,24 @@ async function init(){
     if(googleKey){
       window._googleTileset = await Cesium.Cesium3DTileset.fromUrl(
         `https://tile.googleapis.com/v1/3dtiles/root.json?key=${googleKey}`,
-        {showCreditsOnScreen:false,maximumScreenSpaceError:1.5,preloadWhenHidden:true,
-         skipLevelOfDetail:false,preferLeaves:true}
+        {
+          showCreditsOnScreen: false,
+          maximumScreenSpaceError: 16,        // loads fast, still sharp
+          maximumMemoryUsage: 2048,           // 2GB tile cache in GPU memory
+          preloadWhenHidden: true,
+          skipLevelOfDetail: true,            // skip intermediate LODs, jump to best
+          preferLeaves: true,                 // prefer fully-detailed leaf tiles
+          dynamicScreenSpaceError: true,      // reduce quality at periphery
+          dynamicScreenSpaceErrorDensity: 0.00278,
+          dynamicScreenSpaceErrorFactor: 4.0,
+          dynamicScreenSpaceErrorHeightFalloff: 0.25,
+          cameraEventWaitTime: 0.0,           // start loading immediately on camera move
+        }
       );
+      // Progressive quality — start coarse, ramp to sharp over 8 seconds
+      window._googleTileset.maximumScreenSpaceError = 32;
+      setTimeout(()=>{ if(window._googleTileset) window._googleTileset.maximumScreenSpaceError=16; }, 3000);
+      setTimeout(()=>{ if(window._googleTileset) window._googleTileset.maximumScreenSpaceError=8;  }, 8000);
       viewer.scene.primitives.add(window._googleTileset);
       viewer.scene.globe.show=false;
     }else{
@@ -680,34 +715,40 @@ function setCameraWP(wp, t){
 // ── GHOST CAMERA — preloads tiles ahead of the real camera ──
 // A second offscreen viewer that runs 20 seconds ahead
 // Forces Cesium to stream tiles before the main camera arrives
-let ghostViewer = null;
 const GHOST_LEAD = 20; // seconds ahead
 
 async function initGhost(cesiumToken, googleKey) {
-  const ghostCanvas = document.createElement('canvas');
-  ghostCanvas.width = 1; ghostCanvas.height = 1;
-  ghostCanvas.style.cssText = 'position:fixed;top:-10px;left:-10px;width:1px;height:1px;opacity:0;pointer-events:none;';
-  document.body.appendChild(ghostCanvas);
+  // Spawn 3 ghost viewers at 10s, 25s, 50s ahead
+  for(let i = 0; i < 3; i++){
+    const gc = document.createElement('canvas');
+    gc.width = 2; gc.height = 2;
+    gc.style.cssText = 'position:fixed;top:-10px;left:-10px;width:1px;height:1px;opacity:0;pointer-events:none;';
+    document.body.appendChild(gc);
 
-  Cesium.Ion.defaultAccessToken = cesiumToken;
-  ghostViewer = new Cesium.Viewer(ghostCanvas, {
-    baseLayerPicker:false, geocoder:false, homeButton:false,
-    sceneModePicker:false, navigationHelpButton:false,
-    animation:false, timeline:false, fullscreenButton:false,
-    infoBox:false, selectionIndicator:false,
-    shadows:false, requestRenderMode:false, targetFrameRate:10,
-  });
-  ghostViewer.clock.shouldAnimate = false;
-
-  if (googleKey) {
     try {
-      const ts = await Cesium.Cesium3DTileset.fromUrl(
-        `https://tile.googleapis.com/v1/3dtiles/root.json?key=${googleKey}`,
-        { showCreditsOnScreen:false, maximumScreenSpaceError:4 } // lower quality is fine for preloading
-      );
-      ghostViewer.scene.primitives.add(ts);
-      ghostViewer.scene.globe.show = false;
-    } catch(e) {}
+      const gv = new Cesium.Viewer(gc, {
+        baseLayerPicker:false,geocoder:false,homeButton:false,
+        sceneModePicker:false,navigationHelpButton:false,
+        animation:false,timeline:false,fullscreenButton:false,
+        infoBox:false,selectionIndicator:false,
+        shadows:false,requestRenderMode:false,targetFrameRate:5,
+      });
+      gv.clock.shouldAnimate = false;
+
+      if(googleKey){
+        const ts = await Cesium.Cesium3DTileset.fromUrl(
+          `https://tile.googleapis.com/v1/3dtiles/root.json?key=${googleKey}`,
+          {showCreditsOnScreen:false, maximumScreenSpaceError:16,
+           maximumMemoryUsage:512, dynamicScreenSpaceError:true}
+        );
+        gv.scene.primitives.add(ts);
+        gv.scene.globe.show = false;
+      }
+      ghostViewers.push(gv);
+    } catch(e) { ghostViewers.push(null); }
+
+    // Stagger init so they don't all hit the API at once
+    await new Promise(r => setTimeout(r, 800));
   }
 }
 
@@ -764,22 +805,30 @@ function initIframeWarmers(cesiumToken, googleKey) {
   });
 }
 
+// Three ghost cameras: 10s, 25s, 50s ahead
+const GHOST_OFFSETS = [10, 25, 50];
+let ghostViewers = [];
+
 function updateGhost(elapsed) {
-  if (!ghostViewer) return;
-  const ghostElapsed = elapsed + GHOST_LEAD;
-  const {a, b, segT} = getState(ghostElapsed);
-  const lng = a.lng + (b.lng - a.lng) * segT;
-  const lat = a.lat + (b.lat - a.lat) * segT;
-  const alt = a.alt + (b.alt - a.alt) * segT;
-  ghostViewer.camera.setView({
-    destination: Cesium.Cartesian3.fromDegrees(lng, lat, alt + 50),
-    orientation: {
-      heading: Cesium.Math.toRadians(a.cam_hdg),
-      pitch: Cesium.Math.toRadians(-15),
-      roll: 0
-    }
+  ghostViewers.forEach((gv, i) => {
+    if(!gv) return;
+    const ghostElapsed = elapsed + GHOST_OFFSETS[i];
+    try {
+      const {a, b, segT} = getState(ghostElapsed);
+      const lng = a.lng + (b.lng - a.lng) * segT;
+      const lat = a.lat + (b.lat - a.lat) * segT;
+      const alt = a.alt + (b.alt - a.alt) * segT;
+      gv.camera.setView({
+        destination: Cesium.Cartesian3.fromDegrees(lng, lat, alt + 30),
+        orientation: {
+          heading: Cesium.Math.toRadians(a.cam_hdg),
+          pitch: Cesium.Math.toRadians(-20),
+          roll: 0
+        }
+      });
+      gv.scene.render();
+    } catch(e) {}
   });
-  ghostViewer.scene.render();
 }
 
 // Smooth camera state — lerped toward target each frame
@@ -914,87 +963,100 @@ function togglePause(){
 }
 
 // ── FREE FLY ──
-function toggleFreefly(){ffActive?exitFF():enterFF();}
+// Uses a persistent keyset polled every frame
+// Completely independent of Cesium's event system
+const FF = {
+  active: false,
+  speed: 50,
+  keys: {},
+  mouseDown: false,
+  lastX: 0, lastY: 0,
+  lastT: 0,
+  rafId: null,
+  intervalId: null,
+};
+
+function toggleFreefly(){ FF.active ? exitFF() : enterFF(); }
 
 function enterFF(){
-  ffActive=true;
-  if(!paused)togglePause();
+  FF.active = true;
+  FF.keys = {};
+  FF.speed = 50;
+  if(!paused) togglePause();
+
+  // Disable Cesium's built-in camera inputs entirely
+  viewer.scene.screenSpaceCameraController.enableInputs = false;
+
+  // Show controls in dashboard
   document.getElementById('dash-ff-controls').style.display='flex';
   document.getElementById('crosshair').style.display='block';
-  document.getElementById('ffBtn').textContent='🔴 EXIT';
-  document.getElementById('ffBtn').style.color='rgba(255,100,100,0.9)';
+  document.getElementById('ffBtn').textContent='🔴 EXIT FREE FLY';
   document.getElementById('pauseBtn').disabled=true;
 
-  // Disable Cesium's camera controller so it doesn't fight us
-  viewer.scene.screenSpaceCameraController.enableInputs=false;
+  // Mouse look on canvas
+  viewer.canvas.addEventListener('mousedown', ffMD);
+  viewer.canvas.addEventListener('mouseup',   ffMU);
+  viewer.canvas.addEventListener('mousemove', ffMV);
+  viewer.canvas.addEventListener('wheel',     ffWH, {passive:true});
 
-  // Force focus to body so keyboard events fire reliably
-  viewer.canvas.blur();
-  document.body.focus();
-  document.body.setAttribute('tabindex','0');
-  document.body.focus();
-
-  viewer.canvas.addEventListener('mousedown',ffMD);
-  viewer.canvas.addEventListener('mouseup',ffMU);
-  viewer.canvas.addEventListener('mousemove',ffMV);
-  viewer.canvas.addEventListener('wheel',ffWH,{passive:true});
-  ffLastT=performance.now();
-  ffRun();
+  FF.lastT = performance.now();
+  ffLoop();
 }
 
 function exitFF(){
-  ffActive=false;ffKeys={};
-  if(ffRafId)cancelAnimationFrame(ffRafId);
+  FF.active = false;
+  FF.keys = {};
+  if(FF.rafId) cancelAnimationFrame(FF.rafId);
 
-  // Re-enable Cesium's camera controller
-  viewer.scene.screenSpaceCameraController.enableInputs=true;
+  viewer.scene.screenSpaceCameraController.enableInputs = true;
+  viewer.canvas.removeEventListener('mousedown', ffMD);
+  viewer.canvas.removeEventListener('mouseup',   ffMU);
+  viewer.canvas.removeEventListener('mousemove', ffMV);
+  viewer.canvas.removeEventListener('wheel',     ffWH);
 
-  viewer.canvas.removeEventListener('mousedown',ffMD);
-  viewer.canvas.removeEventListener('mouseup',ffMU);
-  viewer.canvas.removeEventListener('mousemove',ffMV);
-  viewer.canvas.removeEventListener('wheel',ffWH);
   document.getElementById('dash-ff-controls').style.display='none';
   document.getElementById('crosshair').style.display='none';
   document.getElementById('ffBtn').textContent='🕹 FREE FLY';
-  document.getElementById('ffBtn').style.color='';
   document.getElementById('pauseBtn').disabled=false;
 }
 
-function ffMD(e){ffMouseDown=true;ffLastX=e.clientX;ffLastY=e.clientY;}
-function ffMU(){ffMouseDown=false;}
+function ffMD(e){ FF.mouseDown=true; FF.lastX=e.clientX; FF.lastY=e.clientY; }
+function ffMU(){ FF.mouseDown=false; }
 function ffMV(e){
-  if(!ffMouseDown)return;
-  const dx=e.clientX-ffLastX,dy=e.clientY-ffLastY;
-  ffLastX=e.clientX;ffLastY=e.clientY;
+  if(!FF.mouseDown) return;
+  const dx=e.clientX-FF.lastX, dy=e.clientY-FF.lastY;
+  FF.lastX=e.clientX; FF.lastY=e.clientY;
   viewer.camera.lookRight(dx*0.003);
   viewer.camera.lookUp(-dy*0.003);
 }
 function ffWH(e){
-  ffSpeed=Math.max(5,Math.min(600,ffSpeed-e.deltaY*0.08));
+  FF.speed = Math.max(5, Math.min(800, FF.speed - e.deltaY*0.1));
 }
 
-function ffRun(){
-  if(!ffActive)return;
-  const now=performance.now();
-  const dt=Math.min((now-ffLastT)/1000,0.1);
-  ffLastT=now;
-  const s=ffSpeed*dt;
-  if(ffKeys['w']||ffKeys['arrowup'])    viewer.camera.moveForward(s);
-  if(ffKeys['s']||ffKeys['arrowdown'])  viewer.camera.moveBackward(s);
-  if(ffKeys['a']||ffKeys['arrowleft'])  viewer.camera.moveLeft(s*0.8);
-  if(ffKeys['d']||ffKeys['arrowright']) viewer.camera.moveRight(s*0.8);
-  if(ffKeys['q']) viewer.camera.moveUp(s);
-  if(ffKeys['e']) viewer.camera.moveDown(s);
-  // Spin / roll — Z and X keys
-  if(ffKeys['z']) viewer.camera.twistLeft(0.02);
-  if(ffKeys['x']) viewer.camera.twistRight(0.02);
-  const moving=Object.values(ffKeys).some(Boolean)||ffMouseDown;
-  if(moving){
-    const h=Math.round(viewer.camera.positionCartographic.height);
-    document.getElementById('ffInfo').textContent=
-      `${Math.round(ffSpeed)} m/s · ${h}m`;
+function ffLoop(){
+  if(!FF.active) return;
+  const now = performance.now();
+  const dt  = Math.min((now - FF.lastT)/1000, 0.05);
+  FF.lastT  = now;
+  const s   = FF.speed * dt;
+
+  if(FF.keys['w'] || FF.keys['arrowup'])    viewer.camera.moveForward(s);
+  if(FF.keys['s'] || FF.keys['arrowdown'])  viewer.camera.moveBackward(s);
+  if(FF.keys['a'] || FF.keys['arrowleft'])  viewer.camera.moveLeft(s);
+  if(FF.keys['d'] || FF.keys['arrowright']) viewer.camera.moveRight(s);
+  if(FF.keys['q'])                          viewer.camera.moveUp(s);
+  if(FF.keys['e'])                          viewer.camera.moveDown(s);
+  if(FF.keys['z'])                          viewer.camera.twistLeft(0.025);
+  if(FF.keys['x'])                          viewer.camera.twistRight(0.025);
+
+  // Update speed display
+  const spd = document.getElementById('dash-speed');
+  if(spd){
+    const h = Math.round(viewer.camera.positionCartographic.height);
+    spd.textContent = Math.round(FF.speed)+'m/s · '+h+'m alt';
   }
-  ffRafId=requestAnimationFrame(ffRun);
+
+  FF.rafId = requestAnimationFrame(ffLoop);
 }
 
 // ── RECORDER ──
@@ -1115,32 +1177,26 @@ async function stopRec(){
 // ── KEYBOARD ──
 // Use capture:true so we intercept before Cesium does
 // Also attach to document not window for broader coverage
-// Triple-layer keyboard capture to defeat Cesium's event eating
-function handleKey(e, isDown){
+// Keyboard — capture phase beats Cesium
+function handleKey(e, down){
   const k = e.key.toLowerCase();
-  if(isDown && ffActive){
-    ffKeys[k]=true;
-    if(e.key==='Escape'){exitFF();}
-    e.stopImmediatePropagation();
-    e.preventDefault();
+  // Always update FF key state
+  if(FF.active){
+    FF.keys[k] = down;
+    if(down && e.key==='Escape'){ exitFF(); e.preventDefault(); return; }
+    // Let WASD through without preventing default (no page scroll issue)
     return;
   }
-  if(!isDown && ffActive){
-    ffKeys[k]=false;
-    return;
-  }
-  if(!isDown) return;
-  // Normal hotkeys
-  if(e.key===' '){e.preventDefault();togglePause();}
-  else if(k==='r'){e.preventDefault();resetFlight();}
-  else if(k==='n'){e.preventDefault();toggleDayNight();}
-  else if(k==='f'){e.preventDefault();toggleFreefly();}
+  if(!down) return;
+  // Normal flight hotkeys
+  if(e.key===' '){ e.preventDefault(); togglePause(); }
+  else if(k==='r'){ e.preventDefault(); resetFlight(); }
+  else if(k==='n'){ e.preventDefault(); toggleDayNight(); }
+  else if(k==='f'){ e.preventDefault(); toggleFreefly(); }
 }
 
 document.addEventListener('keydown', e=>handleKey(e,true),  {capture:true});
 document.addEventListener('keyup',   e=>handleKey(e,false), {capture:true});
-window.addEventListener('keydown',   e=>handleKey(e,true),  {capture:true});
-window.addEventListener('keyup',     e=>handleKey(e,false), {capture:true});
 window.addEventListener('resize',()=>{if(viewer&&!recording)viewer.resize();});
 window.addEventListener('load',()=>{
   const wait=setInterval(()=>{
