@@ -8583,15 +8583,22 @@ html body[data-theme="light"] #discovery-greeting-strip .dgs-text strong {
         </svg>
       </button>
       <!-- Dropdown panel - hidden by default -->
-      <div id="tb-brightness-panel" style="display:none;position:absolute;top:calc(100% + 8px);right:0;width:180px;background:linear-gradient(135deg,rgba(13,21,37,0.98) 0%,rgba(26,40,64,0.98) 100%);border:1px solid rgba(212,168,50,0.3);border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,0.5);backdrop-filter:blur(10px);z-index:9999;padding:10px;overflow:hidden;">
-        <div style="font-family:var(--f-ui);font-size:10px;font-weight:500;color:rgba(212,168,50,0.7);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid rgba(212,168,50,0.15);">Display Brightness</div>
-        <div id="tb-brightness-levels" style="display:flex;flex-direction:column;gap:4px;">
-          <button class="tb-blevel" data-level="1.7" style="background:rgba(212,168,50,0.06);border:1px solid rgba(212,168,50,0.15);border-radius:4px;padding:6px 10px;font-family:var(--f-ui);font-size:10px;color:#c5cdd8;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:all 0.15s;"><span>-2</span><span style="opacity:0.5">1.7x</span></button>
-          <button class="tb-blevel" data-level="1.8" style="background:rgba(212,168,50,0.06);border:1px solid rgba(212,168,50,0.15);border-radius:4px;padding:6px 10px;font-family:var(--f-ui);font-size:10px;color:#c5cdd8;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:all 0.15s;"><span>-1</span><span style="opacity:0.5">1.8x</span></button>
-          <button class="tb-blevel" data-level="2.0" style="background:rgba(212,168,50,0.06);border:1px solid rgba(212,168,50,0.15);border-radius:4px;padding:6px 10px;font-family:var(--f-ui);font-size:10px;color:#c5cdd8;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:all 0.15s;"><span>0</span><span style="opacity:0.5">2.0x</span></button>
-          <button class="tb-blevel" data-level="2.2" style="background:rgba(212,168,50,0.06);border:1px solid rgba(212,168,50,0.15);border-radius:4px;padding:6px 10px;font-family:var(--f-ui);font-size:10px;color:#c5cdd8;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:all 0.15s;"><span>+1</span><span style="opacity:0.5">2.2x</span></button>
-          <button class="tb-blevel" data-level="2.4" style="background:rgba(212,168,50,0.06);border:1px solid rgba(212,168,50,0.15);border-radius:4px;padding:6px 10px;font-family:var(--f-ui);font-size:10px;color:#c5cdd8;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:all 0.15s;"><span>+2</span><span style="opacity:0.5">2.4x</span></button>
+      <div id="tb-brightness-panel" style="display:none;position:absolute;top:calc(100% + 8px);right:0;width:200px;background:linear-gradient(135deg,rgba(13,21,37,0.98) 0%,rgba(26,40,64,0.98) 100%);border:1px solid rgba(212,168,50,0.3);border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,0.5);backdrop-filter:blur(10px);z-index:9999;padding:14px 12px;">
+        <div style="font-family:var(--f-ui);font-size:10px;font-weight:500;color:rgba(212,168,50,0.7);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:12px;">Display Brightness</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="rgba(212,168,50,0.4)" stroke-width="2" style="width:11px;height:11px;flex-shrink:0;"><circle cx="12" cy="12" r="3"/><line x1="12" y1="3" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="21"/><line x1="3" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="21" y2="12"/></svg>
+          <input id="tb-brightness-slider" type="range" min="0.5" max="4.0" step="0.05" value="2.0" style="flex:1;-webkit-appearance:none;appearance:none;height:3px;border-radius:2px;background:rgba(212,168,50,0.2);outline:none;cursor:pointer;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="rgba(212,168,50,0.7)" stroke-width="2" style="width:14px;height:14px;flex-shrink:0;"><circle cx="12" cy="12" r="4"/><line x1="12" y1="3" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="21"/><line x1="3" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="21" y2="12"/></svg>
         </div>
+        <div style="display:flex;justify-content:space-between;margin-top:8px;">
+          <span id="tb-brightness-val" style="font-family:var(--f-mono);font-size:10px;color:rgba(212,168,50,0.6);">2.0x</span>
+          <span style="font-family:var(--f-ui);font-size:10px;color:rgba(212,168,50,0.35);">drag to adjust</span>
+        </div>
+        <style>
+          #tb-brightness-slider::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:#c9a832;cursor:pointer;box-shadow:0 0 6px rgba(212,168,50,0.5);}
+          #tb-brightness-slider::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:#c9a832;cursor:pointer;border:none;box-shadow:0 0 6px rgba(212,168,50,0.5);}
+          #tb-brightness-slider::-webkit-slider-runnable-track{height:3px;border-radius:2px;background:linear-gradient(to right,rgba(212,168,50,0.6) 0%,rgba(212,168,50,0.6) var(--pct,50%),rgba(212,168,50,0.2) var(--pct,50%),rgba(212,168,50,0.2) 100%);}
+        </style>
       </div>
     </div>
 
@@ -9889,36 +9896,39 @@ window.addEventListener('beforeunload', () => {
 });
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  BRIGHTNESS CONTROL - Topbar button, closed by default, 1.7x default
+//  BRIGHTNESS CONTROL - Topbar button opens slider panel
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 (function() {
+  const DEFAULT_BRIGHTNESS = 2.0;
   const BC = {
-    currentLevel: 1.7,
+    currentLevel: DEFAULT_BRIGHTNESS,
     isOpen: false,
 
     init() {
-      // Load saved preference or default to 1.7x
       try {
         const saved = SafeStorage.getItem('caci_brightness');
-        this.currentLevel = saved ? parseFloat(saved) : 2.0;
+        this.currentLevel = saved ? parseFloat(saved) : DEFAULT_BRIGHTNESS;
       } catch(e) {
-        this.currentLevel = 1.7;
+        this.currentLevel = DEFAULT_BRIGHTNESS;
       }
 
-      // Wait for DOM then wire up
       const setup = () => {
         const btn = document.getElementById('tb-brightness-btn');
         const panel = document.getElementById('tb-brightness-panel');
-        if (!btn || !panel) {
-          setTimeout(setup, 500);
-          return;
-        }
+        const slider = document.getElementById('tb-brightness-slider');
+        const valLabel = document.getElementById('tb-brightness-val');
+        if (!btn || !panel || !slider) { setTimeout(setup, 500); return; }
 
-        // Apply brightness immediately
+        // Set slider to saved value
+        slider.value = this.currentLevel;
+        if (valLabel) valLabel.textContent = this.currentLevel.toFixed(2) + 'x';
+        this.updateSliderTrack(slider);
+
+        // Apply brightness on load
         this.applyBrightness(this.currentLevel, false);
 
-        // Toggle panel on button click
+        // Toggle panel
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
           this.isOpen = !this.isOpen;
@@ -9927,7 +9937,7 @@ window.addEventListener('beforeunload', () => {
           btn.style.background = this.isOpen ? 'rgba(212,168,50,0.12)' : 'transparent';
         });
 
-        // Close panel when clicking outside
+        // Close on outside click
         document.addEventListener('click', () => {
           if (this.isOpen) {
             this.isOpen = false;
@@ -9937,34 +9947,24 @@ window.addEventListener('beforeunload', () => {
           }
         });
 
-        // Wire up level buttons
-        document.querySelectorAll('.tb-blevel').forEach(b => {
-          b.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.applyBrightness(parseFloat(b.dataset.level), true);
-            // Close panel after selection
-            this.isOpen = false;
-            panel.style.display = 'none';
-            btn.style.borderColor = 'rgba(212,168,50,0.2)';
-            btn.style.background = 'transparent';
-          });
-
-          // Hover styles
-          b.addEventListener('mouseenter', () => {
-            b.style.background = 'rgba(212,168,50,0.15)';
-            b.style.borderColor = 'rgba(212,168,50,0.4)';
-            b.style.color = '#f0d060';
-          });
-          b.addEventListener('mouseleave', () => {
-            const isActive = parseFloat(b.dataset.level) === this.currentLevel;
-            b.style.background = isActive ? 'rgba(212,168,50,0.2)' : 'rgba(212,168,50,0.06)';
-            b.style.borderColor = isActive ? 'rgba(212,168,50,0.6)' : 'rgba(212,168,50,0.15)';
-            b.style.color = isActive ? '#f0d060' : '#c5cdd8';
-          });
+        // Slider input - live preview
+        slider.addEventListener('input', (e) => {
+          e.stopPropagation();
+          const level = parseFloat(slider.value);
+          if (valLabel) valLabel.textContent = level.toFixed(2) + 'x';
+          this.updateSliderTrack(slider);
+          this.applyBrightness(level, false);
         });
 
-        this.updateActiveButton();
-        console.log(`✅ Brightness control ready at ${this.currentLevel}x`);
+        // Slider change - save on release
+        slider.addEventListener('change', (e) => {
+          e.stopPropagation();
+          const level = parseFloat(slider.value);
+          this.applyBrightness(level, true);
+        });
+
+        // Prevent panel close when interacting with slider
+        panel.addEventListener('click', (e) => e.stopPropagation());
       };
 
       if (document.readyState === 'loading') {
@@ -9976,33 +9976,29 @@ window.addEventListener('beforeunload', () => {
 
     applyBrightness(level, save) {
       const app = document.getElementById('app');
-      if (!app) {
-        setTimeout(() => this.applyBrightness(level, save), 300);
-        return;
-      }
+      if (!app) { setTimeout(() => this.applyBrightness(level, save), 300); return; }
       this.currentLevel = level;
       if (save) SafeStorage.setItem('caci_brightness', level.toString());
-      if (level === 1.0) {
-        app.style.filter = 'none';
-      } else {
-        app.style.filter = `brightness(${level})`;
-      }
-      this.updateActiveButton();
+      app.style.filter = level === 1.0 ? 'none' : `brightness(${level})`;
     },
 
-    updateActiveButton() {
-      document.querySelectorAll('.tb-blevel').forEach(b => {
-        const isActive = parseFloat(b.dataset.level) === this.currentLevel;
-        b.style.background = isActive ? 'rgba(212,168,50,0.2)' : 'rgba(212,168,50,0.06)';
-        b.style.borderColor = isActive ? 'rgba(212,168,50,0.6)' : 'rgba(212,168,50,0.15)';
-        b.style.color = isActive ? '#f0d060' : '#c5cdd8';
-        b.style.fontWeight = isActive ? '500' : 'normal';
-      });
+    updateSliderTrack(slider) {
+      const min = parseFloat(slider.min);
+      const max = parseFloat(slider.max);
+      const val = parseFloat(slider.value);
+      const pct = ((val - min) / (max - min) * 100).toFixed(1) + '%';
+      slider.style.setProperty('--pct', pct);
     }
   };
 
   BC.init();
-  window.setBrightness = (level) => BC.applyBrightness(level, true);
+  window.setBrightness = (level) => {
+    const slider = document.getElementById('tb-brightness-slider');
+    const valLabel = document.getElementById('tb-brightness-val');
+    if (slider) { slider.value = level; BC.updateSliderTrack(slider); }
+    if (valLabel) valLabel.textContent = level.toFixed(2) + 'x';
+    BC.applyBrightness(level, true);
+  };
 })();
 
 
