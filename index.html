@@ -4327,13 +4327,14 @@ body[data-theme="light"] .login-frame-box {
   content: '';
   position: absolute; inset: 0;
   background: url('JUSHI.webp') center center / cover no-repeat;
-  opacity: 0.45;
+  opacity: var(--bg-img-opacity, 0.45);
   filter: grayscale(0%) contrast(1.0) brightness(0.75);
 }
 /* Dark ink wash — heavier center for text readability, lighter at edges */
 .chat-bg-overlay::after {
   content: '';
   position: absolute; inset: 0;
+  opacity: var(--bg-wash-opacity, 1.0);
   background:
     radial-gradient(ellipse 60% 50% at 50% 50%, rgba(5,8,16,0.35) 0%, rgba(5,8,16,0.05) 100%),
     linear-gradient(180deg, rgba(5,8,16,0.05) 0%, rgba(5,8,16,0.15) 100%);
@@ -10215,26 +10216,42 @@ window.addEventListener('beforeunload', () => {
       }
     },
 
-    // Background: targets background canvas AND sidebar - never topbar
+    // Background: controls image opacity and dark wash - no filter = no blotching
     applyBg(level, save) {
       this.bgLevel = level;
       if (save) SafeStorage.setItem(this.bgKey(), level.toString());
-      const f = level === 1.0 ? 'none' : `brightness(${level})`;
-      ['.chat-bg-overlay', '#app-glimmer'].forEach(sel => {
-        document.querySelectorAll(sel).forEach(el => el.style.filter = f);
+      // Convert level (0.5-4.0) to meaningful opacity ranges
+      // level 1.0 = default (image opacity 0.45, wash at full)
+      // level > 1.0 = brighter (more image, less wash)
+      // level < 1.0 = darker (less image, more wash)
+      const normalized = (level - 0.5) / (4.0 - 0.5); // 0 to 1
+      const imgOpacity  = Math.min(1.0, 0.20 + (normalized * 0.80)); // 0.20 to 1.0
+      const washOpacity = Math.max(0.0, 1.0 - (normalized * 1.2));   // 1.0 to 0.0
+
+      // Apply to image layer (::before via CSS var)
+      document.querySelectorAll('.chat-bg-overlay').forEach(el => {
+        el.style.setProperty('--bg-img-opacity', imgOpacity.toString());
+        el.style.setProperty('--bg-wash-opacity', washOpacity.toString());
       });
-      // Sidebar brightness — but only in dark mode, light mode handles its own styling
+
+      // Sidebar brightness in dark mode - keep filter here since sidebar is solid color not image
       const sidebar = document.getElementById('sidebar');
-      if (sidebar && this.theme() === 'dark') sidebar.style.filter = f;
+      if (sidebar && this.theme() === 'dark') {
+        const sidebarBrightness = 0.6 + (normalized * 0.8); // 0.6 to 1.4
+        sidebar.style.filter = `brightness(${sidebarBrightness.toFixed(2)})`;
+      }
     },
 
-    // Text/content: targets chat content area only
+    // Text/content: gentle brightness on content area only
     applyText(level, save) {
       this.textLevel = level;
       if (save) SafeStorage.setItem(this.textKey(), level.toString());
-      const f = level === 1.0 ? 'none' : `brightness(${level})`;
       const content = document.getElementById('content');
-      if (content) content.style.filter = f;
+      if (content) {
+        // Use a gentler range - stays close to 1.0 to avoid washing out text
+        const clamped = Math.max(0.5, Math.min(2.0, level));
+        content.style.filter = clamped === 1.0 ? 'none' : `brightness(${clamped})`;
+      }
     },
 
     updateSliderTrack(slider) {
