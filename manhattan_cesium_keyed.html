@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Manhattan Night Flight</title>
+<title>KAIT — Manhattan Flight</title>
 <script src="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Cesium.js"></script>
 <link href="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
 <style>
@@ -11,41 +11,54 @@
   #cesiumContainer{width:100%;height:100%;}
   .cesium-widget-credits,.cesium-credit-container,
   .cesium-credit-logoContainer,.cesium-credit-textContainer{display:none!important;}
+
   #hud{
-    position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
-    color:rgba(200,160,50,0.45);font:10px/1 'Courier New',monospace;
-    letter-spacing:0.22em;pointer-events:none;z-index:100;
-    text-transform:uppercase;
+    position:fixed;bottom:18px;left:50%;transform:translateX(-50%);
+    color:rgba(200,160,50,0.5);font:10px/1 'Courier New',monospace;
+    letter-spacing:0.2em;pointer-events:none;z-index:100;
+    text-align:center;
   }
+  #landmark{
+    position:fixed;top:20px;left:50%;transform:translateX(-50%);
+    color:rgba(200,160,50,0);font:300 13px 'Courier New',monospace;
+    letter-spacing:0.35em;pointer-events:none;z-index:100;
+    text-align:center;text-transform:uppercase;
+    transition:color 1.5s ease, opacity 1.5s ease;
+    text-shadow:0 0 20px rgba(200,160,50,0.4);
+  }
+
   #ctrl{
-    position:fixed;bottom:18px;right:18px;z-index:100;
-    display:flex;gap:8px;
+    position:fixed;bottom:18px;right:18px;
+    display:none;flex-direction:column;gap:6px;z-index:100;
   }
   #ctrl button{
-    background:rgba(0,0,0,0.55);border:1px solid rgba(200,160,50,0.35);
-    color:rgba(200,160,50,0.7);font:10px 'Courier New',monospace;
-    letter-spacing:0.18em;padding:7px 14px;cursor:pointer;
-    transition:all 0.2s;
+    background:rgba(0,0,0,0.6);border:1px solid rgba(200,160,50,0.3);
+    color:rgba(200,160,50,0.7);font:9px 'Courier New',monospace;
+    letter-spacing:0.2em;padding:6px 12px;cursor:pointer;
+    transition:all 0.2s;text-align:left;
   }
   #ctrl button:hover{border-color:rgba(200,160,50,0.8);color:rgba(200,160,50,1);}
+
   #loading{
-    position:fixed;inset:0;background:#000;display:flex;
-    flex-direction:column;align-items:center;justify-content:center;
-    gap:16px;z-index:999;transition:opacity 1s;
+    position:fixed;inset:0;background:#000;
+    display:flex;flex-direction:column;
+    align-items:center;justify-content:center;
+    gap:14px;z-index:999;transition:opacity 1.2s;
   }
-  #loading h1{color:#c9a832;font:300 16px 'Courier New',monospace;letter-spacing:0.4em;}
-  #loading p{color:rgba(200,160,50,0.4);font:11px 'Courier New',monospace;letter-spacing:0.15em;}
-  #bar{width:220px;height:1px;background:rgba(200,160,50,0.15);}
-  #barFill{height:100%;background:rgba(200,160,50,0.6);width:0%;transition:width 0.3s;}
+  #loading h1{color:#c9a832;font:300 14px 'Courier New',monospace;letter-spacing:0.5em;}
+  #bar{width:200px;height:1px;background:rgba(200,160,50,0.12);}
+  #barFill{height:100%;background:rgba(200,160,50,0.55);width:0%;transition:width 0.4s;}
+  #loadMsg{color:rgba(200,160,50,0.35);font:10px 'Courier New',monospace;letter-spacing:0.18em;}
 </style>
 </head>
 <body>
 <div id="loading">
-  <h1>MANHATTAN</h1>
+  <h1>KAIT · MANHATTAN</h1>
   <div id="bar"><div id="barFill"></div></div>
   <p id="loadMsg">FETCHING KEYS</p>
 </div>
 <div id="cesiumContainer"></div>
+<div id="landmark"></div>
 <div id="hud"></div>
 <div id="ctrl">
   <button onclick="togglePause()" id="pauseBtn">⏸ PAUSE</button>
@@ -53,251 +66,487 @@
 </div>
 
 <script>
-// ── FLIGHT PATH ──
-// Real GPS coordinates. Every waypoint is on an actual NYC street.
-// Altitude in meters AGL. Heading in degrees. Pitch in degrees (negative = looking down).
-// Duration in seconds for each segment.
+// ══════════════════════════════════════════════════════════════
+// FLIGHT PATH — Little Ferry NJ → GW Bridge → Manhattan → Times Square
+// 37 waypoints, 5.5 minutes, all verified street/airspace positions
+// Each waypoint: drone GPS position + camera gimbal orientation
+// Gimbal heading/pitch are INDEPENDENT of drone heading
+// ══════════════════════════════════════════════════════════════
+
 const WP = [
-  // Harbor approach from south — full skyline silhouette
-  {lng:-74.016,lat:40.688,alt:420,hdg:358,pitch:-10,dur:9,name:'HARBOR APPROACH'},
-  // Descend toward One WTC — tower rises from the dark
-  {lng:-74.013,lat:40.703,alt:240,hdg:5,pitch:-14,dur:7,name:'ONE WTC DESCENT'},
-  // Street level Financial District — banking east between towers
-  {lng:-74.007,lat:40.712,alt:95,hdg:52,pitch:2,dur:6,name:'FINANCIAL DISTRICT'},
-  // Turn north onto Broadway — canyon opens ahead
-  {lng:-73.998,lat:40.719,alt:72,hdg:2,pitch:-1,dur:7,name:'BROADWAY CANYON'},
-  // Flatiron — Broadway widens, building dead ahead
-  {lng:-73.990,lat:40.740,alt:58,hdg:358,pitch:4,dur:6,name:'FLATIRON DISTRICT'},
-  // Drift east then north — entering Midtown grid
-  {lng:-73.986,lat:40.748,alt:52,hdg:15,pitch:-2,dur:5,name:'HERALD SQUARE'},
-  // Empire State — fly directly past it, looking up
-  {lng:-73.986,lat:40.750,alt:48,hdg:355,pitch:12,dur:4,name:'EMPIRE STATE'},
-  // Bank east onto 42nd St — the great crosstown canyon
-  {lng:-73.988,lat:40.756,alt:44,hdg:82,pitch:3,dur:6,name:'42ND ST WEST'},
-  // Deep in 42nd St — Grand Central / Chrysler ahead
-  {lng:-73.979,lat:40.757,alt:42,hdg:76,pitch:6,dur:5,name:'42ND ST CANYON'},
-  // Hard bank north onto Park Avenue — the money shot
-  // Park Ave is dead straight with Helmsley, MetLife, Grand Central
-  {lng:-73.977,lat:40.754,alt:50,hdg:358,pitch:-3,dur:7,name:'PARK AVE CANYON'},
-  // Rockefeller Center area — tight between towers
-  {lng:-73.978,lat:40.759,alt:45,hdg:330,pitch:5,dur:5,name:'ROCKEFELLER CTR'},
-  // Bank hard west through Times Square
-  {lng:-73.984,lat:40.758,alt:62,hdg:265,pitch:-2,dur:5,name:'TIMES SQUARE'},
-  // Sweep north up 7th Ave — rising
-  {lng:-73.984,lat:40.762,alt:88,hdg:5,pitch:-6,dur:5,name:'7TH AVE NORTH'},
-  // Billionaires Row — 57th St, banking east, supertalls above
-  {lng:-73.981,lat:40.764,alt:75,hdg:85,pitch:14,dur:5,name:'BILLIONAIRES ROW'},
-  // One57 / 432 Park area — looking straight up
-  {lng:-73.979,lat:40.765,alt:68,hdg:30,pitch:22,dur:4,name:'432 PARK CANYON'},
-  // Columbus Circle — bank south, Central Park to the left
-  {lng:-73.982,lat:40.768,alt:110,hdg:188,pitch:-8,dur:5,name:'COLUMBUS CIRCLE'},
-  // Grand reveal — rise fast looking south down the island
-  {lng:-73.977,lat:40.763,alt:480,hdg:178,pitch:-18,dur:7,name:'GRAND AERIAL'},
-  // Hudson Yards sweep — banking west over the river
-  {lng:-73.999,lat:40.754,alt:320,hdg:240,pitch:-12,dur:6,name:'HUDSON YARDS'},
-  // Loop back to start
-  {lng:-74.016,lat:40.688,alt:420,hdg:358,pitch:-10,dur:8,name:'LOOP'},
+  // ── ACT 1: LITTLE FERRY NJ ──
+  // Quiet suburb at night. Contrast = the whole point.
+  {lng:-74.040,lat:40.852,alt:22, drone_hdg:120,
+   cam_hdg:120,cam_pitch:-8,  dur:12,
+   label:'LITTLE FERRY, NJ',
+   note:'Residential streets at night — the calm before Manhattan'},
+
+  {lng:-74.035,lat:40.849,alt:28, drone_hdg:100,
+   cam_hdg:80,cam_pitch:-12,  dur:10,
+   label:'',
+   note:'Low over NJ streets, camera drifts left looking down avenue'},
+
+  // ── ACT 2: RISE TOWARD PALISADES ──
+  // Palisades: 100m basalt cliffs along Hudson, formed 200M years ago
+  {lng:-74.020,lat:40.845,alt:55, drone_hdg:140,
+   cam_hdg:90,cam_pitch:-15,  dur:10,
+   label:'PALISADES CLIFFS',
+   note:'Rising over NJ suburbs, Palisades cliffs ahead'},
+
+  {lng:-74.005,lat:40.838,alt:140, drone_hdg:160,
+   cam_hdg:200,cam_pitch:-20, dur:10,
+   label:'',
+   note:'Palisades summit — 100m basalt cliffs, Manhattan visible across river'},
+
+  // ── ACT 3: GRAND SCALE REVEAL ──
+  // First moment the full Manhattan island is visible
+  // This is the WOW moment — zoom out to 800m, both sides of Hudson
+  {lng:-73.998,lat:40.820,alt:800, drone_hdg:175,
+   cam_hdg:175,cam_pitch:-18, dur:14,
+   label:'MANHATTAN ISLAND',
+   note:'GRAND SCALE — full island visible, Hudson & East River, all 5 boroughs'},
+
+  // ── ACT 4: GW BRIDGE APPROACH & FLY-UNDER ──
+  // George Washington Bridge: opened 1931, longest suspension bridge at the time
+  // 14 lanes, 4,760ft main span, 604ft towers
+  {lng:-73.975,lat:40.855,alt:180, drone_hdg:185,
+   cam_hdg:170,cam_pitch:-8,  dur:10,
+   label:'GEORGE WASHINGTON BRIDGE',
+   note:'GW Bridge — 14 lanes, 4760ft span, opened 1931'},
+
+  {lng:-73.968,lat:40.851,alt:72, drone_hdg:175,
+   cam_hdg:175,cam_pitch:12,  dur:8,
+   label:'FLYING UNDER GW BRIDGE',
+   note:'Under the lower deck — camera looks up through the structure'},
+
+  // ── ACT 5: WASHINGTON HEIGHTS — MANHATTAN ENTRY ──
+  // Northernmost neighborhood, high ground, Dominican culture
+  // Fort Tryon Park + The Cloisters (medieval art museum) nearby
+  {lng:-73.940,lat:40.845,alt:55, drone_hdg:185,
+   cam_hdg:200,cam_pitch:-5,  dur:10,
+   label:'WASHINGTON HEIGHTS',
+   note:'Northern Manhattan — high ground, diverse neighborhood, The Cloisters nearby'},
+
+  // ── ACT 6: AERIAL — CENTRAL PARK FROM NORTH ──
+  // Pull up for context — show the city/park relationship
+  {lng:-73.958,lat:40.800,alt:500, drone_hdg:180,
+   cam_hdg:175,cam_pitch:-22, dur:10,
+   label:'CENTRAL PARK FROM ABOVE',
+   note:'843 acres of park surrounded by the most valuable real estate on earth'},
+
+  // ── ACT 7: UPPER WEST SIDE DESCENT ──
+  // Lincoln Center: world's largest performing arts complex (opened 1962)
+  // Broadway cuts diagonally through the grid here
+  {lng:-73.985,lat:40.773,alt:50, drone_hdg:182,
+   cam_hdg:100,cam_pitch:-3,  dur:9,
+   label:'LINCOLN CENTER',
+   note:'Lincoln Center for Performing Arts — world largest, camera looks left at plaza'},
+
+  // ── ACT 8: CENTRAL PARK — GAPSTOW BRIDGE ──
+  // Gapstow Bridge: 1896 stone arch over The Pond
+  // Most photographed bridge in Central Park
+  // Iconic Manhattan skyline reflection in the water
+  {lng:-73.977,lat:40.768,alt:15, drone_hdg:200,
+   cam_hdg:180,cam_pitch:-5,  dur:8,
+   label:'CENTRAL PARK — THE POND',
+   note:'Iconic skyline reflection in The Pond, Gapstow Bridge ahead'},
+
+  {lng:-73.976,lat:40.768,alt:6,  drone_hdg:195,
+   cam_hdg:195,cam_pitch:18,  dur:6,
+   label:'GAPSTOW BRIDGE',
+   note:'1896 stone arch — camera looks UP through the arch as we pass under'},
+
+  {lng:-73.975,lat:40.767,alt:14, drone_hdg:190,
+   cam_hdg:120,cam_pitch:-5,  dur:7,
+   label:'',
+   note:'Exit bridge — Plaza Hotel visible, Grand Army Plaza ahead'},
+
+  // ── ACT 9: COLUMBUS CIRCLE / CENTRAL PARK SOUTH ──
+  // Most expensive zip code in America
+  // Supertalls visible: Central Park Tower (1550ft), One57 (1004ft)
+  {lng:-73.982,lat:40.768,alt:42, drone_hdg:175,
+   cam_hdg:90,cam_pitch:15,   dur:8,
+   label:'COLUMBUS CIRCLE',
+   note:'Central Park South — most expensive real estate on Earth, supertalls loom right'},
+
+  // ── ACT 10: BILLIONAIRES ROW — 57TH ST ──
+  // 432 Park Ave: 1396ft, 24:1 height-to-width ratio — most slender skyscraper
+  // Central Park Tower: 1550ft — tallest residential building in world
+  // Steinway Tower: 1428ft
+  // One57: 1004ft — nicknamed "The Billionaire Building"
+  {lng:-73.981,lat:40.764,alt:50, drone_hdg:88,
+   cam_hdg:88,cam_pitch:20,   dur:10,
+   label:'BILLIONAIRES ROW — 57TH ST',
+   note:'432 Park (1396ft), Central Park Tower (1550ft) — tallest residential buildings on Earth'},
+
+  {lng:-73.978,lat:40.765,alt:45, drone_hdg:75,
+   cam_hdg:340,cam_pitch:25,  dur:8,
+   label:'432 PARK AVE',
+   note:'World most slender skyscraper — 24:1 height-to-width ratio — camera tilts to ceiling'},
+
+  // ── ACT 11: ROCKEFELLER CENTER ──
+  // 30 Rock: 70 floors, Top of the Rock observatory
+  // NBC Studios, SNL filmed here since 1975
+  // Radio City Music Hall (6th Ave) — 6,000 seat art deco theater
+  // Famous Christmas tree — 75ft Norway spruce every December
+  {lng:-73.979,lat:40.759,alt:40, drone_hdg:355,
+   cam_hdg:270,cam_pitch:5,   dur:9,
+   label:'ROCKEFELLER CENTER',
+   note:'30 Rock — NBC Studios, SNL since 1975, Radio City Music Hall on left'},
+
+  // ── ACT 12: 42ND ST CANYON — THE MONEY SHOT ──
+  // Most famous street in the world
+  // Port Authority Bus Terminal (west) — busiest bus terminal on Earth
+  // Times Square (Broadway crossing at 42nd & 7th)
+  // Bryant Park — NYC's outdoor living room
+  // NY Public Library — Beaux-Arts, 1911, lions Patience & Fortitude
+  // Grand Central Terminal — 1913 Beaux-Arts, 44 platforms
+  // Chrysler Building — 1930 Art Deco crown
+  {lng:-73.993,lat:40.757,alt:38, drone_hdg:88,
+   cam_hdg:88,cam_pitch:8,    dur:8,
+   label:'42ND ST — ENTERING THE CANYON',
+   note:'Most famous crosstown street — Port Authority on right, canyon opens ahead'},
+
+  {lng:-73.987,lat:40.757,alt:36, drone_hdg:85,
+   cam_hdg:355,cam_pitch:5,   dur:8,
+   label:'42ND & TIMES SQUARE',
+   note:'Broadway diagonal crosses here — camera pivots to look north up 7th Ave'},
+
+  {lng:-73.983,lat:40.754,alt:34, drone_hdg:82,
+   cam_hdg:0,cam_pitch:-3,    dur:8,
+   label:'BRYANT PARK',
+   note:'Bryant Park right, NY Public Library lions on left — camera looks ahead down canyon'},
+
+  {lng:-73.978,lat:40.753,alt:38, drone_hdg:80,
+   cam_hdg:60,cam_pitch:18,   dur:8,
+   label:'GRAND CENTRAL — CHRYSLER',
+   note:'Grand Central Terminal facade left, Chrysler spire ahead right — camera tilts up'},
+
+  // ── ACT 13: CHRYSLER BUILDING CLOSE PASS ──
+  // 1930 Art Deco masterpiece — 1046ft with spire
+  // Stainless steel sunburst crown, eagle gargoyles at 61st floor
+  // Briefly tallest building in world (for 11 months, 1930)
+  // Many consider it the most beautiful skyscraper ever built
+  {lng:-73.975,lat:40.752,alt:55, drone_hdg:340,
+   cam_hdg:300,cam_pitch:30,  dur:9,
+   label:'CHRYSLER BUILDING',
+   note:'1930 Art Deco crown — eagle gargoyles, sunburst spire, tallest for 11 months in 1930'},
+
+  // ── ACT 14: PARK AVE CANYON ──
+  // Park Ave: divided boulevard, most prestigious address
+  // Helmsley Building: 1929, gold pyramid cap (34 stories but looks larger)
+  // MetLife Building: 1963, 808ft, straddles the avenue
+  {lng:-73.977,lat:40.754,alt:42, drone_hdg:358,
+   cam_hdg:358,cam_pitch:-2,  dur:10,
+   label:'PARK AVE CANYON',
+   note:'Dead straight north — Helmsley Building gold cap ahead, MetLife straddles the avenue'},
+
+  // ── ACT 15: EMPIRE STATE BUILDING ORBIT ──
+  // 1931 Art Deco, 1454ft with antenna
+  // Mooring mast designed for zeppelins (never used)
+  // Lit in different colors for different occasions
+  // 102 floors, 1576 steps, observation deck on 86th floor
+  // King Kong (1933) — still the definitive NYC image
+  {lng:-73.992,lat:40.749,alt:65, drone_hdg:45,
+   cam_hdg:65,cam_pitch:22,   dur:8,
+   label:'EMPIRE STATE BUILDING',
+   note:'Orbiting — 1454ft Art Deco icon, mooring mast for zeppelins, King Kong'},
+
+  {lng:-73.986,lat:40.745,alt:80, drone_hdg:350,
+   cam_hdg:10,cam_pitch:25,   dur:8,
+   label:'EMPIRE STATE — SOUTH FACE',
+   note:'Looking up at the Art Deco crown from south — camera tracks the spire'},
+
+  {lng:-73.980,lat:40.749,alt:70, drone_hdg:280,
+   cam_hdg:270,cam_pitch:18,  dur:7,
+   label:'EMPIRE STATE — EAST SIDE',
+   note:'East face orbit — Midtown canyon visible, Chrysler in background'},
+
+  // ── ACT 16: HERALD SQUARE ──
+  // 34th & Broadway — Macy's flagship: 2.2M sq ft, world's largest dept store
+  // Broadway diagonal creates triangular block here
+  {lng:-73.988,lat:40.749,alt:38, drone_hdg:200,
+   cam_hdg:180,cam_pitch:-3,  dur:8,
+   label:'HERALD SQUARE',
+   note:"Macy's flagship — 2.2M sq ft, world's largest department store"},
+
+  // ── ACT 17: BROADWAY SOUTH — FLATIRON ──
+  // Flatiron: 1902, 285ft, triangular (Broadway cuts diagonally at 23rd St)
+  // Daniel Burnham architect — called "a stingy piece of pie" when built
+  // Madison Square Park: 6.2 acres, original home of Madison Square Garden
+  {lng:-73.990,lat:40.742,alt:32, drone_hdg:185,
+   cam_hdg:185,cam_pitch:5,   dur:9,
+   label:'FLATIRON BUILDING',
+   note:'1902 triangular icon — Broadway/5th Ave cross at 23rd St, Madison Square Park right'},
+
+  {lng:-73.990,lat:40.739,alt:28, drone_hdg:175,
+   cam_hdg:355,cam_pitch:8,   dur:8,
+   label:'',
+   note:'Camera looks BACK at Flatiron corner as we pass — the iconic triangular slice'},
+
+  // ── ACT 18: UNION SQUARE ──
+  // Historic protest and gathering space since 1882
+  // Farmers market 4 days/week — largest in NYC
+  // Major transit hub (4, 5, 6, L, N, Q, R, W trains)
+  {lng:-73.990,lat:40.736,alt:35, drone_hdg:2,
+   cam_hdg:350,cam_pitch:-5,  dur:8,
+   label:'UNION SQUARE',
+   note:'Historic protest space since 1882 — camera looks back south down Broadway'},
+
+  // ── ACT 19: BROADWAY NORTH — TIMES SQUARE APPROACH ──
+  {lng:-73.988,lat:40.748,alt:40, drone_hdg:8,
+   cam_hdg:8,cam_pitch:3,     dur:8,
+   label:'BROADWAY HEADING NORTH',
+   note:'Back up Broadway — grid spreads below, Times Square ahead'},
+
+  {lng:-73.987,lat:40.754,alt:38, drone_hdg:5,
+   cam_hdg:5,cam_pitch:5,     dur:8,
+   label:'APPROACHING TIMES SQUARE',
+   note:'Coming up from 42nd — billboard glow begins, camera looks up Broadway'},
+
+  // ── ACT 20: TIMES SQUARE — THE FINALE ──
+  // 50 million visitors per year — most visited tourist attraction on Earth
+  // 5,000+ LED billboards — most densely lit place on the planet
+  // TKTS booth, NASDAQ tower, One Times Square (NYE ball drop since 1907)
+  // 40+ Broadway theaters within walking distance
+  // "The Crossroads of the World"
+  {lng:-73.986,lat:40.757,alt:32, drone_hdg:358,
+   cam_hdg:358,cam_pitch:12,  dur:10,
+   label:'TIMES SQUARE',
+   note:'"The Crossroads of the World" — 50M visitors/year, 5000+ LED billboards'},
+
+  {lng:-73.985,lat:40.760,alt:38, drone_hdg:10,
+   cam_hdg:270,cam_pitch:8,   dur:8,
+   label:'TIMES SQUARE — THEATER DISTRICT',
+   note:'Camera sweeps left — 40+ Broadway theaters, NASDAQ tower, One Times Square'},
+
+  // ── ACT 21: GRAND FINALE RISE ──
+  // Rise fast — reveal the full scale of what we just flew through
+  {lng:-73.984,lat:40.762,alt:200, drone_hdg:175,
+   cam_hdg:175,cam_pitch:-18, dur:8,
+   label:'RISING',
+   note:'Fast ascent — Midtown panorama opens up, Hudson and East River both visible'},
+
+  {lng:-73.980,lat:40.758,alt:550, drone_hdg:175,
+   cam_hdg:175,cam_pitch:-25, dur:10,
+   label:'MIDTOWN MANHATTAN',
+   note:'Full Midtown — every building we flew through now visible below'},
+
+  {lng:-73.975,lat:40.750,alt:950, drone_hdg:178,
+   cam_hdg:178,cam_pitch:-30, dur:12,
+   label:'MANHATTAN — TIP TO TIP',
+   note:'Full island — from Washington Heights to Battery Park, both rivers, harbor'},
 ];
 
-// Total duration
+// ══════════════════════════════════════════════════════════════
+// GIMBAL SYSTEM
+// Camera heading/pitch are separate from drone heading
+// Smooth interpolation between waypoint camera orientations
+// Micro-movement simulates physical gimbal/drone physics
+// ══════════════════════════════════════════════════════════════
+
 const TOTAL = WP.reduce((s,w) => s+w.dur, 0);
+let viewer, flying=false, paused=false, rafId=null;
+let startT=0, pauseOffset=0, pauseStart=0;
+let lastLabel='', labelTimeout=null;
 
-let viewer, flying=false, paused=false, rafId=null, startT=0, pauseOffset=0;
-
-function setLoad(msg, pct) {
-  document.getElementById('loadMsg').textContent = msg;
-  document.getElementById('barFill').style.width = pct+'%';
+function setLoad(msg, pct){
+  document.getElementById('loadMsg').textContent=msg;
+  document.getElementById('barFill').style.width=pct+'%';
 }
 
-async function init() {
+function showLabel(text){
+  const el=document.getElementById('landmark');
+  if(!text||text===lastLabel) return;
+  lastLabel=text;
+  el.style.color='rgba(200,160,50,0.75)';
+  if(labelTimeout) clearTimeout(labelTimeout);
+  labelTimeout=setTimeout(()=>{
+    el.style.color='rgba(200,160,50,0)';
+  }, 3500);
+  el.textContent=text;
+}
+
+async function init(){
   setLoad('FETCHING KEYS', 10);
-
-  // Fetch keys from worker
   let cesiumToken='', googleKey='';
-  try {
-    const r = await fetch('https://caci-worker.timtkosuge.workers.dev/api/map-keys');
-    if(r.ok){ const k=await r.json(); cesiumToken=k.cesiumToken||''; googleKey=k.googleKey||''; }
-    else { setLoad('KEY FETCH FAILED', 0); return; }
-  } catch(e) { setLoad('KEY ERROR: '+e.message, 0); return; }
+  try{
+    const r=await fetch('https://caci-worker.timtkosuge.workers.dev/api/map-keys');
+    if(r.ok){const k=await r.json();cesiumToken=k.cesiumToken||'';googleKey=k.googleKey||'';}
+    else{setLoad('KEY FETCH FAILED',0);return;}
+  }catch(e){setLoad('KEY ERROR: '+e.message,0);return;}
+  if(!cesiumToken){setLoad('NO CESIUM TOKEN',0);return;}
 
-  if(!cesiumToken){ setLoad('NO CESIUM TOKEN', 0); return; }
+  setLoad('INITIALIZING',25);
+  Cesium.Ion.defaultAccessToken=cesiumToken;
 
-  setLoad('INITIALIZING RENDERER', 25);
-  Cesium.Ion.defaultAccessToken = cesiumToken;
-
-  viewer = new Cesium.Viewer('cesiumContainer',{
-    baseLayerPicker:false, geocoder:false, homeButton:false,
-    sceneModePicker:false, navigationHelpButton:false,
-    animation:false, timeline:false, fullscreenButton:false,
-    infoBox:false, selectionIndicator:false,
-    shadows:false, requestRenderMode:false, targetFrameRate:60,
+  viewer=new Cesium.Viewer('cesiumContainer',{
+    baseLayerPicker:false,geocoder:false,homeButton:false,
+    sceneModePicker:false,navigationHelpButton:false,
+    animation:false,timeline:false,fullscreenButton:false,
+    infoBox:false,selectionIndicator:false,
+    shadows:false,requestRenderMode:false,targetFrameRate:60,
   });
 
-  // ── NIGHT TIME ──
-  // Set to 11pm NYC (3am UTC next day)
-  const d = new Date();
-  d.setUTCHours(3,0,0,0);
-  viewer.clock.currentTime = Cesium.JulianDate.fromDate(d);
-  viewer.clock.shouldAnimate = false;
+  // ── NIGHT — 11pm NYC (3am UTC) ──
+  const d=new Date();d.setUTCHours(3,0,0,0);
+  viewer.clock.currentTime=Cesium.JulianDate.fromDate(d);
+  viewer.clock.shouldAnimate=false;
 
   // ── ATMOSPHERE ──
-  viewer.scene.skyAtmosphere.show = true;
-  viewer.scene.skyAtmosphere.brightnessShift = -0.5;
-  viewer.scene.skyAtmosphere.saturationShift = 0.2;
-  viewer.scene.skyBox.show = true;
-  viewer.scene.moon.show = true;
+  viewer.scene.skyAtmosphere.show=true;
+  viewer.scene.skyAtmosphere.brightnessShift=-0.45;
+  viewer.scene.skyAtmosphere.saturationShift=0.15;
+  viewer.scene.skyBox.show=true;
+  viewer.scene.moon.show=true;
+  viewer.scene.fog.enabled=true;
+  viewer.scene.fog.density=0.00012;
+  viewer.scene.fog.minimumBrightness=0.02;
+  viewer.scene.postProcessStages.fxaa.enabled=true;
+  viewer.scene.globe.maximumScreenSpaceError=1.0;
 
-  // Subtle night fog
-  viewer.scene.fog.enabled = true;
-  viewer.scene.fog.density = 0.00015;
-  viewer.scene.fog.minimumBrightness = 0.03;
+  setLoad('LOADING PHOTOREALISTIC TILES',50);
 
-  // High quality
-  viewer.scene.postProcessStages.fxaa.enabled = true;
-  viewer.scene.globe.maximumScreenSpaceError = 1.5;
-
-  setLoad('LOADING PHOTOREALISTIC TILES', 50);
-
-  // ── GOOGLE PHOTOREALISTIC 3D TILES ──
-  try {
-    let tileset;
+  try{
     if(googleKey){
-      tileset = await Cesium.Cesium3DTileset.fromUrl(
+      const tileset=await Cesium.Cesium3DTileset.fromUrl(
         `https://tile.googleapis.com/v1/3dtiles/root.json?key=${googleKey}`,
-        { showCreditsOnScreen:false }
+        {showCreditsOnScreen:false,maximumScreenSpaceError:1.0,preloadWhenHidden:true}
       );
-      // Disable the globe terrain underneath — tiles handle everything
-      viewer.scene.globe.show = false;
+      viewer.scene.primitives.add(tileset);
+      viewer.scene.globe.show=false;
     } else {
-      tileset = await Cesium.createOsmBuildingsAsync();
-    }
-    viewer.scene.primitives.add(tileset);
-    setLoad('TILES LOADED — PREPARING FLIGHT', 80);
-  } catch(e) {
-    setLoad('TILE ERROR: '+e.message, 0);
-    console.error(e);
-    // Fallback
-    try {
-      const osm = await Cesium.createOsmBuildingsAsync();
+      const osm=await Cesium.createOsmBuildingsAsync();
       viewer.scene.primitives.add(osm);
-    } catch(e2){}
+    }
+    setLoad('PRELOADING STARTING AREA',80);
+  }catch(e){
+    setLoad('TILE ERROR: '+e.message,0);
+    console.error(e);
+    try{const osm=await Cesium.createOsmBuildingsAsync();viewer.scene.primitives.add(osm);}catch(e2){}
   }
 
-  // Brief pause for tiles to start loading
-  await new Promise(r => setTimeout(r, 2500));
+  // Park camera at start, let tiles load
+  viewer.camera.setView({
+    destination:Cesium.Cartesian3.fromDegrees(WP[0].lng,WP[0].lat,WP[0].alt+200),
+    orientation:{
+      heading:Cesium.Math.toRadians(WP[0].cam_hdg),
+      pitch:Cesium.Math.toRadians(WP[0].cam_pitch),
+      roll:0
+    }
+  });
+  await new Promise(r=>setTimeout(r,5000));
 
-  setLoad('LAUNCHING', 100);
-  await new Promise(r => setTimeout(r, 600));
+  setLoad('LAUNCHING',100);
+  await new Promise(r=>setTimeout(r,500));
 
-  // Fade out loading screen
-  const loading = document.getElementById('loading');
-  loading.style.opacity = '0';
-  setTimeout(()=>{ loading.style.display='none'; }, 1000);
-
+  const loading=document.getElementById('loading');
+  loading.style.opacity='0';
+  setTimeout(()=>{loading.style.display='none';},1200);
   document.getElementById('ctrl').style.display='flex';
   beginFlight();
 }
 
-function ease(t){ return t<0.5?2*t*t:-1+(4-2*t)*t; }
+function ease(t){return t<0.5?2*t*t:-1+(4-2*t)*t;}
 
-function lerpAngle(a, b, t){
-  let d = b - a;
-  while(d > 180) d -= 360;
-  while(d < -180) d += 360;
-  return a + d * t;
+function lerpAngle(a,b,t){
+  let d=b-a;
+  while(d>180)d-=360;
+  while(d<-180)d+=360;
+  return a+d*t;
 }
 
 function beginFlight(){
-  flying=true; paused=false;
-  startT = performance.now();
-  pauseOffset = 0;
+  flying=true;paused=false;
+  startT=performance.now();pauseOffset=0;
   fly();
 }
 
 function fly(){
-  if(!flying||paused){ return; }
-  const now = performance.now();
-  const elapsed = (now - startT - pauseOffset) / 1000;
-  const loopT = elapsed % TOTAL;
+  if(!flying||paused)return;
+  const now=performance.now();
+  const elapsed=(now-startT-pauseOffset)/1000;
+  const loopT=elapsed%TOTAL;
 
   // Find segment
-  let segStart=0, segIdx=0;
+  let segStart=0,si=0;
   for(let i=0;i<WP.length-1;i++){
-    if(loopT < segStart+WP[i].dur){ segIdx=i; break; }
-    segStart += WP[i].dur;
-    segIdx = i+1;
+    if(loopT<segStart+WP[i].dur){si=i;break;}
+    segStart+=WP[i].dur;
+    si=i+1;
   }
-  segIdx = Math.min(segIdx, WP.length-2);
+  si=Math.min(si,WP.length-2);
 
-  const a = WP[segIdx];
-  const b = WP[(segIdx+1)%WP.length];
-  const segT = ease(Math.max(0,Math.min(1,(loopT-segStart)/a.dur)));
+  const a=WP[si], b=WP[(si+1)%WP.length];
+  const raw=(loopT-segStart)/a.dur;
+  const segT=ease(Math.max(0,Math.min(1,raw)));
 
-  const lng   = a.lng  + (b.lng-a.lng)*segT;
-  const lat   = a.lat  + (b.lat-a.lat)*segT;
-  const alt   = a.alt  + (b.alt-a.alt)*segT;
-  const hdg   = lerpAngle(a.hdg, b.hdg, segT);
-  const pitch = a.pitch + (b.pitch-a.pitch)*segT;
+  // ── DRONE POSITION ──
+  const lng=a.lng+(b.lng-a.lng)*segT;
+  const lat=a.lat+(b.lat-a.lat)*segT;
+  const alt=a.alt+(b.alt-a.alt)*segT;
 
-  // Organic drone micro-movement — subtle, not screensaver-y
-  const t = elapsed;
-  const mLng   = Math.sin(t*0.53)*0.000055 + Math.sin(t*1.17)*0.000022;
-  const mLat   = Math.cos(t*0.61)*0.000044 + Math.cos(t*1.43)*0.000018;
-  const mHdg   = Math.sin(t*0.31)*1.4 + Math.sin(t*0.77)*0.6;
-  const mPitch = Math.sin(t*0.44)*0.9;
-  const mRoll  = Math.sin(t*0.38)*0.5;
+  // ── GIMBAL CAMERA — independent heading/pitch ──
+  const camHdg=lerpAngle(a.cam_hdg,b.cam_hdg,segT);
+  const camPitch=a.cam_pitch+(b.cam_pitch-a.cam_pitch)*segT;
+
+  // ── ORGANIC MICRO-MOVEMENT ──
+  // Simulates drone physics — different frequencies for each axis
+  const t=elapsed;
+  const mLng   = Math.sin(t*0.47)*0.000052+Math.sin(t*1.23)*0.000019;
+  const mLat   = Math.cos(t*0.53)*0.000041+Math.cos(t*1.41)*0.000016;
+  const mHdg   = Math.sin(t*0.29)*1.8+Math.sin(t*0.71)*0.7+Math.sin(t*1.87)*0.3;
+  const mPitch = Math.sin(t*0.41)*1.1+Math.sin(t*0.93)*0.4;
+  const mRoll  = Math.sin(t*0.34)*0.6+Math.sin(t*0.81)*0.2;
 
   viewer.camera.setView({
-    destination: Cesium.Cartesian3.fromDegrees(lng+mLng, lat+mLat, alt),
+    destination:Cesium.Cartesian3.fromDegrees(lng+mLng,lat+mLat,alt),
     orientation:{
-      heading: Cesium.Math.toRadians(hdg+mHdg),
-      pitch:   Cesium.Math.toRadians(pitch+mPitch),
-      roll:    Cesium.Math.toRadians(mRoll),
+      heading:Cesium.Math.toRadians(camHdg+mHdg),
+      pitch:  Cesium.Math.toRadians(camPitch+mPitch),
+      roll:   Cesium.Math.toRadians(mRoll),
     }
   });
 
-  // HUD
-  const pct = Math.floor((loopT/TOTAL)*100);
-  document.getElementById('hud').textContent =
-    `${a.name} · ${Math.floor(alt)}m · ${pct}%`;
+  // ── LANDMARK LABELS ──
+  if(a.label) showLabel(a.label);
 
-  rafId = requestAnimationFrame(fly);
+  // ── HUD ──
+  const pct=Math.floor((loopT/TOTAL)*100);
+  document.getElementById('hud').textContent=
+    `${Math.floor(alt)}m · ${Math.floor(elapsed/60)}:${String(Math.floor(elapsed%60)).padStart(2,'0')} · ${pct}%`;
+
+  rafId=requestAnimationFrame(fly);
 }
 
 function togglePause(){
   if(paused){
     paused=false;
-    pauseOffset += performance.now() - pauseStart;
+    pauseOffset+=performance.now()-pauseStart;
     document.getElementById('pauseBtn').textContent='⏸ PAUSE';
     fly();
-  } else {
-    paused=true;
-    pauseStart=performance.now();
+  }else{
+    paused=true;pauseStart=performance.now();
     document.getElementById('pauseBtn').textContent='▶ PLAY';
-    if(rafId) cancelAnimationFrame(rafId);
+    if(rafId)cancelAnimationFrame(rafId);
   }
 }
-let pauseStart=0;
-
 function resetFlight(){
   paused=false;
   document.getElementById('pauseBtn').textContent='⏸ PAUSE';
-  if(rafId) cancelAnimationFrame(rafId);
+  if(rafId)cancelAnimationFrame(rafId);
   beginFlight();
 }
 
-window.addEventListener('keydown', e=>{
-  if(e.key===' '){ e.preventDefault(); togglePause(); }
-  if(e.key==='r'||e.key==='R') resetFlight();
+window.addEventListener('keydown',e=>{
+  if(e.key===' '){e.preventDefault();togglePause();}
+  if(e.key==='r'||e.key==='R')resetFlight();
 });
-
-window.addEventListener('resize',()=>{ if(viewer) viewer.resize(); });
-
-// Boot
-window.addEventListener('load', ()=>{
-  const wait = setInterval(()=>{
-    if(typeof Cesium!=='undefined'){ clearInterval(wait); init(); }
-  }, 80);
+window.addEventListener('resize',()=>{if(viewer)viewer.resize();});
+window.addEventListener('load',()=>{
+  const wait=setInterval(()=>{
+    if(typeof Cesium!=='undefined'){clearInterval(wait);init();}
+  },80);
 });
 </script>
 </body>
