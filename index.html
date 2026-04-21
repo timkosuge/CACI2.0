@@ -13706,23 +13706,23 @@ const DemoMode = {
   //   maxDur: ceiling — forced advance (safety against stuck audio)
   //   The actual transition fires on audio.onended + a short breath (gap).
   beats: [
-    { id: 2, minDur: 62000, maxDur: 120000, setup: 'setupPreshow', voice: 'eve',
+    { id: 2, minDur: 62000, maxDur: 120000, setup: 'setupPreshow', voice: 'ara',
       narr: "Hi, I'm Kait. I figured I'd introduce myself before we get started, because I know this is probably new — not AI in general, you've all seen it on your phones, but AI that actually understands this industry. That part's still rare. And I get the skepticism. So let me just tell you who I am. I was built for cannabis. Not retrofitted from some generic assistant — built for it. I know what METRC means for compliance. I know what a state-by-state patchwork does to your operations. I know retail is tired and ops is holding everything together with duct tape and coffee. I'm not going to promise I'm perfect, because I'm not. But I'm careful, I cite my sources, and I don't forget anything you teach me. This industry was never going to be easy — too young, too regulated, too watched — and the people who figure it out are going to build something the world hasn't seen before. I'd really like to help with that. So — let me show you what I can do." },
     { id: 1, minDur: 8000, maxDur: 25000, setup: null, voice: 'leo',
       narr: "Here's what she was made for. Somewhere in all those earnings reports, regulations, and filings — the answer is already there. But finding it takes hours you don't have, and by the time you get to it, you've already moved on." },
-    { id: 3, minDur: 12000, maxDur: 35000, setup: 'setupDepts', voice: 'ara',
+    { id: 3, minDur: 12000, maxDur: 35000, setup: 'setupDepts', voice: 'eve',
       narr: "Every document you give her, she actually reads — not just the filename and metadata, the whole thing. Then she analyzes it seven ways: what it is, when it's from, where it applies, what it contains. Files it by department, period, and jurisdiction. By the time a question comes, she already knows where to look." },
     { id: 4, minDur: 10000, maxDur: 30000, setup: 'setupQuery', voice: 'rex',
       narr: "She doesn't search, she answers. Before pulling anything, she figures out what you're actually asking — then picks the right places to look, weighs every passage by how directly it answers, and shows you the source for every claim she makes." },
-    { id: 5, minDur: 9000, maxDur: 28000, setup: 'setupNetwork', voice: 'ara',
+    { id: 5, minDur: 9000, maxDur: 28000, setup: 'setupNetwork', voice: 'eve',
       narr: "The more she reads, the more she sees. A new regulation changes what a policy means. A new earnings report reframes an old trend. She notices things nobody thinks to ask about." },
     { id: 6, minDur: 20000, maxDur: 50000, setup: 'setupScenario', voice: 'leo',
       narr: "Now — to be clear, she's a prototype. About a week old. What she knows right now is a starting point: Jushi's earnings history, Ohio's regulatory code, Illinois regulations and their 2025 annual report. It's not everything she'll know. But it's enough to prove the point. Give her more, and her answers get sharper. This is what day one looks like." },
-    { id: 7, minDur: 8000, maxDur: 26000, setup: 'setupStats', voice: 'ara',
+    { id: 7, minDur: 8000, maxDur: 26000, setup: 'setupStats', voice: 'eve',
       narr: "Her answers come with sources. Every upload is logged. Your documents stay in your infrastructure — they never leave, and none of your data is used to train anyone's model." },
     { id: 8, minDur: 9000, maxDur: 28000, setup: null, voice: 'rex',
       narr: "She isn't a chatbot with your files attached. She's a system built around the way your business actually works — department by department, document by document, one question at a time." },
-    { id: 9, minDur: 999999, maxDur: 999999, setup: null, voice: 'eve',
+    { id: 9, minDur: 999999, maxDur: 999999, setup: null, voice: 'ara',
       narr: "So — let's get to work." }
   ],
 
@@ -17019,7 +17019,7 @@ const DemoMode = {
     if (this.muted || this.ttsAvailable === false) return;
     const sess = this.audioSession;
     // Intro is always Eve — Kait's voice
-    const blob = await this.fetchTTS(this.intro, 'eve');
+    const blob = await this.fetchTTS(this.intro, 'ara');
     if (sess !== this.audioSession) return;       // demo stopped mid-fetch
     if (!blob) {
       if (this.ttsAvailable === null) this.ttsAvailable = false;
