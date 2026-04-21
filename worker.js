@@ -4308,7 +4308,7 @@ async function handleTTS(request, env) {
 const VALID_BEAT_IDS = ['intro', '1', '3', '4', '5', '6', '7', '8'];
 const kvKeyFor = (beatId) => beatId === 'intro' ? 'demo:intro' : `demo:beat:${beatId}`;
 const kvKeyForVariant = (beatId, variantIdx) => `${kvKeyFor(beatId)}:${variantIdx}`;
-const VARIANTS_PER_BEAT = 3;
+const VARIANTS_PER_BEAT = 5;
 
 async function handleDemoGetScripts(env) {
   try {
@@ -4423,14 +4423,24 @@ Speakability:
 - This will be read aloud by a text-to-speech engine. Avoid industry acronyms and abbreviations — they get mangled in speech. When you'd naturally use an acronym, describe the concept in plain words instead (e.g. "seed-to-sale tracking systems", "state regulators", "compliance audits"). THC, CBD, and AI are fine — those read correctly.
 
 IMPORTANT about variation:
-You'll be called three times in parallel. Each time, pick a structurally different approach. If you default to "Hi, I'm Kait. I wanted to introduce myself..." you've failed — that's a template, not a voice.
+You'll be called five times in parallel, each with a different structural directive. Follow yours exactly — it's the source of real variation, not just word-swapping.
 
-Try things like: opening with a warm greeting followed by something specific. Opening with an observation about the industry before saying who you are. Opening with a question. Burying your name in a later sentence instead of leading with it. Starting with a specific scene or moment — what it feels like on a Friday night in retail, or at the end of a compliance quarter.
+Your directive for this call: {DIRECTIVE}
 
-Pick a genuinely different angle each call. Same you. Different entry point. Do NOT use the same opener pattern across variations.`;
+Whatever directive you get, the content must still accomplish the goals above. The directive controls structure and entry point, not facts.`;
 
-    // Generate 3 variations in parallel at high-ish temperature for real diversity
-    const call = async () => {
+    // Five structurally distinct directives — one per parallel call
+    const INTRO_DIRECTIVES = [
+      'Start with who you are and what makes you different from every other AI they\'ve seen. Warm, direct, no setup. Land your name in the first sentence.',
+      'Open with an observation about the cannabis industry — something specific and true — before you say who you are. Let the industry speak first, then introduce yourself as the answer to it.',
+      'Open in the middle of a thought, like you\'re already in conversation with them. No formal greeting. Just start talking like a colleague who showed up and has something worth saying.',
+      'Start with a specific scene or moment from cannabis operations — something people in this industry will instantly recognize. Then pull back and say who you are.',
+      'Open with something honest about what you are and what you\'re not. Lead with a real limitation or caveat, then explain why you\'re still worth paying attention to.',
+    ];
+
+    // Generate 5 variations in parallel, each with its own structural directive
+    const call = async (directive) => {
+      const prompt = userPrompt.replace('{DIRECTIVE}', directive);
       const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -4441,9 +4451,9 @@ Pick a genuinely different angle each call. Same you. Different entry point. Do 
         body: JSON.stringify({
           model: 'claude-sonnet-4-20250514',
           max_tokens: 1200,
-          temperature: 0.95,
+          temperature: 1.0,
           system: identity,
-          messages: [{ role: 'user', content: userPrompt }],
+          messages: [{ role: 'user', content: prompt }],
         }),
       });
       if (!res.ok) {
@@ -4456,7 +4466,7 @@ Pick a genuinely different angle each call. Same you. Different entry point. Do 
       return txt.replace(/^["'""]|["'""]$/g, '').trim();
     };
 
-    const variations = await Promise.all([call(), call(), call()]);
+    const variations = await Promise.all(INTRO_DIRECTIVES.map(d => call(d)));
     return json({ variations });
   } catch (e) {
     return json({ error: e.message }, 500);
@@ -4617,18 +4627,23 @@ Rules:
 - Return ONLY the spoken text. No preamble, no stage directions, no quotation marks.
 
 IMPORTANT about variation:
-You'll be called three times in parallel for this same beat. Each version should be structurally different — different opening, different emphasis, different rhythm. Not the same framing reworded. Pick a genuinely different angle each call.
+You'll be called five times in parallel, each with a different structural directive. Follow yours exactly.
 
-Some possible angles to consider (pick different ones across the three calls):
-- Lead with the concrete before the abstract (show the scene first, then the concept)
-- Lead with the concept, then illustrate
-- Open with a contrast or comparison
-- Open with a specific fact, let the rest expand from there
-- Open mid-thought, like you're continuing a conversation
+Your directive for this call: {DIRECTIVE}
 
-Same truth. Different voice on it.`;
+Same truth. Different structure. The directive controls how you enter and move through the content — not what the content is.`;
 
-    const call = async () => {
+    // Five structurally distinct directives for chorus beats
+    const CHORUS_DIRECTIVES = [
+      'Lead with the concrete — show the thing happening before you name what it is. Scene first, concept second.',
+      'Lead with the concept or claim, then immediately prove it with the specific detail. Abstract to concrete.',
+      'Open with a contrast — what most people expect or assume, then the reality of how it actually works.',
+      'Open with a specific fact or number from the beat\'s content, then build the context around it.',
+      'Open mid-thought, as if continuing something the previous speaker said. No formal setup — just continue the logic naturally.',
+    ];
+
+    const call = async (directive) => {
+      const prompt = userPrompt.replace('{DIRECTIVE}', directive);
       const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -4639,9 +4654,9 @@ Same truth. Different voice on it.`;
         body: JSON.stringify({
           model: 'claude-sonnet-4-20250514',
           max_tokens: 1000,
-          temperature: 0.95,
+          temperature: 1.0,
           system: identity,
-          messages: [{ role: 'user', content: userPrompt }],
+          messages: [{ role: 'user', content: prompt }],
         }),
       });
       if (!res.ok) {
@@ -4653,7 +4668,7 @@ Same truth. Different voice on it.`;
       return txt.replace(/^["'""]|["'""]$/g, '').trim();
     };
 
-    const variations = await Promise.all([call(), call(), call()]);
+    const variations = await Promise.all(CHORUS_DIRECTIVES.map(d => call(d)));
     return json({ variations, beatId: String(beatId), role: spec.role });
   } catch (e) {
     return json({ error: e.message }, 500);
