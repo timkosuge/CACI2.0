@@ -18173,7 +18173,7 @@ function initVoiceSettings() {
 
   // Test button
   const testBtn = $('gtts-test');
-  if (testBtn) testBtn.addEventListener('click', () => speakText(testBtn, 'CACI Intelligence Platform ready. Voice output is working correctly.'));
+  if (testBtn) testBtn.addEventListener('click', () => speakTextQueued(testBtn, 'CACI Intelligence Platform ready. Voice output is working correctly.'));
 
   initCustomSelects();
 }
