@@ -10089,30 +10089,59 @@ window.addEventListener('beforeunload', () => {
 });
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  BRIGHTNESS CONTROL - Two independent sliders: background + text
+//  BRIGHTNESS CONTROL - Independent settings per dark/light mode
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 (function() {
-  const DEFAULT_BG   = 2.0;  // background brightness default - unchanged from before
-  const DEFAULT_TEXT = 1.0;  // text brightness default - no change on first load
+  // Defaults per theme — adjust these once you dial in the right values
+  const DEFAULTS = {
+    dark:  { bg: 2.0, text: 1.0 },
+    light: { bg: 1.0, text: 1.0 },
+  };
 
   const BC = {
-    bgLevel:   DEFAULT_BG,
-    textLevel: DEFAULT_TEXT,
+    bgLevel:   1.0,
+    textLevel: 1.0,
     isOpen:    false,
 
-    init() {
-      // Load saved preferences - bg carries over from old caci_brightness key
+    // Returns current theme: 'dark' or 'light'
+    theme() {
+      return document.body.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+    },
+
+    // Storage keys scoped to current theme
+    bgKey()   { return `caci_brightness_bg_${this.theme()}`; },
+    textKey() { return `caci_brightness_text_${this.theme()}`; },
+
+    // Load saved values for current theme and apply them
+    loadAndApply() {
+      const t = this.theme();
       try {
-        const savedBg   = SafeStorage.getItem('caci_brightness_bg') || SafeStorage.getItem('caci_brightness');
-        const savedText = SafeStorage.getItem('caci_brightness_text');
-        this.bgLevel   = savedBg   ? parseFloat(savedBg)   : DEFAULT_BG;
-        this.textLevel = savedText ? parseFloat(savedText) : DEFAULT_TEXT;
+        const savedBg   = SafeStorage.getItem(`caci_brightness_bg_${t}`);
+        const savedText = SafeStorage.getItem(`caci_brightness_text_${t}`);
+        this.bgLevel   = savedBg   ? parseFloat(savedBg)   : DEFAULTS[t].bg;
+        this.textLevel = savedText ? parseFloat(savedText) : DEFAULTS[t].text;
       } catch(e) {
-        this.bgLevel   = DEFAULT_BG;
-        this.textLevel = DEFAULT_TEXT;
+        this.bgLevel   = DEFAULTS[t].bg;
+        this.textLevel = DEFAULTS[t].text;
       }
 
+      // Update sliders to reflect loaded values
+      const bgSlider  = document.getElementById('tb-bg-slider');
+      const txtSlider = document.getElementById('tb-text-slider');
+      const bgVal     = document.getElementById('tb-bg-val');
+      const txtVal    = document.getElementById('tb-text-val');
+      if (bgSlider)  { bgSlider.value  = this.bgLevel;   this.updateSliderTrack(bgSlider); }
+      if (txtSlider) { txtSlider.value = this.textLevel; this.updateSliderTrack(txtSlider); }
+      if (bgVal)     bgVal.textContent  = this.bgLevel.toFixed(2)   + 'x';
+      if (txtVal)    txtVal.textContent = this.textLevel.toFixed(2) + 'x';
+
+      // Apply
+      this.applyBg(this.bgLevel, false);
+      this.applyText(this.textLevel, false);
+    },
+
+    init() {
       const setup = () => {
         const btn       = document.getElementById('tb-brightness-btn');
         const panel     = document.getElementById('tb-brightness-panel');
@@ -10122,17 +10151,13 @@ window.addEventListener('beforeunload', () => {
         const txtVal    = document.getElementById('tb-text-val');
         if (!btn || !panel || !bgSlider || !txtSlider) { setTimeout(setup, 500); return; }
 
-        // Set sliders to saved values
-        bgSlider.value  = this.bgLevel;
-        txtSlider.value = this.textLevel;
-        if (bgVal)  bgVal.textContent  = this.bgLevel.toFixed(2)   + 'x';
-        if (txtVal) txtVal.textContent = this.textLevel.toFixed(2) + 'x';
-        this.updateSliderTrack(bgSlider);
-        this.updateSliderTrack(txtSlider);
+        // Load settings for current theme and apply
+        this.loadAndApply();
 
-        // Apply both on load
-        this.applyBg(this.bgLevel, false);
-        this.applyText(this.textLevel, false);
+        // When theme changes, reload settings for the new theme
+        window.addEventListener('caci-theme-changed', () => {
+          this.loadAndApply();
+        });
 
         // Toggle panel
         btn.addEventListener('click', (e) => {
@@ -10190,21 +10215,20 @@ window.addEventListener('beforeunload', () => {
       }
     },
 
-    // Background: targets dark visual layers only - chat background, sidebar bg, topbar bg
+    // Background: targets background canvas only - never sidebar or topbar
     applyBg(level, save) {
       this.bgLevel = level;
-      if (save) SafeStorage.setItem('caci_brightness_bg', level.toString());
+      if (save) SafeStorage.setItem(this.bgKey(), level.toString());
       const f = level === 1.0 ? 'none' : `brightness(${level})`;
-      // Target background elements only - never sidebar or topbar
       ['.chat-bg-overlay', '#app-glimmer'].forEach(sel => {
         document.querySelectorAll(sel).forEach(el => el.style.filter = f);
       });
     },
 
-    // Text/content: targets chat messages area only
+    // Text/content: targets chat content area only
     applyText(level, save) {
       this.textLevel = level;
-      if (save) SafeStorage.setItem('caci_brightness_text', level.toString());
+      if (save) SafeStorage.setItem(this.textKey(), level.toString());
       const f = level === 1.0 ? 'none' : `brightness(${level})`;
       const content = document.getElementById('content');
       if (content) content.style.filter = f;
