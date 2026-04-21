@@ -52,6 +52,30 @@
 </style>
 </head>
 <body>
+<!-- FREE FLY HUD -->
+<div id="freeflyHud" style="display:none;position:fixed;inset:0;pointer-events:none;z-index:200;">
+  <!-- Controls legend -->
+  <div style="position:absolute;top:18px;left:18px;background:rgba(0,0,0,0.7);border:1px solid rgba(100,200,255,0.3);padding:14px 18px;font:10px 'Courier New',monospace;color:rgba(100,200,255,0.8);letter-spacing:0.15em;line-height:2.2;">
+    <div style="color:rgba(100,200,255,1);letter-spacing:0.3em;margin-bottom:6px">FREE FLY MODE</div>
+    W / ↑ &nbsp;&nbsp; FORWARD<br>
+    S / ↓ &nbsp;&nbsp; BACKWARD<br>
+    A / ← &nbsp;&nbsp; STRAFE LEFT<br>
+    D / → &nbsp;&nbsp; STRAFE RIGHT<br>
+    Q &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; UP<br>
+    E &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; DOWN<br>
+    MOUSE DRAG &nbsp; LOOK<br>
+    SCROLL &nbsp;&nbsp;&nbsp;&nbsp; SPEED<br>
+    <div style="margin-top:8px;color:rgba(100,200,255,0.4)">ESC / F — back to path</div>
+  </div>
+  <!-- Speed indicator -->
+  <div id="ffSpeed" style="position:absolute;bottom:50px;left:50%;transform:translateX(-50%);color:rgba(100,200,255,0.5);font:10px 'Courier New',monospace;letter-spacing:0.2em;"></div>
+  <!-- Crosshair -->
+  <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:20px;height:20px;pointer-events:none;">
+    <div style="position:absolute;top:9px;left:0;width:20px;height:1px;background:rgba(100,200,255,0.3)"></div>
+    <div style="position:absolute;top:0;left:9px;width:1px;height:20px;background:rgba(100,200,255,0.3)"></div>
+  </div>
+</div>
+
 <div id="loading">
   <h1>KAIT · MANHATTAN</h1>
   <div id="bar"><div id="barFill"></div></div>
@@ -64,6 +88,7 @@
   <button onclick="togglePause()" id="pauseBtn">⏸ PAUSE</button>
   <button onclick="resetFlight()">↺ RESTART</button>
   <button onclick="toggleDayNight()" id="dayNightBtn">🌙 NIGHT</button>
+  <button onclick="toggleFreefly()" id="freeflyBtn" style="border-color:rgba(100,200,255,0.4);color:rgba(100,200,255,0.7)">🕹 FREE FLY</button>
   <button onclick="showRecMenu()" id="recBtn" style="border-color:rgba(255,80,80,0.4);color:rgba(255,120,120,0.7)">⏺ RECORD</button>
 </div>
 
@@ -791,10 +816,130 @@ async function stopRecord(){
   recDirHandle = null;
 }
 
+// ── FREE FLY MODE ──
+let freeflyActive = false;
+let ffSpeed = 25; // meters per second
+let ffKeys = {};
+let ffMouseDown = false;
+let ffLastMouseX = 0, ffLastMouseY = 0;
+let ffAnimId = null;
+let ffLastTime = 0;
+
+function toggleFreefly(){
+  if(freeflyActive){
+    exitFreefly();
+  } else {
+    enterFreefly();
+  }
+}
+
+function enterFreefly(){
+  freeflyActive = true;
+  // Pause the scripted flight
+  if(!paused){ paused = true; pauseStart = performance.now(); }
+  if(rafId) cancelAnimationFrame(rafId);
+
+  // Enable Cesium's built-in mouse look
+  viewer.scene.screenSpaceCameraController.enableRotate = true;
+  viewer.scene.screenSpaceCameraController.enableTranslate = true;
+  viewer.scene.screenSpaceCameraController.enableZoom = true;
+  viewer.scene.screenSpaceCameraController.enableTilt = true;
+  viewer.scene.screenSpaceCameraController.enableLook = true;
+
+  document.getElementById('freeflyHud').style.display = 'block';
+  document.getElementById('freeflyBtn').textContent = '🔴 EXIT FREE FLY';
+  document.getElementById('freeflyBtn').style.color = 'rgba(255,100,100,0.9)';
+  document.getElementById('freeflyBtn').style.borderColor = 'rgba(255,100,100,0.5)';
+  document.getElementById('pauseBtn').disabled = true;
+
+  // Lock pointer for mouse look
+  viewer.canvas.addEventListener('mousedown', ffOnMouseDown);
+  viewer.canvas.addEventListener('mouseup', ffOnMouseUp);
+  viewer.canvas.addEventListener('mousemove', ffOnMouseMove);
+  viewer.canvas.addEventListener('wheel', ffOnWheel);
+
+  ffLastTime = performance.now();
+  ffLoop();
+}
+
+function exitFreefly(){
+  freeflyActive = false;
+  ffKeys = {};
+  if(ffAnimId) cancelAnimationFrame(ffAnimId);
+
+  viewer.canvas.removeEventListener('mousedown', ffOnMouseDown);
+  viewer.canvas.removeEventListener('mouseup', ffOnMouseUp);
+  viewer.canvas.removeEventListener('mousemove', ffOnMouseMove);
+  viewer.canvas.removeEventListener('wheel', ffOnWheel);
+
+  document.getElementById('freeflyHud').style.display = 'none';
+  document.getElementById('freeflyBtn').textContent = '🕹 FREE FLY';
+  document.getElementById('freeflyBtn').style.color = 'rgba(100,200,255,0.7)';
+  document.getElementById('freeflyBtn').style.borderColor = 'rgba(100,200,255,0.4)';
+  document.getElementById('pauseBtn').disabled = false;
+}
+
+function ffOnMouseDown(e){ ffMouseDown = true; ffLastMouseX = e.clientX; ffLastMouseY = e.clientY; }
+function ffOnMouseUp(){ ffMouseDown = false; }
+function ffOnMouseMove(e){
+  if(!ffMouseDown) return;
+  const dx = e.clientX - ffLastMouseX;
+  const dy = e.clientY - ffLastMouseY;
+  ffLastMouseX = e.clientX;
+  ffLastMouseY = e.clientY;
+  const sensitivity = 0.003;
+  viewer.camera.lookRight(dx * sensitivity);
+  viewer.camera.lookUp(-dy * sensitivity);
+}
+function ffOnWheel(e){
+  ffSpeed = Math.max(5, Math.min(500, ffSpeed - e.deltaY * 0.1));
+  document.getElementById('ffSpeed').textContent = `SPEED: ${Math.round(ffSpeed)}m/s`;
+}
+
+function ffLoop(){
+  if(!freeflyActive) return;
+  const now = performance.now();
+  const dt = Math.min((now - ffLastTime) / 1000, 0.1); // seconds, capped
+  ffLastTime = now;
+
+  const spd = ffSpeed * dt;
+  const spd_h = spd * 0.7; // slightly slower horizontal
+
+  // Forward/back
+  if(ffKeys['w'] || ffKeys['arrowup'])   viewer.camera.moveForward(spd);
+  if(ffKeys['s'] || ffKeys['arrowdown']) viewer.camera.moveBackward(spd);
+  // Strafe
+  if(ffKeys['a'] || ffKeys['arrowleft']) viewer.camera.moveLeft(spd_h);
+  if(ffKeys['d'] || ffKeys['arrowright'])viewer.camera.moveRight(spd_h);
+  // Altitude
+  if(ffKeys['q']) viewer.camera.moveUp(spd);
+  if(ffKeys['e']) viewer.camera.moveDown(spd);
+
+  // Speed display
+  const anyMoving = Object.values(ffKeys).some(Boolean);
+  if(anyMoving){
+    document.getElementById('ffSpeed').textContent =
+      `SPEED: ${Math.round(ffSpeed)}m/s · ALT: ${Math.round(viewer.camera.positionCartographic.height)}m`;
+  }
+
+  ffAnimId = requestAnimationFrame(ffLoop);
+}
+
 window.addEventListener('keydown',e=>{
+  if(freeflyActive){
+    ffKeys[e.key.toLowerCase()] = true;
+    if(e.key==='Escape'){ exitFreefly(); return; }
+    // Block space/r in freefly
+    if(e.key===' '||e.key==='r'||e.key==='R') return;
+  }
   if(e.key===' '){e.preventDefault();togglePause();}
   if(e.key==='r'||e.key==='R') resetFlight();
-  if(e.key==='d'||e.key==='D') toggleDayNight();
+  if(e.key==='n'||e.key==='N') toggleDayNight();
+  if(e.key==='f'||e.key==='F') toggleFreefly();
+});
+
+window.addEventListener('keyup',e=>{
+  if(freeflyActive) ffKeys[e.key.toLowerCase()] = false;
 });
 window.addEventListener('resize',()=>{if(viewer&&!recording)viewer.resize();});
 window.addEventListener('load',()=>{
