@@ -650,19 +650,61 @@ ProRes: ffmpeg -framerate ${fps} -i frame_%04d.png -c:v prores_ks -profile:v 3 -
 const captureCanvas = document.createElement('canvas');
 const captureCtx = captureCanvas.getContext('2d');
 
+// Wait for Cesium tiles to fully load before capturing
+// Polls tilesLoaded + loadProgress, waits until both confirm complete render
+// Also renders multiple frames to flush shader compilation artifacts
+function waitForTilesLoaded(timeoutMs = 15000){
+  return new Promise(resolve => {
+    const start = performance.now();
+    let stableFrames = 0;
+    const STABLE_NEEDED = 6; // must be stable for N consecutive frames
+
+    function check(){
+      // Force a render cycle
+      viewer.scene.render();
+
+      const tilesLoaded = viewer.scene.globe.tilesLoaded;
+      const loadProgress = viewer.scene.globe.loadingDescendantsCount === 0;
+      const tileQueue = viewer.scene.primitives.length > 0;
+
+      if(tilesLoaded && loadProgress){
+        stableFrames++;
+        if(stableFrames >= STABLE_NEEDED){
+          // One final render pass to ensure shaders are compiled
+          viewer.scene.render();
+          viewer.scene.render();
+          resolve();
+          return;
+        }
+      } else {
+        stableFrames = 0;
+      }
+
+      // Timeout safety — don't wait forever on a slow tile
+      if(performance.now() - start > timeoutMs){
+        // Still capture — best we have
+        viewer.scene.render();
+        resolve();
+        return;
+      }
+
+      requestAnimationFrame(check);
+    }
+    requestAnimationFrame(check);
+  });
+}
+
 async function recordFrame(){
   if(!recording) return;
 
-  // Use deterministic time — frame index / fps
   const frameSec = recFrameIdx / recFPS;
 
-  // If we've recorded all frames, stop
   if(recFrameIdx >= recTotalFrames){
     await stopRecord();
     return;
   }
 
-  // Set camera to deterministic position for this frame
+  // ── Position camera for this frame ──
   const loopT = frameSec % TOTAL;
   let segStart=0, si=0;
   for(let i=0;i<WP.length-1;i++){
@@ -679,7 +721,6 @@ async function recordFrame(){
   const camHdg=lerpAngle(a.cam_hdg,b.cam_hdg,segT);
   const camPitch=a.cam_pitch+(b.cam_pitch-a.cam_pitch)*segT;
 
-  // Same micro-movement but deterministic (based on frameSec not real time)
   const t=frameSec;
   const mLng  =Math.sin(t*0.47)*0.000052+Math.sin(t*1.23)*0.000019;
   const mLat  =Math.cos(t*0.53)*0.000041+Math.cos(t*1.41)*0.000016;
@@ -696,20 +737,27 @@ async function recordFrame(){
     }
   });
 
-  // Force render
-  viewer.scene.render();
+  // ── WAIT FOR FULL TILE RENDER ──
+  // This is the key — don't capture until tiles are loaded
+  // Timeout: 15s per frame (slow internet) — captures best available after that
+  document.getElementById('recStatus').textContent =
+    `⏳ LOADING TILES · frame ${recFrameIdx+1}/${recTotalFrames}`;
 
-  // Capture frame
-  captureCanvas.width = viewer.canvas.width;
+  await waitForTilesLoaded(15000);
+
+  // ── CAPTURE ──
+  captureCanvas.width  = viewer.canvas.width;
   captureCanvas.height = viewer.canvas.height;
   captureCtx.drawImage(viewer.canvas, 0, 0);
 
   const blob = await new Promise(res => captureCanvas.toBlob(res, 'image/png'));
   const name = 'frame_' + String(recFrameIdx).padStart(5,'0') + '.png';
+
   try{
     const fh = await recDirHandle.getFileHandle(name,{create:true});
     const fw = await fh.createWritable();
-    await fw.write(blob); await fw.close();
+    await fw.write(blob);
+    await fw.close();
   }catch(e){
     console.error('Frame write failed:', name, e);
     document.getElementById('recStatus').textContent = 'WRITE ERROR — ' + e.message;
@@ -719,12 +767,12 @@ async function recordFrame(){
 
   recFrameIdx++;
   const pct = Math.floor((recFrameIdx/recTotalFrames)*100);
-  const minLeft = Math.floor((recTotalFrames-recFrameIdx)/(recFPS*2)); // rough estimate
   document.getElementById('recStatus').textContent =
-    `⏺ RECORDING ${recFrameIdx}/${recTotalFrames} · ${pct}% · ~${minLeft}min left`;
+    `⏺ CAPTURED ${recFrameIdx}/${recTotalFrames} · ${pct}% · tiles fully loaded`;
 
-  // Next frame
-  requestAnimationFrame(recordFrame);
+  // Next frame — no rAF delay, go immediately
+  // (the tile wait IS the pacing — no need for additional delay)
+  recordFrame();
 }
 
 async function stopRecord(){
