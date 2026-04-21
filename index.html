@@ -1704,7 +1704,7 @@ body[data-theme="light"] .login-frame-box {
 }
 
 /* ══════════════════════════════════════════════════════════
-   PRESHOW — Cassie's intro: 3D constellation → network
+   PRESHOW — Kait's intro: 3D constellation → network
    Fills the demo stage. The canvas draws points + connections.
    The SVG overlay draws the luminous core + aura halos.
    Visible while DemoMode.preshowActive is true.
@@ -1777,7 +1777,7 @@ body[data-theme="light"] .login-frame-box {
   animation: preshowCoreAppear 1.8s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
-/* ─── Preshow v2 — centered CACI reveal, Cassie fades in beneath ─── */
+/* ─── Preshow v2 — centered CACI reveal, Kait fades in beneath ─── */
 .preshow-name-v2 {
   position: absolute;
   left: 50%;
@@ -1815,7 +1815,7 @@ body[data-theme="light"] .login-frame-box {
   100% { opacity: 1; transform: translateY(0);  letter-spacing: 0.30em; }
 }
 
-/* The "Cassie" reveal — smaller italic serif beneath the brand */
+/* The "Kait" reveal — smaller italic serif beneath the brand */
 .preshow-cassie {
   margin-top: 22px;
   font-family: var(--f-display, 'Cormorant Garamond', serif);
@@ -2085,7 +2085,7 @@ body[data-theme="light"] .login-frame-box {
   100% { opacity: 0; transform: scale(1.6); }
 }
 
-/* ── PRE-SHOW — Cassie's intro beat (repurposed Beat 2) ──
+/* ── PRE-SHOW — Kait's intro beat (repurposed Beat 2) ──
    Shield + name + subtitle + slow orbit of glowing dots.
    Visual sits still and breathes while she talks for ~52s. */
 .preshow-shield-wrap {
@@ -2129,7 +2129,7 @@ body[data-theme="light"] .login-frame-box {
 }
 
 /* Orbit of knowledge-domain dots circling the shield.
-   Starts dim; dots light up one by one during Cassie's intro. */
+   Starts dim; dots light up one by one during Kait's intro. */
 .preshow-orbit {
   position: absolute;
   left: 50%;
@@ -2169,7 +2169,7 @@ body[data-theme="light"] .login-frame-box {
   box-shadow: 0 0 12px rgba(245,227,152,0.85),
               0 0 4px rgba(255,240,170,1);
 }
-/* When Cassie lands her final line, the ring pulses once strongly */
+/* When Kait lands her final line, the ring pulses once strongly */
 .preshow-orbit.pulse .preshow-orbit-dot {
   background: rgba(255,240,170,1);
   box-shadow: 0 0 16px rgba(245,227,152,1),
@@ -8059,7 +8059,7 @@ html body[data-theme="light"] .app-launcher-panel a[href*="integration"] {
   border: 1px solid rgba(30, 58, 95, 0.25) !important;
 }
 
-/* Welcome greeting text — "Hey Tim, I'm Caci..." — was gold gradient,
+/* Welcome greeting text — "Hey Tim, I'm Kait..." — was gold gradient,
    unreadable on light sky. Replace with solid dark text. */
 html body[data-theme="light"] #discovery-greeting-strip .dgs-text {
   background: none !important;
@@ -8252,7 +8252,7 @@ html body[data-theme="light"] #discovery-greeting-strip .dgs-text strong {
       </button>
     </div>
 
-    <!-- PRESHOW: Cassie's intro — 3D constellation → network → handoff -->
+    <!-- PRESHOW: Kait's intro — 3D constellation → network → handoff -->
     <div class="demo-preshow" id="demo-preshow">
       <canvas class="demo-preshow-canvas" id="demo-preshow-canvas"></canvas>
       <!-- Cinema WebGL canvas — replaces the 2D canvas when Three.js loads -->
@@ -8277,7 +8277,7 @@ html body[data-theme="light"] #discovery-greeting-strip .dgs-text strong {
       <div class="db-sub db-in d3">Earnings reports. Regulatory filings. Operational docs. Buried across departments, scattered across systems.</div>
     </div>
 
-    <!-- BEAT 2: PRE-SHOW — Cassie introduces herself (plays FIRST in the array)
+    <!-- BEAT 2: PRE-SHOW — Kait introduces herself (plays FIRST in the array)
          The visual is rendered by setupPreshow() into #demo-preshow (canvas + core).
          This .demo-beat wrapper exists only so playBeat() can find it by data-beat=2
          and satisfy the existing activation pattern. Intentionally empty. -->
@@ -9314,7 +9314,7 @@ html body[data-theme="light"] #discovery-greeting-strip .dgs-text strong {
             </div>
           </div>
           <div class="acard">
-            <div class="acard-title">Voice &mdash; Caci&apos;s Voice Engine</div>
+            <div class="acard-title">Voice &mdash; Kait&apos;s Voice Engine</div>
             <div class="acard-sub">xAI API Key &mdash; required for Grok voice</div>
             <div class="arow" style="margin-top:6px"><input class="ainput" type="password" id="xai-key" placeholder="xai-..." autocomplete="off"/><button class="asave" id="xai-save">Save Key</button></div>
             <div class="afb" id="xai-fb"></div>
@@ -9419,7 +9419,7 @@ html body[data-theme="light"] #discovery-greeting-strip .dgs-text strong {
 
         <!-- CACI INSIGHTS -->
         <div class="asec" id="analytics-insights-asec">
-          <div class="asec-head"><div class="asec-title">Caci Insights</div><div class="asec-line"></div></div>
+          <div class="asec-head"><div class="asec-title">Kait Insights</div><div class="asec-line"></div></div>
           <div class="asec-sub-title" style="margin:-8px 0 14px">On-demand analysis of query patterns, knowledge gaps, and recommendations. Generate when you have meaningful data.</div>
           <div id="analytics-insights-wrap">
             <div id="analytics-insights-content" style="display:none"></div>
@@ -13438,11 +13438,11 @@ const DemoMode = {
 
   // The intro narration is now delivered inline by the first beat (the pre-show),
   // not as a separate voice line during stage expand. Leaving this empty means
-  // speakIntro is a no-op — Cassie's actual intro is beat 2 played first.
+  // speakIntro is a no-op — Kait's actual intro is beat 2 played first.
   intro: "",
 
   // Timeline:
-  // 1) PRE-SHOW (beat 2, repurposed) — Cassie introduces herself, Eve, ~52s.
+  // 1) PRE-SHOW (beat 2, repurposed) — Kait introduces herself, Eve, ~52s.
   //    Just the shield + her name + a slow orbit of knowledge domains.
   // 2) Beat 1 — "here's the problem" transition, still Eve's voice.
   // 3) Beats 3-9 — chorus narrates about her in third person.
@@ -13657,14 +13657,14 @@ const DemoMode = {
         this.startCinema();
         this.setCameraTarget('preshowStart');
         // After 400ms, begin the slow camera pull-back to preshowEnd over the
-        // length of Cassie's intro. lerpSpeed 0.004 ≈ very gentle drift.
+        // length of Kait's intro. lerpSpeed 0.004 ≈ very gentle drift.
         setTimeout(() => {
           if (this.running) this.setCameraTarget('preshowEnd', 0.004);
         }, 400);
       }
     }).catch(() => {});
 
-    // Prefetch Beat 2 (Cassie's intro, plays first) AND Beat 1 (the next one).
+    // Prefetch Beat 2 (Kait's intro, plays first) AND Beat 1 (the next one).
     // When Beat 2's blob arrives, fire playBeat(0) — visual and audio start together.
     const sess = this.audioSession;
     let started = false;
@@ -14200,10 +14200,10 @@ const DemoMode = {
   },
 
   // ══════════════════════════════════════════════════════════
-  // PRESHOW — Cassie's intro visual (minimal, sophisticated)
+  // PRESHOW — Kait's intro visual (minimal, sophisticated)
   //
   // Design: near-black screen. ~28 stars breathing softly, scattered.
-  // Her name "Cassie" set in serif, offset (lower-left third).
+  // Her name "Kait" set in serif, offset (lower-left third).
   // A thin gold underline draws itself beneath her name over ~8s.
   // Starting ~55% through her intro, faint threads begin connecting
   // nearby stars — slow, almost invisible, builds by the end.
@@ -14293,7 +14293,7 @@ const DemoMode = {
     }
     threads.sort((a,b) => a.d - b.d);
 
-    // Build the centered CACI / Cassie / underline DOM
+    // Build the centered CACI / Kait / underline DOM
     let nameEl = preshow.querySelector('.preshow-name-v2');
     if (nameEl) nameEl.remove();
     nameEl = document.createElement('div');
@@ -14320,8 +14320,8 @@ const DemoMode = {
     // Painted the background on first frame so trails fade from that color
     let firstFrame = true;
 
-    // Flag for Cassie reveal
-    let cassieRevealed = false; // deprecated: CACI/Cassie reveal removed (name is CACI)
+    // Flag for Kait reveal
+    let kaitRevealed = false; // deprecated: CACI/Kait reveal removed (name is CACI)
 
     let raf = null;
     const frame = () => {
@@ -14411,7 +14411,7 @@ const DemoMode = {
         }
       }
 
-      // Underline draw — starts AFTER Cassie reveals. Draws over ~9 seconds.
+      // Underline draw — starts AFTER Kait reveals. Draws over ~9 seconds.
       const nameLineFill = nameEl && nameEl.querySelector('.preshow-name-line-fill');
       if (nameLineFill) {
         if (tsec < 2.8) {
@@ -16742,7 +16742,7 @@ const DemoMode = {
     // before the TTS call — doesn't affect stored scripts or admin UI.
     // Order: longest / most specific patterns first.
     let ttsText = (text || '');
-    ttsText = ttsText.replace(/\bCACI\b/g, 'Cassie');        // KAH-chee → Cassie
+    ttsText = ttsText.replace(/\bCACI\b/g, 'Kait');          // CACI → Kait
     ttsText = ttsText.replace(/\bMETRC\b/g, 'metric');       // "M-E-T-R-C" → metric (industry pronunciation)
     ttsText = ttsText.replace(/\bOLCC\b/g, 'O L C C');       // Oregon regulator — spell out
     ttsText = ttsText.replace(/\bCDTFA\b/g, 'C D T F A');    // CA tax agency
@@ -16764,7 +16764,7 @@ const DemoMode = {
   async speakIntro() {
     if (this.muted || this.ttsAvailable === false) return;
     const sess = this.audioSession;
-    // Intro is always Eve — Cassie's voice
+    // Intro is always Eve — Kait's voice
     const blob = await this.fetchTTS(this.intro, 'eve');
     if (sess !== this.audioSession) return;       // demo stopped mid-fetch
     if (!blob) {
@@ -17290,7 +17290,7 @@ async function openUploadModal(fileList) {
     const isSingle = !isBatch;
     const rnEl     = isSingle ? $('um-report-name') : null;
 
-    if (isSingle && rnEl) { rnEl.placeholder = 'Caci is reading this file...'; rnEl.disabled = true; }
+    if (isSingle && rnEl) { rnEl.placeholder = 'Kait is reading this file...'; rnEl.disabled = true; }
     if (inputEl) inputEl.classList.add('prefilling');
     if (statusEl) statusEl.textContent = 'Reading...';
 
