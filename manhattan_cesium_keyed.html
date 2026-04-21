@@ -61,9 +61,16 @@
 
   /* HUD */
   #hud{
-    position:fixed;bottom:12px;left:50%;transform:translateX(-50%);
-    color:rgba(200,160,50,0.3);font:9px 'Courier New',monospace;
+    position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
+    color:rgba(200,160,50,0.4);font:11px 'Courier New',monospace;
     letter-spacing:0.2em;pointer-events:none;z-index:100;
+    background:rgba(0,0,0,0.5);padding:4px 12px;
+  }
+  #tileStatus{
+    position:fixed;top:80px;left:50%;transform:translateX(-50%);
+    color:rgba(100,255,150,0.7);font:10px 'Courier New',monospace;
+    letter-spacing:0.15em;pointer-events:none;z-index:100;
+    background:rgba(0,0,0,0.6);padding:4px 12px;
   }
 
   /* Controls */
@@ -229,6 +236,7 @@
 <div id="chapter"></div>
 <div id="progress"></div>
 <div id="hud"></div>
+<div id="tileStatus"></div>
 
 
 
@@ -521,11 +529,12 @@ async function init(){
   setLoad('LOADING PHOTOREALISTIC TILES',50);
   try{
     if(googleKey){
-      const ts=await Cesium.Cesium3DTileset.fromUrl(
+      window._googleTileset = await Cesium.Cesium3DTileset.fromUrl(
         `https://tile.googleapis.com/v1/3dtiles/root.json?key=${googleKey}`,
-        {showCreditsOnScreen:false,maximumScreenSpaceError:1.0,preloadWhenHidden:true}
+        {showCreditsOnScreen:false,maximumScreenSpaceError:1.5,preloadWhenHidden:true,
+         skipLevelOfDetail:false,preferLeaves:true}
       );
-      viewer.scene.primitives.add(ts);
+      viewer.scene.primitives.add(window._googleTileset);
       viewer.scene.globe.show=false;
     }else{
       const osm=await Cesium.createOsmBuildingsAsync();
@@ -537,31 +546,60 @@ async function init(){
     try{viewer.scene.primitives.add(await Cesium.createOsmBuildingsAsync());}catch(e2){}
   }
 
-  // Park at start and WAIT for tiles to actually load
-  // Don't launch until scene is genuinely ready
+  // Park camera at start position
   setCameraWP(WP[0], 0);
-  setLoad('LOADING TILES — PLEASE WAIT', 82);
 
+  // Widen FOV temporarily to blast-load tiles around start position
+  if(viewer.camera.frustum.fov !== undefined){
+    viewer.camera.frustum.fov = Cesium.Math.toRadians(120);
+  }
+
+  setLoad('WARMING TILE CACHE', 82);
+
+  // Wait for the ACTUAL Google tileset to load, not the globe
   await new Promise(resolve => {
+    const deadline = performance.now() + 30000;
     let stable = 0;
-    const NEED = 20; // must be stable for 20 consecutive frames
-    const deadline = performance.now() + 40000; // max 40s wait
+    const NEED = 8;
+
     function check() {
       viewer.scene.render();
-      const ready = viewer.scene.globe.tilesLoaded &&
-                    viewer.scene.globe.loadingDescendantsCount === 0;
-      if (ready) {
+
+      const ts = window._googleTileset;
+      if(!ts){ requestAnimationFrame(check); return; }
+
+      // Check the 3D tileset's own loading state
+      const tilesLoading = ts.statistics ? ts.statistics.numberOfTilesWithContentReady : 0;
+      const pending = ts._requestedTiles ? ts._requestedTiles.length : 0;
+
+      // Primary check: tileset says it's ready AND has loaded some tiles
+      const hasContent = tilesLoading > 5;
+      const notPending = pending === 0;
+
+      if(hasContent && notPending){
         stable++;
-        const pct = 82 + Math.floor((stable / NEED) * 16);
-        setLoad('LOADING TILES — PLEASE WAIT', Math.min(pct, 98));
-        if (stable >= NEED) { setTimeout(resolve, 1000); return; } // 1s extra for shader compile
+        setLoad(`TILES LOADED — ${tilesLoading} ready`, 82 + Math.min(stable * 2, 16));
+        if(stable >= NEED){
+          // Restore normal FOV
+          if(viewer.camera.frustum.fov !== undefined){
+            viewer.camera.frustum.fov = Cesium.Math.toRadians(60);
+          }
+          setTimeout(resolve, 500);
+          return;
+        }
       } else {
         stable = 0;
-        // Show progress based on how many tiles are still loading
-        const loading = viewer.scene.globe.loadingDescendantsCount || 0;
-        setLoad(`LOADING TILES — ${loading} remaining`, 85);
+        setLoad(`LOADING — ${tilesLoading} tiles ready`, 85);
       }
-      if (performance.now() > deadline) { resolve(); return; }
+
+      if(performance.now() > deadline){
+        setLoad('LAUNCHING', 99);
+        if(viewer.camera.frustum.fov !== undefined){
+          viewer.camera.frustum.fov = Cesium.Math.toRadians(60);
+        }
+        resolve();
+        return;
+      }
       requestAnimationFrame(check);
     }
     requestAnimationFrame(check);
@@ -808,6 +846,14 @@ function interpAndSet(elapsed){
   const mins=Math.floor(elapsed/60), secs=Math.floor(elapsed%60);
   document.getElementById('hud').textContent=
     `${mins}:${String(secs).padStart(2,'0')} · ${Math.floor(CAM.alt)}m · ${Math.floor(loopT/TOTAL*100)}%`;
+  // Live tile debug
+  const ts=window._googleTileset;
+  if(ts&&ts.statistics){
+    const ready=ts.statistics.numberOfTilesWithContentReady;
+    const pending=ts._requestedTiles?ts._requestedTiles.length:0;
+    document.getElementById('tileStatus').textContent=
+      `TILES: ${ready} ready · ${pending} pending`;
+  }
   return {loopT,si,a};
 }
 
@@ -936,10 +982,19 @@ function waitTilesLoaded(ms=15000){
     let stable=0;
     function check(){
       viewer.scene.render();
-      const ok=viewer.scene.globe.tilesLoaded&&
-               viewer.scene.globe.loadingDescendantsCount===0;
-      if(ok){stable++;if(stable>=6){viewer.scene.render();viewer.scene.render();resolve();return;}}
-      else stable=0;
+      const ts=window._googleTileset;
+      const tilesReady = ts && ts.statistics ? ts.statistics.numberOfTilesWithContentReady : 0;
+      const pending = ts && ts._requestedTiles ? ts._requestedTiles.length : 0;
+      const ok = tilesReady > 5 && pending === 0;
+      if(ok){
+        stable++;
+        if(stable>=6){
+          viewer.scene.render();
+          viewer.scene.render();
+          resolve();
+          return;
+        }
+      } else { stable=0; }
       if(performance.now()-t0>ms){viewer.scene.render();resolve();return;}
       requestAnimationFrame(check);
     }
