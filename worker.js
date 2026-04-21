@@ -4925,13 +4925,25 @@ async function handleDemoHarvestStats(request, env) {
     }
 
     // Ask Claude to extract structured stats from all retrieved contexts at once
-    const systemPrompt = `You are Kait's data extraction subsystem. Your job is to extract real numeric facts from document excerpts for display in a demo video. You are strict about only returning numbers that are explicitly stated in the source text. Never invent or infer numbers. If a number is not directly stated, do not include it.`;
+    const systemPrompt = `You are Kait's data extraction subsystem. Your job is to extract real numeric facts from document excerpts for display in a demo video. You are strict about only returning numbers that are explicitly stated in the source text. Never invent or infer numbers. If a number is not directly stated, do not include it.
 
-    const extractionPrompt = `Below are excerpts from four topic sweeps of Kait's document library. Extract real, concrete numeric facts from these excerpts for use in a demo video's 3D data visualizations.
+CRITICAL: This demo is about the Illinois and Ohio cannabis MARKETS — regulatory figures, market totals, license counts, tax revenue, compliance data. Do NOT extract financial metrics from individual cannabis operators or companies (revenue, EBITDA, margins, employee counts, store counts, loan amounts, etc.). If an excerpt appears to come from a company earnings report, investor document, or internal operations file — skip it entirely. Only extract facts that describe the market, the regulatory environment, or state-level data.`;
+
+    const extractionPrompt = `Below are excerpts from topic sweeps of Kait's document library. Extract real, concrete numeric facts from these excerpts for use in a demo video's 3D data visualizations.
+
+IMPORTANT — ONLY extract facts from these categories:
+- Illinois or Ohio cannabis market totals (sales, revenue at state/market level)
+- License counts (dispensaries, cultivators, processors, transporters statewide)
+- Tax and fee collections at the state level
+- Regulatory compliance figures (violation counts, inspection numbers, penalty totals)
+- Market growth figures (year-over-year at state level)
+- Patient/consumer counts (medical patients, adult-use purchasers)
+
+DO NOT extract: individual company revenues, company EBITDA, company employee counts, company store counts, company loan amounts, company yield data, company-specific margins, or any metric that belongs to a single operator rather than the market as a whole. If a source file looks like an earnings transcript, investor presentation, or internal ops doc — ignore it completely.
 
 SWEEPS:
 ${retrievedPerTopic.map((r, i) => `
---- Sweep ${i + 1}: ${r.topic} (sources: ${r.scope}) ---
+--- Sweep ${i + 1}: ${r.topic} (scope: ${r.scope}) ---
 ${r.context || '(no relevant excerpts found — skip this sweep)'}
 `).join('\n')}
 
@@ -4942,7 +4954,7 @@ Return a JSON object with two arrays: "singles" and "charts".
   "id": "snake_case_id",
   "kind": "currency" | "count" | "percentage",
   "value": <number>,
-  "displayValue": "<pretty string, e.g. '$474.1M' or '22' or '77%'>",
+  "displayValue": "<pretty string, e.g. '$1.87B' or '110' or '77%'>",
   "label": "<short label, max 45 chars>",
   "period": "<time period or null>",
   "source": "<doc name>"
@@ -4958,13 +4970,14 @@ Return a JSON object with two arrays: "singles" and "charts".
 }
 
 Rules:
-1. Only include facts that are directly stated in the excerpts. If you're guessing, omit.
-2. STRONGLY PREFER THE MOST RECENT DATA. If the excerpts contain both a 2022 figure and a 2024 or 2025 figure for the same metric, use the newer one. Skip older data entirely unless it's part of a multi-year trend chart showing growth over time. For single-value stats, use the latest available period (prefer FY 2025, Q4 2025, or 2024 over anything from 2022 or 2023). This demo reflects the CURRENT state of the business, not historical snapshots.
-3. Prefer numbers that will look good as charts: multi-year trends, by-state breakdowns, categorical counts.
-4. Aim for 6-10 singles and 2-4 charts total. Quality over quantity.
-5. Numbers must be plain numbers (no currency symbols in "value"). Use "displayValue" for formatting.
-6. For every stat, include the period in the label or as a separate "period" field so viewers know WHEN it's from.
-7. If a sweep returned no useful facts, don't force it.
+1. Only include facts directly stated in the excerpts. If you're guessing, omit.
+2. Only include STATE-LEVEL or MARKET-LEVEL data. Skip anything from an individual operator.
+3. STRONGLY PREFER THE MOST RECENT DATA — prefer 2024/2025 figures over older ones.
+4. Prefer numbers that look good as charts: multi-year trends, license type breakdowns, tax revenue growth.
+5. Aim for 6-10 singles and 2-4 charts total. Quality over quantity.
+6. Numbers must be plain numbers (no currency symbols in "value"). Use "displayValue" for formatting.
+7. Include the period in the label or "period" field.
+8. If a sweep returned no useful market-level facts, skip it entirely.
 
 Return ONLY the JSON object. No preamble, no markdown, no explanation.`;
 
