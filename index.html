@@ -56,17 +56,58 @@
   }
 
   /* Controls */
+  /* ── CONTROL PANEL ── */
   #ctrl{
-    position:fixed;bottom:14px;right:14px;
-    display:none;flex-direction:column;gap:5px;z-index:100;
+    position:fixed;bottom:20px;right:20px;
+    display:none;flex-direction:column;gap:0;z-index:100;
+    background:rgba(0,0,4,0.82);
+    border:1px solid rgba(200,160,50,0.25);
+    backdrop-filter:blur(8px);
+    min-width:180px;
+    overflow:hidden;
+  }
+  #ctrl-title{
+    padding:10px 16px 8px;
+    color:rgba(200,160,50,0.35);
+    font:9px 'Courier New',monospace;
+    letter-spacing:0.4em;
+    border-bottom:1px solid rgba(200,160,50,0.1);
+  }
+  #ctrl-section{
+    padding:8px;
+    display:flex;flex-direction:column;gap:4px;
+  }
+  #ctrl-divider{
+    height:1px;background:rgba(200,160,50,0.08);margin:4px 0;
   }
   #ctrl button{
-    background:rgba(0,0,0,0.65);border:1px solid rgba(200,160,50,0.28);
-    color:rgba(200,160,50,0.65);font:9px 'Courier New',monospace;
-    letter-spacing:0.18em;padding:6px 12px;cursor:pointer;
-    transition:all 0.2s;
+    background:rgba(255,255,255,0.03);
+    border:1px solid rgba(200,160,50,0.18);
+    color:rgba(200,160,50,0.75);
+    font:11px 'Courier New',monospace;
+    letter-spacing:0.12em;
+    padding:9px 14px;
+    cursor:pointer;
+    transition:all 0.18s;
+    text-align:left;
+    display:flex;align-items:center;gap:8px;
+    white-space:nowrap;
   }
-  #ctrl button:hover{border-color:rgba(200,160,50,0.7);color:#c9a832;}
+  #ctrl button:hover{
+    background:rgba(200,160,50,0.08);
+    border-color:rgba(200,160,50,0.5);
+    color:rgba(200,160,50,1);
+  }
+  #ctrl button .kb{
+    margin-left:auto;
+    color:rgba(200,160,50,0.25);
+    font-size:9px;
+    letter-spacing:0.05em;
+  }
+  #ctrl .btn-fly{color:rgba(100,200,255,0.8);border-color:rgba(100,200,255,0.2);}
+  #ctrl .btn-fly:hover{background:rgba(100,200,255,0.08);border-color:rgba(100,200,255,0.5);color:rgba(100,200,255,1);}
+  #ctrl .btn-rec{color:rgba(255,100,100,0.8);border-color:rgba(255,80,80,0.2);}
+  #ctrl .btn-rec:hover{background:rgba(255,80,80,0.08);border-color:rgba(255,100,100,0.5);color:rgba(255,120,120,1);}
 
   /* Loading */
   #loading{
@@ -223,11 +264,32 @@
 
 <!-- Controls -->
 <div id="ctrl">
-  <button onclick="togglePause()" id="pauseBtn">⏸ PAUSE</button>
-  <button onclick="resetFlight()">↺ RESTART</button>
-  <button onclick="toggleDayNight()" id="dnBtn">🌙 NIGHT</button>
-  <button onclick="toggleFreefly()" id="ffBtn" style="border-color:rgba(100,200,255,0.3);color:rgba(100,200,255,0.6)">🕹 FREE FLY</button>
-  <button onclick="document.getElementById('recMenu').style.display='flex'" style="border-color:rgba(255,80,80,0.3);color:rgba(255,100,100,0.6)">⏺ RECORD</button>
+  <div id="ctrl-title">KAIT · MANHATTAN</div>
+  <div id="ctrl-section">
+
+    <button onclick="togglePause()" id="pauseBtn">
+      <span>⏸</span> PAUSE <span class="kb">SPACE</span>
+    </button>
+    <button onclick="resetFlight()">
+      <span>↺</span> RESTART <span class="kb">R</span>
+    </button>
+    <button onclick="toggleDayNight()" id="dnBtn">
+      <span>🌙</span> NIGHT MODE <span class="kb">N</span>
+    </button>
+
+    <div id="ctrl-divider"></div>
+
+    <button class="btn-fly" onclick="toggleFreefly()" id="ffBtn">
+      <span>🕹</span> FREE FLY <span class="kb">F</span>
+    </button>
+
+    <div id="ctrl-divider"></div>
+
+    <button class="btn-rec" onclick="document.getElementById('recMenu').style.display='flex'">
+      <span>⏺</span> RECORD VIDEO
+    </button>
+
+  </div>
 </div>
 <div id="recStatus"></div>
 
