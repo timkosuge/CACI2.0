@@ -4607,7 +4607,7 @@ Verified facts you can draw from — these are literally how the system works, s
 ${spec.facts.map((f, i) => `${i+1}. ${f}`).join('\n')}
 
 Rules:
-- Third person about CACI. Use "she" (not "I"). Call her Kait when you use her name.
+- Third person about Kait. Use "she" (not "I"). Call her Kait when you use her name.
 - ${spec.durationSec} seconds of spoken text (roughly ${spec.charRange} characters).
 - Flowing sentences. Commas and em-dashes for natural pauses. No lists, no bullets, no headers.
 - Write for speech, not for reading. It has to sound right out loud.
