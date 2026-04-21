@@ -945,6 +945,180 @@ body[data-theme="light"] .dark-panel {
   border-color: rgba(30, 58, 95, 0.15) !important;
 }
 
+/* ── Light mode fix wave 3 — elements still invisible from screenshot ── */
+
+/* Topbar logo (CACI text) and module label (Intelligence) */
+body[data-theme="light"] .tb-logo {
+  color: #1E3A5F !important;
+}
+body[data-theme="light"] .tb-module {
+  color: rgba(30, 58, 95, 0.65) !important;
+}
+body[data-theme="light"] .tb-sep {
+  background: linear-gradient(180deg, transparent, rgba(30, 58, 95, 0.20), transparent) !important;
+}
+
+/* Scope bar (CONTEXT | ALL FILES | collection pills) */
+body[data-theme="light"] .scope-bar {
+  background: transparent !important;
+  border-color: rgba(30, 58, 95, 0.12) !important;
+}
+body[data-theme="light"] .scope-btn {
+  color: rgba(30, 58, 95, 0.55) !important;
+  border-color: rgba(30, 58, 95, 0.15) !important;
+  background: #FFFFFF !important;
+}
+body[data-theme="light"] .scope-btn.active {
+  color: #1E3A5F !important;
+  background: rgba(30, 58, 95, 0.08) !important;
+  border-color: rgba(30, 58, 95, 0.25) !important;
+}
+body[data-theme="light"] .scope-btn:hover {
+  color: #1E3A5F !important;
+  background: rgba(30, 58, 95, 0.05) !important;
+}
+/* Collection name pills next to scope buttons */
+body[data-theme="light"] .col-pill,
+body[data-theme="light"] .scope-pill,
+body[data-theme="light"] .coll-tab {
+  color: rgba(30, 58, 95, 0.65) !important;
+  border-color: rgba(30, 58, 95, 0.15) !important;
+  background: #FFFFFF !important;
+}
+
+/* Switch Collection / col-picker button */
+body[data-theme="light"] .col-picker-btn,
+body[data-theme="light"] #col-picker-btn {
+  background: #FFFFFF !important;
+  color: #1E3A5F !important;
+  border-color: rgba(30, 58, 95, 0.22) !important;
+}
+body[data-theme="light"] .col-picker-btn:hover {
+  background: rgba(30, 58, 95, 0.05) !important;
+  border-color: rgba(30, 58, 95, 0.35) !important;
+}
+body[data-theme="light"] .col-picker-dropdown {
+  background: #FFFFFF !important;
+  border-color: rgba(30, 58, 95, 0.18) !important;
+  box-shadow: 0 8px 24px rgba(30, 58, 95, 0.12) !important;
+}
+
+/* Chat bar (bottom input area) */
+body[data-theme="light"] #chat-bar,
+body[data-theme="light"] .chat-bar {
+  background: #FFFFFF !important;
+  border-top: 1px solid rgba(30, 58, 95, 0.12) !important;
+}
+body[data-theme="light"] .chat-bar-inner {
+  background: transparent !important;
+}
+body[data-theme="light"] #chat-ta,
+body[data-theme="light"] .chat-ta {
+  background: transparent !important;
+  color: #0F172A !important;
+}
+body[data-theme="light"] #chat-ta::placeholder,
+body[data-theme="light"] .chat-ta::placeholder {
+  color: rgba(30, 58, 95, 0.38) !important;
+}
+
+/* Brightness button and theme toggle in topbar (our new buttons) */
+body[data-theme="light"] #tb-brightness-btn {
+  background: #FFFFFF !important;
+  border-color: rgba(30, 58, 95, 0.22) !important;
+}
+body[data-theme="light"] #tb-brightness-btn svg {
+  stroke: rgba(30, 58, 95, 0.65) !important;
+}
+body[data-theme="light"] #tb-brightness-btn:hover {
+  background: rgba(30, 58, 95, 0.05) !important;
+  border-color: rgba(30, 58, 95, 0.40) !important;
+}
+body[data-theme="light"] #tb-brightness-panel {
+  background: linear-gradient(135deg, #FFFFFF 0%, #F5F7FA 100%) !important;
+  border-color: rgba(30, 58, 95, 0.20) !important;
+  box-shadow: 0 8px 24px rgba(30, 58, 95, 0.12) !important;
+}
+body[data-theme="light"] #tb-brightness-panel span,
+body[data-theme="light"] #tb-bg-val,
+body[data-theme="light"] #tb-text-val {
+  color: rgba(30, 58, 95, 0.65) !important;
+}
+body[data-theme="light"] #theme-toggle {
+  background: #FFFFFF !important;
+  border-color: rgba(30, 58, 95, 0.22) !important;
+}
+body[data-theme="light"] #theme-toggle svg {
+  stroke: rgba(30, 58, 95, 0.65) !important;
+}
+body[data-theme="light"] #theme-toggle:hover {
+  background: rgba(30, 58, 95, 0.05) !important;
+  border-color: rgba(30, 58, 95, 0.40) !important;
+}
+
+/* Sidebar nav section label (DEPARTMENT) */
+body[data-theme="light"] .sb-divider,
+body[data-theme="light"] .sb-section-label,
+body[data-theme="light"] .sb-dept-label {
+  color: rgba(30, 58, 95, 0.45) !important;
+  border-color: rgba(30, 58, 95, 0.12) !important;
+}
+
+/* Action buttons below AI responses (LISTEN, DOWNLOAD, SAVE, COPY, SHARP, MISSED, INCOMPLETE) */
+body[data-theme="light"] .msg-actions {
+  background: transparent !important;
+}
+body[data-theme="light"] .msg-action-btn,
+body[data-theme="light"] .action-btn {
+  background: #FFFFFF !important;
+  color: rgba(30, 58, 95, 0.70) !important;
+  border-color: rgba(30, 58, 95, 0.18) !important;
+}
+body[data-theme="light"] .fb-btn,
+body[data-theme="light"] .feedback-btn {
+  background: #FFFFFF !important;
+  border-color: rgba(30, 58, 95, 0.18) !important;
+  color: rgba(30, 58, 95, 0.65) !important;
+}
+/* Keep red/green feedback buttons colored */
+body[data-theme="light"] .fb-btn.sharp,
+body[data-theme="light"] .fb-btn[data-fb="sharp"] {
+  color: #15803D !important;
+  border-color: rgba(21, 128, 61, 0.30) !important;
+}
+body[data-theme="light"] .fb-btn.missed,
+body[data-theme="light"] .fb-btn[data-fb="missed"] {
+  color: #991B1B !important;
+  border-color: rgba(153, 27, 27, 0.30) !important;
+}
+body[data-theme="light"] .fb-btn.incomplete,
+body[data-theme="light"] .fb-btn[data-fb="incomplete"] {
+  color: #B45309 !important;
+  border-color: rgba(180, 83, 9, 0.30) !important;
+}
+
+/* Claude/model label under response */
+body[data-theme="light"] .msg-model,
+body[data-theme="light"] .model-label,
+body[data-theme="light"] .msg-provider {
+  color: rgba(30, 58, 95, 0.45) !important;
+}
+
+/* Sources line under responses */
+body[data-theme="light"] .msg-sources a,
+body[data-theme="light"] .source-link {
+  color: rgba(30, 58, 95, 0.60) !important;
+}
+body[data-theme="light"] .msg-sources a:hover {
+  color: #1E3A5F !important;
+}
+
+/* SOURCES label */
+body[data-theme="light"] .sources-label,
+body[data-theme="light"] .msg-sources-label {
+  color: rgba(30, 58, 95, 0.45) !important;
+}
+
 /* ── Login ─────────────────────────────────────────────── */
 #login-screen {
   position: fixed; inset: 0; z-index: 9000;
