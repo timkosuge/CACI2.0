@@ -9799,6 +9799,156 @@ html body[data-theme="light"] #discovery-greeting-strip .dgs-text strong {
 </div>
 
 <script>
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  BROWSER STABILITY & MEMORY MANAGEMENT
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// Safe localStorage wrapper - prevents crashes in Safari/incognito
+const SafeStorage = {
+  _memStore: {},
+  
+  getItem(key) {
+    try {
+      return localStorage.getItem(key);
+    } catch(e) {
+      return this._memStore[key] || null;
+    }
+  },
+  
+  setItem(key, value) {
+    try {
+      localStorage.setItem(key, value);
+      this._memStore[key] = value;
+    } catch(e) {
+      this._memStore[key] = value;
+    }
+  },
+  
+  removeItem(key) {
+    try {
+      localStorage.removeItem(key);
+    } catch(e) {}
+    delete this._memStore[key];
+  }
+};
+
+// Global error handlers - prevent UI breakage
+window.addEventListener('error', (event) => {
+  console.error('Error caught:', event.error);
+  event.preventDefault(); // Don't break UI
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('Promise rejection:', event.reason);
+  event.preventDefault();
+});
+
+// Cleanup old data on page unload
+window.addEventListener('beforeunload', () => {
+  try {
+    const now = Date.now();
+    const WEEK = 7 * 24 * 60 * 60 * 1000;
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('caci_history_')) {
+        const data = localStorage.getItem(key);
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.timestamp && (now - parsed.timestamp) > WEEK) {
+            localStorage.removeItem(key);
+          }
+        } catch(e) {}
+      }
+    }
+  } catch(e) {}
+});
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  BRIGHTNESS WIDGET - Monitor icon, default 1.7x  
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+(function() {
+  const BrightnessControl = {
+    isCollapsed: true,
+    currentLevel: null,
+    init() {
+      this.loadSavedBrightness();
+      this.createWidget();
+      this.applySavedBrightness();
+    },
+    loadSavedBrightness() {
+      try {
+        const saved = SafeStorage.getItem('caci_brightness');
+        this.currentLevel = saved ? parseFloat(saved) : 1.7;
+      } catch(e) {
+        this.currentLevel = 1.7;
+      }
+    },
+    applySavedBrightness() {
+      if (this.currentLevel) this.applyBrightness(this.currentLevel);
+    },
+    applyBrightness(level) {
+      const app = document.getElementById('app');
+      if (!app) {
+        setTimeout(() => this.applyBrightness(level), 500);
+        return;
+      }
+      this.currentLevel = level;
+      SafeStorage.setItem('caci_brightness', level.toString());
+      if (level === 1.0) {
+        app.style.filter = 'none';
+      } else {
+        const contrast = 1 + ((level - 1) * 0.3);
+        app.style.filter = `brightness(${level}) contrast(${contrast})`;
+      }
+      this.updateActiveButton();
+    },
+    updateActiveButton() {
+      document.querySelectorAll('.brightness-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (parseFloat(btn.dataset.level) === this.currentLevel) {
+          btn.classList.add('active');
+        }
+      });
+    },
+    createWidget() {
+      setTimeout(() => {
+        if (document.getElementById('brightness-widget')) return;
+        const widget = document.createElement('div');
+        widget.id = 'brightness-widget';
+        widget.className = this.isCollapsed ? 'collapsed' : '';
+        widget.innerHTML = `<style>#brightness-widget{position:fixed;bottom:80px;right:20px;z-index:9999;background:linear-gradient(135deg,rgba(13,21,37,0.95) 0%,rgba(26,40,64,0.95) 100%);border:1px solid rgba(212,168,50,0.3);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.4),0 0 20px rgba(212,168,50,0.15);backdrop-filter:blur(10px);font-family:var(--f-ui);transition:all 0.3s;overflow:hidden}#brightness-widget.collapsed{width:48px;height:48px}#brightness-widget:not(.collapsed){width:220px;padding:16px}.brightness-toggle{width:48px;height:48px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.2s;position:absolute;top:0;right:0}#brightness-widget.collapsed .brightness-toggle{position:static}.brightness-toggle:hover{background:rgba(212,168,50,0.1)}.brightness-toggle svg{width:20px;height:20px;stroke:#f0d060}.brightness-content{display:none;padding-right:48px}#brightness-widget:not(.collapsed) .brightness-content{display:block}.brightness-title{font-size:13px;font-weight:500;color:#f0d060;margin-bottom:12px}.brightness-buttons{display:flex;flex-direction:column;gap:6px}.brightness-btn{background:rgba(212,168,50,0.08);border:1px solid rgba(212,168,50,0.2);border-radius:6px;padding:8px 12px;font-size:11px;color:#c5cdd8;cursor:pointer;transition:all 0.2s;text-align:left;display:flex;justify-content:space-between}.brightness-btn:hover{background:rgba(212,168,50,0.15);border-color:rgba(212,168,50,0.4);color:#f0d060;transform:translateX(-2px)}.brightness-btn.active{background:rgba(212,168,50,0.2);border-color:#f0d060;color:#f0d060;box-shadow:0 0 12px rgba(212,168,50,0.3)}.brightness-footer{margin-top:12px;padding-top:12px;border-top:1px solid rgba(212,168,50,0.15);font-size:10px;color:rgba(197,205,216,0.6);text-align:center}</style><div class="brightness-toggle" id="brightness-toggle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><path d="M7 9 L12 14 L17 9" stroke-width="1.5"/></svg></div><div class="brightness-content"><div class="brightness-title">Display Brightness</div><div class="brightness-buttons"><button class="brightness-btn" data-level="1.0"><span>Normal</span><span style="font-size:10px;opacity:0.7">1.0x</span></button><button class="brightness-btn" data-level="1.2"><span>Bright</span><span style="font-size:10px;opacity:0.7">1.2x</span></button><button class="brightness-btn" data-level="1.4"><span>Brighter</span><span style="font-size:10px;opacity:0.7">1.4x</span></button><button class="brightness-btn" data-level="1.6"><span>Very Bright</span><span style="font-size:10px;opacity:0.7">1.6x</span></button><button class="brightness-btn" data-level="1.7"><span>Default</span><span style="font-size:10px;opacity:0.7">1.7x</span></button><button class="brightness-btn" data-level="1.8"><span>Max</span><span style="font-size:10px;opacity:0.7">1.8x</span></button><button class="brightness-btn" data-level="2.0"><span>Ultra Max</span><span style="font-size:10px;opacity:0.7">2.0x</span></button></div><div class="brightness-footer">Default: 1.7x</div></div>`;
+        document.body.appendChild(widget);
+        document.getElementById('brightness-toggle').addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.isCollapsed = !this.isCollapsed;
+          widget.classList.toggle('collapsed');
+          SafeStorage.setItem('caci_brightness_collapsed', this.isCollapsed ? '1' : '0');
+        });
+        document.querySelectorAll('.brightness-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            this.applyBrightness(parseFloat(btn.dataset.level));
+          });
+        });
+        const savedCollapsed = SafeStorage.getItem('caci_brightness_collapsed');
+        if (savedCollapsed === '0') {
+          this.isCollapsed = false;
+          widget.classList.remove('collapsed');
+        }
+        this.updateActiveButton();
+      }, 2000);
+    }
+  };
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => BrightnessControl.init());
+  } else {
+    BrightnessControl.init();
+  }
+  window.setBrightness = (level) => BrightnessControl.applyBrightness(level);
+})();
+
+
+
+
 const API = 'https://caci-worker.timtkosuge.workers.dev';
 
 const DEPTS = [
