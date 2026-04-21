@@ -14011,11 +14011,11 @@ const DemoMode = {
     this.initCinema().then((c) => {
       if (c && this.running) {
         this.startCinema();
-        this.setCameraTarget('preshowStart');
+        /* camera handled by startCinema */
         // After 400ms, begin the slow camera pull-back to preshowEnd over the
         // length of Kait's intro. lerpSpeed 0.004 ≈ very gentle drift.
         setTimeout(() => {
-          if (this.running) this.setCameraTarget('preshowEnd', 0.004);
+          /* camera handled by startCinema */
         }, 400);
       }
     }).catch(() => {});
@@ -14114,7 +14114,7 @@ const DemoMode = {
     if (scene9) scene9.classList.remove('shimmering', 'bursting', 'landed');
     // Reset camera state so cinema smoothly returns to preshow
     if (this.cinema && this.cinema.camState) {
-      this.setCameraTarget('preshowStart', 0.06);
+      /* camera handled by startCinema */
     }
     // Pick fresh variants for this replay and restart from Beat 0 (the intro)
     this.pickVariantsForThisShow();
@@ -14128,7 +14128,7 @@ const DemoMode = {
       this.running = true;  // re-enable running flag after audio session bump
       // After preshow camera resets, begin the slow drift back to preshowEnd
       setTimeout(() => {
-        if (this.running) this.setCameraTarget('preshowEnd', 0.004);
+        /* camera handled by startCinema */
       }, 400);
       this.playBeat(0);
     };
@@ -14215,7 +14215,7 @@ const DemoMode = {
     // Match-cut: move the cinema camera to this beat's waypoint.
     // No fade/reset — the eye follows the camera through the same space.
     if (this.cinema && this.cameraWaypoints[beat.id]) {
-      this.setCameraTarget(beat.id, 0.025);
+      /* camera handled by startCinema */
     }
 
     // ─── 3D beat-object reveal ───
@@ -14228,29 +14228,25 @@ const DemoMode = {
     //     and Beat 5 (connection threads within the cluster).
     //   • All other beats cleanly hand off.
     const BEATS_WITH_3D = [1, 3, 4, 5, 6, 7];
-    const PERSISTENT_SCENES = {
-      // If the CURRENT beat is in this list, the PREVIOUS beat's 3D content stays
-      4: [3],           // Beat 4 needs Beat 3 clusters visible
-      5: [3],           // Beat 5 needs Beat 3 clusters visible (camera is inside one)
-    };
+    const PERSISTENT_SCENES = {};
     if (this.cinema) {
       const keepVisible = PERSISTENT_SCENES[beat.id] || [];
       if (this._previousBeatId !== undefined
           && BEATS_WITH_3D.includes(this._previousBeatId)
           && !keepVisible.includes(this._previousBeatId)) {
-        this.hideBeatObjects(this._previousBeatId);
+        /* hide prev beat */ if (this.cinema && this.cinema.beatObjects[this._previousBeatId]) { this.cinema.beatObjects[this._previousBeatId].group.visible = false; }
       }
       // Also: if we're at Beat 6 or later, clean up any lingering persistent scenes
       // that were kept visible across beats 3→4→5. Otherwise clusters would hang around.
       if (beat.id >= 6) {
         [3].forEach(persistentId => {
           if (this.cinema.beatObjects[persistentId] && this.cinema.beatObjects[persistentId].group.visible) {
-            this.hideBeatObjects(persistentId);
+            /* hide persistent */ if (this.cinema && this.cinema.beatObjects[persistentId]) { this.cinema.beatObjects[persistentId].group.visible = false; }
           }
         });
       }
       if (BEATS_WITH_3D.includes(beat.id)) {
-        this.showBeatObjects(beat.id);
+        /* show beat */ if (this.cinema && this.cinema.beatObjects[beat.id]) { this.cinema.beatObjects[beat.id].group.visible = true; }
       }
     }
     // Track for next transition
@@ -14260,6 +14256,7 @@ const DemoMode = {
     // (the 3D content IS the beat now)
     if (beatEl && BEATS_WITH_3D.includes(beat.id) && this.cinema) {
       beatEl.classList.remove('active');
+      // New cinema manages its own beat visibility
     }
 
     // Prefetch the next TWO beats for zero-latency transitions
@@ -14921,1497 +14918,558 @@ const DemoMode = {
     if (!canvas) return null;
     const preshow = document.getElementById('demo-preshow');
 
-    // Renderer
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.setClearColor(0x02040a, 1);
+    renderer.setClearColor(0x000508, 1);
 
     const resize = () => {
-      const rect = preshow.getBoundingClientRect();
-      renderer.setSize(rect.width, rect.height, false);
-      if (this.cinema && this.cinema.camera) {
-        this.cinema.camera.aspect = rect.width / rect.height;
-        this.cinema.camera.updateProjectionMatrix();
-      }
+      const rect = preshow ? preshow.getBoundingClientRect() : { width: window.innerWidth, height: window.innerHeight };
+      const w = rect.width || window.innerWidth;
+      const h = rect.height || window.innerHeight;
+      renderer.setSize(w, h, false);
+      C.camera.aspect = w / h;
+      C.camera.updateProjectionMatrix();
     };
-    resize();
     window.addEventListener('resize', resize);
 
-    // Scene + camera
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x02040a, 0.0025);  // volumetric depth fade
+    const camera = new THREE.PerspectiveCamera(50, 1, 0.5, 6000);
+    camera.position.set(0, 0, 300);
 
-    const rect = preshow.getBoundingClientRect();
-    const camera = new THREE.PerspectiveCamera(35, rect.width / rect.height, 0.5, 2000);
-    const startW = this.cameraWaypoints.preshowStart;
-    camera.position.set(...startW.pos);
-    camera.lookAt(...startW.look);
+    // Shared gold palette
+    const GOLD   = 0xc9a832;
+    const GOLD2  = 0xe8c84a;
+    const GOLD3  = 0xfff4cc;
+    const STEEL  = 0x3B6FA8;
+    const TEAL   = 0x00d4aa;
 
-    // Point cloud — a volumetric cluster around origin
-    const POINT_COUNT = 900;
-    const geometry = new THREE.BufferGeometry();
-    const positions = new Float32Array(POINT_COUNT * 3);
-    const colors    = new Float32Array(POINT_COUNT * 3);
-    const sizes     = new Float32Array(POINT_COUNT);
-    const phases    = new Float32Array(POINT_COUNT);
-
-    for (let i = 0; i < POINT_COUNT; i++) {
-      // Ellipsoidal distribution, biased slightly outward so the center isn't mush
-      const r = 60 + Math.pow(Math.random(), 0.7) * 240;
-      const theta = Math.random() * Math.PI * 2;
-      const phi   = Math.acos(2 * Math.random() - 1);
-      positions[i*3  ] = r * Math.sin(phi) * Math.cos(theta);
-      positions[i*3+1] = r * Math.sin(phi) * Math.sin(theta) * 0.75;   // flatter y
-      positions[i*3+2] = r * Math.cos(phi) * 1.15;                     // slight z stretch
-
-      // Warm gold palette with slight variation
-      const warm = 0.8 + Math.random() * 0.2;
-      colors[i*3  ] = 0.96 * warm;                    // R
-      colors[i*3+1] = 0.83 * warm + Math.random()*0.05;  // G
-      colors[i*3+2] = 0.38 * warm;                    // B
-
-      sizes[i]  = 0.8 + Math.random() * 2.4;
-      phases[i] = Math.random() * Math.PI * 2;
+    // ── SHARED PARTICLE FIELD — always visible, fills deep space ──
+    const partCount = 1800;
+    const partPos = new Float32Array(partCount * 3);
+    const partAlpha = new Float32Array(partCount);
+    for (let i = 0; i < partCount; i++) {
+      partPos[i*3]   = (Math.random()-0.5)*2400;
+      partPos[i*3+1] = (Math.random()-0.5)*2400;
+      partPos[i*3+2] = (Math.random()-0.5)*2400;
+      partAlpha[i]   = 0.15 + Math.random()*0.5;
     }
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geometry.setAttribute('color',    new THREE.BufferAttribute(colors, 3));
-    geometry.setAttribute('aSize',    new THREE.BufferAttribute(sizes, 1));
-    geometry.setAttribute('aPhase',   new THREE.BufferAttribute(phases, 1));
+    const partGeom = new THREE.BufferGeometry();
+    partGeom.setAttribute('position', new THREE.BufferAttribute(partPos, 3));
+    partGeom.setAttribute('alpha', new THREE.BufferAttribute(partAlpha, 1));
+    const partMat = new THREE.PointsMaterial({ color: GOLD3, size: 0.8, transparent: true, opacity: 0.25, sizeAttenuation: true });
+    const particles = new THREE.Points(partGeom, partMat);
+    scene.add(particles);
 
-    // Shader material — soft circular points with glow, audio-reactive
-    const material = new THREE.ShaderMaterial({
-      uniforms: {
-        uTime:   { value: 0 },
-        uEnergy: { value: 0 },
-        uBass:   { value: 0 },
-        uTreble: { value: 0 },
-        uOpacity: { value: 0 },
-      },
-      vertexShader: `
-        attribute float aSize;
-        attribute float aPhase;
-        varying vec3 vColor;
-        varying float vAlpha;
-        uniform float uTime;
-        uniform float uEnergy;
-        uniform float uBass;
-        void main() {
-          vColor = color;
-          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-          float twinkle = 0.75 + 0.25 * sin(uTime * 1.2 + aPhase);
-          float audioPulse = 1.0 + uBass * 0.85;
-          gl_PointSize = aSize * (340.0 / -mvPosition.z) * twinkle * audioPulse;
-          vAlpha = twinkle * (0.7 + uEnergy * 0.3);
-          gl_Position = projectionMatrix * mvPosition;
-        }
-      `,
-      fragmentShader: `
-        varying vec3 vColor;
-        varying float vAlpha;
-        uniform float uOpacity;
-        uniform float uEnergy;
-        void main() {
-          // Soft circular falloff — the point is a glowing orb, not a square
-          vec2 uv = gl_PointCoord - 0.5;
-          float d = length(uv);
-          if (d > 0.5) discard;
-          float core = smoothstep(0.5, 0.0, d);
-          float glow = pow(core, 2.2) * (1.0 + uEnergy * 1.2);
-          vec3 tinted = vColor * glow;
-          gl_FragColor = vec4(tinted, glow * vAlpha * uOpacity);
-        }
-      `,
-      transparent: true,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      vertexColors: true,
-    });
-
-    const points = new THREE.Points(geometry, material);
-    scene.add(points);
-
-    // Camera state for interpolation
-    const camState = {
-      current: {
-        pos: new THREE.Vector3(...startW.pos),
-        look: new THREE.Vector3(...startW.look),
-        fov: startW.fov,
-      },
-      target: {
-        pos: new THREE.Vector3(...startW.pos),
-        look: new THREE.Vector3(...startW.look),
-        fov: startW.fov,
-      },
-      lerpSpeed: 0.018,  // how fast camera eases to target each frame
-    };
-
-    this.cinema = {
-      THREE, scene, camera, renderer, points, material, camState,
-      resize, running: false, raf: null, t0: performance.now(),
-      beatObjects: {},   // map of beatId → group of 3D objects for that beat
-    };
-    this.cinema.resizeHandler = resize;
-    this.buildBeatObjects();
-    return this.cinema;
-  },
-
-  // ═══════════════════════════════════════════════════════════════
-  // BEAT OBJECTS — 3D content that lives inside the cinema scene.
-  // Replaces the old DOM overlay "slides." Each chorus beat gets a
-  // group of 3D objects that fade in/out as the camera/beat changes.
-  //
-  // All objects start with opacity 0 and are revealed when DemoMode.showBeatObjects(beatId)
-  // is called. Hidden again via hideBeatObjects(beatId).
-  //
-  // Coordinate system: particles live in an ellipsoid around origin,
-  // roughly ±240 units xy, ±300 z. Beat objects are placed within this volume.
-  // ═══════════════════════════════════════════════════════════════
-
-  // ═══════════════════════════════════════════════════════════════
-  // 3D CHART UTILITIES
-  // Builders that return THREE.Group objects representing real data.
-  // All use canvas-texture labels for legibility and additive-blended
-  // geometry for the Tony Stark holographic feel.
-  // ═══════════════════════════════════════════════════════════════
-
-  // Build a holographic floating-number 3D element.
-  // Composition (z-layers, camera-facing):
-  //   z=-1.5  background plate — dark recessed panel w/ faint grid
-  //   z=-0.5  frame accents — gold corner brackets + cyan tick marks
-  //   z= 0    big number (canvas texture, larger)
-  //   z=+0.3  label & source overlays
-  //   z=+0.6  scan line that sweeps vertically (animated in update loop)
-  //   z=+0.6  live-data indicator dot (pulsing green)
-  // All billboarded. Layered offsets produce parallax when camera moves.
-  _makeFloatingNumber3D(fact, opts) {
-    const C = this.cinema;
-    if (!C || !fact) return null;
-    const THREE = C.THREE;
-    opts = opts || {};
-    const scale = opts.scale || 1;
-
-    const group = new THREE.Group();
-    // Panel dimensions (local units — `scale` multiplies the whole group)
-    const W = 95;
-    const H = 40;
-
-    // ─── Layer 1: Background plate — dark recessed panel with faint grid ───
-    const bgCanvas = document.createElement('canvas');
-    bgCanvas.width = 1024; bgCanvas.height = 420;
-    const bctx = bgCanvas.getContext('2d');
-    // Subtle dark navy fill
-    bctx.fillStyle = 'rgba(6, 11, 22, 0.55)';
-    bctx.fillRect(0, 0, 1024, 420);
-    // Faint grid lines — mostly vertical, very subdued
-    bctx.strokeStyle = 'rgba(110, 208, 232, 0.06)';
-    bctx.lineWidth = 1;
-    const gridStep = 40;
-    for (let x = gridStep; x < 1024; x += gridStep) {
-      bctx.beginPath(); bctx.moveTo(x, 0); bctx.lineTo(x, 420); bctx.stroke();
-    }
-    for (let y = gridStep; y < 420; y += gridStep) {
-      bctx.beginPath(); bctx.moveTo(0, y); bctx.lineTo(1024, y); bctx.stroke();
-    }
-    const bgTex = new THREE.CanvasTexture(bgCanvas);
-    bgTex.needsUpdate = true;
-    const bgMat = new THREE.MeshBasicMaterial({
-      map: bgTex, transparent: true, depthWrite: false, opacity: 0,
-    });
-    const bgMesh = new THREE.Mesh(new THREE.PlaneGeometry(W, H), bgMat);
-    bgMesh.position.z = -1.5;
-    group.add(bgMesh);
-
-    // ─── Layer 2: Frame — corner brackets (gold) + cyan tick marks ───
-    const frameMat = new THREE.LineBasicMaterial({
-      color: 0xf5e398,
-      transparent: true,
-      opacity: 0,
-      blending: THREE.AdditiveBlending,
-    });
-    const cyanMat = new THREE.LineBasicMaterial({
-      color: 0x6ed0e8,
-      transparent: true,
-      opacity: 0,
-      blending: THREE.AdditiveBlending,
-    });
-    // Corner brackets — 4 L-shapes, one per corner
-    const brLen = 6;  // bracket arm length
-    const brX = W / 2 - 1;
-    const brY = H / 2 - 1;
-    [
-      [[-brX, brY], [-brX + brLen, brY], [-brX, brY], [-brX, brY - brLen]],   // top-left
-      [[brX, brY], [brX - brLen, brY], [brX, brY], [brX, brY - brLen]],       // top-right
-      [[-brX, -brY], [-brX + brLen, -brY], [-brX, -brY], [-brX, -brY + brLen]], // bottom-left
-      [[brX, -brY], [brX - brLen, -brY], [brX, -brY], [brX, -brY + brLen]],   // bottom-right
-    ].forEach(segments => {
-      for (let i = 0; i < segments.length; i += 2) {
-        const a = segments[i], b = segments[i + 1];
-        const g = new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(a[0], a[1], -0.5),
-          new THREE.Vector3(b[0], b[1], -0.5),
-        ]);
-        group.add(new THREE.Line(g, frameMat));
-      }
-    });
-    // Cyan tick marks along the top edge — 5 short vertical marks
-    const tickY = H / 2 - 0.5;
-    for (let i = 0; i < 5; i++) {
-      const tx = -W / 2 + (i + 1) * (W / 6);
-      const g = new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(tx, tickY, -0.5),
-        new THREE.Vector3(tx, tickY - 2, -0.5),
-      ]);
-      group.add(new THREE.Line(g, cyanMat));
-    }
-    // Cyan horizontal accent line below the label
-    const accentG = new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(-W / 2 + 6, -H / 2 + 6, -0.5),
-      new THREE.Vector3( W / 2 - 6, -H / 2 + 6, -0.5),
-    ]);
-    group.add(new THREE.Line(accentG, cyanMat));
-
-    // ─── Layer 3: Big number (canvas texture, generous size) ───
-    // Compact any unwieldy display strings. '$262,900,000' → '$262.9M'
-    // so text never bursts the panel. Short values pass through unchanged.
-    const compactDisplay = (s) => {
-      if (!s || typeof s !== 'string') return s;
-      // Match $NNN,NNN,NNN or $NNNNNNNNN and convert to $N.NM/B style
-      const m = s.match(/^(\$?)([\d,]+)(.*)$/);
-      if (m) {
-        const prefix = m[1];
-        const digits = parseFloat(m[2].replace(/,/g, ''));
-        const suffix = m[3];
-        if (!isNaN(digits) && digits >= 1_000_000) {
-          if (digits >= 1_000_000_000) {
-            return prefix + (digits / 1_000_000_000).toFixed(1).replace(/\.0$/, '') + 'B' + suffix;
-          }
-          return prefix + (digits / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M' + suffix;
-        }
-        if (!isNaN(digits) && digits >= 10_000) {
-          return prefix + (digits / 1_000).toFixed(0) + 'K' + suffix;
-        }
-      }
-      return s;
-    };
-    const displayText = compactDisplay(fact.display);
-    // Auto-fit font size: if the text is unusually long, shrink it so it
-    // fits within the panel width. 200px works for ≤8 chars; beyond that
-    // we scale down proportionally.
-    let numFontPx = 200;
-    if (displayText.length > 8)  numFontPx = 170;
-    if (displayText.length > 10) numFontPx = 150;
-    if (displayText.length > 13) numFontPx = 120;
-
-    const numCanvas = document.createElement('canvas');
-    numCanvas.width = 1024; numCanvas.height = 320;
-    const nctx = numCanvas.getContext('2d');
-    nctx.font = `500 ${numFontPx}px "Cormorant Garamond", serif`;
-    nctx.textAlign = 'center';
-    nctx.textBaseline = 'middle';
-    const numGrad = nctx.createLinearGradient(0, 40, 0, 280);
-    numGrad.addColorStop(0.0, '#ffffe8');
-    numGrad.addColorStop(0.25, '#fff2a8');
-    numGrad.addColorStop(0.65, '#f0cc50');
-    numGrad.addColorStop(1.0, '#b8902a');
-    nctx.fillStyle = numGrad;
-    nctx.shadowColor = 'rgba(245,227,152,0.95)';
-    nctx.shadowBlur = 36;
-    nctx.fillText(displayText, 512, 160);
-    // Second pass (smaller shadow) for cleaner edges
-    nctx.shadowBlur = 0;
-    nctx.fillText(displayText, 512, 160);
-    const numTex = new THREE.CanvasTexture(numCanvas);
-    numTex.needsUpdate = true;
-    numTex.anisotropy = 4;
-    const numMat = new THREE.MeshBasicMaterial({
-      map: numTex, transparent: true, depthWrite: false, opacity: 0,
-    });
-    const numMesh = new THREE.Mesh(new THREE.PlaneGeometry(W * 0.92, H * 0.55), numMat);
-    numMesh.position.set(0, H * 0.1, 0);
-    group.add(numMesh);
-
-    // ─── Layer 4: Label — letter-spaced uppercase, muted warm white ───
-    if (fact.label) {
-      const lblCanvas = document.createElement('canvas');
-      lblCanvas.width = 1024; lblCanvas.height = 96;
-      const lctx = lblCanvas.getContext('2d');
-      lctx.font = '500 42px "Inter", sans-serif';
-      lctx.textBaseline = 'middle';
-      const txt = fact.label.toUpperCase();
-      const tracking = 6;
-      lctx.font = '500 42px "Inter", sans-serif';
-      lctx.textAlign = 'left';
-      const metrics = lctx.measureText(txt);
-      const totalW = metrics.width + tracking * (txt.length - 1);
-      let x = 512 - totalW / 2;
-      lctx.fillStyle = 'rgba(240,230,200,0.88)';
-      lctx.shadowColor = 'rgba(0,0,0,0.9)';
-      lctx.shadowBlur = 4;
-      for (const ch of txt) {
-        lctx.fillText(ch, x, 48);
-        x += lctx.measureText(ch).width + tracking;
-      }
-      const lblTex = new THREE.CanvasTexture(lblCanvas);
-      lblTex.needsUpdate = true;
-      const lblMat = new THREE.MeshBasicMaterial({
-        map: lblTex, transparent: true, depthWrite: false, opacity: 0,
+    // ── HELPER: make a glowing canvas label texture ──
+    function makeLabel(lines, opts = {}) {
+      const w = opts.w || 512, h = opts.h || 128;
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      const ctx = c.getContext('2d');
+      ctx.clearRect(0,0,w,h);
+      lines.forEach((line, i) => {
+        ctx.font = (opts.font || `300 ${opts.size||44}px "Cormorant Garamond", serif`);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const grad = ctx.createLinearGradient(0, 0, 0, h);
+        grad.addColorStop(0, opts.color1 || '#fff4cc');
+        grad.addColorStop(0.5, opts.color2 || '#f5e398');
+        grad.addColorStop(1, opts.color3 || '#c9a832');
+        ctx.fillStyle = grad;
+        ctx.shadowColor = 'rgba(212,168,50,0.6)';
+        ctx.shadowBlur = 18;
+        ctx.fillText(line, w/2, h/2 + (i - (lines.length-1)/2) * (opts.lineH || 52));
       });
-      const lblMesh = new THREE.Mesh(new THREE.PlaneGeometry(W * 0.85, H * 0.13), lblMat);
-      lblMesh.position.set(0, -H * 0.12, 0.3);
-      group.add(lblMesh);
-      group.userData.labelMat = lblMat;
+      const tex = new THREE.CanvasTexture(c);
+      return tex;
     }
 
-    // ─── Layer 4b: Source — tiny italic, very muted ───
-    if (fact.source) {
-      const srcCanvas = document.createElement('canvas');
-      srcCanvas.width = 1024; srcCanvas.height = 64;
-      const sctx = srcCanvas.getContext('2d');
-      sctx.font = '300 italic 26px "Cormorant Garamond", serif';
-      sctx.textAlign = 'center';
-      sctx.textBaseline = 'middle';
-      sctx.fillStyle = 'rgba(180,170,140,0.60)';
-      // Truncate long source names
-      const src = fact.source.length > 50 ? fact.source.slice(0, 47) + '\u2026' : fact.source;
-      sctx.fillText(src, 512, 32);
-      const srcTex = new THREE.CanvasTexture(srcCanvas);
-      srcTex.needsUpdate = true;
-      const srcMat = new THREE.MeshBasicMaterial({
-        map: srcTex, transparent: true, depthWrite: false, opacity: 0,
-      });
-      const srcMesh = new THREE.Mesh(new THREE.PlaneGeometry(W * 0.75, H * 0.09), srcMat);
-      srcMesh.position.set(0, -H * 0.32, 0.3);
-      group.add(srcMesh);
-      group.userData.srcMat = srcMat;
+    function makePanel(tex, pw, ph, opacity = 0) {
+      const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide });
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), mat);
+      return mesh;
     }
 
-    // ─── Layer 5: Scan line — animated horizontal bar that sweeps the panel ───
-    const scanMat = new THREE.MeshBasicMaterial({
-      color: 0x6ed0e8,
-      transparent: true,
-      opacity: 0,
-      blending: THREE.AdditiveBlending,
-    });
-    const scanMesh = new THREE.Mesh(new THREE.PlaneGeometry(W * 0.94, 0.5), scanMat);
-    scanMesh.position.set(0, 0, 0.6);
-    group.add(scanMesh);
-    group.userData.scanMat = scanMat;
-    group.userData.scanMesh = scanMesh;
-    group.userData.panelH = H;
-
-    // ─── Layer 6: Live-data indicator dot — tiny pulsing green in top-left ───
-    const liveMat = new THREE.MeshBasicMaterial({
-      color: 0x58e89e,
-      transparent: true,
-      opacity: 0,
-      blending: THREE.AdditiveBlending,
-    });
-    const liveMesh = new THREE.Mesh(new THREE.CircleGeometry(0.9, 16), liveMat);
-    liveMesh.position.set(-W / 2 + 4, H / 2 - 4, 0.6);
-    group.add(liveMesh);
-    group.userData.liveMat = liveMat;
-
-    group.userData.numMat = numMat;
-    group.userData.bgMat = bgMat;
-    group.userData.frameMat = frameMat;
-    group.userData.cyanMat = cyanMat;
-    group.userData.billboard = true;
-    group.userData.isFloatingNumber = true;
-
-    // Apply the caller's scale uniformly
-    group.scale.setScalar(scale);
-    return group;
-  },
-
-  // Build a horizontal 3D bar chart: title above, bars rising from a baseline,
-  // value labels on top of each bar, category labels below. Returns a Group.
-  // `chart` = { title, series: [{label, value, display}], unit, source, insight }
-  // `opts`  = { width, height, scale, colorPair }
-  // Pick one fact per Beat 3 cluster based on theme keywords. Falls back to
-  // sensible defaults if no matching fact exists in the current statsBank.
-  _pickBeat3ClusterFacts() {
-    const singles = (this.statsBank && this.statsBank.singles) || [];
-    const matchByKeyword = (kws) => {
-      for (const kw of kws) {
-        const f = singles.find(s => {
-          const hay = (s.label + ' ' + (s.source || '')).toLowerCase();
-          return hay.includes(kw);
-        });
-        if (f) return f;
-      }
-      return null;
-    };
-    return {
-      Compliance: matchByKeyword(['ohio', 'compliance', 'testing', 'transfer', 'code', 'regulation'])
-                  || singles.find(s => (s.source || '').toLowerCase().includes('ohio'))
-                  || { display: 'OAC §3796', label: 'Ohio cannabis code', source: 'Ohio Administrative Code' },
-      Finance:    matchByKeyword(['revenue', 'ebitda', 'margin', 'earnings'])
-                  || singles[0]
-                  || { display: '$1.87B', label: 'IL Adult-Use Sales 2024', source: 'Illinois Market Data' },
-      Operations: matchByKeyword(['store', 'employee', 'retail', 'dispensary', 'yield', 'wholesale'])
-                  || singles.find(s => /\b\d+\b/.test(s.display) && !s.display.includes('%') && !s.display.includes('$'))
-                  || { display: '42', label: 'Retail stores', source: 'Internal Operations Data' },
-    };
-  },
-
-  _makeBarChart3D(chart, opts) {
-    const C = this.cinema;
-    if (!C || !chart || !chart.series || chart.series.length === 0) return null;
-    const THREE = C.THREE;
-    opts = opts || {};
-    const W = opts.width  || 100;
-    const H = opts.height || 60;
-    const barColor = 0xe8c84a;
-
-    const group = new THREE.Group();
-
-    // Normalize values to [0..1] for bar height
-    const maxVal = Math.max(...chart.series.map(s => Math.abs(s.value || 0)));
-    const barCount = chart.series.length;
-    const gap = W / (barCount + 1);
-    const barWidth = gap * 0.5;
-
-    // Shared bar material (additive glow)
-    const barMat = new THREE.MeshBasicMaterial({
-      color: barColor,
-      transparent: true,
-      opacity: 0,
-      blending: THREE.AdditiveBlending,
-    });
-
-    const bars = [];
-    chart.series.forEach((pt, i) => {
-      const barH = (Math.abs(pt.value || 0) / (maxVal || 1)) * H;
-      // A bar made of a stack of thin boxes gives a pixelated/data-grid feel
-      const barGeom = new THREE.BoxGeometry(barWidth, barH, barWidth * 0.6);
-      const bar = new THREE.Mesh(barGeom, barMat);
-      const xPos = -W / 2 + gap * (i + 1);
-      // Bars rise from the baseline (y = -H/2 is the floor)
-      bar.position.set(xPos, -H / 2 + barH / 2, 0);
-      bar.userData.targetHeight = barH;
-      bar.userData.animOffset = i * 0.15;  // stagger rise-in
-      group.add(bar);
-      bars.push(bar);
-
-      // Value label on top of each bar
-      const vCanvas = document.createElement('canvas');
-      vCanvas.width = 512; vCanvas.height = 128;
-      const vctx = vCanvas.getContext('2d');
-      vctx.font = '500 64px "Cormorant Garamond", serif';
-      vctx.textAlign = 'center';
-      vctx.textBaseline = 'middle';
-      const vGrad = vctx.createLinearGradient(0, 20, 0, 108);
-      vGrad.addColorStop(0, '#fff4cc');
-      vGrad.addColorStop(1, '#e8c84a');
-      vctx.fillStyle = vGrad;
-      vctx.shadowColor = 'rgba(212,168,50,0.5)';
-      vctx.shadowBlur = 12;
-      vctx.fillText(pt.display || String(pt.value), 256, 64);
-      const vTex = new THREE.CanvasTexture(vCanvas);
-      vTex.needsUpdate = true;
-      const vMat = new THREE.MeshBasicMaterial({
-        map: vTex, transparent: true, depthWrite: false, opacity: 0,
-      });
-      const vMesh = new THREE.Mesh(new THREE.PlaneGeometry(barWidth * 2.5, barWidth * 0.8), vMat);
-      vMesh.position.set(xPos, -H / 2 + barH + barWidth * 0.55, 0);
-      vMesh.userData.valMat = vMat;
-      group.add(vMesh);
-
-      // Category label below the baseline — moved further down for breathing room
-      const cCanvas = document.createElement('canvas');
-      cCanvas.width = 512; cCanvas.height = 96;
-      const cctx = cCanvas.getContext('2d');
-      cctx.font = '400 40px "Inter", sans-serif';
-      cctx.textAlign = 'center';
-      cctx.textBaseline = 'middle';
-      cctx.fillStyle = 'rgba(200,185,150,0.75)';
-      const ltxt = (pt.label || '').toUpperCase();
-      const lTracking = 4;
-      cctx.textAlign = 'left';
-      const lMetrics = cctx.measureText(ltxt);
-      const lTotalW = lMetrics.width + lTracking * (ltxt.length - 1);
-      let lx = 256 - lTotalW / 2;
-      for (const ch of ltxt) {
-        cctx.fillText(ch, lx, 48);
-        lx += cctx.measureText(ch).width + lTracking;
-      }
-      const cTex = new THREE.CanvasTexture(cCanvas);
-      cTex.needsUpdate = true;
-      const cMat = new THREE.MeshBasicMaterial({
-        map: cTex, transparent: true, depthWrite: false, opacity: 0,
-      });
-      const cMesh = new THREE.Mesh(new THREE.PlaneGeometry(barWidth * 3, barWidth * 0.7), cMat);
-      // Moved further below baseline (from -0.6 to -1.4) so they don't collide
-      // with the stack labels sitting below charts in the scene
-      cMesh.position.set(xPos, -H / 2 - barWidth * 1.4, 0);
-      cMesh.userData.catMat = cMat;
-      group.add(cMesh);
-    });
-
-    // Title above the chart — lifted higher so it doesn't collide with
-    // value labels on tall bars. Also narrower so long titles compress less.
-    if (chart.title) {
-      const tCanvas = document.createElement('canvas');
-      tCanvas.width = 1024; tCanvas.height = 128;
-      const tctx = tCanvas.getContext('2d');
-      tctx.font = '300 italic 56px "Cormorant Garamond", serif';
-      tctx.textAlign = 'center';
-      tctx.textBaseline = 'middle';
-      const tGrad = tctx.createLinearGradient(0, 20, 0, 108);
-      tGrad.addColorStop(0, '#fff4cc');
-      tGrad.addColorStop(0.7, '#f5e398');
-      tGrad.addColorStop(1, '#c9a832');
-      tctx.fillStyle = tGrad;
-      tctx.shadowColor = 'rgba(212,168,50,0.5)';
-      tctx.shadowBlur = 14;
-      // Truncate overly long titles so they don't get squished in the canvas
-      const titleText = chart.title.length > 34
-        ? chart.title.slice(0, 32) + '…'
-        : chart.title;
-      tctx.fillText(titleText, 512, 64);
-      const tTex = new THREE.CanvasTexture(tCanvas);
-      tTex.needsUpdate = true;
-      const tMat = new THREE.MeshBasicMaterial({
-        map: tTex, transparent: true, depthWrite: false, opacity: 0,
-      });
-      // Title was at H/2 + W*0.08 — now lifted to H/2 + W*0.16 so there's
-      // clear space between the title and the tallest bar's value label.
-      const tMesh = new THREE.Mesh(new THREE.PlaneGeometry(W * 0.85, W * 0.10), tMat);
-      tMesh.position.set(0, H / 2 + W * 0.16, 0);
-      tMesh.userData.titleMat = tMat;
-      group.add(tMesh);
-    }
-
-    // Baseline: thin gold line along the bottom of the bars
-    const baselineGeom = new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(-W / 2, -H / 2, 0),
-      new THREE.Vector3( W / 2, -H / 2, 0),
-    ]);
-    const baselineMat = new THREE.LineBasicMaterial({
-      color: 0xc9a832,
-      transparent: true,
-      opacity: 0,
-      blending: THREE.AdditiveBlending,
-    });
-    const baseline = new THREE.Line(baselineGeom, baselineMat);
-    group.add(baseline);
-
-    group.userData.barMat = barMat;
-    group.userData.baselineMat = baselineMat;
-    group.userData.bars = bars;
-    group.userData.billboard = true;
-    group.userData.isBarChart = true;
-    return group;
-  },
-
-
-  buildBeatObjects() {
-    const C = this.cinema;
-    if (!C) return;
-    const THREE = C.THREE;
-
-    // ─── BEAT 1: Document silhouettes drifting through the volume ───
-    // ~36 thin rectangles at varying depths. Camera glides past them so they
-    // feel like documents scattered through space — the "answer is buried
-    // in thousands of pages" visualization.
+    // ─────────────────────────────────────────────────────────────
+    // BEAT 1 — INFINITE FILE CABINET CORRIDOR
+    // Camera slides through a corridor of filing cabinets extending
+    // to infinity in forced perspective. Drawers slide open at
+    // different rates spilling golden light. Camera angled looking
+    // slightly upward and to one side.
+    // ─────────────────────────────────────────────────────────────
     const beat1Group = new THREE.Group();
     beat1Group.visible = false;
-    const DOC_COUNT = 36;
-    const docGeom = new THREE.PlaneGeometry(26, 34, 1, 1);  // letter-ish aspect ratio
-    const docMaterial = new THREE.ShaderMaterial({
-      uniforms: { uOpacity: { value: 0 }, uTime: { value: 0 } },
-      vertexShader: `
-        varying vec2 vUv;
-        void main() {
-          vUv = uv;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+
+    const cabinetMat = new THREE.MeshBasicMaterial({ color: 0x0a0e18, transparent: true, opacity: 0 });
+    const drawerGlowMat = new THREE.MeshBasicMaterial({ color: GOLD, transparent: true, opacity: 0, blending: THREE.AdditiveBlending });
+    const cabinets = [];
+    const CABINET_COUNT = 40;
+    const CORRIDOR_LENGTH = 2400;
+
+    for (let side = -1; side <= 1; side += 2) {
+      for (let i = 0; i < CABINET_COUNT; i++) {
+        const z = -CORRIDOR_LENGTH/2 + i * (CORRIDOR_LENGTH / CABINET_COUNT);
+        const g = new THREE.Group();
+        g.position.set(side * 85, (Math.random()-0.5)*30, z);
+        g.rotation.y = side < 0 ? Math.PI/2 : -Math.PI/2;
+
+        // Cabinet body
+        const body = new THREE.Mesh(new THREE.BoxGeometry(28, 80, 18), cabinetMat.clone());
+        g.add(body);
+
+        // 4 drawers
+        const drawers = [];
+        for (let d = 0; d < 4; d++) {
+          const drawer = new THREE.Group();
+          const face = new THREE.Mesh(new THREE.BoxGeometry(24, 17, 2),
+            new THREE.MeshBasicMaterial({ color: 0x0d1220, transparent: true, opacity: 0 }));
+          const glow = new THREE.Mesh(new THREE.PlaneGeometry(20, 13),
+            new THREE.MeshBasicMaterial({ color: GOLD2, transparent: true, opacity: 0, blending: THREE.AdditiveBlending }));
+          glow.position.z = 1.2;
+          drawer.add(face, glow);
+          drawer.position.set(0, -28 + d * 18, 10);
+          drawer.userData = {
+            openPhase: Math.random() * Math.PI * 2,
+            openSpeed: 0.25 + Math.random() * 0.4,
+            maxOpen: 8 + Math.random() * 6,
+            glow,
+            face,
+          };
+          drawers.push(drawer);
+          g.add(drawer);
         }
-      `,
-      fragmentShader: `
-        varying vec2 vUv;
-        uniform float uOpacity;
-        void main() {
-          // Soft page edges with faint horizontal "text lines"
-          float edge = smoothstep(0.0, 0.04, vUv.x) * smoothstep(1.0, 0.96, vUv.x)
-                     * smoothstep(0.0, 0.03, vUv.y) * smoothstep(1.0, 0.97, vUv.y);
-          // Six faint lines suggesting text
-          float lines = 0.0;
-          for (int i = 0; i < 6; i++) {
-            float y = 0.15 + float(i) * 0.14;
-            float band = smoothstep(0.008, 0.0, abs(vUv.y - y));
-            lines += band * smoothstep(0.12, 0.88, vUv.x) * 0.18;
-          }
-          vec3 paper = vec3(0.96, 0.86, 0.50) * 0.12;
-          vec3 ink = vec3(0.95, 0.82, 0.42);
-          vec3 col = paper + ink * lines;
-          gl_FragColor = vec4(col, uOpacity * edge * 0.7);
-        }
-      `,
-      transparent: true,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-    });
-    const beat1Docs = [];
-    for (let i = 0; i < DOC_COUNT; i++) {
-      const mesh = new THREE.Mesh(docGeom, docMaterial);
-      // Scatter through volume — biased forward (closer to camera) so some
-      // feel immediate and others recede into depth
-      mesh.position.x = (Math.random() - 0.5) * 380;
-      mesh.position.y = (Math.random() - 0.5) * 240;
-      mesh.position.z = (Math.random() - 0.5) * 400;
-      // Random rotation — documents floating at varying angles
-      mesh.rotation.x = (Math.random() - 0.5) * 0.6;
-      mesh.rotation.y = (Math.random() - 0.5) * 1.2;
-      mesh.rotation.z = (Math.random() - 0.5) * 0.4;
-      // Each doc gets a gentle drift velocity
-      mesh.userData.drift = {
-        vx: (Math.random() - 0.5) * 0.08,
-        vy: (Math.random() - 0.5) * 0.05,
-        vz: (Math.random() - 0.5) * 0.06,
-        rotSpeed: (Math.random() - 0.5) * 0.0008,
-      };
-      beat1Group.add(mesh);
-      beat1Docs.push(mesh);
+        g.userData = { drawers, bodyMat: body.material, side, z };
+        cabinets.push(g);
+        beat1Group.add(g);
+      }
     }
 
-    // ─── Intel tags: real references attached to ~8 random drift docs ──
-    // Small canvas-texture labels that flash real content as the camera drifts
-    // past. Viewers catch glimpses of actual doc names and citations — supports
-    // the "buried in thousands of pages" narration with a whiff of specificity.
-    const INTEL_TAGS = [
-      'Illinois Market Data',
-      'OAC §3796',
-      'IL 2025 Annual',
-      'Ohio Compliance',
-      '§3796-8-03',
-      '$262.9M FY2025',
-      '19.1% EBITDA',
-      '42 retail stores',
-      'Illinois Regs',
-      'Q4 Earnings Call',
-      '92 g/sq ft yield',
-      '160 wholesale doors',
-    ];
-    const beat1Tags = [];
-    // Attach tags to ~8 of the 36 docs, chosen from the forward half of the volume
-    // (closer to camera so they're actually readable)
-    const tagCount = Math.min(INTEL_TAGS.length, 10);
-    const forwardDocs = beat1Docs.filter(d => d.position.z > -100);
-    const shuffled = forwardDocs.slice().sort(() => Math.random() - 0.5);
-    for (let i = 0; i < tagCount && i < shuffled.length; i++) {
-      const hostDoc = shuffled[i];
-      const text = INTEL_TAGS[i % INTEL_TAGS.length];
-      // Build canvas label — small, bright gold, readable at distance
-      const tCanvas = document.createElement('canvas');
-      tCanvas.width = 512; tCanvas.height = 96;
-      const tctx = tCanvas.getContext('2d');
-      tctx.font = '500 42px "Inter", sans-serif';
-      tctx.textAlign = 'center';
-      tctx.textBaseline = 'middle';
-      const tGrad = tctx.createLinearGradient(0, 20, 0, 76);
-      tGrad.addColorStop(0, '#fff8e0');
-      tGrad.addColorStop(1, '#e8c84a');
-      tctx.fillStyle = tGrad;
-      tctx.shadowColor = 'rgba(212,168,50,0.7)';
-      tctx.shadowBlur = 16;
-      tctx.fillText(text, 256, 48);
-      const tTex = new THREE.CanvasTexture(tCanvas);
-      tTex.needsUpdate = true;
-      const tMat = new THREE.MeshBasicMaterial({
-        map: tTex, transparent: true, depthWrite: false, opacity: 0,
-      });
-      const tMesh = new THREE.Mesh(new THREE.PlaneGeometry(24, 4.5), tMat);
-      // Position tag slightly offset from the host doc
-      tMesh.position.copy(hostDoc.position);
-      tMesh.position.y += 22;  // above the doc
-      tMesh.userData.intelTag = true;
-      tMesh.userData.tagMat = tMat;
-      tMesh.userData.host = hostDoc;
-      // Each tag has a phase offset so they don't all flicker together
-      tMesh.userData.phaseOffset = Math.random() * 6.28;
-      beat1Group.add(tMesh);
-      beat1Tags.push(tMesh);
-    }
+    // Floor grid
+    const floorGrid = new THREE.GridHelper(CORRIDOR_LENGTH, 80, 0x1a2a1a, 0x0d1a0d);
+    floorGrid.position.y = -50;
+    floorGrid.material.transparent = true;
+    floorGrid.material.opacity = 0;
+    beat1Group.add(floorGrid);
 
-    C.scene.add(beat1Group);
-    C.beatObjects[1] = { group: beat1Group, docs: beat1Docs, material: docMaterial, intelTags: beat1Tags };
+    scene.add(beat1Group);
 
-    // ─── BEAT 3: Three orbital clusters (Compliance, Finance, Operations) ───
-    // Documents from beat 1 conceptually "get organized" — we show 3 rotating
-    // spherical clusters in distinct positions, each with a floating label.
+    // ─────────────────────────────────────────────────────────────
+    // BEAT 3 — DATA VAULT COLUMNS
+    // Towering columns of glowing holographic data panels rising
+    // to infinity above and below. Camera tilted looking up as
+    // columns slowly rotate. Each panel pulses independently.
+    // ─────────────────────────────────────────────────────────────
     const beat3Group = new THREE.Group();
     beat3Group.visible = false;
-    const clusterPositions = [
-      { name: 'Compliance',  pos: [-160,  40, -40], color: [0.95, 0.82, 0.45] },
-      { name: 'Finance',     pos: [  0,   0,  40], color: [0.95, 0.78, 0.50] },
-      { name: 'Operations',  pos: [160, -30, -60], color: [0.90, 0.75, 0.40] },
-    ];
-    const clusters = [];
-    clusterPositions.forEach((cp) => {
-      const clusterGroup = new THREE.Group();
-      clusterGroup.position.set(...cp.pos);
 
-      // Each cluster = 24 small docs orbiting a central point
-      const CLUSTER_DOCS = 24;
-      const clusterDocs = [];
-      const cDocGeom = new THREE.PlaneGeometry(10, 14, 1, 1);
-      for (let i = 0; i < CLUSTER_DOCS; i++) {
-        const mesh = new THREE.Mesh(cDocGeom, docMaterial);
-        const r = 28 + Math.random() * 14;
-        const theta = Math.random() * Math.PI * 2;
-        const phi = Math.acos(2 * Math.random() - 1);
-        mesh.position.set(
-          r * Math.sin(phi) * Math.cos(theta),
-          r * Math.sin(phi) * Math.sin(theta),
-          r * Math.cos(phi)
-        );
-        mesh.rotation.set(
-          Math.random() * Math.PI,
-          Math.random() * Math.PI,
-          Math.random() * Math.PI * 0.3
-        );
-        mesh.userData.orbit = {
-          radius: r,
-          theta,
-          phi,
-          speed: 0.15 + Math.random() * 0.2,
+    const COLUMN_COUNT = 14;
+    const PANELS_PER_COL = 18;
+    const vaultColumns = [];
+
+    // Data content for panels
+    const dataLines = [
+      ['ILLINOIS', '§410 ILCS 705'], ['OHIO RC 3796', 'COMPLIANCE'],
+      ['ADULT-USE', '2024 DATA'], ['CULTIVATION', 'LICENSE'],
+      ['MEDICAL', 'PROGRAM'], ['SEED-TO-SALE', 'TRACKING'],
+      ['DISPENSARY', 'OPERATIONS'], ['STATE REGS', 'CHAPTER 8'],
+      ['TAX REVENUE', '$685M'], ['LICENSE COUNT', '3,700+'],
+      ['COMPLIANCE', 'AUDIT'], ['REGULATORY', 'FRAMEWORK'],
+    ];
+
+    for (let ci = 0; ci < COLUMN_COUNT; ci++) {
+      const angle = (ci / COLUMN_COUNT) * Math.PI * 2;
+      const radius = 60 + (ci % 3) * 35;
+      const colGroup = new THREE.Group();
+      colGroup.position.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+      colGroup.userData = {
+        orbitSpeed: (0.04 + Math.random()*0.04) * (Math.random()>0.5?1:-1),
+        orbitRadius: radius,
+        orbitAngle: angle,
+        panels: [],
+      };
+
+      for (let pi = 0; pi < PANELS_PER_COL; pi++) {
+        const y = -PANELS_PER_COL*12 + pi * 24;
+        const dl = dataLines[(ci*3+pi) % dataLines.length];
+        const tex = makeLabel(dl, { w:256, h:64, size:18, lineH:28 });
+        const panel = makePanel(tex, 28, 14, 0);
+        panel.position.set(0, y, 0);
+        panel.rotation.y = Math.random() * 0.3 - 0.15;
+        panel.userData = {
+          pulsePhase: Math.random() * Math.PI * 2,
+          pulseSpeed: 0.5 + Math.random(),
+          baseMat: panel.material,
         };
-        clusterGroup.add(mesh);
-        clusterDocs.push(mesh);
+        colGroup.userData.panels.push(panel);
+        colGroup.add(panel);
+
+        // Thin connector line
+        const lineGeo = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(-14, 0, 0), new THREE.Vector3(14, 0, 0)
+        ]);
+        const lineMat = new THREE.LineBasicMaterial({ color: GOLD, transparent: true, opacity: 0.15 });
+        colGroup.add(new THREE.Line(lineGeo, lineMat));
       }
 
-      // Floating label via canvas texture — real 3D plane with rendered text
-      const labelCanvas = document.createElement('canvas');
-      labelCanvas.width = 512; labelCanvas.height = 128;
-      const lctx = labelCanvas.getContext('2d');
-      lctx.fillStyle = 'rgba(0,0,0,0)';
-      lctx.fillRect(0, 0, 512, 128);
-      lctx.font = '300 56px "Cormorant Garamond", serif';
-      lctx.textAlign = 'center';
-      lctx.textBaseline = 'middle';
-      // Gold gradient fill
-      const grad = lctx.createLinearGradient(0, 0, 0, 128);
-      grad.addColorStop(0.0, '#fff4cc');
-      grad.addColorStop(0.4, '#f5e398');
-      grad.addColorStop(0.7, '#e8c84a');
-      grad.addColorStop(1.0, '#c9a832');
-      lctx.fillStyle = grad;
-      lctx.shadowColor = 'rgba(212,168,50,0.5)';
-      lctx.shadowBlur = 18;
-      lctx.fillText(cp.name.toUpperCase(), 256, 64);
-      lctx.shadowBlur = 0;
-      const labelTex = new THREE.CanvasTexture(labelCanvas);
-      labelTex.needsUpdate = true;
-      const labelMat = new THREE.MeshBasicMaterial({
-        map: labelTex,
-        transparent: true,
-        depthWrite: false,
-        opacity: 0,
-      });
-      const labelGeom = new THREE.PlaneGeometry(80, 20);
-      const label = new THREE.Mesh(labelGeom, labelMat);
-      label.position.set(0, 60, 0);  // above the cluster
-      // Label always faces camera — we'll update this in the render loop
-      label.userData.billboard = true;
-      clusterGroup.add(label);
+      vaultColumns.push(colGroup);
+      beat3Group.add(colGroup);
+    }
 
-      beat3Group.add(clusterGroup);
-      clusters.push({ group: clusterGroup, docs: clusterDocs, label, labelMat, name: cp.name });
-    });
+    // Central core pillar
+    const coreGeom = new THREE.CylinderGeometry(1.5, 1.5, 600, 8);
+    const coreMat = new THREE.MeshBasicMaterial({ color: GOLD2, transparent: true, opacity: 0, blending: THREE.AdditiveBlending });
+    const corePillar = new THREE.Mesh(coreGeom, coreMat);
+    beat3Group.add(corePillar);
 
-    // ─── Cluster data holograms: one real fact per cluster ────────
-    // As clusters form and assemble, a relevant real stat hovers above each
-    // — compliance gets an Ohio code ref, finance gets the revenue number,
-    // operations gets the store count. The harvester's data flows in here
-    // via clusterFactPick(), which picks the best fact per theme.
-    const clusterFacts = this._pickBeat3ClusterFacts();
-    const clusterHolograms = [];
-    clusters.forEach((cluster, i) => {
-      const fact = clusterFacts[cluster.name];
-      if (!fact) return;
-      const holo = this._makeFloatingNumber3D(fact, { scale: 0.85 });
-      if (!holo) return;
-      // Position above the cluster's label (label is at y=60 on clusterGroup)
-      // Hologram sits above it at y=110, in cluster's local space.
-      holo.position.set(
-        cluster.group.position.x,
-        cluster.group.position.y + 95,
-        cluster.group.position.z
-      );
-      holo.userData.revealDelay = 1.8 + i * 0.7;  // staggered, appear as clusters form
-      beat3Group.add(holo);
-      clusterHolograms.push(holo);
-    });
+    scene.add(beat3Group);
 
-    C.scene.add(beat3Group);
-    C.beatObjects[3] = { group: beat3Group, clusters, clusterHolograms };
-
-    // ─── BEAT 4: A light-trace line connecting documents in one cluster ───
-    // Highlights the "retrieval" — camera dives into a cluster and a glowing
-    // gold line traces from doc to doc to doc as if following an answer path.
+    // ─────────────────────────────────────────────────────────────
+    // BEAT 4 — QUERY PULSE LATTICE
+    // 3D grid of nodes in all directions. A bright pulse wave
+    // propagates outward from origin in all directions.
+    // Camera below looking up at steep angle.
+    // ─────────────────────────────────────────────────────────────
     const beat4Group = new THREE.Group();
     beat4Group.visible = false;
-    // We'll build the line geometry dynamically when the beat starts,
-    // because we want it to originate in the Finance cluster center
-    C.beatObjects[4] = { group: beat4Group, line: null, traceStart: 0 };
-    C.scene.add(beat4Group);
 
-    // ─── BEAT 5: Connection threads within the cluster (visible from inside) ───
-    // Camera is INSIDE the cluster — thin threads connect nearby docs like
-    // a living web. Reuses geometry from beat 3's Finance cluster.
+    const LATTICE_SIZE = 8; // nodes per axis
+    const LATTICE_SPACING = 38;
+    const latticeNodes = [];
+    const latticeLines = [];
+
+    for (let x = -LATTICE_SIZE/2; x < LATTICE_SIZE/2; x++) {
+      for (let y = -LATTICE_SIZE/2; y < LATTICE_SIZE/2; y++) {
+        for (let z = -LATTICE_SIZE/2; z < LATTICE_SIZE/2; z++) {
+          const px = x * LATTICE_SPACING + (Math.random()-0.5)*8;
+          const py = y * LATTICE_SPACING + (Math.random()-0.5)*8;
+          const pz = z * LATTICE_SPACING + (Math.random()-0.5)*8;
+          const dist = Math.sqrt(px*px+py*py+pz*pz);
+
+          const nodeGeom = new THREE.SphereGeometry(1.2 + Math.random(), 6, 4);
+          const nodeMat = new THREE.MeshBasicMaterial({
+            color: dist < 60 ? GOLD3 : dist < 120 ? GOLD : STEEL,
+            transparent: true, opacity: 0
+          });
+          const node = new THREE.Mesh(nodeGeom, nodeMat);
+          node.position.set(px, py, pz);
+          node.userData = { dist, basePulse: Math.random() };
+          latticeNodes.push(node);
+          beat4Group.add(node);
+        }
+      }
+    }
+
+    // Sparse connection lines between nearby nodes (not all — just enough)
+    for (let i = 0; i < latticeNodes.length; i += 4) {
+      for (let j = i+1; j < latticeNodes.length; j += 4) {
+        const a = latticeNodes[i].position;
+        const b = latticeNodes[j].position;
+        const d = a.distanceTo(b);
+        if (d < LATTICE_SPACING * 1.6) {
+          const lg = new THREE.BufferGeometry().setFromPoints([a.clone(), b.clone()]);
+          const lm = new THREE.LineBasicMaterial({ color: TEAL, transparent: true, opacity: 0 });
+          const line = new THREE.Line(lg, lm);
+          line.userData = { distA: a.distanceTo(new THREE.Vector3(0,0,0)), distB: b.distanceTo(new THREE.Vector3(0,0,0)) };
+          latticeLines.push(line);
+          beat4Group.add(line);
+        }
+      }
+    }
+
+    scene.add(beat4Group);
+
+    // ─────────────────────────────────────────────────────────────
+    // BEAT 5 — CONSTELLATION KNOWLEDGE MAP
+    // Documents as stars in deep space with arcing light
+    // connections sparking between them asynchronously.
+    // Camera drifts slowly, steep downward angle.
+    // ─────────────────────────────────────────────────────────────
     const beat5Group = new THREE.Group();
     beat5Group.visible = false;
-    C.beatObjects[5] = { group: beat5Group, lines: [] };
-    C.scene.add(beat5Group);
-    // We'll build threads when beat 5 actually shows — they depend on beat 3's cluster positions
 
-    // ─── BEAT 7: Four guarantee 3D icons, pulsing in sequence ───
-    // Each icon is a composite of primitive meshes representing a guarantee:
-    //   SOURCES     → open book (two angled pages + spine)
-    //   LOGGED      → clipboard with checkmark
-    //   OURS        → shield with crest stripe and crossbar
-    //   NO TRAINING → ring with a diagonal slash through it
-    const beat7Group = new THREE.Group();
-    beat7Group.visible = false;
-    const iconGold = 0xf5e398;
-    const iconMat = new THREE.MeshBasicMaterial({
-      color: iconGold,
-      transparent: true,
-      opacity: 0,
-      blending: THREE.AdditiveBlending,
-      side: THREE.DoubleSide,
-    });
-
-    // Composite-geometry builders — each returns a THREE.Group
-    const buildBook = () => {
-      const g = new THREE.Group();
-      const pageGeom = new THREE.PlaneGeometry(20, 26);
-      const pageL = new THREE.Mesh(pageGeom, iconMat);
-      pageL.position.set(-10, 0, 0);
-      pageL.rotation.y = Math.PI / 6;
-      const pageR = new THREE.Mesh(pageGeom, iconMat);
-      pageR.position.set(10, 0, 0);
-      pageR.rotation.y = -Math.PI / 6;
-      const spineGeom = new THREE.BoxGeometry(1.2, 28, 1.2);
-      const spine = new THREE.Mesh(spineGeom, iconMat);
-      g.add(pageL, pageR, spine);
-      return g;
-    };
-    const buildClipboard = () => {
-      const g = new THREE.Group();
-      const page = new THREE.Mesh(new THREE.PlaneGeometry(24, 30), iconMat);
-      const clip = new THREE.Mesh(new THREE.BoxGeometry(8, 3, 2), iconMat);
-      clip.position.set(0, 16, 1.2);
-      const leg1 = new THREE.Mesh(new THREE.BoxGeometry(8, 1.6, 1.6), iconMat);
-      leg1.position.set(-3, -1, 1.4);
-      leg1.rotation.z = Math.PI / 4;
-      const leg2 = new THREE.Mesh(new THREE.BoxGeometry(14, 1.6, 1.6), iconMat);
-      leg2.position.set(3, 2.5, 1.4);
-      leg2.rotation.z = -Math.PI / 6;
-      g.add(page, clip, leg1, leg2);
-      return g;
-    };
-    const buildShield = () => {
-      const g = new THREE.Group();
-      const outer = new THREE.Mesh(new THREE.CircleGeometry(16, 5, Math.PI / 2), iconMat);
-      const stripe = new THREE.Mesh(new THREE.BoxGeometry(2, 22, 0.5), iconMat);
-      stripe.position.set(0, -1, 1);
-      const bar = new THREE.Mesh(new THREE.BoxGeometry(14, 2, 0.5), iconMat);
-      bar.position.set(0, 5, 1);
-      g.add(outer, stripe, bar);
-      return g;
-    };
-    const buildNoTraining = () => {
-      const g = new THREE.Group();
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(12, 1.6, 10, 36), iconMat);
-      const slash = new THREE.Mesh(new THREE.BoxGeometry(28, 2.2, 2.2), iconMat);
-      slash.rotation.z = -Math.PI / 4;
-      g.add(ring, slash);
-      return g;
-    };
-
-    const orbPositions = [
-      { pos: [-140,  70, 0],  label: 'SOURCES',      builder: buildBook       },
-      { pos: [ 140,  70, 0],  label: 'LOGGED',       builder: buildClipboard  },
-      { pos: [-140, -70, 0],  label: 'OURS',         builder: buildShield     },
-      { pos: [ 140, -70, 0],  label: 'NO TRAINING',  builder: buildNoTraining },
+    const CONSTELLATION_COUNT = 8;
+    const STARS_PER_CONST = 12;
+    const constellations = [];
+    const constLabels = [
+      'COMPLIANCE', 'FINANCE', 'OPERATIONS', 'RETAIL',
+      'CULTIVATION', 'REGULATORY', 'MARKET DATA', 'LICENSING',
     ];
-    const orbs = [];
-    orbPositions.forEach((op) => {
-      const iconGroup = op.builder();
-      iconGroup.position.set(...op.pos);
-      // Soft halo sphere behind each icon for presence
-      const haloMat = new THREE.MeshBasicMaterial({
-        color: iconGold,
-        transparent: true,
-        opacity: 0,
-        blending: THREE.AdditiveBlending,
-      });
-      const halo = new THREE.Mesh(new THREE.SphereGeometry(22, 16, 12), haloMat);
-      halo.position.set(...op.pos);
-      beat7Group.add(halo);
-      beat7Group.add(iconGroup);
 
-      // Text label beneath the icon — canvas-texture plane, billboards to camera
-      const labelCanvas = document.createElement('canvas');
-      labelCanvas.width = 512; labelCanvas.height = 128;
-      const lctx = labelCanvas.getContext('2d');
-      lctx.font = '400 48px "Inter", sans-serif';
-      lctx.textAlign = 'center';
-      lctx.textBaseline = 'middle';
-      // Gold gradient text with letter-spacing simulated by expanding each letter
-      const grad = lctx.createLinearGradient(0, 30, 0, 100);
-      grad.addColorStop(0.0, '#fff4cc');
-      grad.addColorStop(0.5, '#f5e398');
-      grad.addColorStop(1.0, '#c9a832');
-      lctx.fillStyle = grad;
-      lctx.shadowColor = 'rgba(212,168,50,0.4)';
-      lctx.shadowBlur = 14;
-      // Render each character with extra tracking for the thin-gold-caps look
-      const txt = op.label;
-      const tracking = 10;
-      lctx.save();
-      const metrics = lctx.measureText(txt);
-      const totalW = metrics.width + tracking * (txt.length - 1);
-      let x = 256 - totalW / 2;
-      for (const ch of txt) {
-        lctx.textAlign = 'left';
-        lctx.fillText(ch, x, 64);
-        x += lctx.measureText(ch).width + tracking;
+    for (let ci = 0; ci < CONSTELLATION_COUNT; ci++) {
+      const cx = (Math.random()-0.5)*600;
+      const cy = (Math.random()-0.5)*400;
+      const cz = (Math.random()-0.5)*600;
+      const constGroup = new THREE.Group();
+      constGroup.position.set(cx, cy, cz);
+      const stars = [];
+
+      for (let si = 0; si < STARS_PER_CONST; si++) {
+        const sx = (Math.random()-0.5)*120;
+        const sy = (Math.random()-0.5)*80;
+        const sz = (Math.random()-0.5)*120;
+        const size = 1.5 + Math.random()*3;
+        const sg = new THREE.SphereGeometry(size, 6, 4);
+        const sm = new THREE.MeshBasicMaterial({ color: Math.random()>0.7 ? GOLD3 : Math.random()>0.5 ? GOLD : STEEL, transparent: true, opacity: 0 });
+        const star = new THREE.Mesh(sg, sm);
+        star.position.set(sx, sy, sz);
+        star.userData = { twinklePhase: Math.random()*Math.PI*2, twinkleSpeed: 0.8+Math.random() };
+        stars.push(star);
+        constGroup.add(star);
       }
-      lctx.restore();
-      const labelTex = new THREE.CanvasTexture(labelCanvas);
-      labelTex.needsUpdate = true;
-      const labelMat = new THREE.MeshBasicMaterial({
-        map: labelTex,
-        transparent: true,
-        depthWrite: false,
-        opacity: 0,
-      });
-      const label = new THREE.Mesh(new THREE.PlaneGeometry(72, 18), labelMat);
-      // Position below the icon
-      label.position.set(op.pos[0], op.pos[1] - 34, op.pos[2]);
-      label.userData.billboard = true;
-      beat7Group.add(label);
 
-      orbs.push({
-        mesh: iconGroup,
-        halo,
-        haloMat,
-        iconMat,
-        label,
-        labelMat,
-        position: op.pos,
-        labelText: op.label,
-      });
-    });
+      // Label
+      const tex = makeLabel([constLabels[ci]], { w:256, h:48, size:20 });
+      const label = makePanel(tex, 60, 15, 0);
+      label.position.set(0, 55, 0);
+      label.userData.isLabel = true;
+      constGroup.add(label);
 
-    // ─── CACI centerpiece ─────────────────────────────────────────
-    // Luminous gold sphere in the center of the Beat 7 icon constellation.
-    // Represents CACI herself at the heart of her guarantees. Radiating lines
-    // connect her to each icon — the visual metaphor: these are HER promises.
-    // The inner sphere is solid gold; the outer halo is additive-blended for
-    // the bloom effect. Breathing scale keeps her feeling alive.
-    const caciInnerGeom = new THREE.SphereGeometry(7, 32, 24);
-    const caciInnerMat = new THREE.MeshBasicMaterial({
-      color: 0xf5e398,
-      transparent: true,
-      opacity: 0,
-    });
-    const caciInner = new THREE.Mesh(caciInnerGeom, caciInnerMat);
-    beat7Group.add(caciInner);
+      constGroup.userData = { stars, label, ci, driftSpeed: (Math.random()-0.5)*0.008 };
+      constellations.push(constGroup);
+      beat5Group.add(constGroup);
 
-    const caciHaloGeom = new THREE.SphereGeometry(14, 32, 24);
-    const caciHaloMat = new THREE.MeshBasicMaterial({
-      color: 0xffe8a0,
-      transparent: true,
-      opacity: 0,
-      blending: THREE.AdditiveBlending,
-    });
-    const caciHalo = new THREE.Mesh(caciHaloGeom, caciHaloMat);
-    beat7Group.add(caciHalo);
+      // Arc connections — pre-build a pool, animate in startCinema
+      for (let ai = 0; ai < 3; ai++) {
+        const arcCurve = new THREE.QuadraticBezierCurve3(
+          new THREE.Vector3(0,0,0),
+          new THREE.Vector3((Math.random()-0.5)*80, 40+Math.random()*40, (Math.random()-0.5)*80),
+          new THREE.Vector3((Math.random()-0.5)*120, (Math.random()-0.5)*80, (Math.random()-0.5)*120)
+        );
+        const arcPts = arcCurve.getPoints(20);
+        const arcGeo = new THREE.BufferGeometry().setFromPoints(arcPts);
+        const arcMat = new THREE.LineBasicMaterial({ color: GOLD2, transparent: true, opacity: 0, blending: THREE.AdditiveBlending });
+        const arc = new THREE.Line(arcGeo, arcMat);
+        arc.userData = { arcPhase: Math.random()*Math.PI*2, arcSpeed: 0.3+Math.random()*0.5 };
+        constGroup.add(arc);
+      }
+    }
 
-    // Outermost soft bloom — bigger sphere, very low opacity
-    const caciBloomGeom = new THREE.SphereGeometry(26, 24, 18);
-    const caciBloomMat = new THREE.MeshBasicMaterial({
-      color: 0xf0d060,
-      transparent: true,
-      opacity: 0,
-      blending: THREE.AdditiveBlending,
-    });
-    const caciBloom = new THREE.Mesh(caciBloomGeom, caciBloomMat);
-    beat7Group.add(caciBloom);
+    scene.add(beat5Group);
 
-    // Radiating lines from CACI → each of the 4 icons.
-    // One line material per radial, so we can brighten individual lines
-    // when that icon pulses (matching the pulse sequence in the update loop).
-    const radialLines = [];
-    orbs.forEach((orb, i) => {
-      const radialMat = new THREE.LineBasicMaterial({
-        color: 0xf5e398,
-        transparent: true,
-        opacity: 0,
-        blending: THREE.AdditiveBlending,
-      });
-      const radialGeom = new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(orb.position[0], orb.position[1], orb.position[2]),
-      ]);
-      const radialLine = new THREE.Line(radialGeom, radialMat);
-      beat7Group.add(radialLine);
-
-      // Traveling pulse dot — a small bright sphere that flies from CACI to
-      // the icon during that icon's pulse. Reinforces "activity" — she's
-      // actively signaling each guarantee as she speaks it.
-      const pulseGeom = new THREE.SphereGeometry(1.5, 12, 10);
-      const pulseMat = new THREE.MeshBasicMaterial({
-        color: 0xfff4cc,
-        transparent: true,
-        opacity: 0,
-        blending: THREE.AdditiveBlending,
-      });
-      const pulseDot = new THREE.Mesh(pulseGeom, pulseMat);
-      beat7Group.add(pulseDot);
-
-      radialLines.push({
-        line: radialLine, mat: radialMat,
-        pulseDot, pulseMat,
-        orbPos: new THREE.Vector3(orb.position[0], orb.position[1], orb.position[2]),
-        origin: new THREE.Vector3(0, 0, 0),
-        orbIdx: i,
-      });
-    });
-
-    C.scene.add(beat7Group);
-    C.beatObjects[7] = {
-      group: beat7Group,
-      orbs,
-      pulseSequenceStart: 0,
-      iconMat,
-      caciInner, caciInnerMat,
-      caciHalo,  caciHaloMat,
-      caciBloom, caciBloomMat,
-      radialLines,
-    };
-
-    // ─── BEAT 6: Her actual library — 4 document stacks ───────────────
-    // Honest visualization of what CACI has read. Each stack is a cluster
-    // of document planes with a floating canvas-texture label showing the
-    // real collection name. No fake stats, no made-up simulations.
+    // ─────────────────────────────────────────────────────────────
+    // BEAT 6 — DOCUMENT CATHEDRAL
+    // Camera at the base of a shaft looking steeply upward.
+    // Illinois + Ohio document towers rise into infinity.
+    // Labels float and rotate independently. Slow upward spiral.
+    // ─────────────────────────────────────────────────────────────
     const beat6Group = new THREE.Group();
     beat6Group.visible = false;
-    const LIBRARY_ITEMS = [
-      { name: 'ILLINOIS',           sub: 'Market Data 2025',       pos: [-130,  50, 0],  docCount: 12 },
-      { name: 'OHIO',               sub: 'Regulatory code',        pos: [ -45, -40, 20], docCount: 18 },
-      { name: 'ILLINOIS',           sub: 'Cannabis regulations',   pos: [  60,  50, 0],  docCount: 14 },
-      { name: 'ILLINOIS 2025',      sub: 'Annual report',          pos: [ 150, -35, 30], docCount: 8 },
+
+    const TOWER_DATA = [
+      { name: 'ILLINOIS', sub: 'Cannabis Market 2025', color1:'#fff4cc', color2:'#f5e398', color3:'#c9a832', x:-90, z:0, count:22, docColor:0x0d1828 },
+      { name: 'OHIO', sub: 'Regulatory Code', color1:'#ccf4ff', color2:'#7ecfff', color3:'#3B6FA8', x:90, z:0, count:20, docColor:0x080f1a },
+      { name: 'ILLINOIS 2025', sub: 'Annual Report', color1:'#fff4cc', color2:'#e8c84a', color3:'#a87f20', x:-40, z:-70, count:16, docColor:0x0a1520 },
+      { name: 'OHIO REGS', sub: 'Chapter 3796', color1:'#d0e8ff', color2:'#5aabff', color3:'#1E3A5F', x:40, z:-70, count:14, docColor:0x060d18 },
     ];
-    const libraryStacks = [];
-    LIBRARY_ITEMS.forEach((item, idx) => {
-      const stackGroup = new THREE.Group();
-      stackGroup.position.set(...item.pos);
 
-      // Build a stack — documents at slightly offset positions/rotations,
-      // like a pile of papers gently askew
-      const stackDocs = [];
-      const sDocGeom = new THREE.PlaneGeometry(30, 40, 1, 1);
-      for (let i = 0; i < item.docCount; i++) {
-        const mesh = new THREE.Mesh(sDocGeom, docMaterial);
-        // Slight random offsets for an organic stack appearance
-        mesh.position.set(
-          (Math.random() - 0.5) * 8,
-          i * 1.2 - item.docCount * 0.6,
-          (Math.random() - 0.5) * 8
-        );
-        mesh.rotation.set(
-          Math.PI / 2 + (Math.random() - 0.5) * 0.12,   // laying roughly flat with tilt
-          (Math.random() - 0.5) * 0.2,
-          (Math.random() - 0.5) * 0.15
-        );
-        stackGroup.add(mesh);
-        stackDocs.push(mesh);
+    const docTowers = [];
+    TOWER_DATA.forEach((td) => {
+      const tg = new THREE.Group();
+      tg.position.set(td.x, -200, td.z);
+      const docs = [];
+
+      for (let di = 0; di < td.count; di++) {
+        const y = di * 32;
+        const dm = new THREE.MeshBasicMaterial({ color: td.docColor, transparent: true, opacity: 0 });
+        const doc = new THREE.Mesh(new THREE.BoxGeometry(28, 1.5, 38), dm);
+        doc.position.set((Math.random()-0.5)*4, y, (Math.random()-0.5)*4);
+        doc.rotation.y = (Math.random()-0.5)*0.15;
+        doc.userData = { dm, baseY: y, floatPhase: Math.random()*Math.PI*2 };
+        docs.push(doc);
+        tg.add(doc);
+
+        // Subtle glow edge
+        const edgeMat = new THREE.MeshBasicMaterial({ color: td.docColor < 0x0d1828 ? STEEL : GOLD, transparent: true, opacity: 0, blending: THREE.AdditiveBlending });
+        const edge = new THREE.Mesh(new THREE.BoxGeometry(29, 0.3, 39), edgeMat);
+        edge.position.copy(doc.position);
+        edge.position.y += 0.9;
+        tg.add(edge);
       }
 
-      // Label canvas — two lines, serif gold gradient like Beat 3's cluster labels
-      const labelCanvas = document.createElement('canvas');
-      labelCanvas.width = 768; labelCanvas.height = 192;
-      const lctx = labelCanvas.getContext('2d');
-      // Primary name line
-      lctx.font = '300 64px "Cormorant Garamond", serif';
-      lctx.textAlign = 'center';
-      lctx.textBaseline = 'middle';
-      const gradN = lctx.createLinearGradient(0, 30, 0, 100);
-      gradN.addColorStop(0.0, '#fff4cc');
-      gradN.addColorStop(0.4, '#f5e398');
-      gradN.addColorStop(0.7, '#e8c84a');
-      gradN.addColorStop(1.0, '#c9a832');
-      lctx.fillStyle = gradN;
-      lctx.shadowColor = 'rgba(212,168,50,0.4)';
-      lctx.shadowBlur = 14;
-      lctx.fillText(item.name, 384, 75);
-      // Subtitle line — smaller, muted
-      lctx.shadowBlur = 0;
-      lctx.font = '300 italic 30px "Cormorant Garamond", serif';
-      lctx.fillStyle = 'rgba(230,210,160,0.70)';
-      lctx.fillText(item.sub, 384, 135);
-      const labelTex = new THREE.CanvasTexture(labelCanvas);
-      labelTex.needsUpdate = true;
-      const labelMat = new THREE.MeshBasicMaterial({
-        map: labelTex,
-        transparent: true,
-        depthWrite: false,
-        opacity: 0,
-      });
-      const labelGeom = new THREE.PlaneGeometry(100, 25);
-      const label = new THREE.Mesh(labelGeom, labelMat);
-      label.position.set(0, 40, 0);
-      label.userData.billboard = true;
-      stackGroup.add(label);
+      // Floating label
+      const tex = makeLabel([td.name, td.sub], { w:512, h:128, size:36, lineH:52, color1:td.color1, color2:td.color2, color3:td.color3 });
+      const label = makePanel(tex, 90, 22, 0);
+      label.position.set(0, td.count * 32 + 30, 0);
+      label.userData = { billboard: true, floatPhase: Math.random()*Math.PI*2 };
+      tg.add(label);
 
-      beat6Group.add(stackGroup);
-      libraryStacks.push({ group: stackGroup, docs: stackDocs, label, labelMat, name: item.name });
+      tg.userData = { docs, label, td };
+      docTowers.push(tg);
+      beat6Group.add(tg);
     });
 
-    // ─── Real data bar charts floating next to library stacks ───
-    // Pull from statsBank.charts — each chart sits as a 3D holographic bar
-    // visualization near its associated document stack. Real numbers, big enough
-    // to actually see and read at viewing distance.
-    const libraryCharts = [];
-    if (this.statsBank && Array.isArray(this.statsBank.charts) && this.statsBank.charts.length > 0) {
-      // Place up to 2 charts as companions to the library stacks. Charts sit
-      // BELOW the stack labels in vertical space so their titles don't collide
-      // with "JUSHI EARNINGS" / "ILLINOIS 2025" (which float at y≈90 above
-      // their stacks). Charts are also pushed wider to opposite edges of the
-      // scene so their category labels don't run into the OHIO/ILLINOIS stacks
-      // clustered in the middle.
-      //
-      // Previous tuning put charts at y=10 which placed their titles ~82 (right
-      // next to the stack labels). Now they sit at y=-10 with slightly smaller
-      // dimensions, so titles land around y=65 — well clear of the stacks above
-      // and the category labels well clear of the OHIO stack below.
-      const CHART_PLACEMENTS = [
-        { pos: [-190,  -15,  30], scale: 1.0 },   // far left, offset from JUSHI EARNINGS
-        { pos: [ 210,  -15,  30], scale: 1.0 },   // far right, offset from ILLINOIS 2025
-      ];
-      // Take the first N charts from whatever's in the bank (works with
-      // either the hardcoded data or the harvested/saved data from KV)
-      const picked = this.statsBank.charts.slice(0, CHART_PLACEMENTS.length);
-      picked.forEach((chart, i) => {
-        const placement = CHART_PLACEMENTS[i];
-        // Slightly smaller dimensions so the chart fits cleanly in its own zone
-        const chartMesh = this._makeBarChart3D(chart, { width: 120, height: 75 });
-        if (!chartMesh) return;
-        chartMesh.position.set(...placement.pos);
-        chartMesh.scale.setScalar(placement.scale);
-        chartMesh.userData.revealDelay = 1.2 + i * 0.8;
-        beat6Group.add(chartMesh);
-        libraryCharts.push(chartMesh);
-      });
-    }
+    scene.add(beat6Group);
 
-    C.scene.add(beat6Group);
-    C.beatObjects[6] = { group: beat6Group, stacks: libraryStacks, charts: libraryCharts };
-  },
+    // ─────────────────────────────────────────────────────────────
+    // BEAT 7 — ROTATING GUARANTEE RING
+    // A massive torus ring with guarantee holographic panels
+    // mounted on it, slowly rotating. Camera inside it looking
+    // up at an angle. Each panel pulses and the ring breathes.
+    // ─────────────────────────────────────────────────────────────
+    const beat7Group = new THREE.Group();
+    beat7Group.visible = false;
 
-  // Fade in the 3D objects for a given beat. Tweens uOpacity (for shader
-  // materials) and material.opacity (for basic materials) from 0 to 1.
-  showBeatObjects(beatId) {
-    const C = this.cinema;
-    if (!C) return;
-    const entry = C.beatObjects[beatId];
-    if (!entry) return;
-    // Cancel any pending hide-safety timer (e.g. if we re-show before fade-out completes)
-    if (entry._hideSafetyTimer) {
-      clearTimeout(entry._hideSafetyTimer);
-      entry._hideSafetyTimer = null;
-    }
-    entry._hideStartTime = null;   // reset fade-out tracking
-    entry.group.visible = true;
-    entry._showStartTime = performance.now();
+    // The torus itself
+    const torusGeom = new THREE.TorusGeometry(160, 4, 12, 80);
+    const torusMat = new THREE.MeshBasicMaterial({ color: GOLD, transparent: true, opacity: 0, wireframe: true });
+    const torus = new THREE.Mesh(torusGeom, torusMat);
+    torus.rotation.x = Math.PI / 2;
+    beat7Group.add(torus);
 
-    // Special setup per beat
-    if (beatId === 4) this._initBeat4Trace();
-    if (beatId === 5) this._initBeat5Threads();
-    if (beatId === 7) {
-      entry.pulseSequenceStart = performance.now();
-    }
-  },
+    // Second inner torus
+    const torus2 = new THREE.Mesh(
+      new THREE.TorusGeometry(110, 2, 8, 60),
+      new THREE.MeshBasicMaterial({ color: STEEL, transparent: true, opacity: 0, wireframe: true })
+    );
+    torus2.rotation.x = Math.PI / 3;
+    beat7Group.add(torus2);
 
-  hideBeatObjects(beatId) {
-    const C = this.cinema;
-    if (!C) return;
-    const entry = C.beatObjects[beatId];
-    if (!entry) return;
-    entry._hideStartTime = performance.now();
-    // Belt-and-suspenders: after the fade duration, force the group hidden
-    // and zero out any shared material opacities that might otherwise linger.
-    const HIDE_SAFETY_DELAY = 1100;  // slightly longer than FADE_DUR (900ms)
-    if (entry._hideSafetyTimer) clearTimeout(entry._hideSafetyTimer);
-    entry._hideSafetyTimer = setTimeout(() => {
-      if (!entry._hideStartTime) return;  // already canceled by a re-show
-      entry.group.visible = false;
-      // Zero out shared materials on Beat 7 (iconMat + haloMat + labelMat)
-      // since the render loop skips invisible groups but shared materials might
-      // still carry their last opacity values elsewhere.
-      if (beatId === 7 && entry.iconMat) entry.iconMat.opacity = 0;
-      if (beatId === 7 && entry.orbs) {
-        entry.orbs.forEach(o => {
-          if (o.haloMat) o.haloMat.opacity = 0;
-          if (o.labelMat) o.labelMat.opacity = 0;
-        });
-      }
-    }, HIDE_SAFETY_DELAY);
-  },
-
-  // Create the retrieval-trace line for Beat 4 — a light path through
-  // documents in one cluster, showing how she navigates to an answer
-  _initBeat4Trace() {
-    const C = this.cinema;
-    if (!C) return;
-    const entry4 = C.beatObjects[4];
-    const entry3 = C.beatObjects[3];
-    if (!entry4 || !entry3 || !entry3.clusters || entry3.clusters.length === 0) return;
-    const THREE = C.THREE;
-    // Clean up from previous run
-    if (entry4.line) {
-      entry4.group.remove(entry4.line);
-      entry4.line.geometry.dispose();
-      entry4.line = null;
-    }
-    if (entry4.queryOrb) {
-      entry4.group.remove(entry4.queryOrb);
-      entry4.queryOrb.geometry.dispose();
-      entry4.queryOrb = null;
-    }
-    if (entry4.highlights) {
-      entry4.highlights.forEach(h => {
-        entry4.group.remove(h);
-        h.geometry.dispose();
-      });
-      entry4.highlights = null;
-    }
-    // Pick the Finance cluster (center one) and build a path through 4 docs
-    const finance = entry3.clusters[1];
-    if (!finance || !finance.docs || finance.docs.length < 4) return;
-    const indices = [3, 9, 16, 21];
-    const points = indices.map(i => {
-      const d = finance.docs[i % finance.docs.length];
-      return d.position.clone().add(finance.group.position);
-    });
-    // Base line through all 4 documents
-    const lineGeom = new THREE.BufferGeometry().setFromPoints(points);
-    const lineMat = new THREE.LineBasicMaterial({
-      color: 0xffe996,
-      transparent: true,
-      opacity: 0,
-      blending: THREE.AdditiveBlending,
-    });
-    const line = new THREE.Line(lineGeom, lineMat);
-    entry4.line = line;
-    entry4.lineMat = lineMat;
-    entry4.tracePoints = points;
-    entry4.group.add(line);
-
-    // Query orb — small bright sphere that travels the path
-    const orbGeom = new THREE.SphereGeometry(5, 20, 16);
-    const orbMat = new THREE.MeshBasicMaterial({
-      color: 0xffffcc,
-      transparent: true,
-      opacity: 0,
-      blending: THREE.AdditiveBlending,
-    });
-    const queryOrb = new THREE.Mesh(orbGeom, orbMat);
-    // Start off-screen (toward camera, above the cluster) so it looks like
-    // it enters the scene as a query
-    const startPos = points[0].clone();
-    startPos.y += 120;
-    startPos.z += 80;
-    queryOrb.position.copy(startPos);
-    entry4.queryOrb = queryOrb;
-    entry4.queryOrbMat = orbMat;
-    entry4.queryOrbStartPos = startPos;
-    entry4.group.add(queryOrb);
-
-    // Highlight rings — one per document in the trace. Fade in as orb reaches them.
-    const highlights = [];
-    const highlightTimes = [];
-    points.forEach((p, i) => {
-      const ringGeom = new THREE.RingGeometry(10, 14, 24);
-      const ringMat = new THREE.MeshBasicMaterial({
-        color: 0xfff4cc,
-        transparent: true,
-        opacity: 0,
-        blending: THREE.AdditiveBlending,
-        side: THREE.DoubleSide,
-      });
-      const ring = new THREE.Mesh(ringGeom, ringMat);
-      ring.position.copy(p);
-      highlights.push(ring);
-      // Each highlight activates at a staggered time (seconds into beat)
-      highlightTimes.push(1.2 + i * 1.4);
-      entry4.group.add(ring);
-    });
-    entry4.highlights = highlights;
-    entry4.highlightTimes = highlightTimes;
-    entry4.traceStart = performance.now();
-
-    // ─── Answer hologram: the real stat that CACI "found" ───
-    // After the query orb has traveled through all 4 documents, a real stat
-    // appears near the end of the trace — the retrieved answer. This is the
-    // "payoff" moment of the beat. Uses the most impressive single stat.
-    if (entry4.answerHologram) {
-      entry4.group.remove(entry4.answerHologram);
-    }
-    const pickedAnswer = (this.statsBank && this.statsBank.singles && this.statsBank.singles[0]) || null;
-    if (pickedAnswer) {
-      const answer = this._makeFloatingNumber3D(pickedAnswer, { scale: 1.6 });
-      if (answer) {
-        // Position just off to the side of the final trace point, closer to camera
-        const finalPt = points[points.length - 1].clone();
-        answer.position.set(finalPt.x + 15, finalPt.y + 30, finalPt.z + 25);
-        // Reveal after all 4 documents have been highlighted (4 × 1.4 = 5.6s + buffer)
-        answer.userData.revealDelay = 6.4;
-        entry4.group.add(answer);
-        entry4.answerHologram = answer;
-      }
-    }
-  },
-
-  // Create connection threads for Beat 5 — thin gold lines connecting nearby
-  // documents in the Finance cluster, plus a few cross-cluster reaches showing
-  // that connections exist beyond any one department.
-  _initBeat5Threads() {
-    const C = this.cinema;
-    if (!C) return;
-    const entry5 = C.beatObjects[5];
-    const entry3 = C.beatObjects[3];
-    if (!entry5 || !entry3 || !entry3.clusters) return;
-    // Clear previous threads and pulses
-    entry5.lines.forEach(l => { entry5.group.remove(l); l.geometry.dispose(); });
-    entry5.lines = [];
-    if (entry5.pulses) {
-      entry5.pulses.forEach(p => {
-        entry5.group.remove(p.mesh);
-        p.mesh.geometry.dispose();
-      });
-    }
-    entry5.pulses = [];
-    const THREE = C.THREE;
-    // Threads within the Finance cluster
-    const finance = entry3.clusters[1];
-    if (!finance || !finance.docs) return;
-    const docs = finance.docs;
-    const clusterCenter = finance.group.position;
-    const added = new Set();
-    const threadData = [];  // remember endpoints for pulse traversal
-    docs.forEach((doc, i) => {
-      const myPos = doc.position.clone().add(clusterCenter);
-      const sortedByDist = docs
-        .map((d, j) => {
-          if (i === j) return null;
-          const wp = d.position.clone().add(clusterCenter);
-          return { idx: j, dist: myPos.distanceTo(wp), pos: wp };
-        })
-        .filter(Boolean)
-        .sort((a, b) => a.dist - b.dist)
-        .slice(0, 2);
-      sortedByDist.forEach(n => {
-        const key = i < n.idx ? `${i}-${n.idx}` : `${n.idx}-${i}`;
-        if (added.has(key)) return;
-        added.add(key);
-        const geom = new THREE.BufferGeometry().setFromPoints([myPos, n.pos]);
-        const mat = new THREE.LineBasicMaterial({
-          color: 0xc9a832,
-          transparent: true,
-          opacity: 0,
-          blending: THREE.AdditiveBlending,
-        });
-        const line = new THREE.Line(geom, mat);
-        entry5.lines.push(line);
-        entry5.group.add(line);
-        threadData.push({ a: myPos.clone(), b: n.pos.clone(), crossCluster: false });
-      });
-    });
-    // Cross-cluster reaches — a few threads from Finance out to Compliance and Operations
-    // showing that connections span departments (multi-collection reasoning)
-    const otherClusters = [entry3.clusters[0], entry3.clusters[2]];  // Compliance, Operations
-    otherClusters.forEach((other) => {
-      if (!other || !other.docs) return;
-      // Pick 2 documents from each "other" cluster and connect them to nearby Finance docs
-      for (let k = 0; k < 2; k++) {
-        const otherDoc = other.docs[Math.floor((k + 1) * other.docs.length / 4)];
-        const otherWp = otherDoc.position.clone().add(other.group.position);
-        // Find nearest Finance doc
-        const nearestFinance = docs
-          .map(d => ({ doc: d, pos: d.position.clone().add(clusterCenter) }))
-          .map(o => ({ ...o, dist: otherWp.distanceTo(o.pos) }))
-          .sort((a, b) => a.dist - b.dist)[0];
-        if (!nearestFinance) continue;
-        const geom = new THREE.BufferGeometry().setFromPoints([nearestFinance.pos, otherWp]);
-        const mat = new THREE.LineBasicMaterial({
-          color: 0xc9a832,
-          transparent: true,
-          opacity: 0,
-          blending: THREE.AdditiveBlending,
-        });
-        const line = new THREE.Line(geom, mat);
-        entry5.lines.push(line);
-        entry5.group.add(line);
-        threadData.push({ a: nearestFinance.pos.clone(), b: otherWp.clone(), crossCluster: true });
-      }
-    });
-    entry5.threadData = threadData;
-
-    // Create a handful of small bright pulses that travel along random threads.
-    // These give the threads a "data flowing" feel.
-    const PULSE_COUNT = 6;
-    for (let p = 0; p < PULSE_COUNT; p++) {
-      const pulseGeom = new THREE.SphereGeometry(1.6, 10, 8);
-      const pulseMat = new THREE.MeshBasicMaterial({
-        color: 0xfff4cc,
-        transparent: true,
-        opacity: 0,
-        blending: THREE.AdditiveBlending,
-      });
-      const pulseMesh = new THREE.Mesh(pulseGeom, pulseMat);
-      entry5.group.add(pulseMesh);
-      entry5.pulses.push({
-        mesh: pulseMesh,
-        material: pulseMat,
-        threadIdx: Math.floor(Math.random() * threadData.length),
-        progress: Math.random(),   // current t along thread [0..1]
-        speed: 0.15 + Math.random() * 0.25,  // units per second
-        startDelay: p * 0.3,
-      });
-    }
-
-    // ─── Data nodes: real floating numbers at strategic positions ───
-    // Clear previous data nodes
-    if (entry5.dataNodes) {
-      entry5.dataNodes.forEach(n => entry5.group.remove(n));
-    }
-    entry5.dataNodes = [];
-    // Pick the first 5 facts from the stats bank. Distribute them around the
-    // camera's interior view of the Finance cluster. Positions tightened so
-    // holograms stay inside the viewport at scale 1.1 (they extend ~47 local
-    // units wide after scaling, so extreme positions clipped the frustum).
-    const pickedStats = (this.statsBank && this.statsBank.singles || []).slice(0, 5);
-    const NODE_POSITIONS = [
-      [ 38,  20,   25],   // upper right
-      [-25, -15,   55],   // lower left, close
-      [ 50,  -8,   50],   // right middle
-      [  5,  25,   70],   // top center
-      [-35,   8,    5],   // left, farther back
+    // Guarantee panels mounted on the outer torus
+    const guarantees = [
+      { label: ['SOURCES', 'CITED'], angle: 0 },
+      { label: ['ALL UPLOADS', 'LOGGED'], angle: Math.PI/2 },
+      { label: ['YOUR DATA', 'YOUR SERVERS'], angle: Math.PI },
+      { label: ['NO TRAINING', 'ON YOUR DATA'], angle: 3*Math.PI/2 },
     ];
-    pickedStats.forEach((fact, i) => {
-      if (i >= NODE_POSITIONS.length) return;
-      const node = this._makeFloatingNumber3D(fact, { scale: 1.1 });
-      if (!node) return;
-      node.position.set(...NODE_POSITIONS[i]);
-      node.userData.revealDelay = 0.5 + i * 0.6;  // staggered fade-in
-      entry5.group.add(node);
-      entry5.dataNodes.push(node);
+
+    const guaranteePanels = [];
+    guarantees.forEach((g, i) => {
+      const r = 160;
+      const px = Math.cos(g.angle) * r;
+      const pz = Math.sin(g.angle) * r;
+      const tex = makeLabel(g.label, { w:320, h:100, size:26, lineH:42 });
+      const panel = makePanel(tex, 70, 22, 0);
+      panel.position.set(px, 0, pz);
+      panel.lookAt(new THREE.Vector3(0, 0, 0));
+      panel.userData = { angle: g.angle, r, pulsePhase: i * Math.PI/2 };
+      guaranteePanels.push(panel);
+      beat7Group.add(panel);
+
+      // Halo around each panel
+      const haloMat = new THREE.MeshBasicMaterial({ color: GOLD, transparent: true, opacity: 0, blending: THREE.AdditiveBlending });
+      const halo = new THREE.Mesh(new THREE.PlaneGeometry(90, 30), haloMat);
+      halo.position.copy(panel.position);
+      halo.lookAt(new THREE.Vector3(0,0,0));
+      halo.userData = { haloMat };
+      beat7Group.add(halo);
     });
+
+    // Radial spokes from center to ring
+    for (let i = 0; i < 12; i++) {
+      const angle = (i / 12) * Math.PI * 2;
+      const spokeGeo = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0,0,0),
+        new THREE.Vector3(Math.cos(angle)*160, 0, Math.sin(angle)*160)
+      ]);
+      const spokeMat = new THREE.LineBasicMaterial({ color: GOLD2, transparent: true, opacity: 0 });
+      const spoke = new THREE.Line(spokeGeo, spokeMat);
+      beat7Group.add(spoke);
+    }
+
+    // Central core sphere
+    const coreSphereMat = new THREE.MeshBasicMaterial({ color: GOLD3, transparent: true, opacity: 0, blending: THREE.AdditiveBlending });
+    const coreSphere = new THREE.Mesh(new THREE.SphereGeometry(12, 20, 14), coreSphereMat);
+    beat7Group.add(coreSphere);
+
+    scene.add(beat7Group);
+
+    // ─────────────────────────────────────────────────────────────
+    // BEAT 8 — PARTICLE WORDMARK ASSEMBLY
+    // Thousands of particles converging from all directions to
+    // spell out the distinction statement. Camera circles slowly.
+    // ─────────────────────────────────────────────────────────────
+    const beat8Group = new THREE.Group();
+    beat8Group.visible = false;
+
+    // Target word positions — simple 3D text layout
+    const words = ['PURPOSE-BUILT', 'INTELLIGENCE'];
+    const wordParticles = [];
+    const WORD_PARTICLE_COUNT = 600;
+
+    // Particle positions in formation (two rows)
+    const formationPos = [];
+    for (let wi = 0; wi < words.length; wi++) {
+      const y = (wi - 0.5) * 50;
+      const chars = words[wi].length;
+      for (let ci = 0; ci < chars * 4; ci++) {
+        const x = (ci / (chars * 4) - 0.5) * (chars * 18);
+        formationPos.push(new THREE.Vector3(x, y, (Math.random()-0.5)*5));
+      }
+    }
+
+    const wpPositions = new Float32Array(WORD_PARTICLE_COUNT * 3);
+    const wpColors = new Float32Array(WORD_PARTICLE_COUNT * 3);
+    for (let i = 0; i < WORD_PARTICLE_COUNT; i++) {
+      // Start scattered
+      wpPositions[i*3]   = (Math.random()-0.5)*800;
+      wpPositions[i*3+1] = (Math.random()-0.5)*800;
+      wpPositions[i*3+2] = (Math.random()-0.5)*800;
+      // Gold color with variation
+      const brightness = 0.7 + Math.random()*0.3;
+      wpColors[i*3]   = brightness;
+      wpColors[i*3+1] = brightness * 0.82;
+      wpColors[i*3+2] = brightness * 0.2;
+    }
+    const wpGeom = new THREE.BufferGeometry();
+    wpGeom.setAttribute('position', new THREE.BufferAttribute(wpPositions, 3));
+    wpGeom.setAttribute('color', new THREE.BufferAttribute(wpColors, 3));
+    const wpMat = new THREE.PointsMaterial({ size: 2.5, vertexColors: true, transparent: true, opacity: 0, sizeAttenuation: true });
+    const wordPoints = new THREE.Points(wpGeom, wpMat);
+    beat8Group.userData = { wordPoints, wpGeom, wpPositions, formationPos, assembled: 0 };
+    beat8Group.add(wordPoints);
+
+    // Subtitle panels
+    const sub1tex = makeLabel(['NOT ANOTHER AI CHATBOT'], { w:640, h:72, size:22, color1:'#aac8e8', color2:'#7aafd4', color3:'#3B6FA8' });
+    const sub1 = makePanel(sub1tex, 180, 20, 0);
+    sub1.position.set(0, -60, 0);
+    beat8Group.add(sub1);
+
+    const sub2tex = makeLabel(['BUILT FOR CANNABIS OPERATIONS'], { w:640, h:72, size:22, color1:'#aac8e8', color2:'#7aafd4', color3:'#3B6FA8' });
+    const sub2 = makePanel(sub2tex, 200, 20, 0);
+    sub2.position.set(0, -85, 0);
+    beat8Group.add(sub2);
+
+    scene.add(beat8Group);
+
+    // ── CAMERA state ──
+    const camState = {
+      current: { pos: new THREE.Vector3(0,0,300), look: new THREE.Vector3(0,0,0), fov: 50 },
+      target:  { pos: new THREE.Vector3(0,0,300), look: new THREE.Vector3(0,0,0), fov: 50 },
+      lerpSpeed: 0.018,
+    };
+
+    // ── Material uniform for the point cloud background ──
+    const material = { uniforms: { uTime: {value:0}, uEnergy:{value:0}, uBass:{value:0}, uTreble:{value:0}, uOpacity:{value:1} } };
+
+    const C = {
+      scene, camera, renderer, material, camState,
+      beatObjects: {
+        1: { group: beat1Group, cabinets, floorGrid },
+        3: { group: beat3Group, vaultColumns, corePillar, coreMat },
+        4: { group: beat4Group, latticeNodes, latticeLines },
+        5: { group: beat5Group, constellations },
+        6: { group: beat6Group, docTowers },
+        7: { group: beat7Group, torus, torusMat, torus2, guaranteePanels, coreSphere, coreSphereMat },
+        8: { group: beat8Group },
+      },
+      running: false,
+      raf: null,
+      resizeHandler: resize,
+      t0: 0,
+    };
+
+    C.particles = particles;
+    this.cinema = C;
+    resize();
+
+    // DOM beats hidden — cinema handles all visuals
+    document.querySelectorAll('.demo-beat').forEach(b => {
+      if (b.dataset.beat && b.dataset.beat !== '2' && b.dataset.beat !== '9') {
+        b.style.display = 'none';
+      }
+    });
+
+    return C;
   },
 
   startCinema() {
@@ -16420,69 +15478,287 @@ const DemoMode = {
     if (C.running) return;
     C.running = true;
     C.t0 = performance.now();
+    const THREE = window.THREE;
     const preshow = document.getElementById('demo-preshow');
     if (preshow) preshow.classList.add('cinema-active');
+
+    const GOLD  = 0xc9a832;
+    const GOLD2 = 0xe8c84a;
+    const GOLD3 = 0xfff4cc;
+    const STEEL = 0x3B6FA8;
 
     const frame = () => {
       if (!C.running) { C.raf = null; return; }
       const now = performance.now();
-      const t = (now - C.t0) / 1000;
+      const tSec = (now - C.t0) / 1000;
 
-      // Uniforms — audio-reactive
-      C.material.uniforms.uTime.value   = t;
-      C.material.uniforms.uEnergy.value = this.audio.energy;
-      C.material.uniforms.uBass.value   = this.audio.bass;
-      C.material.uniforms.uTreble.value = this.audio.treble;
+      // Fade-in / fade-out
+      const fadeIn  = Math.min(1, tSec / 2);
+      const fadeOut = C._fadeOut !== undefined ? Math.max(0, 1 - (now - C._fadeOut) / 1500) : 1;
+      const globalFade = fadeIn * fadeOut;
 
-      // Gentle fade-in over first 2 seconds, fade out whenever we flag it
-      const fadeIn = Math.min(1, t / 2);
-      const fadeOut = (this._cinemaFadeOut !== undefined) ?
-        Math.max(0, 1 - (now - this._cinemaFadeOut) / 1500) : 1;
-      C.material.uniforms.uOpacity.value = fadeIn * fadeOut;
+      // Slow particle drift
+      if (C.particles) {
+        C.particles.rotation.y = tSec * 0.005;
+        C.particles.material.opacity = 0.18 * globalFade;
+      }
 
-      // Camera interpolation — ease current toward target
-      const { current, target, lerpSpeed } = C.camState;
-      current.pos.lerp(target.pos, lerpSpeed);
-      current.look.lerp(target.look, lerpSpeed);
-      current.fov = current.fov + (target.fov - current.fov) * lerpSpeed;
-      C.camera.position.copy(current.pos);
-      C.camera.lookAt(current.look);
-      C.camera.fov = current.fov;
-      C.camera.updateProjectionMatrix();
+      // Billboard helper — make panels face camera
+      const camPos = C.camera.position;
 
-      // Small organic camera drift driven by treble — consonants "shake" the lens
-      // Very subtle — ±1 unit perpendicular to view direction
-      const drift = this.audio.treble * 0.8;
-      C.camera.position.x += Math.sin(t * 1.3) * drift;
-      C.camera.position.y += Math.cos(t * 1.1) * drift;
+      // ── Beat 1: Filing cabinet corridor ──
+      const b1 = C.beatObjects[1];
+      if (b1 && b1.group.visible) {
+        const fade = Math.min(1, tSec < 1 ? tSec : 1) * globalFade;
+        b1.floorGrid.material.opacity = fade * 0.15;
+        b1.cabinets.forEach((cab, ci) => {
+          // Fade in body
+          cab.userData.bodyMat.opacity = fade * 0.9;
+          // Animate drawers
+          cab.userData.drawers.forEach((drawer, di) => {
+            const phase = tSec * drawer.userData.openSpeed + drawer.userData.openPhase + ci * 0.3 + di * 0.8;
+            const openAmt = Math.max(0, Math.sin(phase) * drawer.userData.maxOpen);
+            const side = cab.userData.side;
+            drawer.position.z = 10 + openAmt;
+            // Glow intensity when open
+            const glowStrength = Math.max(0, Math.sin(phase));
+            drawer.userData.glow.material.opacity = glowStrength * fade * 0.6;
+            drawer.userData.face.material.opacity = fade * 0.85;
+          });
+        });
+        // Camera drift through corridor — looking slightly up and to side
+        const corridorT = tSec * 0.4;
+        C.camera.position.lerp(new THREE.Vector3(
+          Math.sin(corridorT * 0.15) * 20 - 15,
+          Math.sin(corridorT * 0.08) * 12 - 8,
+          -800 + corridorT * 180
+        ), 0.02);
+        C.camera.lookAt(new THREE.Vector3(
+          C.camera.position.x + 10,
+          C.camera.position.y + 6,
+          C.camera.position.z - 200
+        ));
+      }
 
-      // Slow auto-rotation of point cloud for life
-      C.points.rotation.y = t * 0.012;
-      C.points.rotation.x = Math.sin(t * 0.08) * 0.04;
+      // ── Beat 3: Data vault columns ──
+      const b3 = C.beatObjects[3];
+      if (b3 && b3.group.visible) {
+        const fade = Math.min(1, tSec < 1.5 ? tSec/1.5 : 1) * globalFade;
+        b3.coreMat.opacity = fade * 0.4;
+        b3.vaultColumns.forEach((col, ci) => {
+          // Orbit the columns
+          col.userData.orbitAngle += col.userData.orbitSpeed * 0.016;
+          const r = col.userData.orbitRadius;
+          const a = col.userData.orbitAngle;
+          col.position.x = Math.cos(a) * r;
+          col.position.z = Math.sin(a) * r;
+          col.rotation.y = -a;
 
-      // Update beat objects (fade in/out, animations, billboards, pulses)
-      this._updateBeatObjects(now, t);
+          // Pulse panels
+          col.userData.panels.forEach((panel, pi) => {
+            const pulse = 0.4 + 0.6 * Math.abs(Math.sin(tSec * panel.userData.pulseSpeed + panel.userData.pulsePhase + ci*0.4));
+            panel.material.opacity = pulse * fade * 0.85;
+            panel.lookAt(camPos);
+          });
+        });
+        // Camera looking steeply upward from below, drifting slowly
+        C.camera.position.lerp(new THREE.Vector3(
+          Math.sin(tSec*0.07)*40,
+          -160 + Math.sin(tSec*0.05)*20,
+          Math.cos(tSec*0.06)*60
+        ), 0.015);
+        C.camera.lookAt(new THREE.Vector3(Math.sin(tSec*0.04)*20, 200, Math.cos(tSec*0.04)*20));
+        C.camera.fov = 75 + Math.sin(tSec*0.03)*5;
+        C.camera.updateProjectionMatrix();
+      }
+
+      // ── Beat 4: Query pulse lattice ──
+      const b4 = C.beatObjects[4];
+      if (b4 && b4.group.visible) {
+        const fade = Math.min(1, tSec < 1 ? tSec : 1) * globalFade;
+        const pulseSpeed = 80; // units per second
+        const pulsePeriod = 3.5;
+        const pulseT = tSec % pulsePeriod;
+        const waveFront = pulseT * pulseSpeed;
+        const waveWidth = 60;
+
+        b4.latticeNodes.forEach(node => {
+          const d = node.userData.dist;
+          const waveProx = Math.max(0, 1 - Math.abs(d - waveFront) / waveWidth);
+          const ambient = 0.1 + node.userData.basePulse * 0.2;
+          node.material.opacity = (ambient + waveProx * 0.9) * fade;
+        });
+        b4.latticeLines.forEach(line => {
+          const avgDist = (line.userData.distA + line.userData.distB) / 2;
+          const waveProx = Math.max(0, 1 - Math.abs(avgDist - waveFront) / waveWidth);
+          line.material.opacity = (0.05 + waveProx * 0.5) * fade;
+        });
+
+        // Camera below lattice looking steeply up and to the side
+        C.camera.position.lerp(new THREE.Vector3(
+          -80 + Math.sin(tSec*0.08)*30,
+          -160,
+          50 + Math.sin(tSec*0.06)*30
+        ), 0.018);
+        C.camera.lookAt(new THREE.Vector3(40, 80, 0));
+        C.camera.fov = 65;
+        C.camera.updateProjectionMatrix();
+      }
+
+      // ── Beat 5: Constellation knowledge map ──
+      const b5 = C.beatObjects[5];
+      if (b5 && b5.group.visible) {
+        const fade = Math.min(1, tSec < 1.5 ? tSec/1.5 : 1) * globalFade;
+        b5.constellations.forEach((cg, ci) => {
+          // Gentle drift of each constellation
+          cg.rotation.y += cg.userData.driftSpeed;
+          cg.userData.stars.forEach(star => {
+            const tw = 0.5 + 0.5 * Math.sin(tSec * star.userData.twinkleSpeed + star.userData.twinklePhase);
+            star.material.opacity = (0.3 + tw * 0.7) * fade;
+          });
+          cg.userData.label.material.opacity = fade * 0.8;
+          cg.userData.label.lookAt(camPos);
+
+          // Arcs fire asynchronously
+          cg.children.forEach(child => {
+            if (child.isLine && child.userData.arcPhase !== undefined) {
+              const arcPulse = Math.max(0, Math.sin(tSec * child.userData.arcSpeed + child.userData.arcPhase));
+              child.material.opacity = arcPulse * fade * 0.6;
+            }
+          });
+        });
+        // Camera drifting with steep downward angle looking across the constellation field
+        C.camera.position.lerp(new THREE.Vector3(
+          Math.sin(tSec*0.04)*120,
+          180 + Math.sin(tSec*0.03)*40,
+          300 + Math.cos(tSec*0.035)*100
+        ), 0.012);
+        C.camera.lookAt(new THREE.Vector3(Math.sin(tSec*0.02)*50, -80, 0));
+        C.camera.fov = 60;
+        C.camera.updateProjectionMatrix();
+      }
+
+      // ── Beat 6: Document cathedral ──
+      const b6 = C.beatObjects[6];
+      if (b6 && b6.group.visible) {
+        const fade = Math.min(1, tSec < 2 ? tSec/2 : 1) * globalFade;
+        b6.docTowers.forEach((tower, ti) => {
+          tower.userData.docs.forEach((doc, di) => {
+            doc.userData.dm.opacity = fade * (0.6 + 0.4*Math.sin(tSec*0.3 + di*0.2 + ti));
+            doc.position.y = doc.userData.baseY + Math.sin(tSec*0.4 + doc.userData.floatPhase) * 1.5;
+          });
+          tower.userData.label.material.opacity = fade * 0.9;
+          tower.userData.label.lookAt(camPos);
+          tower.userData.label.position.y = tower.userData.td.count * 32 + 35 + Math.sin(tSec*0.3 + ti) * 4;
+        });
+        // Camera at base looking steeply upward, slowly spiraling
+        const spiralAngle = tSec * 0.06;
+        C.camera.position.lerp(new THREE.Vector3(
+          Math.sin(spiralAngle) * 30,
+          -150 + tSec * 3,
+          Math.cos(spiralAngle) * 30
+        ), 0.015);
+        C.camera.lookAt(new THREE.Vector3(0, 300, 0));
+        C.camera.fov = 72;
+        C.camera.updateProjectionMatrix();
+      }
+
+      // ── Beat 7: Guarantee ring ──
+      const b7 = C.beatObjects[7];
+      if (b7 && b7.group.visible) {
+        const fade = Math.min(1, tSec < 1.5 ? tSec/1.5 : 1) * globalFade;
+        b7.torus.rotation.y += 0.004;
+        b7.torus.rotation.z += 0.002;
+        b7.torusMat.opacity = fade * 0.35;
+        b7.torus2.rotation.x += 0.003;
+        b7.torus2.rotation.y += 0.005;
+        b7.torus2.material.opacity = fade * 0.2;
+        b7.coreSphereMat.opacity = fade * (0.4 + 0.3*Math.sin(tSec*1.2));
+
+        b7.guaranteePanels.forEach((panel, pi) => {
+          // Orbit panels with the ring
+          const angle = panel.userData.angle + tSec * 0.12;
+          const r = panel.userData.r;
+          panel.position.x = Math.cos(angle) * r;
+          panel.position.z = Math.sin(angle) * r;
+          panel.lookAt(new THREE.Vector3(0,0,0));
+          const pulse = 0.5 + 0.5*Math.sin(tSec*0.8 + panel.userData.pulsePhase);
+          panel.material.opacity = (0.5 + pulse * 0.5) * fade;
+        });
+
+        // Camera inside the ring, looking up at an angle
+        C.camera.position.lerp(new THREE.Vector3(
+          Math.sin(tSec*0.07)*60,
+          -90 + Math.sin(tSec*0.04)*20,
+          Math.cos(tSec*0.08)*60
+        ), 0.015);
+        C.camera.lookAt(new THREE.Vector3(Math.sin(tSec*0.05)*30, 100, 0));
+        C.camera.fov = 70;
+        C.camera.updateProjectionMatrix();
+      }
+
+      // ── Beat 8: Particle wordmark ──
+      const b8 = C.beatObjects[8];
+      if (b8 && b8.group.visible) {
+        const fade = Math.min(1, tSec < 1 ? tSec : 1) * globalFade;
+        const b8d = beat8Group.userData;
+        const assembleProgress = Math.min(1, tSec / 4.0);
+        const positions = b8d.wpGeom.attributes.position.array;
+        const formation = b8d.formationPos;
+
+        for (let i = 0; i < 600; i++) {
+          const fi = i % formation.length;
+          const target = formation[fi];
+          positions[i*3]   += (target.x - positions[i*3])   * assembleProgress * 0.04;
+          positions[i*3+1] += (target.y - positions[i*3+1]) * assembleProgress * 0.04;
+          positions[i*3+2] += (target.z - positions[i*3+2]) * assembleProgress * 0.04;
+        }
+        b8d.wpGeom.attributes.position.needsUpdate = true;
+        b8d.wordPoints.material.opacity = fade * 0.9;
+
+        // Subtitle fades in after particles assemble
+        beat8Group.children.forEach(child => {
+          if (child !== b8d.wordPoints) {
+            child.material.opacity = Math.max(0, (tSec - 2) / 2) * fade * 0.8;
+          }
+        });
+
+        // Camera circles slowly
+        const circleAngle = tSec * 0.08;
+        C.camera.position.lerp(new THREE.Vector3(
+          Math.sin(circleAngle) * 250,
+          30 + Math.sin(tSec*0.04)*20,
+          Math.cos(circleAngle) * 250
+        ), 0.01);
+        C.camera.lookAt(new THREE.Vector3(0, 0, 0));
+        C.camera.fov = 45;
+        C.camera.updateProjectionMatrix();
+      }
 
       C.renderer.render(C.scene, C.camera);
       C.raf = requestAnimationFrame(frame);
     };
-    frame();
+
+    C.raf = requestAnimationFrame(frame);
   },
 
-  setCameraTarget(waypointKey, lerpSpeedOverride) {
-    if (!this.cinema) return;
-    const wp = this.cameraWaypoints[waypointKey];
-    if (!wp) return;
-    const C = this.cinema;
-    C.camState.target.pos.set(...wp.pos);
-    C.camState.target.look.set(...wp.look);
-    C.camState.target.fov = wp.fov;
-    if (lerpSpeedOverride) C.camState.lerpSpeed = lerpSpeedOverride;
-    else                   C.camState.lerpSpeed = 0.018;
-  },
 
   fadeOutCinema() {
     this._cinemaFadeOut = performance.now();
+    if (this.cinema) this.cinema._fadeOut = performance.now();
+  },
+
+  // Stubs — new cinema handles camera and beat objects internally
+  setCameraTarget(beatId, speed) { /* handled by startCinema frame loop */ },
+  showBeatObjects(beatId) {
+    if (this.cinema && this.cinema.beatObjects[beatId]) {
+      this.cinema.beatObjects[beatId].group.visible = true;
+    }
+  },
+  hideBeatObjects(beatId) {
+    if (this.cinema && this.cinema.beatObjects[beatId]) {
+      this.cinema.beatObjects[beatId].group.visible = false;
+    }
   },
 
   stopCinema() {
