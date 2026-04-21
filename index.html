@@ -8107,7 +8107,7 @@ html body[data-theme="light"] #discovery-greeting-strip .dgs-text strong {
 <script>
 (function() {
   try {
-    var saved = localStorage.getItem('caci_theme');
+    var saved = SafeStorage.getItem('caci_theme');
     var theme;
     if (saved === 'light' || saved === 'dark') {
       theme = saved;
@@ -8162,25 +8162,7 @@ html body[data-theme="light"] #discovery-greeting-strip .dgs-text strong {
 
 <!-- LOGIN -->
 <div id="login-screen">
-  <!-- Theme toggle — small sun/moon icon in the top-right. Persists choice
-       to localStorage. Visible before login so first-time visitors can set
-       their preference before entering the app. -->
-  <button class="theme-toggle" id="theme-toggle" aria-label="Toggle light/dark theme" title="Toggle light/dark theme">
-    <svg class="theme-toggle-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-    </svg>
-    <svg class="theme-toggle-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="12" cy="12" r="4"/>
-      <line x1="12" y1="3" x2="12" y2="5"/>
-      <line x1="12" y1="19" x2="12" y2="21"/>
-      <line x1="3" y1="12" x2="5" y2="12"/>
-      <line x1="19" y1="12" x2="21" y2="12"/>
-      <line x1="5.6" y1="5.6" x2="7" y2="7"/>
-      <line x1="17" y1="17" x2="18.4" y2="18.4"/>
-      <line x1="5.6" y1="18.4" x2="7" y2="17"/>
-      <line x1="17" y1="7" x2="18.4" y2="5.6"/>
-    </svg>
-  </button>
+  <!-- Theme toggle moved to main UI top-right -->
   <div class="login-frame-box" aria-hidden="true">
     <div class="fc tl"></div><div class="fc tr"></div>
     <div class="fc bl"></div><div class="fc br"></div>
@@ -8216,7 +8198,7 @@ html body[data-theme="light"] #discovery-greeting-strip .dgs-text strong {
           <div class="corner bl"></div><div class="corner br"></div>
           <div class="lfield-wrap" style="margin-bottom:10px;">
             <div class="lfield-label" style="margin-top:4px;">Username <span style="opacity:0.4;font-size:8px">(optional)</span></div>
-            <input class="linput" type="text" id="login-user" placeholder="your name" autocomplete="username" autocorrect="off" autocapitalize="off" spellcheck="false" style="letter-spacing:0.08em;text-align:left;padding-left:16px;">
+            <input class="linput" type="text" id="login-user" placeholder="your name" autocomplete="username" autocorrect="off" autocapitalize="off" spellcheck="false" style="letter-spacing:0.08em;text-align:center;">
             <div class="linput-glow"></div>
           </div>
           <div class="lfield-wrap">
@@ -9851,11 +9833,11 @@ window.addEventListener('beforeunload', () => {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       if (key && key.startsWith('caci_history_')) {
-        const data = localStorage.getItem(key);
+        const data = SafeStorage.getItem(key);
         try {
           const parsed = JSON.parse(data);
           if (parsed.timestamp && (now - parsed.timestamp) > WEEK) {
-            localStorage.removeItem(key);
+            SafeStorage.removeItem(key);
           }
         } catch(e) {}
       }
@@ -9979,9 +9961,9 @@ const MODS = [
 ];
 
 let token   = sessionStorage.getItem('caci_token') || '';
-let dept    = localStorage.getItem('caci_dept')    || 'retail';
+let dept    = SafeStorage.getItem('caci_dept')    || 'retail';
 let _isSending = false; // guard against stuck send button
-let modelId = localStorage.getItem('caci_model')   || 'grok';
+let modelId = SafeStorage.getItem('caci_model')   || 'grok';
 let chatHistory = [];
 let curPanel = 'chat';
 let _chatImageBase64 = null;   // base64 string of attached image
@@ -10055,7 +10037,7 @@ async function refreshFileMapping() {
     
     loadUserPreference() {
       try {
-        const saved = localStorage.getItem('caci_brightness');
+        const saved = SafeStorage.getItem('caci_brightness');
         if (saved && !isNaN(parseFloat(saved))) {
           this.userBrightness = parseFloat(saved);
           console.log('🎚️ User brightness loaded:', this.userBrightness);
@@ -10205,7 +10187,7 @@ async function refreshFileMapping() {
         // Wire up buttons
         const setBrightness = (value) => {
           this.userBrightness = value;
-          localStorage.setItem('caci_brightness', value.toString());
+          SafeStorage.setItem('caci_brightness', value.toString());
           this.applyBrightness();
         };
         
@@ -10239,7 +10221,7 @@ async function refreshFileMapping() {
       5: 1.8
     };
     const brightness = levels[level] || 1.3;
-    localStorage.setItem('caci_brightness', brightness.toString());
+    SafeStorage.setItem('caci_brightness', brightness.toString());
     DisplayFix.userBrightness = brightness;
     DisplayFix.applyBrightness();
     console.log(`🔆 Brightness set to ${brightness}x`);
@@ -10254,9 +10236,11 @@ function chatHistoryKey() { return 'caci_history_' + dept; }
 
 function saveChatHistory() {
   try {
-    const toSave = chatHistory.slice(-40);
-    // Always write localStorage for instant restore
-    localStorage.setItem(chatHistoryKey(), JSON.stringify(toSave));
+    // Limit to last 50 messages to prevent memory bloat
+    const MAX_MESSAGES = 50;
+    const toSave = chatHistory.slice(-MAX_MESSAGES);
+    // Always write SafeStorage for instant restore (prevents crashes)
+    SafeStorage.setItem(chatHistoryKey(), JSON.stringify(toSave));
     // Persist to server (fire-and-forget) — syncs across devices
     apiFetch('/history/' + encodeURIComponent(dept), {
       method: 'POST',
@@ -10270,7 +10254,7 @@ function loadChatHistory() {
   // Return localStorage immediately (fast, works offline)
   // Server history is loaded async in bootApp and merged on next saveChatHistory
   try {
-    const raw = localStorage.getItem(chatHistoryKey());
+    const raw = SafeStorage.getItem(chatHistoryKey());
     return raw ? JSON.parse(raw) : [];
   } catch(e) { return []; }
 }
@@ -10283,7 +10267,7 @@ async function loadChatHistoryFromServer() {
       // Use server history if it's longer than what we have locally
       const local = loadChatHistory();
       if (data.history.length > local.length) {
-        localStorage.setItem(chatHistoryKey(), JSON.stringify(data.history));
+        SafeStorage.setItem(chatHistoryKey(), JSON.stringify(data.history));
         return data.history;
       }
     }
@@ -10292,7 +10276,7 @@ async function loadChatHistoryFromServer() {
 }
 
 function clearChatHistory() {
-  try { localStorage.removeItem(chatHistoryKey()); } catch(e) {}
+  try { SafeStorage.removeItem(chatHistoryKey()); } catch(e) {}
   // Clear on server too
   apiFetch('/history/' + encodeURIComponent(dept), {
     method: 'POST',
@@ -10320,7 +10304,7 @@ function getCaciTheme() {
 function setCaciTheme(theme) {
   if (theme !== 'light' && theme !== 'dark') return;
   document.body.setAttribute('data-theme', theme);
-  try { localStorage.setItem('caci_theme', theme); } catch {}
+  try { SafeStorage.setItem('caci_theme', theme); } catch {}
   // Let listeners (like toggle buttons) update their state
   window.dispatchEvent(new CustomEvent('caci-theme-changed', { detail: { theme } }));
 }
@@ -10632,13 +10616,13 @@ function setupLogin() {
 
 // Apply prefs received from server on login
 function applyUserPrefs(prefs) {
-  if (prefs.dept)        { dept    = prefs.dept;    localStorage.setItem('caci_dept',  dept); }
-  if (prefs.model)       { modelId = prefs.model;   localStorage.setItem('caci_model', modelId); }
-  if (prefs.ttsVoice)    localStorage.setItem('caci_tts_grok_voice', prefs.ttsVoice);
-  if (prefs.ttsLength)   localStorage.setItem('caci_tts_length',     String(prefs.ttsLength));
-  if (prefs.ttsAuto)     localStorage.setItem('caci_voice_auto',     String(prefs.ttsAuto));
-  if (prefs.ttsProvider) localStorage.setItem('caci_tts_provider',   prefs.ttsProvider);
-  if (prefs.sbCollapsed !== undefined) localStorage.setItem('caci_sb_collapsed', prefs.sbCollapsed ? '1' : '0');
+  if (prefs.dept)        { dept    = prefs.dept;    SafeStorage.setItem('caci_dept',  dept); }
+  if (prefs.model)       { modelId = prefs.model;   SafeStorage.setItem('caci_model', modelId); }
+  if (prefs.ttsVoice)    SafeStorage.setItem('caci_tts_grok_voice', prefs.ttsVoice);
+  if (prefs.ttsLength)   SafeStorage.setItem('caci_tts_length',     String(prefs.ttsLength));
+  if (prefs.ttsAuto)     SafeStorage.setItem('caci_voice_auto',     String(prefs.ttsAuto));
+  if (prefs.ttsProvider) SafeStorage.setItem('caci_tts_provider',   prefs.ttsProvider);
+  if (prefs.sbCollapsed !== undefined) SafeStorage.setItem('caci_sb_collapsed', prefs.sbCollapsed ? '1' : '0');
 }
 
 // Apply identity UI — safe to call multiple times (idempotent)
@@ -10756,11 +10740,11 @@ function bootApp() {
     const collapsed = sidebar.classList.toggle('collapsed');
     sbToggle.classList.toggle('collapsed', collapsed);
     if (contentEl) contentEl.classList.toggle('sb-collapsed', collapsed);
-    localStorage.setItem('caci_sb_collapsed', collapsed ? '1' : '0');
+    SafeStorage.setItem('caci_sb_collapsed', collapsed ? '1' : '0');
     saveUserPref('sbCollapsed', collapsed);
   });
   // Restore state
-  if (localStorage.getItem('caci_sb_collapsed') === '1') {
+  if (SafeStorage.getItem('caci_sb_collapsed') === '1') {
     sidebar.classList.add('collapsed');
     sbToggle.classList.add('collapsed');
     if (contentEl) contentEl.classList.add('sb-collapsed');
@@ -11257,7 +11241,7 @@ function toggleAppLauncher() {
 }
 
 function syncAppLauncherStatus() {
-  const stored = JSON.parse(localStorage.getItem('caci_integrations') || '{}');
+  const stored = JSON.parse(SafeStorage.getItem('caci_integrations') || '{}');
   const map = {
     'als-teams': 'teams', 'als-excel': 'excel', 'als-word': 'word',
     'als-sharepoint': 'sharepoint', 'als-powerpoint': 'powerpoint',
@@ -11285,7 +11269,7 @@ function resetSendState() {
 function setDept(id) {
   if (dept === id) return; // No change, skip
   dept = id;
-  localStorage.setItem('caci_dept', id);
+  SafeStorage.setItem('caci_dept', id);
   saveUserPref('dept', id);
   
   // Refresh everything that depends on dept, without reloading the browser
@@ -11336,7 +11320,7 @@ function buildModelList() {
   ).join('');
   $('model-list').querySelectorAll('.moption').forEach(el => el.addEventListener('click', () => { setModel(el.dataset.m); $('model-modal').classList.remove('open'); }));
 }
-function setModel(id) { modelId = id; localStorage.setItem('caci_model', id); syncModel(); saveUserPref('model', id); }
+function setModel(id) { modelId = id; SafeStorage.setItem('caci_model', id); syncModel(); saveUserPref('model', id); }
 function syncModel() {
   const m = MODELS.find(x => x.id === modelId) || MODELS[0];
   $('mp-name').textContent = m.name;
@@ -12478,10 +12462,10 @@ function saveResponse(prompt, text) {
   };
   // Optimistic local write for instant UI
   try {
-    const stored = JSON.parse(localStorage.getItem('caci_saved_responses') || '[]');
+    const stored = JSON.parse(SafeStorage.getItem('caci_saved_responses') || '[]');
     stored.unshift(entry);
     if (stored.length > 100) stored.splice(100);
-    localStorage.setItem('caci_saved_responses', JSON.stringify(stored));
+    SafeStorage.setItem('caci_saved_responses', JSON.stringify(stored));
   } catch {}
   // Persist to server (fire-and-forget)
   apiFetch('/saved', {
@@ -12522,7 +12506,7 @@ function renderRespCards(responses) {
     return;
   }
   const countEl = $('resp-count');
-  const allStored = JSON.parse(localStorage.getItem('caci_saved_responses') || '[]');
+  const allStored = JSON.parse(SafeStorage.getItem('caci_saved_responses') || '[]');
   if (countEl) {
     if (responses.length < allStored.length) {
       countEl.style.display = 'block';
@@ -12557,14 +12541,14 @@ function loadResponses() {
 
   apiFetch('/saved').then(r => r.json()).then(data => {
     const serverItems = data.ok ? (data.items || []) : [];
-    const localItems  = JSON.parse(localStorage.getItem('caci_saved_responses') || '[]');
+    const localItems  = JSON.parse(SafeStorage.getItem('caci_saved_responses') || '[]');
     const serverIds   = new Set(serverItems.map(i => String(i.id)));
     const localOnly   = localItems.filter(i => !serverIds.has(String(i.id)));
     const merged      = [...serverItems, ...localOnly]
       .sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt)).slice(0, 100);
     _renderResponsesPanel(merged);
   }).catch(() => {
-    const stored = JSON.parse(localStorage.getItem('caci_saved_responses') || '[]');
+    const stored = JSON.parse(SafeStorage.getItem('caci_saved_responses') || '[]');
     _renderResponsesPanel(stored);
   });
 }
@@ -12615,9 +12599,9 @@ function toggleRespExpand(id, btn) {
 
 function deleteResponse(id) {
   // Remove from localStorage immediately
-  let stored = JSON.parse(localStorage.getItem('caci_saved_responses') || '[]');
+  let stored = JSON.parse(SafeStorage.getItem('caci_saved_responses') || '[]');
   stored = stored.filter(r => r.id !== id);
-  localStorage.setItem('caci_saved_responses', JSON.stringify(stored));
+  SafeStorage.setItem('caci_saved_responses', JSON.stringify(stored));
   // Delete from server (fire-and-forget)
   apiFetch('/saved/' + id, { method: 'DELETE' }).catch(() => {});
   loadResponses();
@@ -16906,8 +16890,8 @@ const DemoMode = {
   async fetchTTS(text, voice) {
     // Provider: admin-selected or grok (required for multi-voice cast).
     // Voice: per-beat override, falls back to admin choice, then eve.
-    const provider = localStorage.getItem('caci_tts_provider') || 'grok';
-    const v = voice || localStorage.getItem('caci_tts_grok_voice') || 'eve';
+    const provider = SafeStorage.getItem('caci_tts_provider') || 'grok';
+    const v = voice || SafeStorage.getItem('caci_tts_grok_voice') || 'eve';
     // Pronunciation fixes: the stored text uses canonical names/acronyms, but
     // Grok TTS mangles most industry acronyms. Swap to phonetic forms right
     // before the TTS call — doesn't affect stored scripts or admin UI.
@@ -17920,7 +17904,7 @@ async function loadContextDocs() {
    VOICE  — STT (Web Speech API) + TTS (Google Cloud WaveNet)
 ═══════════════════════════════════════════════════════════ */
 
-let voiceAutoSpeak  = localStorage.getItem('caci_voice_auto') === 'true';
+let voiceAutoSpeak  = SafeStorage.getItem('caci_voice_auto') === 'true';
 let _currentAudio   = null;
 let _currentSpkBtn  = null;
 let _recognition    = null;
@@ -17949,8 +17933,8 @@ function _splitSentences(text) {
 }
 
 async function _fetchTTSBlob(text) {
-  const provider  = localStorage.getItem('caci_tts_provider') || 'grok';
-  const grokVoice = localStorage.getItem('caci_tts_grok_voice') || 'eve';
+  const provider  = SafeStorage.getItem('caci_tts_provider') || 'grok';
+  const grokVoice = SafeStorage.getItem('caci_tts_grok_voice') || 'eve';
   const res = await apiFetch('/tts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -17989,7 +17973,7 @@ function _ttsPlayNext(sessionId) {
   // which renders slightly quieter than a plain <audio> element at the same source level.
   // We bring the chat audio down to match. Adjustable via localStorage if a user
   // wants chat louder or quieter than the default.
-  const chatGain = parseFloat(localStorage.getItem('caci_tts_chat_gain') || '0.82');
+  const chatGain = parseFloat(SafeStorage.getItem('caci_tts_chat_gain') || '0.82');
   audio.volume = Math.min(1, Math.max(0, isNaN(chatGain) ? 0.82 : chatGain));
   _currentAudio = audio;
   setVoiceStatus('Speaking…', true);
@@ -18044,7 +18028,7 @@ async function speakTextQueued(btn, text) {
     .replace(/\s+/g, ' ') // Clean up multiple spaces
     .replace(/\n+/g, ' ').trim();
 
-  const ttsMaxLen = parseInt(localStorage.getItem('caci_tts_length') || '3000', 10);
+  const ttsMaxLen = parseInt(SafeStorage.getItem('caci_tts_length') || '3000', 10);
   const capped = clean.length > ttsMaxLen ? clean.slice(0, ttsMaxLen) : clean;
   const sentences = _splitSentences(capped);
 
@@ -18107,7 +18091,7 @@ async function appendToTtsQueue(text) {
     .replace(/,\s*([.!?])/g, '$1') // Remove comma before punctuation
     .replace(/\s+/g, ' ') // Clean up multiple spaces
     .replace(/\n+/g, ' ').trim();
-  const ttsMaxLen = parseInt(localStorage.getItem('caci_tts_length') || '3000', 10);
+  const ttsMaxLen = parseInt(SafeStorage.getItem('caci_tts_length') || '3000', 10);
   const capped = clean.length > ttsMaxLen ? clean.slice(0, ttsMaxLen) : clean;
   const newSentences = _splitSentences(capped);
   if (newSentences.length === 0) return;
@@ -18183,7 +18167,7 @@ function initVoiceInput() {
       }
       // Otherwise toggle auto-speak
       voiceAutoSpeak = !voiceAutoSpeak;
-      localStorage.setItem('caci_voice_auto', voiceAutoSpeak);
+      SafeStorage.setItem('caci_voice_auto', voiceAutoSpeak);
       saveUserPref('ttsAuto', voiceAutoSpeak);
       spkToggle.classList.toggle('active', voiceAutoSpeak);
       spkToggle.title = voiceAutoSpeak ? 'Auto-speak ON — click to turn off' : 'Auto-speak OFF — click to turn on';
@@ -18256,19 +18240,19 @@ function initVoiceSettings() {
   // Provider select
   const providerSel = $('tts-provider');
   if (providerSel) {
-    providerSel.value = localStorage.getItem('caci_tts_provider') || 'grok';
-    providerSel.addEventListener('change', () => { localStorage.setItem('caci_tts_provider', providerSel.value); saveUserPref('ttsProvider', providerSel.value); });
+    providerSel.value = SafeStorage.getItem('caci_tts_provider') || 'grok';
+    providerSel.addEventListener('change', () => { SafeStorage.setItem('caci_tts_provider', providerSel.value); saveUserPref('ttsProvider', providerSel.value); });
   }
 
   // Grok voice select
   const voiceSel = $('tts-grok-voice');
   if (voiceSel) {
-    voiceSel.value = localStorage.getItem('caci_tts_grok_voice') || 'eve';
-    voiceSel.addEventListener('change', () => { localStorage.setItem('caci_tts_grok_voice', voiceSel.value); saveUserPref('ttsVoice', voiceSel.value); });
+    voiceSel.value = SafeStorage.getItem('caci_tts_grok_voice') || 'eve';
+    voiceSel.addEventListener('change', () => { SafeStorage.setItem('caci_tts_grok_voice', voiceSel.value); saveUserPref('ttsVoice', voiceSel.value); });
     const lengthSel = $('tts-length');
     if (lengthSel) {
-      lengthSel.value = localStorage.getItem('caci_tts_length') || '3000';
-      lengthSel.addEventListener('change', () => { localStorage.setItem('caci_tts_length', lengthSel.value); saveUserPref('ttsLength', parseInt(lengthSel.value)); });
+      lengthSel.value = SafeStorage.getItem('caci_tts_length') || '3000';
+      lengthSel.addEventListener('change', () => { SafeStorage.setItem('caci_tts_length', lengthSel.value); saveUserPref('ttsLength', parseInt(lengthSel.value)); });
     }
   }
 
@@ -18278,7 +18262,7 @@ function initVoiceSettings() {
     autoChk.checked = voiceAutoSpeak;
     autoChk.addEventListener('change', () => {
       voiceAutoSpeak = autoChk.checked;
-      localStorage.setItem('caci_voice_auto', voiceAutoSpeak);
+      SafeStorage.setItem('caci_voice_auto', voiceAutoSpeak);
       saveUserPref('ttsAuto', voiceAutoSpeak);
       const tog = $('spk-toggle-btn');
       if (tog) tog.classList.toggle('active', voiceAutoSpeak);
@@ -18334,9 +18318,9 @@ async function connectIntegration(id) {
     }
   } catch(e) {
     // Worker route not yet deployed — store locally so UI reflects intent
-    const stored = JSON.parse(localStorage.getItem('caci_integrations') || '{}');
+    const stored = JSON.parse(SafeStorage.getItem('caci_integrations') || '{}');
     stored[id] = { ...vals, connectedAt: new Date().toISOString() };
-    localStorage.setItem('caci_integrations', JSON.stringify(stored));
+    SafeStorage.setItem('caci_integrations', JSON.stringify(stored));
     setIntFb(id, '✓ Saved locally (deploy worker to persist)', 'ok');
     setIntStatus(id, true);
     loadIntegrationStatuses();
@@ -18362,7 +18346,7 @@ function setIntStatus(id, connected) {
 }
 
 function loadIntegrationStatuses() {
-  const stored = JSON.parse(localStorage.getItem('caci_integrations') || '{}');
+  const stored = JSON.parse(SafeStorage.getItem('caci_integrations') || '{}');
   INT_DEFS.forEach(def => setIntStatus(def.id, !!stored[def.id]));
 
   const list = document.getElementById('int-connected-list');
@@ -18385,9 +18369,9 @@ function loadIntegrationStatuses() {
 }
 
 function disconnectIntegration(id) {
-  const stored = JSON.parse(localStorage.getItem('caci_integrations') || '{}');
+  const stored = JSON.parse(SafeStorage.getItem('caci_integrations') || '{}');
   delete stored[id];
-  localStorage.setItem('caci_integrations', JSON.stringify(stored));
+  SafeStorage.setItem('caci_integrations', JSON.stringify(stored));
   setIntStatus(id, false);
   setIntFb(id, 'Disconnected.', '');
   loadIntegrationStatuses();
@@ -18440,7 +18424,7 @@ async function saveConnector(id) {
     }
   } catch(e) {
     // Store locally until worker route is deployed
-    const stored = JSON.parse(localStorage.getItem('caci_connectors') || '{}');
+    const stored = JSON.parse(SafeStorage.getItem('caci_connectors') || '{}');
     const safeVals = { ...vals };
     // Redact secrets before storing in localStorage
     def.fields.forEach(f => {
@@ -18449,7 +18433,7 @@ async function saveConnector(id) {
       }
     });
     stored[id] = { ...safeVals, savedAt: new Date().toISOString() };
-    localStorage.setItem('caci_connectors', JSON.stringify(stored));
+    SafeStorage.setItem('caci_connectors', JSON.stringify(stored));
     setConFb(id, '✓ Saved (deploy worker route to persist securely)', 'ok');
     setConStatus(id, true);
     loadConnectorStatuses();
@@ -18475,7 +18459,7 @@ function setConStatus(id, connected) {
 }
 
 function loadConnectorStatuses() {
-  const stored = JSON.parse(localStorage.getItem('caci_connectors') || '{}');
+  const stored = JSON.parse(SafeStorage.getItem('caci_connectors') || '{}');
   CON_DEFS.forEach(def => setConStatus(def.id, !!stored[def.id]));
 
   const list = document.getElementById('con-active-list');
@@ -18499,9 +18483,9 @@ function loadConnectorStatuses() {
 }
 
 function disconnectConnector(id) {
-  const stored = JSON.parse(localStorage.getItem('caci_connectors') || '{}');
+  const stored = JSON.parse(SafeStorage.getItem('caci_connectors') || '{}');
   delete stored[id];
-  localStorage.setItem('caci_connectors', JSON.stringify(stored));
+  SafeStorage.setItem('caci_connectors', JSON.stringify(stored));
   setConStatus(id, false);
   setConFb(id, 'Removed.', '');
   loadConnectorStatuses();
@@ -19333,7 +19317,7 @@ async function loadAuditLog() {
 ═══════════════════════════════════════════════════════════ */
 
 // State
-let _aiClassifyEnabled  = localStorage.getItem('caci_ai_classify') !== 'false'; // on by default
+let _aiClassifyEnabled  = SafeStorage.getItem('caci_ai_classify') !== 'false'; // on by default
 let _aiPendingResults   = []; // { fileId, name, collection, suggested: {category,period,reportName,reportType,isContextDoc}, applied: false }
 let _aiClassifyQueue    = []; // file IDs waiting to be classified
 let _aiClassifyRunning  = false;
@@ -19345,7 +19329,7 @@ function initAiClassify() {
     toggle.checked = _aiClassifyEnabled;
     toggle.addEventListener('change', () => {
       _aiClassifyEnabled = toggle.checked;
-      localStorage.setItem('caci_ai_classify', _aiClassifyEnabled);
+      SafeStorage.setItem('caci_ai_classify', _aiClassifyEnabled);
       updateAiClassifyCostLabel();
     });
   }
@@ -20383,10 +20367,10 @@ const UserTour = (() => {
   function $$ (id) { return document.getElementById(id); }
 
   function hasSeenTour() {
-    try { return localStorage.getItem(STORAGE_KEY) === '1'; } catch { return false; }
+    try { return SafeStorage.getItem(STORAGE_KEY) === '1'; } catch { return false; }
   }
   function markSeen() {
-    try { localStorage.setItem(STORAGE_KEY, '1'); } catch {}
+    try { SafeStorage.setItem(STORAGE_KEY, '1'); } catch {}
   }
 
   // Returns the first DOM element matching the step's target selector,
@@ -20794,8 +20778,8 @@ const UserTour = (() => {
   // Public API so other code can start/restart the tour on demand
   return {
     init,
-    start: () => { try { localStorage.removeItem(STORAGE_KEY); } catch {} start(); },
-    reset: () => { try { localStorage.removeItem(STORAGE_KEY); } catch {} },
+    start: () => { try { SafeStorage.removeItem(STORAGE_KEY); } catch {} start(); },
+    reset: () => { try { SafeStorage.removeItem(STORAGE_KEY); } catch {} },
   };
 })();
 
