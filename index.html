@@ -9968,8 +9968,7 @@ window.addEventListener('beforeunload', () => {
       if (level === 1.0) {
         app.style.filter = 'none';
       } else {
-        const contrast = 1 + ((level - 1) * 0.25);
-        app.style.filter = `brightness(${level}) contrast(${contrast})`;
+        app.style.filter = `brightness(${level})`;
       }
       this.updateActiveButton();
     },
