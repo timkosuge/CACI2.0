@@ -2004,7 +2004,12 @@ body[data-theme="light"] .login-frame-box {
   transform-origin: center;
   transition:
     transform 0.9s cubic-bezier(0.22,0.61,0.36,1),
-    opacity 0.7s cubic-bezier(0.22,0.61,0.36,1);
+    opacity 0.7s cubic-bezier(0.22,0.61,0.36,1),
+    width 1.2s cubic-bezier(0.22,0.61,0.36,1),
+    height 1.2s cubic-bezier(0.22,0.61,0.36,1),
+    max-height 1.2s cubic-bezier(0.22,0.61,0.36,1),
+    border-radius 1.2s cubic-bezier(0.22,0.61,0.36,1),
+    box-shadow 1.2s cubic-bezier(0.22,0.61,0.36,1);
   box-shadow:
     0 0 0 1px rgba(212,168,50,0.55),
     0 0 0 2px rgba(212,168,50,0.12),
@@ -2016,6 +2021,20 @@ body[data-theme="light"] .login-frame-box {
 #demo-theatre.active .demo-stage {
   transform: scale(1);
   opacity: 1;
+}
+
+/* Full screen mode — triggered when chorus begins (Beat 1+) */
+#demo-theatre.active .demo-stage.fullscreen {
+  width: 100vw !important;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+#demo-theatre.active .demo-stage.fullscreen .demo-stage-corner,
+#demo-theatre.active .demo-stage.fullscreen::before {
+  opacity: 0;
+  transition: opacity 0.8s ease;
 }
 
 /* Gold metallic top edge on stage */
@@ -9575,7 +9594,7 @@ html body[data-theme="light"] #discovery-greeting-strip .dgs-text strong {
 
           <div class="acard admin-only" id="demo-scripts-card">
             <div class="acard-title">Demo Scripts</div>
-            <div class="acard-sub">Kait writes all narration for the demo herself. One click generates 3 variants for every beat (intro + 7 chorus beats = 24 scripts). Each show randomly picks one variant per beat, so repeat viewings aren't identical. To refresh everything, generate again — this replaces all stored variants.</div>
+            <div class="acard-sub">Kait writes all narration for the demo herself. One click generates 5 variants for every beat (intro + 7 chorus beats = 40 scripts). Each show randomly picks one variant per beat, so repeat viewings aren't identical. To refresh everything, generate again — this replaces all stored variants.</div>
             <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;align-items:center">
               <button class="asave" id="demo-gen-all" style="white-space:nowrap">Generate Full Demo (24 scripts)</button>
               <button class="asave" id="demo-reset-all" style="background:transparent;border:1px solid rgba(220,90,90,0.5);color:rgba(240,160,160,0.95)">Reset All</button>
@@ -14035,6 +14054,9 @@ const DemoMode = {
     // Reset all beats
     document.querySelectorAll('.demo-beat').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.demo-dot').forEach(d => { d.classList.remove('active'); d.classList.remove('done'); });
+    // Reset fullscreen
+    const stage = document.getElementById('demo-stage');
+    if (stage) stage.classList.remove('fullscreen');
     // Reset 3D beat objects
     if (this.cinema && this.cinema.beatObjects) {
       Object.values(this.cinema.beatObjects).forEach(entry => {
@@ -14132,6 +14154,13 @@ const DemoMode = {
 
     // Fade out all beats, fade in current
     document.querySelectorAll('.demo-beat').forEach(b => b.classList.remove('active'));
+
+    // Go fullscreen when the first chorus voice kicks in (beat id !== 2)
+    const stage = document.getElementById('demo-stage');
+    if (stage && beat.id !== 2) {
+      stage.classList.add('fullscreen');
+    }
+
     const beatEl = document.querySelector(`.demo-beat[data-beat="${beat.id}"]`);
     if (beatEl) {
       // Run setup hook if any
