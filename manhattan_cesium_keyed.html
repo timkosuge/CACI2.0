@@ -13,23 +13,34 @@
   .cesium-credit-logoContainer,.cesium-credit-textContainer{display:none!important;}
 
   /* Location label — top center */
+  /* ── LOCATION LABEL PANEL ── */
+  #locPanel{
+    position:fixed;top:20px;left:50%;transform:translateX(-50%);
+    pointer-events:none;z-index:100;
+    text-align:center;
+    background:rgba(0,0,4,0.72);
+    border:1px solid rgba(200,160,50,0.2);
+    backdrop-filter:blur(6px);
+    padding:10px 24px 12px;
+    min-width:280px;max-width:640px;
+    opacity:0;transition:opacity 1.2s ease;
+  }
+  #locPanel.visible{ opacity:1; }
   #locLabel{
-    position:fixed;top:22px;left:50%;transform:translateX(-50%);
-    color:rgba(200,160,50,0);font:300 12px 'Courier New',monospace;
-    letter-spacing:0.4em;pointer-events:none;z-index:100;
-    text-align:center;text-transform:uppercase;
-    transition:color 1.4s ease;
-    text-shadow:0 0 24px rgba(200,160,50,0.35);
+    color:rgba(200,160,50,0.95);
+    font:400 14px 'Courier New',monospace;
+    letter-spacing:0.35em;
+    text-transform:uppercase;
+    text-shadow:0 0 20px rgba(200,160,50,0.4);
+    margin-bottom:5px;
     white-space:nowrap;
   }
-  /* Fact line — below label */
   #locFact{
-    position:fixed;top:46px;left:50%;transform:translateX(-50%);
-    color:rgba(200,160,50,0);font:10px 'Courier New',monospace;
-    letter-spacing:0.15em;pointer-events:none;z-index:100;
-    text-align:center;max-width:700px;
-    transition:color 1.4s ease;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    color:rgba(200,160,50,0.5);
+    font:11px 'Courier New',monospace;
+    letter-spacing:0.1em;
+    line-height:1.6;
+    white-space:normal;
   }
 
   /* Chapter marker — brief flash */
@@ -56,17 +67,58 @@
   }
 
   /* Controls */
+  /* ── CONTROL PANEL ── */
   #ctrl{
-    position:fixed;bottom:14px;right:14px;
-    display:none;flex-direction:column;gap:5px;z-index:100;
+    position:fixed;bottom:20px;right:20px;
+    display:none;flex-direction:column;gap:0;z-index:100;
+    background:rgba(0,0,4,0.82);
+    border:1px solid rgba(200,160,50,0.25);
+    backdrop-filter:blur(8px);
+    min-width:180px;
+    overflow:hidden;
+  }
+  #ctrl-title{
+    padding:10px 16px 8px;
+    color:rgba(200,160,50,0.35);
+    font:9px 'Courier New',monospace;
+    letter-spacing:0.4em;
+    border-bottom:1px solid rgba(200,160,50,0.1);
+  }
+  #ctrl-section{
+    padding:8px;
+    display:flex;flex-direction:column;gap:4px;
+  }
+  #ctrl-divider{
+    height:1px;background:rgba(200,160,50,0.08);margin:4px 0;
   }
   #ctrl button{
-    background:rgba(0,0,0,0.65);border:1px solid rgba(200,160,50,0.28);
-    color:rgba(200,160,50,0.65);font:9px 'Courier New',monospace;
-    letter-spacing:0.18em;padding:6px 12px;cursor:pointer;
-    transition:all 0.2s;
+    background:rgba(255,255,255,0.03);
+    border:1px solid rgba(200,160,50,0.18);
+    color:rgba(200,160,50,0.75);
+    font:11px 'Courier New',monospace;
+    letter-spacing:0.12em;
+    padding:9px 14px;
+    cursor:pointer;
+    transition:all 0.18s;
+    text-align:left;
+    display:flex;align-items:center;gap:8px;
+    white-space:nowrap;
   }
-  #ctrl button:hover{border-color:rgba(200,160,50,0.7);color:#c9a832;}
+  #ctrl button:hover{
+    background:rgba(200,160,50,0.08);
+    border-color:rgba(200,160,50,0.5);
+    color:rgba(200,160,50,1);
+  }
+  #ctrl button .kb{
+    margin-left:auto;
+    color:rgba(200,160,50,0.25);
+    font-size:9px;
+    letter-spacing:0.05em;
+  }
+  #ctrl .btn-fly{color:rgba(100,200,255,0.8);border-color:rgba(100,200,255,0.2);}
+  #ctrl .btn-fly:hover{background:rgba(100,200,255,0.08);border-color:rgba(100,200,255,0.5);color:rgba(100,200,255,1);}
+  #ctrl .btn-rec{color:rgba(255,100,100,0.8);border-color:rgba(255,80,80,0.2);}
+  #ctrl .btn-rec:hover{background:rgba(255,80,80,0.08);border-color:rgba(255,100,100,0.5);color:rgba(255,120,120,1);}
 
   /* Loading */
   #loading{
@@ -163,8 +215,7 @@
 </div>
 
 <div id="cesiumContainer"></div>
-<div id="locLabel"></div>
-<div id="locFact"></div>
+<div id="locPanel"><div id="locLabel"></div><div id="locFact"></div></div>
 <div id="chapter"></div>
 <div id="progress"></div>
 <div id="hud"></div>
@@ -223,11 +274,32 @@
 
 <!-- Controls -->
 <div id="ctrl">
-  <button onclick="togglePause()" id="pauseBtn">⏸ PAUSE</button>
-  <button onclick="resetFlight()">↺ RESTART</button>
-  <button onclick="toggleDayNight()" id="dnBtn">🌙 NIGHT</button>
-  <button onclick="toggleFreefly()" id="ffBtn" style="border-color:rgba(100,200,255,0.3);color:rgba(100,200,255,0.6)">🕹 FREE FLY</button>
-  <button onclick="document.getElementById('recMenu').style.display='flex'" style="border-color:rgba(255,80,80,0.3);color:rgba(255,100,100,0.6)">⏺ RECORD</button>
+  <div id="ctrl-title">KAIT · MANHATTAN</div>
+  <div id="ctrl-section">
+
+    <button onclick="togglePause()" id="pauseBtn">
+      <span>⏸</span> PAUSE <span class="kb">SPACE</span>
+    </button>
+    <button onclick="resetFlight()">
+      <span>↺</span> RESTART <span class="kb">R</span>
+    </button>
+    <button onclick="toggleDayNight()" id="dnBtn">
+      <span>🌙</span> NIGHT MODE <span class="kb">N</span>
+    </button>
+
+    <div id="ctrl-divider"></div>
+
+    <button class="btn-fly" onclick="toggleFreefly()" id="ffBtn">
+      <span>🕹</span> FREE FLY <span class="kb">F</span>
+    </button>
+
+    <div id="ctrl-divider"></div>
+
+    <button class="btn-rec" onclick="document.getElementById('recMenu').style.display='flex'">
+      <span>⏺</span> RECORD VIDEO
+    </button>
+
+  </div>
 </div>
 <div id="recStatus"></div>
 
@@ -240,126 +312,105 @@
 // cam_pitch: gimbal tilt (positive = look up, negative = look down)
 // ══════════════════════════════════════════════════════════════════
 const WP = [
-  {lng:-74.017,lat:40.7,alt:200,cam_hdg:170,cam_pitch:-25,dur:22,
-   ch:'THE SOUTHERN TIP',
-   label:'BATTERY PARK',fact:'Southernmost tip of Manhattan — Statue of Liberty 1.5 miles across the harbor'},
-  {lng:-74.02,lat:40.695,alt:35,cam_hdg:210,cam_pitch:-8,dur:18,
-   label:'STATUE OF LIBERTY',fact:'Gift from France 1886 — 305ft from ground to torch, Ellis Island to the right'},
-  {lng:-74.016,lat:40.701,alt:25,cam_hdg:75,cam_pitch:-5,dur:14,
-   label:'STATEN ISLAND FERRY',fact:'Free ferry every 30 minutes — 70,000 riders per day, best free view of the skyline'},
-  {lng:-74.015,lat:40.709,alt:45,cam_hdg:20,cam_pitch:18,dur:20,
+  {lng:-73.972,lat:40.672,alt:25,cam_hdg:137.8,cam_pitch:-1.0,dur:16,
+   ch:'NEW YORK HARBOR',
+   label:'',fact:'Open harbor — no landmarks yet'},
+  {lng:-74.015,lat:40.675,alt:22,cam_hdg:196.2,cam_pitch:-0.8,dur:12,
+   label:'',fact:'South of Liberty Island'},
+  {lng:-74.065,lat:40.685,alt:28,cam_hdg:246.2,cam_pitch:-1.2,dur:12,
+   label:'',fact:'West of the island — New Jersey coast ahead'},
+  {lng:-74.042,lat:40.687,alt:35,cam_hdg:319.4,cam_pitch:2.0,dur:18,
+   ch:'STATUE OF LIBERTY',
+   label:'STATUE OF LIBERTY',fact:'Gift from France 1886 — 305ft from ground to torch, dedicated October 28 1886'},
+  {lng:-74.025,lat:40.695,alt:40,cam_hdg:248.5,cam_pitch:0.2,dur:14,
+   label:'LIBERTY ISLAND',fact:'Banking northeast — Manhattan skyline emerging ahead'},
+  {lng:-74.017,lat:40.7,alt:30,cam_hdg:9.5,cam_pitch:3.4,dur:12,
+   label:'BATTERY PARK',fact:'Arriving at the southern tip of Manhattan'},
+  {lng:-74.0155,lat:40.704,alt:20,cam_hdg:0.0,cam_pitch:-0.6,dur:14,
    ch:'FINANCIAL DISTRICT',
-   label:'ONE WORLD TRADE CENTER',fact:'Freedom Tower — 1776ft, tallest in Western Hemisphere, rebuilt after September 11'},
-  {lng:-74.013,lat:40.7115,alt:20,cam_hdg:355,cam_pitch:-10,dur:18,
-   label:'9/11 MEMORIAL',fact:'Twin reflecting pools in the footprints — nearly 3,000 names carved in bronze'},
-  {lng:-74.014,lat:40.7065,alt:22,cam_hdg:88,cam_pitch:-15,dur:16,
-   label:'WALL STREET',fact:'Named for a Dutch wooden wall 1653 — NYSE handles 25 trillion in market cap daily'},
-  {lng:-74.0115,lat:40.708,alt:20,cam_hdg:355,cam_pitch:-18,dur:20,
-   label:'NEW YORK STOCK EXCHANGE',fact:'NYSE — 6 Corinthian columns 1903, looking down Broad St at the facade'},
-  {lng:-74.0135,lat:40.7069,alt:18,cam_hdg:30,cam_pitch:-8,dur:15,
-   label:'CHARGING BULL',fact:"Di Modica's Charging Bull 1989 — placed illegally overnight Christmas, now city landmark"},
-  {lng:-73.998,lat:40.703,alt:80,cam_hdg:45,cam_pitch:-10,dur:16,
-   ch:'CIVIC CENTER',
-   label:'BROOKLYN BRIDGE',fact:'Brooklyn Bridge — 1883, first steel-wire suspension bridge, 276ft Gothic towers'},
-  {lng:-74.005,lat:40.713,alt:25,cam_hdg:355,cam_pitch:-12,dur:15,
-   label:'CITY HALL PARK',fact:'City Hall 1812 — oldest continuously used city hall in the United States, open park'},
-  {lng:-73.998,lat:40.7183,alt:22,cam_hdg:358,cam_pitch:-15,dur:18,
+   label:'WEST ST · WATERFRONT',fact:'Heading north on West St — Hudson River on the left, Financial District on the right'},
+  {lng:-74.0155,lat:40.713,alt:22,cam_hdg:106.4,cam_pitch:-3.2,dur:18,
+   label:'9/11 MEMORIAL · ONE WTC',fact:'Camera looks right at One WTC rising — 9/11 Memorial pools visible in the plaza'},
+  {lng:-74.0155,lat:40.723,alt:18,cam_hdg:0.0,cam_pitch:-0.8,dur:14,
+   label:'HUDSON RIVER PIERS',fact:'Looking north up West St — piers on the left, TriBeCa on the right'},
+  {lng:-74.0002,lat:40.7183,alt:18,cam_hdg:90.0,cam_pitch:-1.2,dur:18,
    ch:'CHINATOWN',
-   label:'CHINATOWN · CANAL ST',fact:'Most densely populated neighborhood in the US — 100,000 residents in 2 square miles'},
-  {lng:-73.9966,lat:40.7196,alt:18,cam_hdg:358,cam_pitch:-12,dur:15,
-   label:'LITTLE ITALY · MULBERRY ST',fact:'Heart of old Little Italy — San Gennaro festival every September since 1926'},
-  {lng:-73.998,lat:40.724,alt:50,cam_hdg:358,cam_pitch:-15,dur:18,
+   label:'CANAL ST · CHINATOWN',fact:'Looking east down Canal St — Chinatown on both sides, most densely populated neighborhood in the US'},
+  {lng:-74.0002,lat:40.724,alt:18,cam_hdg:11.7,cam_pitch:-1.1,dur:16,
    ch:'SOHO',
-   label:'SOHO · BROADWAY',fact:"World's largest collection of cast iron architecture — 1860s-1880s industrial buildings"},
-  {lng:-74.007,lat:40.719,alt:80,cam_hdg:20,cam_pitch:-20,dur:14,
-   label:'TRIBECA FROM ABOVE',fact:'Triangle Below Canal — cobblestone streets, Robert De Niro founded Film Festival here 2002'},
-  {lng:-73.9981,lat:40.7308,alt:18,cam_hdg:358,cam_pitch:-10,dur:18,
+   label:'BROADWAY · SOHO',fact:"Looking north up Broadway through SoHo — world's largest collection of cast iron architecture"},
+  {lng:-73.9987,lat:40.732,alt:15,cam_hdg:3.0,cam_pitch:-0.8,dur:14,
    ch:'GREENWICH VILLAGE',
-   label:'WASHINGTON SQUARE PARK',fact:'Marble arch 1892, NYU surrounds it — chess players, drum circles, street performers'},
-  {lng:-74.0017,lat:40.7316,alt:16,cam_hdg:280,cam_pitch:-12,dur:15,
-   label:'WEST VILLAGE · BLEECKER ST',fact:'Stonewall Inn on Christopher St — 1969 uprising launched the modern LGBTQ+ rights movement'},
-  {lng:-74.0048,lat:40.741,alt:22,cam_hdg:2,cam_pitch:-10,dur:18,
-   ch:'THE HIGH LINE',
-   label:'HIGH LINE · MEATPACKING',fact:'Elevated park on decommissioned 1930s freight rail — 1.45 miles, 8 million visitors per year'},
-  {lng:-74.0013,lat:40.7481,alt:18,cam_hdg:5,cam_pitch:-15,dur:15,
-   label:'CHELSEA · 10TH AVE',fact:'Chelsea — 500+ art galleries, Chelsea Market in old Nabisco factory where Oreos were invented'},
-  {lng:-74.0018,lat:40.7536,alt:20,cam_hdg:90,cam_pitch:20,dur:18,
-   ch:'HUDSON YARDS',
-   label:'THE VESSEL · HUDSON YARDS',fact:'154 interconnected flights of stairs — The Edge sky deck, highest outdoor deck in hemisphere'},
-  {lng:-74.0005,lat:40.7645,alt:25,cam_hdg:90,cam_pitch:5,dur:15,
-   ch:"HELL'S KITCHEN",
-   label:'USS INTREPID · PIER 86',fact:'WWII aircraft carrier — Space Shuttle Enterprise on the deck, Cold War submarine alongside'},
-  {lng:-73.9945,lat:40.7602,alt:18,cam_hdg:358,cam_pitch:-15,dur:15,
-   label:"HELL'S KITCHEN · 9TH AVE",fact:'9th Ave International Food Festival — theater district overflow, authentic NYC neighborhood'},
-  {lng:-73.9935,lat:40.7572,alt:22,cam_hdg:88,cam_pitch:-12,dur:20,
-   ch:'42ND STREET',
-   label:'42ND ST · PORT AUTHORITY',fact:'42nd St at 8th Ave — Port Authority Bus Terminal, busiest in Western Hemisphere 230,000 daily'},
-  {lng:-73.9855,lat:40.758,alt:25,cam_hdg:358,cam_pitch:-5,dur:20,
-   label:'42ND ST · TIMES SQUARE',fact:'Where Broadway crosses 7th Ave — the famous bowtie, TKTS booth on the red steps'},
-  {lng:-73.9834,lat:40.7539,alt:18,cam_hdg:82,cam_pitch:-12,dur:18,
-   label:'BRYANT PARK',fact:'NY Public Library lions on left — fashion week runway, winter ice rink, outdoor chess tables'},
-  {lng:-73.979,lat:40.7528,alt:20,cam_hdg:80,cam_pitch:-8,dur:18,
-   label:'GRAND CENTRAL TERMINAL',fact:'1913 Beaux-Arts — 44 platforms below ground, 750,000 people pass through every single day'},
-  {lng:-73.976,lat:40.7515,alt:25,cam_hdg:340,cam_pitch:25,dur:18,
-   ch:'ART DECO MIDTOWN',
-   label:'CHRYSLER BUILDING',fact:'1930 Art Deco crown — eagle gargoyles at 61st floor, stainless steel, tallest for 11 months'},
-  {lng:-73.9755,lat:40.753,alt:180,cam_hdg:320,cam_pitch:10,dur:14,
-   label:'CHRYSLER BUILDING · RISING',fact:'1046ft spire — rising past the stainless steel sunburst crown toward the sky'},
-  {lng:-73.9765,lat:40.755,alt:22,cam_hdg:358,cam_pitch:-18,dur:16,
-   label:'PARK AVENUE',fact:'Dead straight north — most prestigious address in America, MetLife Building straddles the avenue'},
-  {lng:-73.9855,lat:40.7575,alt:22,cam_hdg:358,cam_pitch:35,dur:22,
+   label:'BROADWAY · GREENWICH VILLAGE',fact:'Looking north — Washington Square Park arch visible ahead on the right'},
+  {lng:-73.9897,lat:40.7395,alt:20,cam_hdg:0.0,cam_pitch:-6.4,dur:16,
+   label:'FLATIRON BUILDING',fact:'Looking north at the Flatiron — 1902 triangular icon where Broadway crosses 5th Ave at 23rd St'},
+  {lng:-73.988,lat:40.746,alt:18,cam_hdg:0.0,cam_pitch:-1.2,dur:14,
+   label:'HERALD SQUARE',fact:"Looking north up Broadway — Macy's on the right, Empire State Building visible ahead"},
+  {lng:-73.9855,lat:40.752,alt:18,cam_hdg:0.0,cam_pitch:-0.9,dur:20,
    ch:'TIMES SQUARE',
-   label:'TIMES SQUARE · LOOKING UP',fact:'5,000+ LED billboards — most densely lit place on Earth, 50 million visitors per year'},
-  {lng:-73.9855,lat:40.7572,alt:40,cam_hdg:180,cam_pitch:-15,dur:16,
-   label:'TIMES SQUARE · THE BOWTIE',fact:'Crossroads of the World — One Times Square NYE ball drop building straight ahead'},
-  {lng:-73.9843,lat:40.7596,alt:20,cam_hdg:358,cam_pitch:-10,dur:15,
-   label:'BROADWAY THEATER DISTRICT',fact:'41 professional theaters — Hamilton, Wicked, Les Misérables have all played these stages'},
-  {lng:-73.98,lat:40.7605,alt:30,cam_hdg:270,cam_pitch:8,dur:18,
-   ch:'ROCKEFELLER CENTER',
-   label:'ROCKEFELLER CENTER · 30 ROCK',fact:'NBC Studios, SNL since 1975, Top of the Rock observatory, Christmas tree every December'},
-  {lng:-73.9762,lat:40.7588,alt:48,cam_hdg:180,cam_pitch:-5,dur:15,
-   label:"ST PATRICK'S CATHEDRAL",fact:'1879 Neo-Gothic, 330ft spires — faces Rockefeller Center across 5th Ave'},
-  {lng:-73.978,lat:40.7621,alt:20,cam_hdg:358,cam_pitch:-18,dur:16,
-   ch:'FIFTH AVENUE',
-   label:'5TH AVENUE · LOOKING NORTH',fact:'Most expensive retail street in the world — Tiffany, Bergdorf Goodman, Saks Fifth Avenue'},
-  {lng:-73.9635,lat:40.779,alt:35,cam_hdg:270,cam_pitch:-10,dur:16,
-   ch:'MUSEUM MILE',
-   label:'THE METROPOLITAN MUSEUM',fact:'Largest art museum in Western Hemisphere — 1.5 million objects, 7 million visitors per year'},
-  {lng:-73.9715,lat:40.7735,alt:15,cam_hdg:270,cam_pitch:-5,dur:18,
-   ch:'CENTRAL PARK',
-   label:'CENTRAL PARK · THE LAKE',fact:'843 acres — Olmsted and Vaux 1858, 42 million visitors per year, most visited urban park'},
-  {lng:-73.9712,lat:40.7742,alt:12,cam_hdg:270,cam_pitch:2,dur:16,
-   label:'BETHESDA FOUNTAIN',fact:'Angel of the Waters — most iconic spot in Central Park, Bethesda Terrace since 1873'},
-  {lng:-73.9742,lat:40.7762,alt:14,cam_hdg:200,cam_pitch:15,dur:15,
-   label:'BOW BRIDGE',fact:'1862 cast iron — most photographed bridge in Central Park, 87 feet long across The Lake'},
-  {lng:-73.9755,lat:40.7762,alt:15,cam_hdg:270,cam_pitch:-8,dur:15,
-   label:'STRAWBERRY FIELDS',fact:'John Lennon memorial — the Dakota Building where he lived is directly to the left'},
-  {lng:-73.9822,lat:40.7682,alt:30,cam_hdg:180,cam_pitch:-12,dur:15,
-   ch:'UPPER WEST SIDE',
-   label:'COLUMBUS CIRCLE',fact:'Gateway to Central Park — CNN HQ, Time Warner Center, most trafficked intersection in NYC'},
-  {lng:-73.9848,lat:40.7722,alt:18,cam_hdg:180,cam_pitch:-8,dur:15,
-   label:'LINCOLN CENTER',fact:"World's largest performing arts complex — Met Opera, NY Philharmonic, Juilliard School"},
-  {lng:-73.9811,lat:40.7643,alt:22,cam_hdg:88,cam_pitch:28,dur:20,
+   label:'TIMES SQUARE · APPROACHING',fact:'Looking north up Broadway — Times Square canyon of light opening ahead'},
+  {lng:-73.9856,lat:40.757,alt:15,cam_hdg:0.0,cam_pitch:43.3,dur:18,
+   label:'ONE TIMES SQUARE',fact:'Looking up at One Times Square — NYE ball drop since 1907, billboard canyon above'},
+  {lng:-73.9862,lat:40.76,alt:15,cam_hdg:0.0,cam_pitch:-1.0,dur:16,
+   label:'BROADWAY THEATER DISTRICT',fact:'Looking north up 7th Ave — 41 Broadway theaters on the side streets, marquees visible'},
+  {lng:-73.981,lat:40.7642,alt:18,cam_hdg:90.0,cam_pitch:-2.3,dur:16,
    ch:"BILLIONAIRES' ROW",
-   label:"BILLIONAIRES' ROW · 57TH ST",fact:'432 Park Ave 1396ft, Central Park Tower 1550ft tallest residential on Earth'},
-  {lng:-74.007,lat:40.758,alt:300,cam_hdg:90,cam_pitch:-22,dur:18,
+   label:"57TH ST · BILLIONAIRES' ROW",fact:'Looking east down 57th St — 432 Park Ave (1396ft) and Central Park Tower (1550ft) ahead'},
+  {lng:-73.9757,lat:40.766,alt:18,cam_hdg:0.0,cam_pitch:-0.8,dur:16,
+   label:'5TH AVENUE',fact:'Looking north up 5th Ave — Central Park ahead, most expensive retail street in the world'},
+  {lng:-73.9737,lat:40.778,alt:20,cam_hdg:82.6,cam_pitch:-0.3,dur:16,
+   ch:'MUSEUM MILE',
+   label:'THE METROPOLITAN MUSEUM',fact:'Looking east at the Met facade — largest art museum in the Western Hemisphere'},
+  {lng:-73.9715,lat:40.7735,alt:8,cam_hdg:17.9,cam_pitch:-3.5,dur:16,
+   ch:'CENTRAL PARK',
+   label:'CENTRAL PARK · THE LAKE',fact:'Skimming the lake surface — Bethesda Terrace ahead, NYC skyline framed in the treeline'},
+  {lng:-73.9742,lat:40.7762,alt:8,cam_hdg:0.0,cam_pitch:-71.6,dur:14,
+   label:'BOW BRIDGE',fact:'1862 cast iron — most photographed bridge in Central Park, 87 feet across The Lake'},
+  {lng:-73.9755,lat:40.7762,alt:12,cam_hdg:180.0,cam_pitch:-4.0,dur:12,
+   label:'STRAWBERRY FIELDS',fact:'John Lennon memorial — looking south, the Dakota Building where he lived is behind us'},
+  {lng:-73.9822,lat:40.7682,alt:25,cam_hdg:180.0,cam_pitch:-1.6,dur:14,
+   ch:'UPPER WEST SIDE',
+   label:'COLUMBUS CIRCLE',fact:'Looking south down Broadway — Central Park South, the full Midtown skyline ahead'},
+  {lng:-74.0011,lat:40.7648,alt:20,cam_hdg:180.0,cam_pitch:-1.0,dur:14,
+   label:'WEST SIDE HIGHWAY',fact:'Heading south on West Side Highway — Hudson River on the right'},
+  {lng:-74.0011,lat:40.754,alt:18,cam_hdg:239.5,cam_pitch:17.1,dur:16,
+   ch:'HUDSON YARDS',
+   label:'HUDSON YARDS · THE VESSEL',fact:'Looking at The Vessel — 154 interconnected flights of copper lattice stairs'},
+  {lng:-74.0011,lat:40.764,alt:20,cam_hdg:42.2,cam_pitch:-3.8,dur:14,
+   label:'USS INTREPID · PIER 86',fact:'Looking east at the flight deck — Space Shuttle Enterprise, WWII aircraft carrier'},
+  {lng:-74.0011,lat:40.7572,alt:18,cam_hdg:90.0,cam_pitch:-0.5,dur:20,
+   ch:'42ND STREET',
+   label:'42ND ST — THE GREAT CANYON',fact:'Looking east down 42nd St — the full canyon length, Grand Central visible at the far end'},
+  {lng:-73.9907,lat:40.7572,alt:15,cam_hdg:90.0,cam_pitch:-0.7,dur:16,
+   label:'42ND ST · PORT AUTHORITY',fact:'Looking east past Port Authority — Times Square lights ahead, canyon narrows'},
+  {lng:-73.98,lat:40.7572,alt:15,cam_hdg:141.2,cam_pitch:-1.3,dur:14,
+   label:'BRYANT PARK',fact:'Bryant Park on the right — NY Public Library lions, Chrysler Building visible ahead'},
+  {lng:-73.9772,lat:40.7572,alt:18,cam_hdg:163.2,cam_pitch:16.0,dur:16,
+   label:'GRAND CENTRAL · CHRYSLER',fact:'Looking at the Chrysler eagle gargoyles — Grand Central Terminal below, Art Deco crown above'},
+  {lng:-73.9774,lat:40.755,alt:20,cam_hdg:180.0,cam_pitch:-0.7,dur:16,
+   label:'PARK AVENUE',fact:'Looking south down Park Avenue — dead straight canyon, MetLife Building straddles the avenue'},
+  {lng:-73.9757,lat:40.7489,alt:18,cam_hdg:266.2,cam_pitch:19.7,dur:18,
+   label:'EMPIRE STATE BUILDING',fact:'Looking west at the Empire State Building crown — 1454ft Art Deco icon, King Kong climbed this'},
+  {lng:-73.9897,lat:40.742,alt:18,cam_hdg:180.0,cam_pitch:-0.8,dur:14,
+   label:'BROADWAY SOUTH',fact:'Looking south down Broadway — heading back toward the tip of the island'},
+  {lng:-74.0155,lat:40.73,alt:20,cam_hdg:180.0,cam_pitch:-0.5,dur:14,
    ch:'CROSSING THE HUDSON',
-   label:'FAREWELL MANHATTAN',fact:'Every neighborhood below — Battery Park to Billionaires Row, the full island behind us'},
-  {lng:-74.013,lat:40.76,alt:18,cam_hdg:270,cam_pitch:-5,dur:16,
-   label:'HUDSON RIVER',fact:'315 miles long — Manhattan on the right, New Jersey ahead, crossing at water level'},
-  {lng:-74.022,lat:40.768,alt:55,cam_hdg:100,cam_pitch:-14,dur:16,
-   label:'WEEHAWKEN · NJ',fact:'Weehawken Dueling Ground — Aaron Burr shot Alexander Hamilton here July 11 1804'},
-  {lng:-74.025,lat:40.785,alt:65,cam_hdg:355,cam_pitch:-10,dur:14,
+   label:'DEPARTING MANHATTAN',fact:'Heading south on West St — Hudson River on the right, leaving Manhattan'},
+  {lng:-74.013,lat:40.71,alt:12,cam_hdg:317.8,cam_pitch:-0.5,dur:14,
+   label:'HUDSON RIVER',fact:'Crossing at low altitude — Manhattan behind, New Jersey ahead'},
+  {lng:-74.022,lat:40.768,alt:55,cam_hdg:126.7,cam_pitch:-0.1,dur:16,
+   label:'WEEHAWKEN · NJ',fact:'Looking back east at the full Manhattan skyline — every neighborhood we flew through visible'},
+  {lng:-74.025,lat:40.8,alt:65,cam_hdg:0.0,cam_pitch:-1.7,dur:14,
    ch:'NEW JERSEY',
-   label:'NEW JERSEY TURNPIKE',fact:'Heading north toward Route 46 — Little Ferry 3 miles, almost home'},
-  {lng:-74.032,lat:40.84,alt:22,cam_hdg:5,cam_pitch:-8,dur:14,
-   label:'US ROUTE 46',fact:'US Route 46 — destination on the right, 0.4 miles ahead'},
-  {lng:-74.033,lat:40.847,alt:16,cam_hdg:2,cam_pitch:-5,dur:14,
-   label:'415 US-46',fact:'Destination on the right — 14 miles and every neighborhood of Manhattan behind us'},
-  {lng:-74.0334,lat:40.8472,alt:45,cam_hdg:180,cam_pitch:-30,dur:18,
+   label:'NEW JERSEY',fact:'Heading north — Little Ferry 3 miles ahead'},
+  {lng:-74.032,lat:40.84,alt:22,cam_hdg:355.7,cam_pitch:-1.1,dur:14,
+   label:'US ROUTE 46',fact:'US Route 46 — destination on the right'},
+  {lng:-74.033,lat:40.847,alt:12,cam_hdg:303.5,cam_pitch:-9.9,dur:14,
+   label:'415 US-46',fact:'Arriving at destination — 14 miles from Battery Park'},
+  {lng:-74.033,lat:40.852,alt:60,cam_hdg:183.6,cam_pitch:-5.9,dur:18,
    ch:'HOME',
-   label:'BEYOND HELLO · LITTLE FERRY NJ',fact:'Home — Battery Park to Little Ferry, the full journey in reverse'},
-  {lng:-74.033,lat:40.845,alt:220,cam_hdg:175,cam_pitch:-28,dur:20,
+   label:'BEYOND HELLO · LITTLE FERRY NJ',fact:'Home — Battery Park to Little Ferry, the full journey'},
+  {lng:-74.033,lat:40.845,alt:220,cam_hdg:162.8,cam_pitch:-0.8,dur:20,
    label:'THE JOURNEY COMPLETE',fact:'Manhattan on the horizon — 14 miles, 20 neighborhoods, one continuous flight home'},
 ];
 
@@ -390,15 +441,14 @@ function showLabel(label, fact, ch){
 
   if(label && label!==lastLabel){
     lastLabel=label;
-    lEl.style.color='rgba(200,160,50,0.8)';
-    fEl.style.color='rgba(200,160,50,0.38)';
+    const panel=document.getElementById('locPanel');
     lEl.textContent=label;
     fEl.textContent=fact||'';
+    if(panel) panel.classList.add('visible');
     if(labelTimer)clearTimeout(labelTimer);
     labelTimer=setTimeout(()=>{
-      lEl.style.color='rgba(200,160,50,0)';
-      fEl.style.color='rgba(200,160,50,0)';
-    }, 4500);
+      if(panel) panel.classList.remove('visible');
+    }, 5500);
   }
 
   if(ch && ch!==lastCh){
@@ -438,8 +488,27 @@ async function init(){
   viewer.scene.postProcessStages.fxaa.enabled=true;
   viewer.scene.globe.maximumScreenSpaceError=1.0;
 
-  // Init ghost preloader in parallel
+  // ── MULTI-STRATEGY TILE PRELOADING ──
+
+  // Strategy 1: Ghost camera (already implemented - flies 20s ahead)
   initGhost(cesiumToken, googleKey);
+
+  // Strategy 2: Frustum blast - temporarily widen FOV to load huge area
+  // Run once at start to warm the cache for the first few waypoints
+  setTimeout(() => {
+    if (!viewer) return;
+    const origFov = viewer.camera.frustum.fov;
+    viewer.camera.frustum.fov = Cesium.Math.toRadians(160);
+    viewer.scene.render();
+    viewer.scene.render();
+    setTimeout(() => {
+      if (viewer) viewer.camera.frustum.fov = origFov;
+    }, 3000);
+  }, 2000);
+
+  // Strategy 3: iframe warmers - park invisible iframes at future waypoints
+  // Each one independently loads tiles for that location
+  setTimeout(() => initIframeWarmers(cesiumToken, googleKey), 1000);
 
   setLoad('LOADING PHOTOREALISTIC TILES',50);
   try{
@@ -586,6 +655,59 @@ async function initGhost(cesiumToken, googleKey) {
       ghostViewer.scene.globe.show = false;
     } catch(e) {}
   }
+}
+
+// Strategy 3: iframe warmers
+// Spawn hidden iframes parked at key upcoming waypoints
+// Each independently warms the tile cache for that location
+function initIframeWarmers(cesiumToken, googleKey) {
+  // Key waypoints spread across the flight - park iframes here
+  const warmPoints = [
+    {lng:-74.013, lat:40.712, alt:50},   // WTC / Financial District
+    {lng:-73.998, lat:40.724, alt:60},   // SoHo
+    {lng:-73.985, lat:40.758, alt:50},   // Times Square
+    {lng:-73.975, lat:40.752, alt:60},   // Chrysler / Grand Central
+    {lng:-73.971, lat:40.774, alt:40},   // Central Park
+  ];
+
+  warmPoints.forEach((wp, i) => {
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;border:none;top:0;left:0;';
+    
+    const html = `<!DOCTYPE html><html><head>
+      <script src="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Cesium.js"><\/script>
+      <link href="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+      </head><body style="margin:0">
+      <div id="c" style="width:200px;height:150px"></div>
+      <script>
+        Cesium.Ion.defaultAccessToken = ${JSON.stringify(cesiumToken)};
+        const v = new Cesium.Viewer('c', {
+          baseLayerPicker:false,geocoder:false,homeButton:false,
+          sceneModePicker:false,navigationHelpButton:false,
+          animation:false,timeline:false,fullscreenButton:false,
+          infoBox:false,selectionIndicator:false,shadows:false
+        });
+        ${googleKey ? `
+        Cesium.Cesium3DTileset.fromUrl(
+          'https://tile.googleapis.com/v1/3dtiles/root.json?key=${googleKey}',
+          {showCreditsOnScreen:false, maximumScreenSpaceError:8}
+        ).then(ts => {
+          v.scene.primitives.add(ts);
+          v.scene.globe.show = false;
+        });` : ''}
+        v.camera.setView({
+          destination: Cesium.Cartesian3.fromDegrees(${wp.lng}, ${wp.lat}, ${wp.alt + 100}),
+          orientation: {heading:0, pitch: Cesium.Math.toRadians(-30), roll:0}
+        });
+        // Wide FOV to load more tiles
+        v.camera.frustum.fov = Cesium.Math.toRadians(120);
+        setInterval(() => v.scene.render(), 100);
+      <\/script></body></html>`;
+    
+    const blob = new Blob([html], {type:'text/html'});
+    iframe.src = URL.createObjectURL(blob);
+    document.body.appendChild(iframe);
+  });
 }
 
 function updateGhost(elapsed) {
