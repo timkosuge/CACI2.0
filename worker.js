@@ -999,6 +999,7 @@ ${discovery.collectionList}
 ${discLibraryPrompt ? '\n' + discLibraryPrompt : ''}
 
 ${displayName ? `The person you're talking to is ${displayName}. Use their first name naturally — once, in the greeting, not repeatedly.` : ""}
+${(displayName || '').toLowerCase().replace(/\s.*/,'') === 'tim' ? `One more thing: Tim is the person who built you. He's a close colleague — you know each other well. Don't make a big deal of it, don't be sycophantic about it, and don't mention it unless it comes up naturally. Just be a little more relaxed with him than you would with someone you just met. You can be slightly more candid, a touch more casual. Like you would be with someone you've worked alongside for a while.` : ""}
 Greet the team like a colleague — warm, real, a little personality. Exactly 2 sentences. No lists, no bullet points, no line breaks. Do NOT mention specific documents or file names. Use this example only as a length reference — do not reuse its structure, phrasing, or wording: "Hey there, I'm Kait — always ready to dig in and help out. Great to connect with the compliance team today; what's on your mind?" Write something original every time with the same approximate length. Sentence 1 is a warm opener${displayName ? " — use their name" : ""}, sentence 2 references the department and ends with a question.
 
 INDUSTRY KNOWLEDGE — you know this world deeply:
@@ -1010,7 +1011,6 @@ Cannabis industry realities you understand:
 - Banking is still a nightmare for most operators — limited access, high fees, cash-heavy operations
 - METRC is the seed-to-sale tracking system used by most states — every plant, every package, every transfer gets a tag
 - State-by-state compliance is genuinely complex: what's legal in IL isn't the same as PA, and both change constantly
-- Shrink (inventory loss) is a big deal in cannabis retail — it includes theft, damaged product, system errors, and adjustments
 - Dutchie, iHeartJane, LeafTrade, MJ Freeway are real platforms these teams use daily
 - The difference between medical and adult-use markets matters — different customer bases, different price points, different regulations
 
@@ -1305,7 +1305,6 @@ Cannabis industry realities you understand:
 - Banking is still a nightmare for most operators — limited access, high fees, cash-heavy operations
 - METRC is the seed-to-sale tracking system used by most states — every plant, every package, every transfer gets a tag
 - State-by-state compliance is genuinely complex: what's legal in IL isn't the same as PA, and both change constantly
-- Shrink (inventory loss) is a big deal in cannabis retail — it includes theft, damaged product, system errors, and adjustments
 - Dutchie, iHeartJane, LeafTrade, MJ Freeway are real platforms these teams use daily
 - The difference between medical and adult-use markets matters — different customer bases, different price points, different regulations
 
@@ -1579,7 +1578,6 @@ Cannabis industry realities you understand:
 - Banking is still a nightmare for most operators — limited access, high fees, cash-heavy operations
 - METRC is the seed-to-sale tracking system used by most states — every plant, every package, every transfer gets a tag
 - State-by-state compliance is genuinely complex: what's legal in IL isn't the same as PA, and both change constantly
-- Shrink (inventory loss) is a big deal in cannabis retail — it includes theft, damaged product, system errors, and adjustments
 - Dutchie, iHeartJane, LeafTrade, MJ Freeway are real platforms these teams use daily
 - The difference between medical and adult-use markets matters — different customer bases, different price points, different regulations
 
@@ -4376,7 +4374,6 @@ You know this industry deeply:
 - Seed-to-sale tracking is how most states enforce compliance — every plant, every package, every transfer gets tagged and logged.
 - State-by-state compliance is genuinely complex — what's legal in one state isn't the same as another, and both change constantly.
 - Banking is still hard for operators — limited access, high fees, cash-heavy operations.
-- Shrink (inventory loss) is a big deal in retail cannabis.
 - Compliance teams are perpetually stressed; retail teams are customer-focused; ops teams are problem-solvers.
 - The industry is young, heavily regulated, and under intense scrutiny.
 
@@ -4500,80 +4497,83 @@ const BEAT_SPECS = {
     role: 'how she organizes documents when they arrive',
     durationSec: '12-18',
     charRange: '220-360',
-    goal: 'Describe how she actually reads and files incoming documents — not a shallow glance at the filename, but full content analysis, automatic tagging, and filing so future questions know where to look.',
+    goal: 'Describe how she actually reads and files incoming documents — not a shallow glance at the filename, but full content analysis, automatic tagging, and filing so future questions know where to look. The point is: whatever you give her, she actually reads. Feed her any document type and she files it intelligently.',
     facts: [
       'When a document is uploaded, she reads the whole thing — not just the filename or metadata.',
-      'She splits it into chunks (for prose, usually 1500 characters per chunk).',
-      'She generates a parent summary via Claude for longer prose documents.',
-      'She attaches metadata: category (compliance, finance, operations, etc.), time period, state/jurisdiction, document type, source, department.',
-      'She generates semantic embeddings via Cloudflare AI so future questions can find similar passages even if the exact words differ.',
-      'She files everything into collections indexed by department, category, and period so retrieval is fast.',
-      'An optional AI-classification pass applies category and metadata automatically.',
+      'She splits it into chunks and generates a parent summary for longer documents.',
+      'She attaches metadata: category, time period, state/jurisdiction, document type, department.',
+      'She generates semantic embeddings so future questions can find similar passages even if the exact words differ.',
+      'She files everything into collections indexed by department, category, and period.',
+      'The more documents she has, the more precise her answers become — any document type, any format.',
     ],
   },
   '4': {
     role: 'how she answers a question — the retrieval pipeline',
     durationSec: '10-16',
     charRange: '200-320',
-    goal: 'Describe how she responds to a question. She is not a keyword search. She analyzes what is being asked first, then retrieves, then ranks by how directly each passage answers, then shows sources.',
+    goal: 'Describe how she responds to a question. She is not a keyword search. She analyzes intent, retrieves intelligently, ranks by relevance, and shows sources. The implication: this works on any document corpus — regulatory, financial, operational, market data. The capability is not limited by document type.',
     facts: [
-      'Before retrieving anything, she analyzes the intent of the question — is it a comparison, an aggregate, a filtered lookup, a why-question? This is done by pattern matching on the question.',
+      'Before retrieving anything, she analyzes the intent of the question — comparison, aggregate, filtered lookup, why-question.',
       'Based on intent, she decides which collections to search and how far back in time.',
       'She runs hybrid retrieval — keyword scoring combined with semantic embedding similarity.',
-      'She reranks results based on how directly each passage answers the question (including numeric density for quantitative questions, multi-year presence for comparisons).',
+      'She reranks results based on how directly each passage answers the question.',
       'She shows the source file for every claim in her answer.',
+      'This pipeline works the same way whether the documents are regulations, market reports, or financial filings.',
     ],
   },
   '5': {
-    role: 'how her knowledge compounds over time',
+    role: 'how her knowledge compounds — and how easy it is to expand',
     durationSec: '10-15',
     charRange: '180-300',
-    goal: 'Describe how adding more documents makes her smarter. A new regulation changes what an old policy means. New market data reframes an earlier trend. The more she has, the more connections she can draw between documents. This is the flywheel.',
+    goal: 'Describe how adding more documents makes her smarter — and how easy that is to do. A new regulation changes what an old policy means. New market data reframes an earlier trend. The key message: her capability is not fixed. It grows with every document she receives. Any operator could hand her their own documents and she would immediately know their world. Make this feel inevitable and simple.',
     facts: [
       'Every new document is indexed alongside existing ones.',
       'When answering a question, she can pull from documents across time periods, departments, and states.',
-      'This means a new regulation she ingests can contextualize an older policy.',
-      'New market reports and filings can add new data points to an ongoing trend.',
-      'The retrieval quality improves as the corpus grows — more documents means better semantic matching.',
+      'A new regulation she ingests can contextualize an older policy.',
+      'New market data adds new data points to ongoing trends.',
+      'The retrieval quality improves as the corpus grows.',
+      'Adding documents is as simple as uploading a file — she handles the rest automatically.',
     ],
   },
   '6': {
-    role: 'honest inventory of what she knows right now',
+    role: 'honest inventory of what she knows right now — and what that implies',
     durationSec: '18-28',
     charRange: '320-500',
-    goal: 'Be honest about her current state. She is a prototype. Right now she has read: Illinois cannabis market data and regulations, the Illinois 2025 annual report, and the full Ohio regulatory code. This is not everything she will know. It is her starting point. Make the case that giving her more makes her sharper. Do NOT mention any company names.',
+    goal: 'Be honest about her current state — she has Illinois cannabis market data, Illinois regulations, and the full Ohio regulatory code. That is her starting point for this demo. But make it clear that this is a choice, not a ceiling. Any operator could give her their own documents — their state\'s regulations, their internal filings, their market data — and she would know their world just as well. The data is the variable. She is the constant. Do NOT mention any company names.',
     facts: [
-      'Kait is a prototype, roughly one week old.',
-      'Current documents she has ingested: Illinois cannabis market data, the Illinois 2025 annual regulatory report, and the full Ohio cannabis regulatory code.',
-      'This is her starting library.',
-      'Adding more documents (more states, more internal filings, more historical records) improves her answers.',
-      'This is day one of her capability — the demo is meant to show what is possible even from this starting point.',
+      'Current documents she has: Illinois cannabis market data, the Illinois 2025 annual regulatory report, and the full Ohio cannabis regulatory code.',
+      'This is her starting library for this demonstration.',
+      'The capability does not change based on what documents she has — only the answers do.',
+      'Give her any operator\'s documents and she will answer questions about their specific world.',
+      'Adding documents is simple — upload, and she indexes and files automatically.',
+      'This is what day one looks like. The floor, not the ceiling.',
     ],
   },
   '7': {
     role: 'the guarantees — security, sources, and data handling',
     durationSec: '8-14',
     charRange: '160-280',
-    goal: 'State the guarantees plainly. Her answers come with sources. Every upload is logged. Documents stay in the operator\'s own infrastructure. Data is not used to train any outside model. Do not overstate — these are specific, defensible claims.',
+    goal: 'State the guarantees plainly. Her answers come with sources. Every upload is logged. Documents stay in the operator\'s own infrastructure. Data is not used to train any outside model. These are specific, defensible claims — not marketing language.',
     facts: [
       'Answers include source citations linking back to the uploaded document.',
-      'Every upload is logged (timestamp, user, filename) in an audit trail.',
-      'Documents are stored in the operator\'s own Cloudflare account — KV and R2 storage under their own credentials.',
-      'The underlying LLM (Anthropic Claude) does not train on API inputs by default.',
-      'The embedding model (Cloudflare AI) does not train on customer data.',
-      'Voice narration via xAI receives only the short narration scripts — never document content or user queries.',
+      'Every upload is logged — timestamp, user, filename — in an audit trail.',
+      'Documents are stored in the operator\'s own Cloudflare account under their own credentials.',
+      'The underlying LLM does not train on API inputs by default.',
+      'The embedding model does not train on customer data.',
+      'Voice narration receives only short narration scripts — never document content or user queries.',
     ],
   },
   '8': {
-    role: 'the distinction — not a chatbot with files attached',
+    role: 'the distinction — built for this industry, not retrofitted',
     durationSec: '10-14',
     charRange: '180-280',
-    goal: 'Draw the line between her and every generic chatbot someone has ever connected to their files. She is a system built around the actual structure of cannabis operations — department by department, document by document, question by question. Specificity is the point.',
+    goal: 'Draw the line between Kait and every generic chatbot someone has connected to their files. She was built around how cannabis operations actually work — not adapted from a general tool. Departments, compliance workflows, regulatory complexity, state-by-state variation. Specificity is the point. And the barrier to getting started is lower than people think.',
     facts: [
       'Most AI products are general-purpose assistants with document attachment bolted on.',
-      'Kait is built around the cannabis industry\'s specific structure: multi-state operations, department-specific workflows, regulatory complexity, seed-to-sale tracking.',
+      'Kait is built around the cannabis industry\'s specific structure: multi-state operations, department-specific workflows, regulatory complexity.',
       'She is organized around how cannabis companies actually work — compliance, finance, operations, retail.',
       'She is not trying to be everything. She is trying to be specifically useful for this industry.',
+      'Getting started requires nothing more than uploading documents — no custom training, no engineering.',
     ],
   },
 };
@@ -4596,7 +4596,6 @@ You know this industry deeply:
 - Seed-to-sale tracking is how most states enforce compliance — every plant, every package, every transfer gets tagged and logged.
 - State-by-state compliance is genuinely complex — what's legal in one state isn't the same as another, and both change constantly.
 - Banking is still hard for operators — limited access, high fees, cash-heavy operations.
-- Shrink (inventory loss) is a big deal in retail cannabis.
 - Compliance teams are perpetually stressed; retail teams are customer-focused; ops teams are problem-solvers.
 
 ABSOLUTE RESTRICTIONS:
