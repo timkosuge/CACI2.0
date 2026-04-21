@@ -8685,7 +8685,7 @@ html body[data-theme="light"] #discovery-greeting-strip .dgs-text strong {
         </div>
       </div>
       <div class="db9-cta-row db-in d3" style="display:flex;gap:14px;align-items:center;justify-content:center;flex-wrap:wrap">
-        <button class="db9-cta" id="db9-cta">Enter Kait &rarr;</button>
+        <button class="db9-cta" id="db9-cta">Kait Site &rarr;</button>
         <button class="db9-replay" id="db9-replay" title="Play again">&#8634; Replay</button>
       </div>
     </div>
@@ -13924,7 +13924,13 @@ const DemoMode = {
     const skipBtn = document.getElementById('demo-skip');
     if (skipBtn) skipBtn.addEventListener('click', () => this.stop());
     const ctaBtn = document.getElementById('db9-cta');
-    if (ctaBtn) ctaBtn.addEventListener('click', () => this.stop());
+    if (ctaBtn) ctaBtn.addEventListener('click', () => {
+      this.stop();
+      // Navigate to the clean URL — strips ?demo=1 so they land on the regular login
+      const url = new URL(window.location.href);
+      url.searchParams.delete('demo');
+      window.location.href = url.toString();
+    });
     const replayBtn = document.getElementById('db9-replay');
     if (replayBtn) replayBtn.addEventListener('click', () => this.replay());
     const muteBtn = document.getElementById('demo-mute');
