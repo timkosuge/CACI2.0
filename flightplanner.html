@@ -178,11 +178,11 @@ html,body { width:100%; height:100%; overflow:hidden; background:#060610; color:
         <h1>KAIT · FLIGHT PLANNER</h1>
       </div>
       <div id="rp-tabs">
-        <button class="rtab on" id="tab-wp" onclick="setRTab('wp')">WAYPOINTS</button>
-        <button class="rtab" id="tab-lm" onclick="setRTab('lm')">LANDMARKS</button>
+        <button class="rtab" id="tab-wp" onclick="setRTab('wp')">WAYPOINTS</button>
+        <button class="rtab on" id="tab-lm" onclick="setRTab('lm')">LANDMARKS</button>
       </div>
-      <div id="wp-list"></div>
-      <div id="lm-list" style="display:none;flex:1;overflow-y:auto;font-size:9px;"></div>
+      <div id="wp-list" style="display:none"></div>
+      <div id="lm-list" style="flex:1;overflow-y:auto;font-size:9px;"></div>
       <div id="rp-stats">0 waypoints</div>
       <div id="rp-btns">
         <div class="rb-row">
@@ -484,6 +484,9 @@ function renderMap(){
       html:`<div style="width:${sel?24:18}px;height:${sel?24:18}px;border-radius:50%;background:${sel?'#c9a832':c};border:${sel?'2px solid #fff':'2px solid rgba(0,0,0,0.5)'};color:#000;font:bold ${sel?9:7}px Courier New;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 0 ${sel?8:4}px ${c}${sel?'':'88'};">${i+1}</div>`,
       iconSize:[sel?24:18,sel?24:18],iconAnchor:[sel?12:9,sel?12:9]});
     const m=L.marker([wp.lat,wp.lng],{icon,draggable:true,zIndexOffset:500}).addTo(map);
+    // Tooltip bound to marker — removed automatically when marker is removed
+    if(wp.name) m.bindTooltip(`<span style="font:8px Courier New;color:#c9a832;background:rgba(0,0,4,0.9);padding:2px 5px;border:1px solid rgba(200,160,50,0.3)">${wp.name}</span>`,
+      {permanent:true,direction:'top',offset:[0,-14],className:'wp-label-tt'});
     m.on('click',e=>{L.DomEvent.stopPropagation(e);selIdx=i;renderMap();buildList();openEditor(i);});
     m.on('dragend',e=>{const ll=e.target.getLatLng();waypoints[i].lat=ll.lat;waypoints[i].lng=ll.lng;renderMap();buildList();});
     wpLayers.push(m);
@@ -500,7 +503,8 @@ function setRTab(t){
   document.getElementById('tab-wp').classList.toggle('on',t==='wp');
   document.getElementById('tab-lm').classList.toggle('on',t==='lm');
   document.getElementById('wp-list').style.display=t==='wp'?'block':'none';
-  document.getElementById('lm-list').style.display=t==='lm'?'block':'none';
+  document.getElementById('lm-list').style.display=t==='lm'?'flex':'none';
+  document.getElementById('lm-list').style.flexDirection='column';
   if(t==='lm') buildLmList();
 }
 
@@ -530,17 +534,40 @@ function buildList(){
 
 function buildLmList(){
   const el=document.getElementById('lm-list'); el.innerHTML='';
+
+  // Section header
+  const hdr=document.createElement('div');
+  hdr.style.cssText='padding:8px 12px 6px;font-size:8px;letter-spacing:0.2em;color:rgba(200,160,50,0.35);border-bottom:1px solid rgba(200,160,50,0.1);flex-shrink:0';
+  hdr.textContent='CLICK ANY LOCATION TO ADD TO FLIGHT PATH';
+  el.appendChild(hdr);
+
   const cats=[...new Set(LANDMARKS.map(l=>l.cat))];
+  const catNames={harbor:'🌊 HARBOR',downtown:'🏙 DOWNTOWN',soho:'🏘 SOHO / TRIBECA',village:'🌳 GREENWICH VILLAGE',midtown:'⭐ MIDTOWN',park:'🌿 CENTRAL PARK',nj:'🏠 NEW JERSEY'};
+
   cats.forEach(cat=>{
+    // Category header
     const h=document.createElement('div');
-    h.style.cssText=`padding:6px 10px 3px;font-size:8px;letter-spacing:0.2em;color:${CAT_COLOR[cat]||'#888'};border-bottom:1px solid rgba(200,160,50,0.06)`;
-    h.textContent=cat.toUpperCase();
+    h.style.cssText=`padding:7px 12px 4px;font-size:9px;letter-spacing:0.2em;color:${CAT_COLOR[cat]||'#888'};background:rgba(200,160,50,0.03);border-top:1px solid rgba(200,160,50,0.1);flex-shrink:0`;
+    h.textContent=catNames[cat]||cat.toUpperCase();
     el.appendChild(h);
+
     LANDMARKS.filter(l=>l.cat===cat).forEach(lm=>{
       const d=document.createElement('div');
-      d.style.cssText='padding:5px 10px;border-bottom:1px solid rgba(200,160,50,0.04);cursor:pointer;font-size:8px;';
-      d.innerHTML=`<span style="color:rgba(200,160,50,0.8)">${lm.n}</span><br><span style="color:rgba(200,160,50,0.3);font-size:7px">${lm.note.substring(0,55)}...</span>`;
-      d.onclick=()=>{addWP(lm.lat,lm.lng,lm.n,25,16,-10,0);map.setView([lm.lat,lm.lng],16);setRTab('wp');};
+      d.style.cssText='padding:6px 12px;border-bottom:1px solid rgba(200,160,50,0.05);cursor:pointer;transition:background 0.1s;flex-shrink:0';
+      d.innerHTML=`
+        <div style="display:flex;align-items:center;gap:6px">
+          <div style="width:6px;height:6px;border-radius:50%;background:${CAT_COLOR[lm.cat]};flex-shrink:0"></div>
+          <span style="font-size:9px;color:rgba(200,160,50,0.9);flex:1">${lm.n}</span>
+          <span style="font-size:7px;color:rgba(100,200,255,0.5);border:1px solid rgba(100,200,255,0.2);padding:1px 4px">+ ADD</span>
+        </div>
+        <div style="font-size:7px;color:rgba(200,160,50,0.3);margin-top:3px;padding-left:12px;line-height:1.5">${lm.note}</div>`;
+      d.onmouseover=()=>d.style.background='rgba(200,160,50,0.05)';
+      d.onmouseout=()=>d.style.background='';
+      d.onclick=()=>{
+        addWP(lm.lat,lm.lng,lm.n,25,16,-10,0);
+        map.setView([lm.lat,lm.lng],16);
+        setRTab('wp');
+      };
       el.appendChild(d);
     });
   });
@@ -982,8 +1009,11 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){closeEditor();document.getElementById('export-overlay').classList.remove('open');}
 });
 
-// Init
-loadDefault();
+// Init — start empty, landmarks tab visible
+setRTab('lm');
+buildLmList();
+renderMap();
+buildList();
 </script>
 </body>
 </html>
