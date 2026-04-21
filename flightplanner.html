@@ -189,9 +189,29 @@ html,body { width:100%; height:100%; overflow:hidden; background:#060610; color:
           <button class="rb bl" onclick="openCesium(-1)">▶ TEST FULL PATH</button>
           <button class="rb" onclick="closeCesium()">✕ CLOSE 3D</button>
         </div>
+        <div style="font-size:7px;letter-spacing:0.2em;color:rgba(200,160,50,0.3);padding:4px 0 2px">PATH TOOLS</div>
+        <div class="rb-row">
+          <button class="rb" id="tool-lookat" onclick="toggleLookAt()" title="Click map to set target, then apply to a waypoint">🎯 LOOK-AT TARGET</button>
+        </div>
+        <div class="rb-row">
+          <button class="rb" onclick="snapAll()" title="Snap all Manhattan waypoints to street centerlines">⊞ SNAP TO STREETS</button>
+          <button class="rb" onclick="smoothPath()" title="Insert smooth transition points on sharp turns">〜 SMOOTH PATH</button>
+        </div>
+        <div class="rb-row">
+          <button class="rb" onclick="toggleProfiler()" title="Show altitude graph">↗ ALT PROFILE</button>
+          <button class="rb" onclick="reversePath()" title="Flip the entire route direction">⇄ REVERSE</button>
+        </div>
+        <div class="rb-row">
+          <button class="rb" onclick="showImport()" title="Paste const WP=[...] from flight file">⬆ IMPORT WP</button>
+          <button class="rb" onclick="showTimeCalc()" title="Estimate recording time">⏱ TIME CALC</button>
+        </div>
+        <div style="font-size:7px;letter-spacing:0.2em;color:rgba(200,160,50,0.3);padding:4px 0 2px">EXPORT</div>
         <div class="rb-row">
           <button class="rb gn" onclick="doExport()">⬇ EXPORT JS</button>
           <button class="rb" onclick="loadDefault()">↺ DEFAULT</button>
+        </div>
+        <div class="rb-row">
+          <button class="rb" onclick="clearAll()" style="border-color:rgba(255,80,80,0.2);color:rgba(255,100,100,0.6)">✕ CLEAR ALL</button>
         </div>
       </div>
     </div>
@@ -355,6 +375,17 @@ html,body { width:100%; height:100%; overflow:hidden; background:#060610; color:
     </div>
     <div id="export-text"></div>
   </div>
+</div>
+
+<!-- ALTITUDE PROFILER PANEL -->
+<div id="profiler-panel" style="display:none;position:fixed;bottom:165px;left:0;right:310px;
+  background:rgba(4,4,14,0.95);border-top:1px solid rgba(200,160,50,0.2);
+  border-bottom:1px solid rgba(200,160,50,0.1);padding:8px 12px;z-index:400">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+    <span style="font-size:8px;letter-spacing:0.2em;color:rgba(200,160,50,0.4)">ALTITUDE PROFILE</span>
+    <span onclick="toggleProfiler()" style="font-size:9px;color:rgba(200,160,50,0.4);cursor:pointer">✕</span>
+  </div>
+  <canvas id="profiler-canvas" style="width:100%;display:block"></canvas>
 </div>
 
 <script>
@@ -523,9 +554,14 @@ function buildList(){
       <div class="wr2">
         <span>alt:${wp.alt}m</span><span>hdg:${wp.hdg}°</span><span>pitch:${wp.pitch}°</span><span>${wp.dur}s</span>
       </div>
-      <span class="wtag" onclick="openEditor(${i},event)">✏ EDIT</span>
-      <span class="wtag" onclick="previewWP(${i},event)">👁 3D PREVIEW</span>
-      <span class="wtag or" onclick="openCesium(${i},event)">▶ TEST FROM HERE</span>`;
+      <div style="display:flex;flex-wrap:wrap;gap:2px;padding-left:19px;margin-top:2px">
+        <span class="wtag" onclick="openEditor(${i},event)">✏ EDIT</span>
+        <span class="wtag" onclick="previewWP(${i},event)">👁 PREVIEW</span>
+        <span class="wtag or" onclick="openCesium(${i},event)">▶ TEST</span>
+        <span class="wtag" onclick="applyLookAt(${i},event)" title="Point camera at look-at target">🎯 LOOK-AT</span>
+        <span class="wtag" onclick="snapToStreet(${i},event)" title="Snap to nearest street center">⊞ SNAP</span>
+        <span class="wtag" onclick="duplicateWP(${i},event)" title="Duplicate this waypoint">⧉ DUP</span>
+      </div>`;
     d.onclick=e=>{if(['wdel','wtag'].some(c=>e.target.classList.contains(c)))return;selIdx=i;renderMap();buildList();};
     el.appendChild(d);
   });
@@ -1008,6 +1044,389 @@ document.addEventListener('keydown',e=>{
   if(cesiumOpen)return;
   if(e.key==='Escape'){closeEditor();document.getElementById('export-overlay').classList.remove('open');}
 });
+
+// ══ TOOLS ══
+// ══════════════════════════════════════════════════════════════
+// TOOL: LOOK-AT TARGET
+// Click a landmark or map point, then click a waypoint
+// Computes exact heading + pitch to look at that target
+// ══════════════════════════════════════════════════════════════
+let lookAtMode = false;
+let lookAtTarget = null; // {lat, lng, alt}
+let lookAtMarker = null;
+
+function toggleLookAt() {
+  lookAtMode = !lookAtMode;
+  const btn = document.getElementById('tool-lookat');
+  if (lookAtMode) {
+    btn.style.color = '#ff8080';
+    btn.style.borderColor = 'rgba(255,80,80,0.6)';
+    btn.textContent = '🎯 CLICK TARGET ON MAP';
+    setStatus('LOOK-AT MODE: Click anywhere on the map to set the target point');
+    map.getContainer().style.cursor = 'crosshair';
+  } else {
+    btn.style.color = '';
+    btn.style.borderColor = '';
+    btn.textContent = '🎯 LOOK-AT TARGET';
+    setStatus('');
+    map.getContainer().style.cursor = '';
+    if (lookAtMarker) { map.removeLayer(lookAtMarker); lookAtMarker = null; }
+    lookAtTarget = null;
+  }
+}
+
+function applyLookAt(wpIdx) {
+  if (!lookAtTarget) { setStatus('⚠ Set a look-at target first (click 🎯 LOOK-AT TARGET)'); return; }
+  const wp = waypoints[wpIdx];
+  if (!wp) return;
+  const result = computeLookAt(wp.lat, wp.lng, wp.alt, lookAtTarget.lat, lookAtTarget.lng, lookAtTarget.alt || 0);
+  wp.hdg = result.hdg;
+  wp.pitch = result.pitch;
+  renderMap(); buildList();
+  setStatus(`✓ WP ${wpIdx+1} now looking at target — hdg:${result.hdg}° pitch:${result.pitch}°`);
+}
+
+function computeLookAt(fromLat, fromLng, fromAlt, toLat, toLng, toAlt) {
+  const dx = (toLng - fromLng) * 0.7547 * 111320;
+  const dy = (toLat - fromLat) * 111320;
+  const dz = toAlt - fromAlt;
+  const horiz = Math.sqrt(dx*dx + dy*dy);
+  let hdg = Math.round(Math.atan2(dx, dy) * 180 / Math.PI);
+  hdg = ((hdg % 360) + 360) % 360;
+  const pitch = Math.round(Math.atan2(dz, Math.max(horiz, 1)) * 180 / Math.PI);
+  return { hdg, pitch };
+}
+
+// ══════════════════════════════════════════════════════════════
+// TOOL: SNAP TO STREET
+// Moves waypoint to nearest verified street centerline
+// ══════════════════════════════════════════════════════════════
+const STREET_CENTERLINES = {
+  // Avenues (N-S) — longitude
+  avenues: [
+    { name: 'West St',    lng: -74.01555 },
+    { name: '10th Ave',   lng: -73.99874 },
+    { name: '9th Ave',    lng: -73.99571 },
+    { name: '8th Ave',    lng: -73.99149 },
+    { name: '7th Ave',    lng: -73.98803 },
+    { name: 'Broadway',   lng: -73.98520 },
+    { name: '6th Ave',    lng: -73.98045 },
+    { name: '5th Ave',    lng: -73.97709 },
+    { name: 'Park Ave',   lng: -73.97740 },
+    { name: 'Lexington',  lng: -73.97470 },
+    { name: '3rd Ave',    lng: -73.97140 },
+    { name: '2nd Ave',    lng: -73.96800 },
+  ],
+  // Streets (E-W) — latitude
+  streets: [
+    { name: 'Wall St',    lat: 40.70740 },
+    { name: 'Fulton St',  lat: 40.70980 },
+    { name: 'Canal St',   lat: 40.71787 },
+    { name: 'Houston St', lat: 40.72820 },
+    { name: '14th St',    lat: 40.73829 },
+    { name: '23rd St',    lat: 40.74342 },
+    { name: '34th St',    lat: 40.74953 },
+    { name: '42nd St',    lat: 40.75654 },
+    { name: '49th St',    lat: 40.76172 },
+    { name: '57th St',    lat: 40.76424 },
+    { name: '72nd St',    lat: 40.77330 },
+    { name: '79th St',    lat: 40.77780 },
+    { name: '86th St',    lat: 40.78510 },
+  ]
+};
+
+function snapToStreet(wpIdx) {
+  const wp = waypoints[wpIdx];
+  if (!wp) return;
+
+  // Only snap if within Manhattan bounds
+  if (wp.lng < -74.020 || wp.lng > -73.930 || wp.lat < 40.700 || wp.lat > 40.820) {
+    setStatus(`WP ${wpIdx+1} is outside Manhattan grid — no snap`);
+    return;
+  }
+
+  // Find nearest avenue
+  let bestAve = STREET_CENTERLINES.avenues[0];
+  let bestAveDist = Math.abs(wp.lng - bestAve.lng) * 111320 * 0.7547;
+  for (const ave of STREET_CENTERLINES.avenues) {
+    const d = Math.abs(wp.lng - ave.lng) * 111320 * 0.7547;
+    if (d < bestAveDist) { bestAveDist = d; bestAve = ave; }
+  }
+
+  // Find nearest street
+  let bestSt = STREET_CENTERLINES.streets[0];
+  let bestStDist = Math.abs(wp.lat - bestSt.lat) * 111320;
+  for (const st of STREET_CENTERLINES.streets) {
+    const d = Math.abs(wp.lat - st.lat) * 111320;
+    if (d < bestStDist) { bestStDist = d; bestSt = st; }
+  }
+
+  // Snap to whichever axis is closer
+  if (bestAveDist < bestStDist) {
+    wp.lng = bestAve.lng;
+    setStatus(`✓ WP ${wpIdx+1} snapped to ${bestAve.name} (${bestAveDist.toFixed(0)}m from center)`);
+  } else {
+    wp.lat = bestSt.lat;
+    setStatus(`✓ WP ${wpIdx+1} snapped to ${bestSt.name} (${bestStDist.toFixed(0)}m from center)`);
+  }
+
+  renderMap(); buildList();
+}
+
+function snapAll() {
+  waypoints.forEach((wp, i) => {
+    if (wp.lng >= -74.020 && wp.lng <= -73.930 && wp.lat >= 40.700 && wp.lat <= 40.820) {
+      snapToStreet(i);
+    }
+  });
+  setStatus(`✓ All Manhattan waypoints snapped to street centerlines`);
+}
+
+// ══════════════════════════════════════════════════════════════
+// TOOL: PATH SMOOTHER
+// Inserts intermediate waypoints to smooth sharp turns
+// ══════════════════════════════════════════════════════════════
+function smoothPath() {
+  if (waypoints.length < 2) { setStatus('⚠ Need at least 2 waypoints to smooth'); return; }
+
+  const smoothed = [];
+  for (let i = 0; i < waypoints.length - 1; i++) {
+    const a = waypoints[i];
+    const b = waypoints[i + 1];
+    smoothed.push(a);
+
+    // Compute turn angle
+    if (i > 0 && i < waypoints.length - 2) {
+      const prev = waypoints[i - 1];
+      const hdg1 = Math.atan2((a.lng - prev.lng) * 0.7547, a.lat - prev.lat) * 180 / Math.PI;
+      const hdg2 = Math.atan2((b.lng - a.lng) * 0.7547, b.lat - a.lat) * 180 / Math.PI;
+      let turnAngle = Math.abs(hdg2 - hdg1);
+      if (turnAngle > 180) turnAngle = 360 - turnAngle;
+
+      // Insert intermediate point if turn is sharp (>30 degrees)
+      if (turnAngle > 30) {
+        smoothed.push({
+          lat: (a.lat * 0.7 + b.lat * 0.3),
+          lng: (a.lng * 0.7 + b.lng * 0.3),
+          name: `smooth-${i}`,
+          alt: Math.round((a.alt + b.alt) / 2),
+          dur: Math.max(8, Math.round(a.dur * 0.4)),
+          hdg: Math.round((a.hdg + b.hdg) / 2),
+          pitch: Math.round((a.pitch + b.pitch) / 2),
+        });
+      }
+    }
+  }
+  smoothed.push(waypoints[waypoints.length - 1]);
+
+  const added = smoothed.length - waypoints.length;
+  waypoints = smoothed;
+  renderMap(); buildList();
+  setStatus(`✓ Path smoothed — ${added} intermediate points added`);
+}
+
+// ══════════════════════════════════════════════════════════════
+// TOOL: ALTITUDE PROFILER
+// Shows altitude graph across the flight
+// ══════════════════════════════════════════════════════════════
+let profilerOpen = false;
+
+function toggleProfiler() {
+  profilerOpen = !profilerOpen;
+  const el = document.getElementById('profiler-panel');
+  el.style.display = profilerOpen ? 'block' : 'none';
+  if (profilerOpen) drawProfiler();
+}
+
+function drawProfiler() {
+  const canvas = document.getElementById('profiler-canvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width = canvas.offsetWidth;
+  const H = canvas.height = 80;
+  ctx.clearRect(0, 0, W, H);
+
+  if (waypoints.length < 2) return;
+
+  const maxAlt = Math.max(...waypoints.map(w => w.alt), 50);
+  const totalDur = waypoints.reduce((s, w) => s + w.dur, 0);
+
+  // Background
+  ctx.fillStyle = '#04040e';
+  ctx.fillRect(0, 0, W, H);
+
+  // Grid lines
+  ctx.strokeStyle = 'rgba(200,160,50,0.08)';
+  ctx.lineWidth = 1;
+  [0, 50, 100, 200, 300].forEach(alt => {
+    if (alt > maxAlt * 1.1) return;
+    const y = H - (alt / (maxAlt * 1.1)) * H;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    ctx.fillStyle = 'rgba(200,160,50,0.2)';
+    ctx.font = '7px Courier New';
+    ctx.fillText(alt + 'm', 2, y - 2);
+  });
+
+  // Altitude curve
+  let elapsed = 0;
+  ctx.beginPath();
+  ctx.strokeStyle = '#c9a832';
+  ctx.lineWidth = 2;
+
+  waypoints.forEach((wp, i) => {
+    const x = (elapsed / totalDur) * W;
+    const y = H - (wp.alt / (maxAlt * 1.1)) * H;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    elapsed += wp.dur;
+  });
+  // Last point
+  const xLast = W;
+  const yLast = H - (waypoints[waypoints.length-1].alt / (maxAlt * 1.1)) * H;
+  ctx.lineTo(xLast, yLast);
+  ctx.stroke();
+
+  // Fill under curve
+  ctx.lineTo(W, H); ctx.lineTo(0, H);
+  ctx.fillStyle = 'rgba(200,160,50,0.08)';
+  ctx.fill();
+
+  // Waypoint dots
+  elapsed = 0;
+  waypoints.forEach((wp, i) => {
+    const x = (elapsed / totalDur) * W;
+    const y = H - (wp.alt / (maxAlt * 1.1)) * H;
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.fillStyle = altColor(wp.alt);
+    ctx.fill();
+    elapsed += wp.dur;
+  });
+
+  // 30m street level line
+  const streetY = H - (30 / (maxAlt * 1.1)) * H;
+  ctx.strokeStyle = 'rgba(100,200,255,0.3)';
+  ctx.setLineDash([4, 4]);
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, streetY); ctx.lineTo(W, streetY); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(100,200,255,0.4)';
+  ctx.font = '7px Courier New';
+  ctx.fillText('street level', 2, streetY - 2);
+}
+
+// ══════════════════════════════════════════════════════════════
+// TOOL: TIME CALCULATOR
+// Shows recording time estimates at each quality
+// ══════════════════════════════════════════════════════════════
+function showTimeCalc() {
+  const total = waypoints.reduce((s, w) => s + w.dur, 0);
+  if (total === 0) { setStatus('⚠ No waypoints — add some first'); return; }
+
+  const presets = [
+    { name: '1080p 30fps', fps: 30, frames: total * 30, secPerFrame: 2 },
+    { name: '2K 30fps',    fps: 30, frames: total * 30, secPerFrame: 3 },
+    { name: '4K 30fps',    fps: 30, frames: total * 30, secPerFrame: 6 },
+    { name: '4K 60fps',    fps: 60, frames: total * 60, secPerFrame: 6 },
+  ];
+
+  let msg = `FLIGHT: ${total}s (${(total/60).toFixed(1)}min)\n\nRECORDING TIME ESTIMATES:\n`;
+  presets.forEach(p => {
+    const frames = Math.round(total * p.fps);
+    const recSec = frames * p.secPerFrame;
+    const recHrs = (recSec / 3600).toFixed(1);
+    msg += `\n${p.name}:\n  ${frames.toLocaleString()} frames\n  ~${recHrs} hours render time\n`;
+  });
+  msg += '\nThese are estimates. Actual time depends on tile loading speed.';
+  alert(msg);
+}
+
+// ══════════════════════════════════════════════════════════════
+// TOOL: DUPLICATE WAYPOINT
+// ══════════════════════════════════════════════════════════════
+function duplicateWP(idx) {
+  const wp = waypoints[idx];
+  if (!wp) return;
+  const copy = { ...wp, name: wp.name + ' (copy)', lat: wp.lat + 0.0002, lng: wp.lng + 0.0002 };
+  waypoints.splice(idx + 1, 0, copy);
+  selIdx = idx + 1;
+  renderMap(); buildList();
+  setStatus(`✓ Duplicated WP ${idx+1} — drag to reposition`);
+}
+
+// ══════════════════════════════════════════════════════════════
+// TOOL: REVERSE PATH
+// ══════════════════════════════════════════════════════════════
+function reversePath() {
+  if (waypoints.length < 2) return;
+  if (!confirm('Reverse the entire flight path?')) return;
+  waypoints.reverse();
+  // Flip camera headings by 180°
+  waypoints.forEach(wp => { wp.hdg = ((wp.hdg + 180) % 360); });
+  selIdx = -1;
+  renderMap(); buildList();
+  setStatus('✓ Path reversed — camera headings flipped 180°');
+}
+
+// ══════════════════════════════════════════════════════════════
+// TOOL: IMPORT FROM FLIGHT FILE
+// Paste const WP = [...] and it loads into the planner
+// ══════════════════════════════════════════════════════════════
+function showImport() {
+  const txt = prompt('Paste your const WP = [...] JavaScript here:');
+  if (!txt) return;
+  try {
+    // Extract array content
+    const match = txt.match(/const WP\s*=\s*(\[[\s\S]*?\]);/);
+    if (!match) throw new Error('Could not find const WP = [...] in pasted text');
+
+    // Safe eval using Function
+    const arr = new Function('return ' + match[1])();
+    if (!Array.isArray(arr)) throw new Error('Not an array');
+
+    waypoints = arr.map(w => ({
+      lat:   w.lat   || 0,
+      lng:   w.lng   || 0,
+      alt:   w.alt   || 25,
+      hdg:   w.cam_hdg || w.hdg || 0,
+      pitch: w.cam_pitch || w.pitch || -10,
+      dur:   w.dur   || 16,
+      name:  w.label || w.name || '',
+    }));
+
+    selIdx = -1;
+    renderMap(); buildList(); updateTimeline();
+    if (waypoints.length > 0) map.fitBounds(waypoints.map(w => [w.lat, w.lng]));
+    setStatus(`✓ Imported ${waypoints.length} waypoints from flight file`);
+    setRTab('wp');
+  } catch(e) {
+    alert('Import failed: ' + e.message + '\n\nMake sure you copied the entire const WP = [...]; block.');
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// STATUS BAR
+// ══════════════════════════════════════════════════════════════
+function setStatus(msg) {
+  document.getElementById('cesium-status-bar').textContent = msg || 'Ready';
+}
+
+
+
+// ══ MAP CLICK HANDLER — handles look-at mode ══
+const _origMapClick = map._events?.click;
+map.on('click', e => {
+  if (lookAtMode) {
+    lookAtTarget = { lat: e.latlng.lat, lng: e.latlng.lng, alt: 0 };
+    if (lookAtMarker) map.removeLayer(lookAtMarker);
+    lookAtMarker = L.circleMarker([e.latlng.lat, e.latlng.lng], {
+      radius: 8, color: '#ff5050', fillColor: '#ff5050', fillOpacity: 0.4, weight: 2
+    }).addTo(map).bindPopup('<b>LOOK-AT TARGET</b><br>Now click a waypoint → LOOK-AT');
+    lookAtMarker.openPopup();
+    setStatus(`✓ Target set at (${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}) — now click a waypoint and use LOOK-AT`);
+  }
+});
+
+// Redraw profiler when waypoints change
+const _origRenderMap = renderMap;
 
 // Init — start empty, landmarks tab visible
 setRTab('lm');
