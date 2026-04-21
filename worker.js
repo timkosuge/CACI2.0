@@ -4490,7 +4490,7 @@ const BEAT_SPECS = {
     charRange: '180-280',
     goal: 'Set up the problem Kait was made to solve. Frame it around the cannabis industry generally — regulations, compliance, market data, operations. Do NOT mention any specific company name. Someone in this industry has answers buried in thousands of documents — regulations, SOPs, filings, market reports. Finding the right passage takes hours, often never happens. By the time someone digs it up, the moment has passed. This is the pain. Lead with it.',
     facts: [
-      'Cannabis operators generate huge volumes of documents — regulations, earnings reports, compliance memos, policies, internal filings.',
+      'Cannabis operators generate huge volumes of documents — regulations, market reports, compliance memos, policies, internal filings.',
       'These documents are scattered across different systems and folders.',
       'Finding a specific answer in them typically takes hours of searching.',
       'By the time someone finds the answer, the decision or question has often already moved on.',
@@ -4528,12 +4528,12 @@ const BEAT_SPECS = {
     role: 'how her knowledge compounds over time',
     durationSec: '10-15',
     charRange: '180-300',
-    goal: 'Describe how adding more documents makes her smarter. A new regulation changes what an old policy means. A new earnings report reframes an earlier trend. The more she has, the more connections she can draw between documents. This is the flywheel.',
+    goal: 'Describe how adding more documents makes her smarter. A new regulation changes what an old policy means. New market data reframes an earlier trend. The more she has, the more connections she can draw between documents. This is the flywheel.',
     facts: [
       'Every new document is indexed alongside existing ones.',
       'When answering a question, she can pull from documents across time periods, departments, and states.',
       'This means a new regulation she ingests can contextualize an older policy.',
-      'A new earnings report can add new data points to an ongoing trend.',
+      'New market reports and filings can add new data points to an ongoing trend.',
       'The retrieval quality improves as the corpus grows — more documents means better semantic matching.',
     ],
   },
