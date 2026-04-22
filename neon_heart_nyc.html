@@ -206,6 +206,8 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
         if (window.__cameraMode === 'synced') {
           modeEl.textContent = '● SYNCED (space to free fly)';
           modeEl.style.color = '#f0f';
+          // Auto-disable carry when leaving free mode — carry only makes sense while flying
+          if (window.__signCarrying && window.__toggleCarry) window.__toggleCarry();
         } else {
           modeEl.textContent = '◉ FREE FLY (space to resume)';
           modeEl.style.color = '#ff0';
@@ -509,7 +511,7 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
     window.__signHidden = false;
     window.__toggleHideSign = () => {
       window.__signHidden = !window.__signHidden;
-      signGroup.visible = !window.__signHidden;
+      signPivot.visible = !window.__signHidden;
       innerWash.visible = !window.__signHidden;
       outerWash.visible = !window.__signHidden;
       particleGroup.visible = !window.__signHidden;
@@ -537,6 +539,9 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
         lat: window.__SIGN_ANCHOR_LAT,
         alt: window.__SIGN_ANCHOR_ALT,
         scale: window.__signScale || 1,
+        heading: (window.__signHeading || 0) * 180 / Math.PI,
+        pitch: (window.__signPitch || 0) * 180 / Math.PI,
+        roll: (window.__signRoll || 0) * 180 / Math.PI,
         ts: Date.now()
       };
       window.__bookmarks.push(bm);
@@ -549,6 +554,9 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
       if (!bm) return;
       moveSignTo(bm.lon, bm.lat, bm.alt);
       if (bm.scale && window.__setSignSize) window.__setSignSize(bm.scale);
+      if (window.__setSignOrientation) {
+        window.__setSignOrientation(bm.heading || 0, bm.pitch || 0, bm.roll || 0);
+      }
     };
 
     window.__deleteBookmark = idx => {
@@ -606,6 +614,27 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
       </div>
       <div style="color:#aaa;font-size:9px;line-height:1.4;margin-bottom:8px;">
         <b style="color:#fff;">Ctrl+Z</b> undo · <b style="color:#fff;">Ctrl+Shift+Z</b> redo
+      </div>
+
+      <div style="color:#fff;font-size:9px;margin:12px 0 4px 0;">ORIENTATION</div>
+      <div style="display:flex;gap:4px;align-items:center;margin-bottom:3px;">
+        <span style="font-size:9px;color:#aaa;width:46px;">HEADING</span>
+        <input id="headSlider" type="range" min="-180" max="180" step="1" value="0" style="flex:1;accent-color:#f0f;">
+        <span id="headLabel" style="font-size:9px;color:#faa;width:32px;text-align:right;">0°</span>
+      </div>
+      <div style="display:flex;gap:4px;align-items:center;margin-bottom:3px;">
+        <span style="font-size:9px;color:#aaa;width:46px;">PITCH</span>
+        <input id="pitchSlider" type="range" min="-90" max="90" step="1" value="0" style="flex:1;accent-color:#f0f;">
+        <span id="pitchLabel" style="font-size:9px;color:#faa;width:32px;text-align:right;">0°</span>
+      </div>
+      <div style="display:flex;gap:4px;align-items:center;margin-bottom:3px;">
+        <span style="font-size:9px;color:#aaa;width:46px;">ROLL</span>
+        <input id="rollSlider" type="range" min="-180" max="180" step="1" value="0" style="flex:1;accent-color:#f0f;">
+        <span id="rollLabel" style="font-size:9px;color:#faa;width:32px;text-align:right;">0°</span>
+      </div>
+      <div style="display:flex;gap:4px;margin-bottom:4px;">
+        <button id="faceBtn" style="flex:2;background:rgba(255,0,255,0.2);color:#f0f;border:1px solid rgba(255,0,255,0.5);padding:4px;font:10px monospace;cursor:pointer;">🎯 FACE CAMERA</button>
+        <button id="resetOriBtn" style="flex:1;background:rgba(100,100,100,0.2);color:#ccc;border:1px solid rgba(150,150,150,0.4);padding:4px;font:10px monospace;cursor:pointer;">RESET</button>
       </div>
 
       <div style="color:#fff;font-size:9px;margin-bottom:4px;">SAVED LOCATIONS</div>
@@ -667,6 +696,50 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
       if (confirm('Delete this saved location?')) window.__deleteBookmark(parseInt(sel.value));
     });
     window.__refreshBookmarkList();
+
+    // ── ORIENTATION SLIDERS ──
+    const hSlider = document.getElementById('headSlider');
+    const pSlider = document.getElementById('pitchSlider');
+    const rSlider = document.getElementById('rollSlider');
+    const hLabel  = document.getElementById('headLabel');
+    const pLabel  = document.getElementById('pitchLabel');
+    const rLabel  = document.getElementById('rollLabel');
+
+    function setOrientation(hDeg, pDeg, rDeg) {
+      window.__signHeading = hDeg * Math.PI / 180;
+      window.__signPitch   = pDeg * Math.PI / 180;
+      window.__signRoll    = rDeg * Math.PI / 180;
+      hSlider.value = hDeg; pSlider.value = pDeg; rSlider.value = rDeg;
+      hLabel.textContent = `${Math.round(hDeg)}°`;
+      pLabel.textContent = `${Math.round(pDeg)}°`;
+      rLabel.textContent = `${Math.round(rDeg)}°`;
+    }
+    window.__setSignOrientation = setOrientation;
+
+    hSlider.addEventListener('input', e => setOrientation(+e.target.value, +pSlider.value, +rSlider.value));
+    pSlider.addEventListener('input', e => setOrientation(+hSlider.value, +e.target.value, +rSlider.value));
+    rSlider.addEventListener('input', e => setOrientation(+hSlider.value, +pSlider.value, +e.target.value));
+
+    document.getElementById('resetOriBtn').addEventListener('click', () => setOrientation(0, 0, 0));
+
+    // FACE CAMERA — orient sign toward wherever Cesium camera is looking from
+    document.getElementById('faceBtn').addEventListener('click', () => {
+      if (!cesiumViewer) return;
+      const cam = cesiumViewer.camera;
+      const anchor = Cesium.Cartesian3.fromDegrees(
+        window.__SIGN_ANCHOR_LON, window.__SIGN_ANCHOR_LAT, window.__SIGN_ANCHOR_ALT
+      );
+      // Vector from sign to camera, in ENU frame at anchor
+      const enuMatrix = Cesium.Transforms.eastNorthUpToFixedFrame(anchor);
+      const rot = Cesium.Matrix4.getMatrix3(enuMatrix, new Cesium.Matrix3());
+      const invRot = Cesium.Matrix3.transpose(rot, new Cesium.Matrix3());
+      const delta = Cesium.Cartesian3.subtract(cam.position, anchor, new Cesium.Cartesian3());
+      const enu = Cesium.Matrix3.multiplyByVector(invRot, delta, new Cesium.Cartesian3());
+      // enu.x=east, enu.y=north, enu.z=up → we want heading such that sign faces the camera
+      // Heading 0 = facing north; atan2(east, north) gives heading toward camera
+      const headingDeg = Math.atan2(enu.x, enu.y) * 180 / Math.PI;
+      setOrientation(headingDeg, 0, 0);
+    });
 
     // Drop handlers — X = camera position, C = where camera is looking
     window.__dropSignAtCam = () => {
@@ -906,11 +979,19 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
   }
 
   // SIGN GROUP — from extracted paths, floating in space
+  // Outer pivot handles user-applied orientation (heading/pitch/roll).
+  // Inner signGroup handles the choreography spin. Nesting means the spin
+  // is around the sign's *local* Y axis, so a tilted sign still spins naturally.
+  const signPivot = new THREE.Group();
   const signGroup = new THREE.Group();
+  signPivot.add(signGroup);
   const SIGN_ALTITUDE = 180;
-  signGroup.position.set(0, SIGN_ALTITUDE, 0);
+  signPivot.position.set(0, SIGN_ALTITUDE, 0);
   window.__signScale = 1.0;  // live-tweakable size multiplier
-  scene.add(signGroup);
+  window.__signHeading = 0;  // user-applied yaw (radians, around world-up)
+  window.__signPitch = 0;    // user-applied tilt forward/back (radians)
+  window.__signRoll = 0;     // user-applied bank left/right (radians)
+  scene.add(signPivot);
   
   const depthHintMeshes = [];  // populated below; hidden during the rest hold
   
@@ -1011,7 +1092,7 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
     side: THREE.BackSide
   });
   const innerWash = new THREE.Mesh(new THREE.SphereGeometry(130, 24, 12), innerWashMat);
-  innerWash.position.copy(signGroup.position);
+  innerWash.position.copy(signPivot.position);
   scene.add(innerWash);
   
   // Outer wash: wider, purple-shifted
@@ -1034,7 +1115,7 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
     side: THREE.BackSide
   });
   const outerWash = new THREE.Mesh(new THREE.SphereGeometry(280, 24, 12), outerWashMat);
-  outerWash.position.copy(signGroup.position);
+  outerWash.position.copy(signPivot.position);
   scene.add(outerWash);
   
   // ════════════════════════════════════════════════════════════
@@ -1065,7 +1146,7 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
   const particleMat = new THREE.ShaderMaterial({
     uniforms: { 
       uTime: { value: 0 },
-      uSignPos: { value: signGroup.position.clone() }
+      uSignPos: { value: signPivot.position.clone() }
     },
     vertexShader: `
       attribute float seed;
@@ -1660,9 +1741,15 @@ To add music and loop:
       const easeO = 1 - (1 - act5P) * (1 - act5P);
       signRotation = startRot + (targetRot - startRot) * easeO;
     }
-    signGroup.rotation.y = signRotation;
-    signGroup.scale.setScalar(window.__signScale || 1.0);
-    signGroup.position.y = SIGN_ALTITUDE + Math.sin(t * 0.22) * 1.0;
+    signGroup.rotation.y = signRotation;                                   // choreography spin (local Y)
+    signPivot.rotation.set(                                                  // user orientation
+      window.__signPitch || 0,
+      window.__signHeading || 0,
+      window.__signRoll || 0,
+      'YXZ'                                                                  // yaw first, then pitch, then roll
+    );
+    signPivot.scale.setScalar(window.__signScale || 1.0);
+    signPivot.position.y = SIGN_ALTITUDE + Math.sin(t * 0.22) * 1.0;
 
     updateCamera(camT);
 
