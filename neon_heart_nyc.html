@@ -80,7 +80,16 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
   bgTexture.generateMipmaps = false;
   bgTexture.format = THREE.RGBAFormat;
   bgTexture.flipY = true;
-  scene.background = bgTexture;
+  // Full-screen quad that displays the Cesium canvas — rendered BEHIND everything
+  // Uses a second orthographic camera so it always fills the screen
+  const bgScene = new THREE.Scene();
+  const bgCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  const bgQuad = new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ map: bgTexture, depthTest: false, depthWrite: false })
+  );
+  bgScene.add(bgQuad);
+  scene.background = null;
 
   // ── V9 NIGHT SKY SPHERE ──
   // Renders on top of bgTexture for the upper sky — gives the dark blue
@@ -1115,7 +1124,12 @@ To add music and loop:
       document.getElementById('progressFill').style.width = ((rawCycleT / CAM_DUR) * 100).toFixed(1) + '%';
     }
 
+    // Render Cesium bg first (fills canvas), then sign scene on top without clearing
+    renderer.autoClear = true;
+    renderer.render(bgScene, bgCam);
+    renderer.autoClear = false;
     renderer.render(scene, camera);
+    renderer.autoClear = true;
     if (recording) {
       captureCurrentFrame().then(() => { if (recording) requestAnimationFrame(frame); });
     } else {
