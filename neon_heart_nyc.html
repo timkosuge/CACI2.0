@@ -243,6 +243,10 @@
         <button class="btn" id="faceBtn" style="flex:2;">🎯 Face Camera</button>
         <button class="btn sm" id="resetOriBtn">RESET</button>
       </div>
+      <div class="row" style="margin-top:10px;"><span class="tag">Hover</span>
+        <input id="hoverSlider" type="range" min="0" max="500" step="5" value="180">
+        <span class="val" id="hoverLabel">180m</span></div>
+      <div class="hint">Height above the drop point. <b>0</b> plants it directly on the surface, <b>180</b> floats it high above.</div>
     </div>
   </div>
   <div class="section" id="secAct">
@@ -1334,17 +1338,80 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
 
     // ── SIGN PLACEMENT UI ──
     // Presets, drop-where-looking, manual GPS input
+    // Each preset has TWO pieces: where the sign goes, and where the camera goes to frame it.
+    // Altitudes in metres above sea level. Hover = how high above the anchor the sign floats.
+    // Camera fields are heading (compass deg, 0=N, 90=E), pitch (deg, - = looking down), altitude.
     const PRESETS = {
-      'Hudson River (default)':  { lon: -74.013, lat: 40.758, alt: 0 },
-      'Times Square':            { lon: -73.9855, lat: 40.7580, alt: 0 },
-      'Empire State Building':   { lon: -73.9857, lat: 40.7484, alt: 0 },
-      'Brooklyn Bridge':         { lon: -73.9969, lat: 40.7061, alt: 0 },
-      'Statue of Liberty':       { lon: -74.0445, lat: 40.6892, alt: 0 },
-      'Central Park':            { lon: -73.9654, lat: 40.7829, alt: 0 },
-      'One World Trade':         { lon: -74.0134, lat: 40.7127, alt: 0 },
-      'Williamsburg Waterfront': { lon: -73.9616, lat: 40.7208, alt: 0 },
-      'Over Midtown (500m up)':  { lon: -73.9857, lat: 40.7580, alt: 500 },
+      'Hudson River (default)': {
+        sign: { lon: -74.013,  lat: 40.758,  alt: 0,   hover: 180 },
+        cam:  { lon: -74.023,  lat: 40.758,  alt: 250, heading: 95,  pitch: -6 }
+      },
+      'Times Square (on plaza)': {
+        sign: { lon: -73.9855, lat: 40.7580, alt: 20,  hover: 40 },
+        cam:  { lon: -73.9870, lat: 40.7565, alt: 90,  heading: 30,  pitch: -4 }
+      },
+      'Empire State Building (top)': {
+        sign: { lon: -73.9857, lat: 40.7484, alt: 380, hover: 20 },
+        cam:  { lon: -73.9910, lat: 40.7475, alt: 420, heading: 80,  pitch: -5 }
+      },
+      'Brooklyn Bridge (above)': {
+        sign: { lon: -73.9969, lat: 40.7061, alt: 100, hover: 30 },
+        cam:  { lon: -74.0015, lat: 40.7040, alt: 180, heading: 50,  pitch: -8 }
+      },
+      'Statue of Liberty (torch level)': {
+        sign: { lon: -74.0445, lat: 40.6892, alt: 90,  hover: 20 },
+        cam:  { lon: -74.0395, lat: 40.6892, alt: 130, heading: 270, pitch: -3 }
+      },
+      'Central Park (meadow)': {
+        sign: { lon: -73.9700, lat: 40.7820, alt: 30,  hover: 60 },
+        cam:  { lon: -73.9725, lat: 40.7800, alt: 110, heading: 55,  pitch: -10 }
+      },
+      'One World Trade (spire)': {
+        sign: { lon: -74.0134, lat: 40.7127, alt: 540, hover: 30 },
+        cam:  { lon: -74.0200, lat: 40.7130, alt: 600, heading: 85,  pitch: -4 }
+      },
+      'Williamsburg Waterfront': {
+        sign: { lon: -73.9650, lat: 40.7180, alt: 30,  hover: 80 },
+        cam:  { lon: -73.9595, lat: 40.7170, alt: 140, heading: 280, pitch: -7 }
+      },
+      'Midtown Skyline (high)': {
+        sign: { lon: -73.9857, lat: 40.7580, alt: 400, hover: 100 },
+        cam:  { lon: -73.9990, lat: 40.7570, alt: 550, heading: 90,  pitch: -6 }
+      },
     };
+
+    // Apply a full preset: move sign, set hover, fly camera to composition framing.
+    function applyPreset(name) {
+      const p = PRESETS[name];
+      if (!p) return;
+      // Sign
+      moveSignTo(p.sign.lon, p.sign.lat, p.sign.alt);
+      if (p.sign.hover !== undefined && window.__setSignAltitude) {
+        window.__setSignAltitude(p.sign.hover);
+        const hs = document.getElementById('hoverSlider');
+        const hl = document.getElementById('hoverLabel');
+        if (hs) hs.value = p.sign.hover;
+        if (hl) hl.textContent = Math.round(p.sign.hover) + 'm';
+      }
+      // Camera — auto-switch to free fly first so the composition sticks
+      if (window.__cameraMode === 'synced') {
+        window.__cameraMode = 'free';
+        if (window.__refreshModeUI) window.__refreshModeUI();
+      }
+      if (cesiumViewer && p.cam) {
+        cesiumViewer.camera.flyTo({
+          destination: Cesium.Cartesian3.fromDegrees(p.cam.lon, p.cam.lat, p.cam.alt),
+          orientation: {
+            heading: Cesium.Math.toRadians(p.cam.heading),
+            pitch:   Cesium.Math.toRadians(p.cam.pitch),
+            roll: 0
+          },
+          duration: 1.8,
+          easingFunction: Cesium.EasingFunction.CUBIC_IN_OUT
+        });
+      }
+    }
+    window.__applyPreset = applyPreset;
 
     function moveSignTo(lon, lat, alt, opts) {
       opts = opts || {};
@@ -1479,15 +1546,9 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
     document.getElementById('signCoords').textContent =
       `${window.__SIGN_ANCHOR_LON.toFixed(5)}, ${window.__SIGN_ANCHOR_LAT.toFixed(5)}, ${window.__SIGN_ANCHOR_ALT.toFixed(0)}m`;
 
-    // Preset dropdown
+    // Preset dropdown — applies full composition (sign position, hover, AND camera framing)
     document.getElementById('presetSel').addEventListener('change', e => {
-      const p = PRESETS[e.target.value];
-      if (p) {
-        moveSignTo(p.lon, p.lat, p.alt);
-        document.getElementById('inLon').value = p.lon;
-        document.getElementById('inLat').value = p.lat;
-        document.getElementById('inAlt').value = p.alt;
-      }
+      applyPreset(e.target.value);
     });
 
     // Manual apply
@@ -1590,6 +1651,17 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
     rSlider.addEventListener('input', e => setOrientation(+hSlider.value, +pSlider.value, +e.target.value));
 
     document.getElementById('resetOriBtn').addEventListener('click', () => setOrientation(0, 0, 0));
+
+    // ── HOVER HEIGHT ──
+    const hoverSlider = document.getElementById('hoverSlider');
+    const hoverLabel = document.getElementById('hoverLabel');
+    if (hoverSlider) {
+      hoverSlider.addEventListener('input', e => {
+        const v = parseFloat(e.target.value);
+        if (window.__setSignAltitude) window.__setSignAltitude(v);
+        hoverLabel.textContent = Math.round(v) + 'm';
+      });
+    }
 
     // FACE CAMERA — orient sign toward wherever Cesium camera is looking from
     document.getElementById('faceBtn').addEventListener('click', () => {
@@ -1935,7 +2007,11 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
   const signPivot = new THREE.Group();
   const signGroup = new THREE.Group();
   signPivot.add(signGroup);
-  const SIGN_ALTITUDE = 180;
+  // SIGN_ALTITUDE = how many Three.js units (= metres) above the GPS anchor
+  // the sign floats. User-tweakable via the Hover slider in the Orientation section.
+  let SIGN_ALTITUDE = 180;
+  window.__getSignAltitude = () => SIGN_ALTITUDE;
+  window.__setSignAltitude = (v) => { SIGN_ALTITUDE = v; };
   signPivot.position.set(0, SIGN_ALTITUDE, 0);
   window.__signScale = 1.0;  // live-tweakable size multiplier
   window.__signHeading = 0;  // user-applied yaw (radians, around world-up)
@@ -2290,11 +2366,15 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
         Math.cos(finalAngThisFrame) * (radius + breathR)
       );
       camLook = lookTarget;
-      
+
       setCityOpacity(cityOpacityTarget);
       setNeonIntensity(neonIntensity);
-      camera.position.copy(camPos);
-      camera.lookAt(camLook);
+      // Scale camera orbit distance by sign scale so 2× sign = 2× camera distance (same frame)
+      const scaleK = window.__signScale || 1.0;
+      const scaleAbout = new THREE.Vector3(0, SIGN_ALTITUDE, 0);
+      camera.position.copy(camPos.sub(scaleAbout).multiplyScalar(scaleK).add(scaleAbout));
+      const scaledLook = camLook.clone().sub(scaleAbout).multiplyScalar(scaleK).add(scaleAbout);
+      camera.lookAt(scaledLook);
       return;
     }
     
@@ -2312,8 +2392,12 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
     
     setCityOpacity(cityOpacityTarget);
     setNeonIntensity(neonIntensity);
-    camera.position.copy(camPos);
-    camera.lookAt(camLook);
+    // Scale camera orbit distance by sign scale so 2× sign = 2× camera distance (same frame)
+    const scaleK = window.__signScale || 1.0;
+    const scaleAbout = new THREE.Vector3(0, SIGN_ALTITUDE, 0);
+    camera.position.copy(camPos.sub(scaleAbout).multiplyScalar(scaleK).add(scaleAbout));
+    const scaledLook = camLook.clone().sub(scaleAbout).multiplyScalar(scaleK).add(scaleAbout);
+    camera.lookAt(scaledLook);
   }
   
 
