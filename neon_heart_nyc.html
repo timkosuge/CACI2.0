@@ -256,6 +256,18 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
     window.__bgCanvas = bgCanvas;
     window.__bgCtx = bgCtx;
 
+    // DEBUG: pin a small preview of the Cesium view to bottom-left
+    const dbg = document.createElement('canvas');
+    dbg.width = 320; dbg.height = 180;
+    dbg.style.cssText = 'position:fixed;bottom:60px;left:12px;width:320px;height:180px;z-index:50;border:2px solid #f0f;box-shadow:0 0 10px rgba(255,0,255,0.5);';
+    document.body.appendChild(dbg);
+    const dbgCtx = dbg.getContext('2d');
+    window.__dbgTick = () => {
+      if (cesiumViewer && cesiumViewer.canvas) {
+        dbgCtx.drawImage(cesiumViewer.canvas, 0, 0, 320, 180);
+      }
+    };
+
     // ── NIGHT GRADE — added here so pipeline is fully initialized ──
     // Cesium PostProcessStage runs inside WebGL — actually modifies tile pixels
     try {
@@ -1130,6 +1142,7 @@ To add music and loop:
     renderer.autoClear = false;
     renderer.render(scene, camera);
     renderer.autoClear = true;
+    if (window.__dbgTick) window.__dbgTick();
     if (recording) {
       captureCurrentFrame().then(() => { if (recording) requestAnimationFrame(frame); });
     } else {
