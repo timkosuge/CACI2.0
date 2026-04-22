@@ -240,6 +240,9 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
     });
 
     cesiumReady = true;
+    window.__cesiumViewer = cesiumViewer; // debug access
+    window.__bgCanvas = bgCanvas;
+    window.__bgCtx = bgCtx;
 
     // ── NIGHT GRADE — added here so pipeline is fully initialized ──
     // Cesium PostProcessStage runs inside WebGL — actually modifies tile pixels
@@ -1050,6 +1053,13 @@ To add music and loop:
         if (cc.width > 0) {
           bgCtx.drawImage(cc, 0, 0, bgCanvas.width, bgCanvas.height);
           bgTexture.needsUpdate = true;
+          if (!window.__bliDone) {
+            window.__bliDone = true;
+            // Sample a pixel from center of bg to confirm tiles painted something
+            const px = bgCtx.getImageData(bgCanvas.width/2, bgCanvas.height*0.7, 1, 1).data;
+            console.log('First blit — Cesium canvas', cc.width, 'x', cc.height,
+                        '| bg center pixel RGBA:', px[0], px[1], px[2], px[3]);
+          }
         }
       } catch(e) {
         cesiumReady = false;
