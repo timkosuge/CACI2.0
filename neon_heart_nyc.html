@@ -355,11 +355,12 @@ function initHeartRenderer() {
   renderer3.setClearColor(0x000000, 0); // transparent bg
   renderer3.toneMapping = THREE.NoToneMapping;
 
-  // Scene + camera
+  // Camera at origin looking down -Z. Heart placed at z=-800.
+  // NDC → world at that depth: worldX = ndcX * tan(fov/2) * aspect * 800
   scene3 = new THREE.Scene();
   camera3 = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 50000);
-  camera3.position.set(0, 0, 800);
-  camera3.lookAt(0, 0, 0);
+  camera3.position.set(0, 0, 0);
+  camera3.lookAt(0, 0, -1);
 
   // ── BUILD HEART GEOMETRY ──
   heartGroup = buildHeart();
@@ -495,9 +496,10 @@ function buildHeart() {
   group.userData.coreMat = coreMat;
   group.userData.fillMat = fillMat;
 
-  // Scale and position
-  group.scale.setScalar(90); // ~180m wide heart
-  group.position.set(0, 0, 0);
+  // Scale: at z=-800, 1 unit ≈ 1px at 60° FOV on 1080p
+  // We want the heart to appear ~400px tall → scale ~200
+  group.scale.setScalar(200);
+  group.position.set(0, 0, -800);
 
   return group;
 }
@@ -574,7 +576,8 @@ function addVolumetricCloud() {
   });
 
   const cloud = new THREE.Points(geo, mat);
-  cloud.scale.setScalar(90);
+  cloud.scale.setScalar(200);
+  cloud.position.set(0, 0, -800);
   cloud.userData.isCloud = true;
   scene3.add(cloud);
   scene3.userData.cloudMat = mat;
@@ -780,68 +783,49 @@ function buildCompositePass() {
 }
 
 // ══════════════════════════════════════════════════════
-// SYNC CAMERA — map Cesium's camera to Three.js camera
-// This makes the heart appear to be in the Cesium world
+// SYNC CAMERA — use Cesium's own projection to get
+// the heart's exact screen pixel, then back-project
+// into Three.js NDC so the heart renders there
 // ══════════════════════════════════════════════════════
 function syncCamera() {
   if (!viewer) return;
 
-  const cesiumCam = viewer.camera;
-  const cesiumPos = cesiumCam.positionWC;
-
-  // Heart world position in ECEF
-  const heartECEF = Cesium.Cartesian3.fromDegrees(HEART_POS.lng, HEART_POS.lat, HEART_POS.alt);
-
-  // Vector from camera to heart in world space
-  const camToHeart = Cesium.Cartesian3.subtract(heartECEF, cesiumPos, new Cesium.Cartesian3());
-
-  // Transform into camera local space using Cesium's view matrix
-  const viewMatrix = viewer.camera.viewMatrix;
-  const heartCamSpace = Cesium.Matrix4.multiplyByPoint(viewMatrix, heartECEF, new Cesium.Cartesian3());
-
-  // heartCamSpace is now in Cesium camera coordinates
-  // Cesium: X right, Y up, -Z forward (standard right-hand)
-  // Three.js: X right, Y up, -Z forward (matches)
-  // Scale: 1 Cesium meter = 1 Three.js unit
-  camera3.position.set(0, 0, 0);
-
-  // Project heart into Three.js screen space at correct depth
-  const heartDepth = -heartCamSpace.z; // positive depth
-
-  // FOV sync
-  camera3.fov = Cesium.Math.toDegrees(viewer.camera.frustum.fovy || Math.PI / 3);
-  camera3.aspect = window.innerWidth / window.innerHeight;
-  camera3.near = 1;
-  camera3.far = 50000;
-  camera3.updateProjectionMatrix();
-
-  // Angular offset from camera center to heart
-  // We put the heart at 0,0,-dist in camera space — but offset by the angle
-  const distToHeart = Cesium.Cartesian3.magnitude(camToHeart);
-
-  // Horizontal and vertical angle to heart
-  const heartNorm = Cesium.Cartesian3.normalize(camToHeart, new Cesium.Cartesian3());
-  const fwdNorm = new Cesium.Cartesian3(-viewMatrix[2], -viewMatrix[6], -viewMatrix[10]);
-  const rightNorm = new Cesium.Cartesian3(viewMatrix[0], viewMatrix[4], viewMatrix[8]);
-  const upNorm = new Cesium.Cartesian3(viewMatrix[1], viewMatrix[5], viewMatrix[9]);
-
-  const dotFwd = Cesium.Cartesian3.dot(heartNorm, fwdNorm);
-  const dotRight = Cesium.Cartesian3.dot(heartNorm, rightNorm);
-  const dotUp = Cesium.Cartesian3.dot(heartNorm, upNorm);
-
-  // Place heart group at correct position in Three.js camera space
-  const scale = heartDepth / Math.max(dotFwd, 0.01);
-  heartGroup.position.set(
-    dotRight * scale,
-    dotUp * scale,
-    -heartDepth
+  const heartECEF = Cesium.Cartesian3.fromDegrees(
+    HEART_POS.lng, HEART_POS.lat, HEART_POS.alt
   );
 
-  // Update cloud positions to match
+  // Ask Cesium: where on screen (pixels) is this world point?
+  const screenPos = Cesium.SceneTransforms.wgs84ToWindowCoordinates(
+    viewer.scene, heartECEF, new Cesium.Cartesian2()
+  );
+
+  if (!screenPos) return; // heart is behind camera — skip
+
+  const W = window.innerWidth;
+  const H = window.innerHeight;
+
+  // Convert pixel → NDC (-1..1)
+  const ndcX = (screenPos.x / W) * 2 - 1;
+  const ndcY = -((screenPos.y / H) * 2 - 1); // flip Y
+
+  // Three.js camera looks down -Z, heart sits at fixed depth
+  // We move the heart in XY to match NDC, keep Z fixed
+  const HEART_Z = -800; // distance from camera in Three.js units
+
+  // Convert NDC offset to world offset at that depth
+  // For PerspectiveCamera: worldX = ndcX * tan(fovY/2) * aspect * |Z|
+  const fovRad = THREE.MathUtils.degToRad(camera3.fov);
+  const halfH_at_Z = Math.abs(HEART_Z) * Math.tan(fovRad / 2);
+  const halfW_at_Z = halfH_at_Z * camera3.aspect;
+
+  const worldX = ndcX * halfW_at_Z;
+  const worldY = ndcY * halfH_at_Z;
+
+  heartGroup.position.set(worldX, worldY, HEART_Z);
+
+  // Cloud follows heart
   scene3.children.forEach(c => {
-    if (c.userData.isCloud) {
-      c.position.copy(heartGroup.position);
-    }
+    if (c.userData.isCloud) c.position.copy(heartGroup.position);
   });
 }
 
@@ -884,7 +868,7 @@ function renderLoop(ts = 0) {
   }
 
   // Animate heart scale (subtle throb)
-  const scale = 90 * (1.0 + beat * 0.04);
+  const scale = 200 * (1.0 + beat * 0.04);
   heartGroup.scale.setScalar(scale);
 
   // Breathe rotation
