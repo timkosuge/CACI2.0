@@ -312,6 +312,25 @@
     </div>
   </div>
 
+  <div class="section" id="secSignLight">
+    <div class="section-header" data-target="secSignLight"><span>💡 Sign Illuminates World</span><span class="caret">▾</span></div>
+    <div class="section-body">
+      <div class="row">
+        <label style="display:flex;align-items:center;gap:8px;color:#e8d7ff;font:500 11px -apple-system,sans-serif;cursor:pointer;">
+          <input id="signLightToggle" type="checkbox" style="accent-color:#f0f;cursor:pointer;" checked>
+          <span>Enable glow on nearby surfaces</span>
+        </label>
+      </div>
+      <div class="row"><span class="tag">Power</span>
+        <input id="slPowerSlider" type="range" min="0" max="3" step="0.05" value="1">
+        <span class="val" id="slPowerLabel">1.00</span></div>
+      <div class="row"><span class="tag">Radius</span>
+        <input id="slRadiusSlider" type="range" min="100" max="3000" step="50" value="800">
+        <span class="val" id="slRadiusLabel">800m</span></div>
+      <div class="hint">Depth-aware: close buildings glow pink, far buildings don't. Auto-dims in daylight.</div>
+    </div>
+  </div>
+
   <div class="section" id="secTime">
     <div class="section-header" data-target="secTime"><span>☀ Time of Day</span><span class="caret">▾</span></div>
     <div class="section-body">
@@ -1151,6 +1170,38 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
       });
     }
 
+    // ── SIGN-LIGHT CONTROLS ──
+    window.__signLightPower = 1.0;
+    window.__signLightRadius = 800.0;
+    const slToggle     = document.getElementById('signLightToggle');
+    const slPowerEl    = document.getElementById('slPowerSlider');
+    const slPowerLbl   = document.getElementById('slPowerLabel');
+    const slRadiusEl   = document.getElementById('slRadiusSlider');
+    const slRadiusLbl  = document.getElementById('slRadiusLabel');
+    if (slToggle) {
+      slToggle.addEventListener('change', e => {
+        // Disable by setting power to 0 (simpler than unregistering the stage)
+        if (e.target.checked) {
+          window.__signLightPower = parseFloat(slPowerEl.value);
+        } else {
+          window.__signLightPower = 0;
+        }
+      });
+    }
+    if (slPowerEl) {
+      slPowerEl.addEventListener('input', e => {
+        const v = parseFloat(e.target.value);
+        window.__signLightPower = slToggle && slToggle.checked ? v : 0;
+        slPowerLbl.textContent = v.toFixed(2);
+      });
+    }
+    if (slRadiusEl) {
+      slRadiusEl.addEventListener('input', e => {
+        window.__signLightRadius = parseFloat(e.target.value);
+        slRadiusLbl.textContent = Math.round(window.__signLightRadius) + 'm';
+      });
+    }
+
     // ── MINIMAP ──
     // Stylized NYC — Manhattan polygon, water, landmasses. Pink dot = sign, yellow arrow = camera.
     (function initMinimap(){
@@ -1667,6 +1718,75 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
       cesiumViewer.scene.postProcessStages.add(tileGrade);
       window.__tileGrade = tileGrade;
       console.log('Time-of-day tile grade added');
+
+      // ── SIGN-LIGHT STAGE ──
+      // For each pixel, reconstruct world-space position from depth buffer,
+      // compute distance to sign's real GPS position (ECEF), add a pink glow
+      // that falls off with distance. This is what makes the sign appear to
+      // actually light up the buildings and water around it.
+      try {
+        const signLight = new Cesium.PostProcessStage({
+          uniforms: {
+            uSignECEF:    new Cesium.Cartesian3(0, 0, 0),  // updated each frame
+            uLightColor:  new Cesium.Cartesian3(1.0, 0.25, 0.7),  // neon pink
+            uLightRadius: 800.0,    // metres — distance at which glow falls to ~0
+            uLightPower:  1.0,      // master brightness
+            uTimeMult:    1.0,      // ramps with time-of-day (off in daylight)
+          },
+          fragmentShader: `
+            uniform sampler2D colorTexture;
+            uniform sampler2D depthTexture;
+            uniform vec3 uSignECEF;
+            uniform vec3 uLightColor;
+            uniform float uLightRadius;
+            uniform float uLightPower;
+            uniform float uTimeMult;
+            in vec2 v_textureCoordinates;
+            out vec4 fragColor;
+
+            // Reconstruct world-space (ECEF) position from the depth texture.
+            // Cesium stores linear depth; we invert the view-projection to get world coords.
+            vec4 clipToEye(vec2 uv, float depth) {
+              vec4 clip = vec4(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+              vec4 eye = czm_inverseProjection * clip;
+              eye.xyz /= eye.w;
+              return vec4(eye.xyz, 1.0);
+            }
+
+            void main() {
+              vec4 base = texture(colorTexture, v_textureCoordinates);
+              float d = czm_readDepth(depthTexture, v_textureCoordinates);
+
+              // Skip pixels at max depth (sky) — no glow in sky
+              if (d >= 1.0 - 1.0e-6) {
+                fragColor = base;
+                return;
+              }
+
+              // Reconstruct eye-space position
+              vec4 eye = clipToEye(v_textureCoordinates, d);
+              // Transform to world (ECEF)
+              vec4 world = czm_inverseView * eye;
+
+              // Distance from this pixel's world position to the sign
+              float dist = length(world.xyz - uSignECEF);
+
+              // Falloff: smooth quadratic, clamped. Very close = 1.0, at radius = 0.0.
+              float falloff = 1.0 - smoothstep(0.0, uLightRadius, dist);
+              falloff = falloff * falloff;  // sharper falloff near sign
+
+              // Add glow
+              vec3 glow = uLightColor * falloff * uLightPower * uTimeMult;
+              fragColor = vec4(base.rgb + glow, base.a);
+            }
+          `
+        });
+        cesiumViewer.scene.postProcessStages.add(signLight);
+        window.__signLight = signLight;
+        console.log('Sign-light PostProcessStage added');
+      } catch(e) {
+        console.warn('Sign-light failed:', e);
+      }
     } catch(e) {
       console.warn('PostProcessStage failed:', e);
     }
@@ -2515,6 +2635,26 @@ To add music and loop:
     // Update playback HUD
     if (window.__updatePlaybackHud) window.__updatePlaybackHud();
     if (window.__drawMinimap) window.__drawMinimap();
+
+    // ── UPDATE SIGN-LIGHT UNIFORMS ──
+    if (window.__signLight) {
+      // Sign's real ECEF position: GPS anchor + 180m altitude (SIGN_ALTITUDE in metres)
+      const signCart = Cesium.Cartesian3.fromDegrees(
+        window.__SIGN_ANCHOR_LON,
+        window.__SIGN_ANCHOR_LAT,
+        window.__SIGN_ANCHOR_ALT + SIGN_ALTITUDE
+      );
+      window.__signLight.uniforms.uSignECEF = signCart;
+      // Ramp intensity with time-of-day (full at night, fades to 0 at noon)
+      // Also apply a master `window.__signLightPower` knob
+      const tMult = (window.__timeNeonMult !== undefined) ? window.__timeNeonMult : 1.0;
+      window.__signLight.uniforms.uTimeMult = tMult;
+      window.__signLight.uniforms.uLightPower = (window.__signLightPower !== undefined) ? window.__signLightPower : 1.0;
+      window.__signLight.uniforms.uLightRadius = (window.__signLightRadius !== undefined) ? window.__signLightRadius : 800.0;
+      // Also scale with sign size — bigger sign = farther-reaching light
+      const scale = window.__signScale || 1;
+      window.__signLight.uniforms.uLightRadius = (window.__signLightRadius || 800) * Math.max(0.3, Math.sqrt(scale));
+    }
     if (cesiumViewer && cesiumReady) {
       try {
         if (window.__updateCesiumCam) window.__updateCesiumCam();
