@@ -7,7 +7,7 @@
 <link href="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
 <style>
   html,body{margin:0;padding:0;background:#000;overflow:hidden;width:100%;height:100%;}
-  #cesiumContainer{position:fixed;top:0;left:0;width:100%;height:100%;visibility:hidden;pointer-events:none;}
+  #cesiumContainer{position:fixed;top:0;left:0;width:100%;height:100%;opacity:0.001;pointer-events:none;z-index:-1;}
   #c{display:block;width:100%;height:100%;position:relative;z-index:10;}
   .cesium-widget-credits,.cesium-credit-container,
   .cesium-credit-logoContainer,.cesium-credit-textContainer{display:none!important;}
@@ -1050,7 +1050,10 @@ To add music and loop:
           bgCtx.drawImage(cc, 0, 0, bgCanvas.width, bgCanvas.height);
           bgTexture.needsUpdate = true;
         }
-      } catch(e) {}
+      } catch(e) {
+        cesiumReady = false;
+        console.warn('Cesium render stopped:', e.message);
+      }
     }
     neonMats.forEach(m => { m.uniforms.uTime.value = t; });
     innerWashMat.uniforms.uTime.value = t;
