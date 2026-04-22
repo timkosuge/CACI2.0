@@ -101,8 +101,8 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
       void main() {
         vec3 nd = normalize(vPos);
         float h = nd.y;
-        // Only paint the upper hemisphere — lower half is Cesium city
-        if (h < 0.0) { gl_FragColor = vec4(0.0); return; }
+        // DISCARD lower hemisphere — let Cesium city show through
+        if (h < 0.0) discard;
         vec3 zenith  = vec3(0.008, 0.010, 0.028);
         vec3 midSky  = vec3(0.04,  0.03,  0.08);
         vec3 horizon = vec3(0.12,  0.07,  0.10);
@@ -116,7 +116,7 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
     `,
     side: THREE.BackSide,
     depthWrite: false,
-    transparent: false,
+    transparent: true,
   });
   scene.add(new THREE.Mesh(new THREE.SphereGeometry(6000, 32, 16), skyMat));
 
