@@ -213,6 +213,8 @@
         <button class="btn sm" id="dropCamBtn">Drop at cam (X)</button>
         <button class="btn sm" id="dropLookBtn">Where looking (C)</button>
       </div>
+      <button class="btn primary" id="goToSignBtn" style="width:100%;margin-top:6px;">🎯 GO TO SIGN</button>
+      <div class="hint">Presets move the sign. Click <b>Go to Sign</b> to warp the camera to it.</div>
     </div>
   </div>
   <div class="section" id="secSize">
@@ -1497,6 +1499,44 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
         moveSignTo(lon, lat, alt);
       }
     });
+
+    // Drop buttons (matching X/C keys)
+    const dropCamBtn = document.getElementById('dropCamBtn');
+    const dropLookBtn = document.getElementById('dropLookBtn');
+    if (dropCamBtn) dropCamBtn.addEventListener('click', () => window.__dropSignAtCam && window.__dropSignAtCam());
+    if (dropLookBtn) dropLookBtn.addEventListener('click', () => window.__dropSignAtLook && window.__dropSignAtLook());
+
+    // GO TO SIGN — teleport the Cesium camera to frame the sign nicely.
+    // We position the camera ~600m away, 300m up, pointed at the sign's center.
+    // Also auto-switches to FREE mode so you can explore from there without the choreography hijacking the camera.
+    window.__goToSign = () => {
+      if (!cesiumViewer) return;
+      // Switch to free mode if we're synced
+      if (window.__cameraMode === 'synced') {
+        window.__cameraMode = 'free';
+        if (window.__refreshModeUI) window.__refreshModeUI();
+      }
+      const signLon = window.__SIGN_ANCHOR_LON;
+      const signLat = window.__SIGN_ANCHOR_LAT;
+      const signAlt = window.__SIGN_ANCHOR_ALT + 180;  // sign body is 180m above anchor
+      // Offset camera: ~600m to the west, 300m up, looking east at the sign
+      // Convert offset to GPS: ~600m west ≈ 0.0071° lon at 40.76°N
+      const camLon = signLon - 0.0071;
+      const camLat = signLat;
+      const camAlt = signAlt + 150;
+      cesiumViewer.camera.flyTo({
+        destination: Cesium.Cartesian3.fromDegrees(camLon, camLat, camAlt),
+        orientation: {
+          heading: Cesium.Math.toRadians(90),   // looking east
+          pitch:   Cesium.Math.toRadians(-8),   // slightly down toward the sign
+          roll: 0
+        },
+        duration: 1.5,  // short flyTo; feels responsive
+        easingFunction: Cesium.EasingFunction.CUBIC_IN_OUT
+      });
+    };
+    const goBtn = document.getElementById('goToSignBtn');
+    if (goBtn) goBtn.addEventListener('click', () => window.__goToSign());
 
     // Size slider + setter
     const sizeSlider = document.getElementById('sizeSlider');
