@@ -589,21 +589,27 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
     };
     function refreshModeUI() {
       const isFree = window.__cameraMode === 'free';
-      modeChip.textContent = isFree ? '◉ FREE FLY — click to resume' : '● SYNCED — click to free fly';
-      modeChip.classList.toggle('free', isFree);
-      modeLabel.textContent = isFree ? 'FREE FLY' : 'SYNCED';
-      document.getElementById('modeToggleBtn').classList.toggle('active', isFree);
+      if (modeChip) {
+        modeChip.textContent = isFree ? '◉ FREE FLY — click to resume' : '● SYNCED — click to free fly';
+        modeChip.classList.toggle('free', isFree);
+      }
+      if (modeLabel) modeLabel.textContent = isFree ? 'FREE FLY' : 'SYNCED';
+      const modeToggleBtn = document.getElementById('modeToggleBtn');
+      if (modeToggleBtn) modeToggleBtn.classList.toggle('active', isFree);
       if (freeControls) freeControls.style.display = isFree ? 'block' : 'none';
       if (syncInfo) syncInfo.style.display = isFree ? 'none' : 'block';
     }
     window.__refreshModeUI = refreshModeUI;
     // Mode chip + top-bar mode button both toggle the mode
-    modeChip.addEventListener('click', () => {
-      window.__cameraMode = window.__cameraMode === 'synced' ? 'free' : 'synced';
-      if (window.__cameraMode === 'synced' && window.__signCarrying && window.__toggleCarry) window.__toggleCarry();
-      refreshModeUI();
-    });
-    document.getElementById('modeToggleBtn').addEventListener('click', () => modeChip.click());
+    if (modeChip) {
+      modeChip.addEventListener('click', () => {
+        window.__cameraMode = window.__cameraMode === 'synced' ? 'free' : 'synced';
+        if (window.__cameraMode === 'synced' && window.__signCarrying && window.__toggleCarry) window.__toggleCarry();
+        refreshModeUI();
+      });
+    }
+    const modeToggleBtn = document.getElementById('modeToggleBtn');
+    if (modeToggleBtn && modeChip) modeToggleBtn.addEventListener('click', () => modeChip.click());
     refreshModeUI();
 
     const keys = {};
@@ -2120,21 +2126,9 @@ To add music and loop:
     }
   }
   
-  // Keyboard shortcuts for recording
-  // R: show menu
-  // 1-4: start recording at corresponding preset
+  // Keyboard shortcuts for recording: 1-4 only. R is reserved for fly-up.
   window.addEventListener('keydown', (e) => {
     if (recording) return;
-    if (e.key === 'r' || e.key === 'R') {
-      alert(
-        'Recording presets — press the number key to start:\n\n' +
-        '1 — 1080p @ 60fps (safest, ~2GB)\n' +
-        '2 — 2K @ 60fps (great quality, ~6GB)\n' +
-        '3 — 4K @ 30fps (max res, still smooth, ~6GB)\n' +
-        '4 — 4K @ 60fps (ultra, ~12GB — may crash on limited RAM)'
-      );
-      return;
-    }
     if (['1', '2', '3', '4'].includes(e.key)) {
       startRecording(e.key);
     }
@@ -2161,13 +2155,10 @@ To add music and loop:
     });
     // Poll recording state so the button reflects progress
     setInterval(() => {
+      if (!btn || !lbl) return;
       if (window.__recording) {
         btn.classList.add('active');
-        if (window.__recordProgress) {
-          lbl.textContent = window.__recordProgress;
-        } else {
-          lbl.textContent = 'RECORDING';
-        }
+        lbl.textContent = window.__recordProgress || 'RECORDING';
       } else {
         btn.classList.remove('active');
         lbl.textContent = 'RECORD';
@@ -2296,20 +2287,21 @@ To add music and loop:
       const anchor = Cesium.Cartesian3.fromDegrees(
         window.__SIGN_ANCHOR_LON, window.__SIGN_ANCHOR_LAT, window.__SIGN_ANCHOR_ALT
       );
-      // Build ENU frame at the anchor. We extract ONLY the rotation part for
-      // converting ECEF deltas → ENU deltas (translation is handled by subtracting anchor).
       const enuMatrix = Cesium.Transforms.eastNorthUpToFixedFrame(anchor);
       const rot = Cesium.Matrix4.getMatrix3(enuMatrix, new Cesium.Matrix3());
-      const invRot = Cesium.Matrix3.transpose(rot, new Cesium.Matrix3()); // rotation inverse = transpose
+      const invRot = Cesium.Matrix3.transpose(rot, new Cesium.Matrix3());
 
-      // Position: delta from anchor, rotated into ENU
+      // Position
       const relECEF = Cesium.Cartesian3.subtract(cesiumCam.position, anchor, new Cesium.Cartesian3());
       const relENU = Cesium.Matrix3.multiplyByVector(invRot, relECEF, new Cesium.Cartesian3());
-      // ENU(x=East,y=North,z=Up) → Three.js(x=East, y=Up, z=-North)
       camera.position.set(relENU.x, relENU.z, -relENU.y);
 
-      // Direction: rotate ECEF direction into ENU (no translation, it's a direction)
+      // Direction and up both need to follow Cesium to preserve rotation/roll/pitch
       const dirENU = Cesium.Matrix3.multiplyByVector(invRot, cesiumCam.direction, new Cesium.Cartesian3());
+      const upENU  = Cesium.Matrix3.multiplyByVector(invRot, cesiumCam.up, new Cesium.Cartesian3());
+
+      // ENU(x=E,y=N,z=U) → Three(x=E, y=U, z=-N)
+      camera.up.set(upENU.x, upENU.z, -upENU.y);
       camera.lookAt(
         camera.position.x + dirENU.x,
         camera.position.y + dirENU.z,
@@ -2318,6 +2310,9 @@ To add music and loop:
 
       camera.fov = Cesium.Math.toDegrees(cesiumCam.frustum.fov);
       camera.updateProjectionMatrix();
+    } else {
+      // Reset Three.js up to world-Y in synced mode so v9 choreography behaves correctly
+      camera.up.set(0, 1, 0);
     }
 
     const flickerMult = computeFlickerMultiplier(t % CAM_DUR);
