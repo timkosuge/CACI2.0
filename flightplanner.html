@@ -5,42 +5,28 @@
 <title>KAIT Flight Planner</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Cesium.js"></script>
-<link href="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+<!-- Cesium loaded lazily only when 3D preview opened -->
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 html,body { width:100%; height:100%; overflow:hidden; background:#060610; color:#c9a832; font-family:'Courier New',monospace; }
-
-/* ══ LAYOUT ══ */
 #app { display:flex; flex-direction:column; height:100vh; }
 #top { display:flex; flex:1; min-height:0; }
 #map-wrap { flex:1; position:relative; }
 #map { width:100%; height:100%; filter:invert(1) hue-rotate(180deg) brightness(0.8) contrast(1.1) saturate(0.55); }
-#cesium-wrap {
-  position:absolute; inset:0; display:none; flex-direction:column; z-index:100;
-  background:#000;
-}
+#cesium-wrap { position:absolute; inset:0; display:none; flex-direction:column; z-index:100; background:#000; }
 #cesium-wrap.open { display:flex; }
-#cesiumContainer { flex:1; }
-
-/* ══ RIGHT PANEL ══ */
-#rpanel {
-  width:280px; background:#07070f; border-left:1px solid rgba(200,160,50,0.15);
-  display:flex; flex-direction:column; flex-shrink:0;
-}
+#cesiumContainer { flex:1; min-height:0; width:100%; }
+.cesium-widget,.cesium-widget canvas { width:100%!important; height:100%!important; }
+#rpanel { width:280px; background:#07070f; border-left:1px solid rgba(200,160,50,0.15); display:flex; flex-direction:column; flex-shrink:0; }
 #rp-header { padding:10px 12px 8px; border-bottom:1px solid rgba(200,160,50,0.1); }
 #rp-header h1 { font-size:9px; letter-spacing:0.45em; color:#c9a832; }
 #rp-tabs { display:flex; border-bottom:1px solid rgba(200,160,50,0.1); }
-.rtab { flex:1; padding:7px 2px; font-size:8px; letter-spacing:0.08em; text-align:center;
-  cursor:pointer; color:rgba(200,160,50,0.3); background:none; border:none;
-  border-bottom:2px solid transparent; transition:all 0.15s; }
+.rtab { flex:1; padding:7px 2px; font-size:8px; letter-spacing:0.08em; text-align:center; cursor:pointer; color:rgba(200,160,50,0.3); background:none; border:none; border-bottom:2px solid transparent; transition:all 0.15s; }
 .rtab.on { color:#c9a832; border-bottom-color:#c9a832; background:rgba(200,160,50,0.05); }
-
 #wp-list { flex:1; overflow-y:auto; min-height:0; }
 #wp-list::-webkit-scrollbar { width:2px; }
 #wp-list::-webkit-scrollbar-thumb { background:rgba(200,160,50,0.2); }
-.wrow { padding:5px 10px; border-bottom:1px solid rgba(200,160,50,0.05);
-  cursor:pointer; transition:background 0.1s; }
+.wrow { padding:5px 10px; border-bottom:1px solid rgba(200,160,50,0.05); cursor:pointer; transition:background 0.1s; }
 .wrow:hover { background:rgba(200,160,50,0.04); }
 .wrow.sel { background:rgba(200,160,50,0.08); border-left:2px solid #c9a832; }
 .wr1 { display:flex; align-items:center; gap:5px; }
@@ -56,43 +42,24 @@ html,body { width:100%; height:100%; overflow:hidden; background:#060610; color:
 .wtag.or:hover { color:rgba(255,160,50,1); border-color:rgba(255,160,50,0.6); }
 .wtag.gr { color:rgba(100,255,150,0.6); border-color:rgba(100,255,150,0.2); }
 .wtag.gr:hover { color:rgba(100,255,150,1); border-color:rgba(100,255,150,0.5); }
-
-#rp-stats { padding:6px 12px; font-size:8px; color:rgba(200,160,50,0.3);
-  border-top:1px solid rgba(200,160,50,0.08); letter-spacing:0.08em; }
-#rp-btns { padding:8px 10px; border-top:1px solid rgba(200,160,50,0.1); display:flex; flex-direction:column; gap:5px; }
-.rb { padding:7px; font-size:8px; letter-spacing:0.12em; text-align:center;
-  border:1px solid rgba(200,160,50,0.2); background:rgba(200,160,50,0.04);
-  color:rgba(200,160,50,0.7); cursor:pointer; transition:all 0.15s; }
+#rp-stats { padding:6px 12px; font-size:8px; color:rgba(200,160,50,0.3); border-top:1px solid rgba(200,160,50,0.08); letter-spacing:0.08em; }
+#rp-btns { padding:8px 10px; border-top:1px solid rgba(200,160,50,0.1); display:flex; flex-direction:column; gap:4px; overflow-y:auto; }
+.rb { padding:7px; font-size:8px; letter-spacing:0.12em; text-align:center; border:1px solid rgba(200,160,50,0.2); background:rgba(200,160,50,0.04); color:rgba(200,160,50,0.7); cursor:pointer; transition:all 0.15s; }
 .rb:hover { border-color:#c9a832; color:#c9a832; background:rgba(200,160,50,0.09); }
 .rb.bl { border-color:rgba(100,180,255,0.2); color:rgba(100,180,255,0.7); }
 .rb.bl:hover { border-color:rgba(100,180,255,0.7); color:#80c8ff; background:rgba(100,180,255,0.07); }
 .rb.gn { border-color:rgba(100,255,150,0.2); color:rgba(100,255,150,0.7); }
 .rb.gn:hover { border-color:rgba(100,255,150,0.7); color:#80ffaa; background:rgba(100,255,150,0.07); }
-.rb-row { display:flex; gap:5px; }
+.rb-row { display:flex; gap:4px; }
 .rb-row .rb { flex:1; }
-
-/* ══ BOTTOM DASHBOARD ══ */
-#dashboard {
-  height:160px; background:#04040e; border-top:1px solid rgba(200,160,50,0.2);
-  display:flex; flex-shrink:0;
-}
-
-/* Left: 3D Controls */
-#ctrl-pad {
-  width:340px; border-right:1px solid rgba(200,160,50,0.12);
-  padding:10px 12px; display:flex; flex-direction:column; gap:6px; flex-shrink:0;
-}
+.rb-sep { font-size:7px; letter-spacing:0.2em; color:rgba(200,160,50,0.3); padding:3px 0 1px; }
+#dashboard { height:160px; background:#04040e; border-top:1px solid rgba(200,160,50,0.2); display:flex; flex-shrink:0; }
+#ctrl-pad { width:340px; border-right:1px solid rgba(200,160,50,0.12); padding:10px 12px; display:flex; flex-direction:column; gap:6px; flex-shrink:0; }
 #ctrl-pad-title { font-size:8px; letter-spacing:0.3em; color:rgba(200,160,50,0.4); margin-bottom:2px; }
 .ctrl-cluster { display:flex; gap:8px; align-items:center; }
 .ctrl-group { display:flex; flex-direction:column; gap:3px; }
 .ctrl-row { display:flex; gap:3px; justify-content:center; }
-.ckey {
-  width:32px; height:28px; background:rgba(200,160,50,0.06);
-  border:1px solid rgba(200,160,50,0.2); color:rgba(200,160,50,0.7);
-  font:8px 'Courier New',monospace; display:flex; flex-direction:column;
-  align-items:center; justify-content:center; cursor:pointer; transition:all 0.1s;
-  user-select:none; letter-spacing:0.05em; line-height:1.2;
-}
+.ckey { width:32px; height:28px; background:rgba(200,160,50,0.06); border:1px solid rgba(200,160,50,0.2); color:rgba(200,160,50,0.7); font:8px 'Courier New',monospace; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; transition:all 0.1s; user-select:none; letter-spacing:0.05em; line-height:1.2; }
 .ckey:hover { background:rgba(200,160,50,0.12); border-color:#c9a832; color:#c9a832; }
 .ckey.active { background:rgba(200,160,50,0.2); border-color:#c9a832; color:#fff; }
 .ckey.wide { width:52px; }
@@ -106,77 +73,47 @@ html,body { width:100%; height:100%; overflow:hidden; background:#060610; color:
 .ckey-label { font-size:6px; color:rgba(200,160,50,0.35); margin-top:1px; }
 .ctrl-sep { width:1px; background:rgba(200,160,50,0.08); align-self:stretch; margin:0 4px; }
 .ctrl-info { font-size:7px; color:rgba(200,160,50,0.3); line-height:2; letter-spacing:0.05em; }
-
-/* Middle: Status + Timeline */
 #center-dash { flex:1; padding:10px 14px; display:flex; flex-direction:column; gap:6px; }
 #cesium-status-bar { font-size:9px; color:rgba(200,160,50,0.5); letter-spacing:0.1em; min-height:14px; }
 #timeline { flex:1; background:rgba(200,160,50,0.03); border:1px solid rgba(200,160,50,0.1); position:relative; cursor:pointer; }
-#timeline-fill { height:100%; background:rgba(200,160,50,0.15); width:0%; transition:width 0.2s; }
-#timeline-marker { position:absolute; top:0; bottom:0; width:2px; background:#c9a832; left:0%; transition:left 0.2s; }
+#timeline-fill { height:100%; background:rgba(200,160,50,0.15); width:0%; }
+#timeline-marker { position:absolute; top:0; bottom:0; width:2px; background:#c9a832; left:0%; }
 .tl-labels { display:flex; justify-content:space-between; font-size:7px; color:rgba(200,160,50,0.3); margin-top:2px; }
 #playback-info { font-size:8px; color:rgba(200,160,50,0.4); letter-spacing:0.1em; }
-#speed-display { font-size:9px; color:rgba(100,200,255,0.5); letter-spacing:0.15em; }
-
-/* Right: Camera info */
 #cam-display { width:200px; border-left:1px solid rgba(200,160,50,0.12); padding:10px 12px; flex-shrink:0; }
 #cam-display-title { font-size:8px; letter-spacing:0.25em; color:rgba(200,160,50,0.4); margin-bottom:8px; }
 .cdval { display:flex; justify-content:space-between; margin:5px 0; font-size:10px; }
 .cdval span:first-child { color:rgba(200,160,50,0.35); font-size:8px; }
 .cdval span:last-child { color:#c9a832; }
-#compass { width:60px; height:60px; margin:6px auto 0; position:relative; }
-#compass svg { width:100%; height:100%; }
-
-/* ══ EDITOR MODAL ══ */
-#editor {
-  display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
-  background:#04040e; border:1px solid rgba(200,160,50,0.35); padding:16px;
-  z-index:2000; width:340px;
-}
+#editor { display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:#04040e; border:1px solid rgba(200,160,50,0.35); padding:16px; z-index:2000; width:340px; }
 #editor h3 { font-size:9px; letter-spacing:0.3em; color:rgba(200,160,50,0.5); margin-bottom:12px; }
 .ef { margin-bottom:9px; }
 .ef label { font-size:7px; color:rgba(200,160,50,0.4); display:block; margin-bottom:3px; letter-spacing:0.1em; }
-.ef input, .ef select { width:100%; padding:6px 8px; background:rgba(200,160,50,0.05);
-  border:1px solid rgba(200,160,50,0.2); color:#c9a832; font:10px 'Courier New',monospace; }
+.ef input { width:100%; padding:6px 8px; background:rgba(200,160,50,0.05); border:1px solid rgba(200,160,50,0.2); color:#c9a832; font:10px 'Courier New',monospace; }
 .ef input[type=range] { padding:3px 0; border:none; background:none; accent-color:#c9a832; cursor:pointer; }
 .rval { float:right; color:#c9a832; font-size:10px; }
 .ef-row { display:flex; gap:6px; margin-top:10px; }
 .ef-row .rb { flex:1; }
-.cam-hint { background:rgba(100,200,255,0.05); border:1px solid rgba(100,200,255,0.15);
-  padding:7px 9px; font-size:8px; color:rgba(100,200,255,0.55); letter-spacing:0.07em;
-  line-height:1.9; margin-bottom:10px; }
-
-/* ══ EXPORT ══ */
-#export-overlay {
-  display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:3000;
-  align-items:center; justify-content:center;
-}
+.cam-hint { background:rgba(100,200,255,0.05); border:1px solid rgba(100,200,255,0.15); padding:7px 9px; font-size:8px; color:rgba(100,200,255,0.55); letter-spacing:0.07em; line-height:1.9; margin-bottom:10px; }
+#export-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:3000; align-items:center; justify-content:center; }
 #export-overlay.open { display:flex; }
-#export-box { background:#04040e; border:1px solid rgba(200,160,50,0.3); padding:16px;
-  width:620px; max-height:80vh; display:flex; flex-direction:column; gap:10px; }
+#export-box { background:#04040e; border:1px solid rgba(200,160,50,0.3); padding:16px; width:620px; max-height:80vh; display:flex; flex-direction:column; gap:10px; }
 #export-box h3 { font-size:9px; letter-spacing:0.3em; color:#c9a832; }
-#export-text { flex:1; overflow-y:auto; white-space:pre; font-size:8px; line-height:1.6;
-  color:rgba(200,160,50,0.7); background:rgba(200,160,50,0.03);
-  border:1px solid rgba(200,160,50,0.1); padding:10px; }
+#export-text { flex:1; overflow-y:auto; white-space:pre; font-size:8px; line-height:1.6; color:rgba(200,160,50,0.7); background:rgba(200,160,50,0.03); border:1px solid rgba(200,160,50,0.1); padding:10px; }
+#profiler-panel { display:none; position:fixed; bottom:165px; left:0; right:280px; background:rgba(4,4,14,0.95); border-top:1px solid rgba(200,160,50,0.2); padding:8px 12px; z-index:400; }
 </style>
 </head>
 <body>
 <div id="app">
   <div id="top">
-
-    <!-- 2D MAP -->
     <div id="map-wrap">
       <div id="map"></div>
-      <!-- CESIUM PREVIEW -->
       <div id="cesium-wrap">
         <div id="cesiumContainer"></div>
       </div>
     </div>
-
-    <!-- RIGHT PANEL -->
     <div id="rpanel">
-      <div id="rp-header">
-        <h1>KAIT · FLIGHT PLANNER</h1>
-      </div>
+      <div id="rp-header"><h1>KAIT · FLIGHT PLANNER</h1></div>
       <div id="rp-tabs">
         <button class="rtab" id="tab-wp" onclick="setRTab('wp')">WAYPOINTS</button>
         <button class="rtab on" id="tab-lm" onclick="setRTab('lm')">LANDMARKS</button>
@@ -186,51 +123,45 @@ html,body { width:100%; height:100%; overflow:hidden; background:#060610; color:
       <div id="rp-stats">0 waypoints</div>
       <div id="rp-btns">
         <div class="rb-row">
+          <button class="rb" id="lm-toggle-btn" onclick="toggleLandmarks()">★ HIDE LANDMARKS</button>
           <button class="rb bl" onclick="openCesium(-1)">▶ TEST FULL PATH</button>
-          <button class="rb" onclick="closeCesium()">✕ CLOSE 3D</button>
         </div>
-        <div style="font-size:7px;letter-spacing:0.2em;color:rgba(200,160,50,0.3);padding:4px 0 2px">PATH TOOLS</div>
+        <div class="rb-sep">PATH TOOLS</div>
         <div class="rb-row">
-          <button class="rb" id="tool-lookat" onclick="toggleLookAt()" title="Click map to set target, then apply to a waypoint">🎯 LOOK-AT TARGET</button>
-        </div>
-        <div class="rb-row">
-          <button class="rb" onclick="snapAll()" title="Snap all Manhattan waypoints to street centerlines">⊞ SNAP TO STREETS</button>
-          <button class="rb" onclick="smoothPath()" title="Insert smooth transition points on sharp turns">〜 SMOOTH PATH</button>
+          <button class="rb" id="tool-lookat" onclick="toggleLookAt()">🎯 LOOK-AT TARGET</button>
         </div>
         <div class="rb-row">
-          <button class="rb" onclick="toggleProfiler()" title="Show altitude graph">↗ ALT PROFILE</button>
-          <button class="rb" onclick="reversePath()" title="Flip the entire route direction">⇄ REVERSE</button>
+          <button class="rb" onclick="snapAll()">⊞ SNAP TO STREETS</button>
+          <button class="rb" onclick="smoothPath()">〜 SMOOTH PATH</button>
         </div>
         <div class="rb-row">
-          <button class="rb" onclick="showImport()" title="Paste const WP=[...] from flight file">⬆ IMPORT WP</button>
-          <button class="rb" onclick="showTimeCalc()" title="Estimate recording time">⏱ TIME CALC</button>
+          <button class="rb" onclick="toggleProfiler()">↗ ALT PROFILE</button>
+          <button class="rb" onclick="reversePath()">⇄ REVERSE</button>
         </div>
-        <div style="font-size:7px;letter-spacing:0.2em;color:rgba(200,160,50,0.3);padding:4px 0 2px">EXPORT</div>
+        <div class="rb-row">
+          <button class="rb" onclick="showImport()">⬆ IMPORT WP</button>
+          <button class="rb" onclick="showTimeCalc()">⏱ TIME CALC</button>
+        </div>
+        <div class="rb-sep">EXPORT</div>
         <div class="rb-row">
           <button class="rb gn" onclick="doExport()">⬇ EXPORT JS</button>
           <button class="rb" onclick="loadDefault()">↺ DEFAULT</button>
         </div>
+        <div class="rb-sep">HISTORY</div>
         <div class="rb-row">
-          <button class="rb" onclick="clearAll()" style="border-color:rgba(255,80,80,0.2);color:rgba(255,100,100,0.6)">✕ CLEAR ALL</button>
+          <button class="rb" onclick="undoLast()" style="border-color:rgba(255,160,50,0.25);color:rgba(255,160,50,0.7)">↩ UNDO LAST</button>
+          <button class="rb" onclick="clearAll()" style="border-color:rgba(255,80,80,0.2);color:rgba(255,100,100,0.6)">✕ DISCARD ALL</button>
         </div>
       </div>
     </div>
   </div>
-
-  <!-- BOTTOM DASHBOARD -->
   <div id="dashboard">
-
-    <!-- CONTROL PAD -->
     <div id="ctrl-pad">
       <div id="ctrl-pad-title">CAMERA &amp; FLIGHT CONTROLS</div>
       <div class="ctrl-cluster">
-
-        <!-- Movement group -->
         <div class="ctrl-group">
           <div style="font-size:7px;color:rgba(200,160,50,0.3);margin-bottom:2px;letter-spacing:0.1em">MOVE</div>
-          <div class="ctrl-row">
-            <div class="ckey" id="ck-w" onmousedown="kd('w')" onmouseup="ku('w')" ontouchstart="kd('w')" ontouchend="ku('w')">W<div class="ckey-label">FWD</div></div>
-          </div>
+          <div class="ctrl-row"><div class="ckey" id="ck-w" onmousedown="kd('w')" onmouseup="ku('w')">W<div class="ckey-label">FWD</div></div></div>
           <div class="ctrl-row">
             <div class="ckey" id="ck-a" onmousedown="kd('a')" onmouseup="ku('a')">A<div class="ckey-label">LEFT</div></div>
             <div class="ckey" id="ck-s" onmousedown="kd('s')" onmouseup="ku('s')">S<div class="ckey-label">BACK</div></div>
@@ -241,79 +172,47 @@ html,body { width:100%; height:100%; overflow:hidden; background:#060610; color:
             <div class="ckey" id="ck-e" onmousedown="kd('e')" onmouseup="ku('e')">E<div class="ckey-label">DOWN</div></div>
           </div>
         </div>
-
         <div class="ctrl-sep"></div>
-
-        <!-- Camera rotation group -->
         <div class="ctrl-group">
           <div style="font-size:7px;color:rgba(100,200,255,0.4);margin-bottom:2px;letter-spacing:0.1em">CAMERA LOOK</div>
-          <div class="ctrl-row">
-            <div class="ckey blue" id="ck-up" onmousedown="kd('arrowup')" onmouseup="ku('arrowup')">↑<div class="ckey-label">TILT UP</div></div>
-          </div>
+          <div class="ctrl-row"><div class="ckey blue" id="ck-up" onmousedown="kd('arrowup')" onmouseup="ku('arrowup')">↑<div class="ckey-label">TILT UP</div></div></div>
           <div class="ctrl-row">
             <div class="ckey blue" id="ck-left" onmousedown="kd('arrowleft')" onmouseup="ku('arrowleft')">←<div class="ckey-label">SPIN L</div></div>
             <div class="ckey blue" id="ck-down" onmousedown="kd('arrowdown')" onmouseup="ku('arrowdown')">↓<div class="ckey-label">TILT DN</div></div>
             <div class="ckey blue" id="ck-right" onmousedown="kd('arrowright')" onmouseup="ku('arrowright')">→<div class="ckey-label">SPIN R</div></div>
           </div>
           <div class="ctrl-row">
-            <div class="ckey blue" id="ck-ob" onmousedown="kd('[');" onmouseup="ku('[')">&#91;<div class="ckey-label">ROLL L</div></div>
-            <div class="ckey blue" id="ck-cb" onmousedown="kd(']');" onmouseup="ku(']')">&#93;<div class="ckey-label">ROLL R</div></div>
+            <div class="ckey blue" id="ck-ob" onmousedown="kd('[')" onmouseup="ku('[')">&#91;<div class="ckey-label">ROLL L</div></div>
+            <div class="ckey blue" id="ck-cb" onmousedown="kd(']')" onmouseup="ku(']')" >&#93;<div class="ckey-label">ROLL R</div></div>
           </div>
         </div>
-
         <div class="ctrl-sep"></div>
-
-        <!-- Actions -->
         <div class="ctrl-group">
           <div style="font-size:7px;color:rgba(200,160,50,0.3);margin-bottom:2px;letter-spacing:0.1em">ACTIONS</div>
-          <div class="ctrl-row">
-            <div class="ckey green wide" onclick="captureAngle()" style="font-size:7px;">⊕ CAPTURE<div class="ckey-label">SAVE ANGLE</div></div>
-          </div>
-          <div class="ctrl-row">
-            <div class="ckey wide" onclick="togglePlayback()" id="play-key" style="font-size:7px;">▶ PLAY<div class="ckey-label">TEST PATH</div></div>
-          </div>
-          <div class="ctrl-row">
-            <div class="ckey red wide" onclick="closeCesium()" style="font-size:7px;">✕ EXIT<div class="ckey-label">BACK TO MAP</div></div>
-          </div>
+          <div class="ctrl-row"><div class="ckey green wide" onclick="captureAngle()" style="font-size:7px;">⊕ CAPTURE<div class="ckey-label">SAVE ANGLE</div></div></div>
+          <div class="ctrl-row"><div class="ckey wide" onclick="togglePlayback()" id="play-key" style="font-size:7px;">▶ PLAY<div class="ckey-label">TEST PATH</div></div></div>
+          <div class="ctrl-row"><div class="ckey red wide" onclick="closeCesium()" style="font-size:7px;">✕ EXIT<div class="ckey-label">BACK TO MAP</div></div></div>
         </div>
-
         <div class="ctrl-sep"></div>
-
-        <!-- Speed + scroll hint -->
-        <div class="ctrl-info">
-          MOUSE DRAG<br>
-          → look around<br><br>
-          SCROLL<br>
-          → zoom in/out<br><br>
-          <span id="speed-display">SPEED: 50m/s</span>
-        </div>
-
+        <div class="ctrl-info">MOUSE DRAG<br>→ look around<br><br>SCROLL<br>→ zoom in/out<br><br><span id="speed-display">SPEED: 50m/s</span></div>
       </div>
     </div>
-
-    <!-- CENTER: Status + Timeline -->
     <div id="center-dash">
-      <div id="cesium-status-bar">Click a waypoint → PREVIEW, or ▶ TEST FULL PATH</div>
+      <div id="cesium-status-bar">Click landmarks to add waypoints. Click map to add custom point.</div>
       <div id="timeline" onclick="timelineClick(event)">
         <div id="timeline-fill"></div>
         <div id="timeline-marker"></div>
       </div>
-      <div class="tl-labels">
-        <span>0:00</span>
-        <span id="tl-mid"></span>
-        <span id="tl-end">0:00</span>
-      </div>
+      <div class="tl-labels"><span>0:00</span><span id="tl-mid"></span><span id="tl-end">0:00</span></div>
       <div id="playback-info">—</div>
     </div>
-
-    <!-- RIGHT: Camera readout + compass -->
     <div id="cam-display">
       <div id="cam-display-title">CAMERA STATE</div>
       <div class="cdval"><span>HEADING</span><span id="cd-hdg">—</span></div>
       <div class="cdval"><span>PITCH</span><span id="cd-pitch">—</span></div>
       <div class="cdval"><span>ALTITUDE</span><span id="cd-alt">—</span></div>
       <div class="cdval"><span>ROLL</span><span id="cd-roll">—</span></div>
-      <svg id="compass-svg" viewBox="0 0 80 80" style="width:80px;height:80px;display:block;margin:4px auto 0">
+      <svg viewBox="0 0 80 80" style="width:80px;height:80px;display:block;margin:4px auto 0">
         <circle cx="40" cy="40" r="36" fill="none" stroke="rgba(200,160,50,0.12)" stroke-width="1"/>
         <text x="40" y="10" text-anchor="middle" fill="rgba(200,160,50,0.4)" font-size="8" font-family="Courier New">N</text>
         <text x="72" y="43" text-anchor="middle" fill="rgba(200,160,50,0.4)" font-size="8" font-family="Courier New">E</text>
@@ -326,46 +225,18 @@ html,body { width:100%; height:100%; overflow:hidden; background:#060610; color:
   </div>
 </div>
 
-<!-- WAYPOINT EDITOR -->
 <div id="editor">
   <h3 id="editor-title">EDIT WAYPOINT</h3>
-  <div class="cam-hint">
-    💡 Open 3D preview, fly to the exact position and<br>
-    aim the camera where you want it, then click<br>
-    <b style="color:#c9a832">⊕ CAPTURE</b> in the control pad — angles save automatically.
-  </div>
-  <div class="ef">
-    <label>NAME / LABEL</label>
-    <input id="ae-name" type="text" placeholder="e.g. TIMES SQUARE">
-  </div>
-  <div class="ef">
-    <label>ALTITUDE &nbsp;<span class="rval" id="av">25m</span></label>
-    <input id="ae-alt" type="range" min="5" max="500" value="25" oninput="document.getElementById('av').textContent=this.value+'m'">
-  </div>
-  <div class="ef">
-    <label>DURATION AT THIS WAYPOINT &nbsp;<span class="rval" id="dv">16s</span></label>
-    <input id="ae-dur" type="range" min="4" max="90" value="16" oninput="document.getElementById('dv').textContent=this.value+'s'">
-  </div>
-  <div class="ef">
-    <label>CAMERA HEADING &nbsp;<span class="rval" id="hv">0°</span>
-      <small style="color:rgba(200,160,50,0.25)"> 0=N 90=E 180=S 270=W</small></label>
-    <input id="ae-hdg" type="range" min="0" max="359" value="0" oninput="document.getElementById('hv').textContent=this.value+'°';updateCompassFromEditor()">
-  </div>
-  <div class="ef">
-    <label>CAMERA PITCH &nbsp;<span class="rval" id="pv">-10°</span>
-      <small style="color:rgba(200,160,50,0.25)"> -90=down 0=level +90=up</small></label>
-    <input id="ae-pitch" type="range" min="-85" max="85" value="-10" oninput="document.getElementById('pv').textContent=this.value+'°'">
-  </div>
-  <div class="ef-row">
-    <button class="rb bl" onclick="previewFromEditor()">👁 OPEN 3D PREVIEW</button>
-  </div>
-  <div class="ef-row">
-    <button class="rb gn" onclick="saveEdit()">✓ SAVE</button>
-    <button class="rb" onclick="closeEditor()">✕ CANCEL</button>
-  </div>
+  <div class="cam-hint">💡 Open 3D preview, fly to position, aim camera, then click <b style="color:#c9a832">⊕ CAPTURE</b> — angles save automatically.</div>
+  <div class="ef"><label>NAME / LABEL</label><input id="ae-name" type="text" placeholder="e.g. TIMES SQUARE"></div>
+  <div class="ef"><label>ALTITUDE &nbsp;<span class="rval" id="av">25m</span></label><input id="ae-alt" type="range" min="5" max="500" value="25" oninput="document.getElementById('av').textContent=this.value+'m'"></div>
+  <div class="ef"><label>DURATION &nbsp;<span class="rval" id="dv">16s</span></label><input id="ae-dur" type="range" min="4" max="90" value="16" oninput="document.getElementById('dv').textContent=this.value+'s'"></div>
+  <div class="ef"><label>CAMERA HEADING &nbsp;<span class="rval" id="hv">0°</span> <small style="color:rgba(200,160,50,0.25)">0=N 90=E 180=S 270=W</small></label><input id="ae-hdg" type="range" min="0" max="359" value="0" oninput="document.getElementById('hv').textContent=this.value+'°';updateCompassFromEditor()"></div>
+  <div class="ef"><label>CAMERA PITCH &nbsp;<span class="rval" id="pv">-10°</span> <small style="color:rgba(200,160,50,0.25)">-90=down 0=level +90=up</small></label><input id="ae-pitch" type="range" min="-85" max="85" value="-10" oninput="document.getElementById('pv').textContent=this.value+'°'"></div>
+  <div class="ef-row"><button class="rb bl" onclick="previewFromEditor()">👁 OPEN 3D PREVIEW</button></div>
+  <div class="ef-row"><button class="rb gn" onclick="saveEdit()">✓ SAVE</button><button class="rb" onclick="closeEditor()">✕ CANCEL</button></div>
 </div>
 
-<!-- EXPORT OVERLAY -->
 <div id="export-overlay">
   <div id="export-box">
     <h3>EXPORT — paste const WP = [...] into manhattan_cesium_keyed.html</h3>
@@ -377,10 +248,7 @@ html,body { width:100%; height:100%; overflow:hidden; background:#060610; color:
   </div>
 </div>
 
-<!-- ALTITUDE PROFILER PANEL -->
-<div id="profiler-panel" style="display:none;position:fixed;bottom:165px;left:0;right:310px;
-  background:rgba(4,4,14,0.95);border-top:1px solid rgba(200,160,50,0.2);
-  border-bottom:1px solid rgba(200,160,50,0.1);padding:8px 12px;z-index:400">
+<div id="profiler-panel">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
     <span style="font-size:8px;letter-spacing:0.2em;color:rgba(200,160,50,0.4)">ALTITUDE PROFILE</span>
     <span onclick="toggleProfiler()" style="font-size:9px;color:rgba(200,160,50,0.4);cursor:pointer">✕</span>
@@ -389,9 +257,6 @@ html,body { width:100%; height:100%; overflow:hidden; background:#060610; color:
 </div>
 
 <script>
-// ══════════════════════════════════════════════════════════════
-// LANDMARKS
-// ══════════════════════════════════════════════════════════════
 const LANDMARKS = [
   {n:'STATUE OF LIBERTY',  lat:40.68924,lng:-74.04456,cat:'harbor', note:'Face faces SE — be SE of her looking NW (hdg~315) for face shot'},
   {n:'ELLIS ISLAND',       lat:40.69930,lng:-74.03947,cat:'harbor', note:'Immigration museum island'},
@@ -430,138 +295,104 @@ const LANDMARKS = [
 ];
 const CAT_COLOR={harbor:'#4af',downtown:'#fa4',soho:'#f84',village:'#af4',midtown:'#f4a',park:'#4fa',nj:'#aaf'};
 
-// ══════════════════════════════════════════════════════════════
-// STATE
-// ══════════════════════════════════════════════════════════════
-let waypoints = [];
-let selIdx = -1;
-let editIdx = -1;
-let rTab = 'wp';
-let cesiumOpen = false;
-let viewer = null;
-let cesiumReady = false;
-let previewIdx = -1; // which WP we're previewing (-1 = full path)
-
-// Camera state
+let waypoints=[], selIdx=-1, editIdx=-1, rTab='lm';
+let viewer=null, cesiumReady=false, previewIdx=-1;
 let ffHdg=0, ffPitch=0, ffZoomV=0, ffRoll=0;
 let ffMouseDown=false, ffLastX=0, ffLastY=0;
-let cesiumKeys={};
-let ffRaf=null, lastFfT=0;
-let flySpeed=50;
+let cesiumKeys={}, ffRaf=null, lastFfT=0, flySpeed=50;
+let playing=false, playStart=0, playRaf=null, totalDur=0;
+let lookAtMode=false, lookAtTarget=null, lookAtMarker=null;
+let profilerOpen=false, landmarksVisible=true;
+let pathLayers=[], wpLayers=[];
 
-// Playback
-let playing=false, playStart=0, playRaf=null;
-let totalDur=0;
+const keyMap={'w':'ck-w','s':'ck-s','a':'ck-a','d':'ck-d','q':'ck-q','e':'ck-e',
+  'arrowup':'ck-up','arrowdown':'ck-down','arrowleft':'ck-left','arrowright':'ck-right',
+  '[':'ck-ob',']':'ck-cb'};
 
-// ══════════════════════════════════════════════════════════════
-// 2D MAP
-// ══════════════════════════════════════════════════════════════
 const map = L.map('map',{zoomControl:true}).setView([40.74,-74.00],13);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM',maxZoom:19}).addTo(map);
 
-// Landmark markers
 const lmLayer = L.layerGroup().addTo(map);
 LANDMARKS.forEach(lm=>{
   const c=CAT_COLOR[lm.cat]||'#888';
   const icon=L.divIcon({className:'',
-    html:`<div style="width:13px;height:13px;background:${c}22;border:1px solid ${c};border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:7px;cursor:pointer;color:${c}">★</div>`,
-    iconSize:[13,13],iconAnchor:[6,6]});
+    html:`<div style="width:15px;height:15px;background:${c}28;border:1.5px solid ${c};border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;cursor:pointer;color:${c};box-shadow:0 0 5px ${c}44">★</div>`,
+    iconSize:[15,15],iconAnchor:[7,7]});
   const m=L.marker([lm.lat,lm.lng],{icon,zIndexOffset:100}).addTo(lmLayer);
-  m.bindTooltip(`<b>${lm.n}</b><br><i style="font-size:10px;color:#aaa">${lm.note}</i>`,{direction:'top',offset:[0,-7]});
+  m.bindTooltip(`<b>${lm.n}</b><br><i style="font-size:10px;color:#aaa">${lm.note}</i><br><span style="font-size:9px;color:rgba(100,200,255,0.6)">Click to add to path</span>`,{direction:'top',offset:[0,-8]});
   m.on('click',e=>{
     L.DomEvent.stopPropagation(e);
-    addWP(lm.lat,lm.lng,lm.n,25,16,-10,0);
+    if(lookAtMode){
+      lookAtTarget={lat:lm.lat,lng:lm.lng,alt:0};
+      if(lookAtMarker)map.removeLayer(lookAtMarker);
+      lookAtMarker=L.circleMarker([lm.lat,lm.lng],{radius:8,color:'#ff5050',fillColor:'#ff5050',fillOpacity:0.4,weight:2}).addTo(map);
+      setStatus('✓ Target: '+lm.n+' — now click a waypoint → 🎯 LOOK-AT');
+    } else {
+      addWP(lm.lat,lm.lng,lm.n,25,16,-10,0);
+    }
   });
 });
 
-map.on('click',e=>{ addWP(e.latlng.lat,e.latlng.lng,'',25,16,-10,0); });
-
-// Map layers
-let pathLayers=[], wpLayers=[];
+// Single map click handler — adds WP only if not in look-at mode
+map.on('click',e=>{
+  if(lookAtMode){
+    lookAtTarget={lat:e.latlng.lat,lng:e.latlng.lng,alt:0};
+    if(lookAtMarker)map.removeLayer(lookAtMarker);
+    lookAtMarker=L.circleMarker([e.latlng.lat,e.latlng.lng],{radius:8,color:'#ff5050',fillColor:'#ff5050',fillOpacity:0.4,weight:2}).addTo(map);
+    setStatus(`✓ Target set — now click a waypoint and use 🎯 LOOK-AT`);
+  } else {
+    addWP(e.latlng.lat,e.latlng.lng,'',25,16,-10,0);
+  }
+});
 
 function addWP(lat,lng,name='',alt=25,dur=16,pitch=-10,hdg=0){
   waypoints.push({lat,lng,name,alt,dur,pitch,hdg});
   selIdx=waypoints.length-1;
-  renderMap(); buildList(); updateTimeline();
+  renderMap();buildList();updateTimeline();
   openEditor(selIdx);
 }
 
 function renderMap(){
-  pathLayers.forEach(l=>map.removeLayer(l)); pathLayers=[];
-  wpLayers.forEach(l=>map.removeLayer(l));   wpLayers=[];
-
-  // Path segments colored by altitude
+  pathLayers.forEach(l=>map.removeLayer(l));pathLayers=[];
+  wpLayers.forEach(l=>{try{map.removeLayer(l);}catch(e){}});wpLayers=[];
   for(let i=0;i<waypoints.length-1;i++){
     const a=waypoints[i],b=waypoints[i+1];
-    const l=L.polyline([[a.lat,a.lng],[b.lat,b.lng]],{
-      color:altColor((a.alt+b.alt)/2),weight:3,opacity:0.8
-    }).addTo(map);
-    pathLayers.push(l);
+    pathLayers.push(L.polyline([[a.lat,a.lng],[b.lat,b.lng]],{color:altColor((a.alt+b.alt)/2),weight:3,opacity:0.8}).addTo(map));
   }
-
-  // Waypoint markers + camera arrows
   waypoints.forEach((wp,i)=>{
-    const sel=i===selIdx;
-    const c=altColor(wp.alt);
-
-    // Arrow showing camera direction
-    const ar=L.divIcon({className:'',
-      html:`<div style="width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;border-bottom:11px solid ${c}99;transform:rotate(${wp.hdg}deg);transform-origin:center bottom;position:absolute;top:-11px;left:-4px;"></div>`,
-      iconSize:[0,0],iconAnchor:[0,11]});
+    const sel=i===selIdx, c=altColor(wp.alt);
+    const ar=L.divIcon({className:'',html:`<div style="width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;border-bottom:11px solid ${c}99;transform:rotate(${wp.hdg}deg);transform-origin:center bottom;position:absolute;top:-11px;left:-4px;"></div>`,iconSize:[0,0],iconAnchor:[0,11]});
     wpLayers.push(L.marker([wp.lat,wp.lng],{icon:ar,zIndexOffset:300}).addTo(map));
-
-    // Dot
-    const icon=L.divIcon({className:'',
-      html:`<div style="width:${sel?24:18}px;height:${sel?24:18}px;border-radius:50%;background:${sel?'#c9a832':c};border:${sel?'2px solid #fff':'2px solid rgba(0,0,0,0.5)'};color:#000;font:bold ${sel?9:7}px Courier New;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 0 ${sel?8:4}px ${c}${sel?'':'88'};">${i+1}</div>`,
-      iconSize:[sel?24:18,sel?24:18],iconAnchor:[sel?12:9,sel?12:9]});
+    const sz=sel?24:18;
+    const icon=L.divIcon({className:'',html:`<div style="width:${sz}px;height:${sz}px;border-radius:50%;background:${sel?'#c9a832':c};border:${sel?'2px solid #fff':'2px solid rgba(0,0,0,0.5)'};color:#000;font:bold ${sel?9:7}px Courier New;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 0 ${sel?8:4}px ${c}${sel?'':' 88'}">${i+1}</div>`,iconSize:[sz,sz],iconAnchor:[sz/2,sz/2]});
     const m=L.marker([wp.lat,wp.lng],{icon,draggable:true,zIndexOffset:500}).addTo(map);
-    // Tooltip bound to marker — removed automatically when marker is removed
-    if(wp.name) m.bindTooltip(`<span style="font:8px Courier New;color:#c9a832;background:rgba(0,0,4,0.9);padding:2px 5px;border:1px solid rgba(200,160,50,0.3)">${wp.name}</span>`,
-      {permanent:true,direction:'top',offset:[0,-14],className:'wp-label-tt'});
+    if(wp.name)m.bindTooltip(`<span style="font:8px Courier New;color:#c9a832;background:rgba(0,0,4,0.9);padding:2px 5px;border:1px solid rgba(200,160,50,0.3)">${wp.name}</span>`,{permanent:true,direction:'top',offset:[0,-sz/2-2],className:''});
     m.on('click',e=>{L.DomEvent.stopPropagation(e);selIdx=i;renderMap();buildList();openEditor(i);});
     m.on('dragend',e=>{const ll=e.target.getLatLng();waypoints[i].lat=ll.lat;waypoints[i].lng=ll.lng;renderMap();buildList();});
     wpLayers.push(m);
   });
+  if(profilerOpen)drawProfiler();
 }
 
-function altColor(a){ return a<30?'#64c8ff':a<80?'#c9a832':a<200?'#ff8c32':'#ff5050'; }
+function altColor(a){return a<30?'#64c8ff':a<80?'#c9a832':a<200?'#ff8c32':'#ff5050';}
 
-// ══════════════════════════════════════════════════════════════
-// SIDEBAR LIST
-// ══════════════════════════════════════════════════════════════
 function setRTab(t){
   rTab=t;
   document.getElementById('tab-wp').classList.toggle('on',t==='wp');
   document.getElementById('tab-lm').classList.toggle('on',t==='lm');
   document.getElementById('wp-list').style.display=t==='wp'?'block':'none';
-  document.getElementById('lm-list').style.display=t==='lm'?'flex':'none';
-  document.getElementById('lm-list').style.flexDirection='column';
-  if(t==='lm') buildLmList();
+  const lmEl=document.getElementById('lm-list');
+  lmEl.style.display=t==='lm'?'flex':'none';
+  lmEl.style.flexDirection='column';
+  if(t==='lm')buildLmList();
 }
 
 function buildList(){
-  const el=document.getElementById('wp-list'); el.innerHTML='';
+  const el=document.getElementById('wp-list');el.innerHTML='';
   waypoints.forEach((wp,i)=>{
     const d=document.createElement('div');
     d.className='wrow'+(i===selIdx?' sel':'');
-    d.innerHTML=`
-      <div class="wr1">
-        <span class="wnum">${String(i+1).padStart(2,'0')}</span>
-        <div class="wdot" style="background:${altColor(wp.alt)}"></div>
-        <span class="wname">${wp.name||'(unnamed)'}</span>
-        <span class="wdel" onclick="delWP(${i},event)">✕</span>
-      </div>
-      <div class="wr2">
-        <span>alt:${wp.alt}m</span><span>hdg:${wp.hdg}°</span><span>pitch:${wp.pitch}°</span><span>${wp.dur}s</span>
-      </div>
-      <div style="display:flex;flex-wrap:wrap;gap:2px;padding-left:19px;margin-top:2px">
-        <span class="wtag" onclick="openEditor(${i},event)">✏ EDIT</span>
-        <span class="wtag" onclick="previewWP(${i},event)">👁 PREVIEW</span>
-        <span class="wtag or" onclick="openCesium(${i},event)">▶ TEST</span>
-        <span class="wtag" onclick="applyLookAt(${i},event)" title="Point camera at look-at target">🎯 LOOK-AT</span>
-        <span class="wtag" onclick="snapToStreet(${i},event)" title="Snap to nearest street center">⊞ SNAP</span>
-        <span class="wtag" onclick="duplicateWP(${i},event)" title="Duplicate this waypoint">⧉ DUP</span>
-      </div>`;
+    d.innerHTML=`<div class="wr1"><span class="wnum">${String(i+1).padStart(2,'0')}</span><div class="wdot" style="background:${altColor(wp.alt)}"></div><span class="wname">${wp.name||'(unnamed)'}</span><span class="wdel" onclick="delWP(${i},event)">✕</span></div><div class="wr2"><span>alt:${wp.alt}m</span><span>hdg:${wp.hdg}°</span><span>pitch:${wp.pitch}°</span><span>${wp.dur}s</span></div><div style="margin-top:2px;margin-left:19px;display:flex;flex-wrap:wrap;gap:2px"><span class="wtag" onclick="openEditor(${i},event)">✏ EDIT</span><span class="wtag" onclick="previewWP(${i},event)">👁 PREVIEW</span><span class="wtag or" onclick="openCesium(${i},event)">▶ TEST</span><span class="wtag" onclick="applyLookAt(${i},event)">🎯 LOOK-AT</span><span class="wtag" onclick="snapToStreet(${i},event)">⊞ SNAP</span><span class="wtag" onclick="duplicateWP(${i},event)">⧉ DUP</span></div>`;
     d.onclick=e=>{if(['wdel','wtag'].some(c=>e.target.classList.contains(c)))return;selIdx=i;renderMap();buildList();};
     el.appendChild(d);
   });
@@ -569,41 +400,25 @@ function buildList(){
 }
 
 function buildLmList(){
-  const el=document.getElementById('lm-list'); el.innerHTML='';
-
-  // Section header
+  const el=document.getElementById('lm-list');el.innerHTML='';
   const hdr=document.createElement('div');
-  hdr.style.cssText='padding:8px 12px 6px;font-size:8px;letter-spacing:0.2em;color:rgba(200,160,50,0.35);border-bottom:1px solid rgba(200,160,50,0.1);flex-shrink:0';
+  hdr.style.cssText='padding:8px 12px 6px;font-size:8px;letter-spacing:0.15em;color:rgba(200,160,50,0.35);border-bottom:1px solid rgba(200,160,50,0.1);flex-shrink:0';
   hdr.textContent='CLICK ANY LOCATION TO ADD TO FLIGHT PATH';
   el.appendChild(hdr);
-
   const cats=[...new Set(LANDMARKS.map(l=>l.cat))];
   const catNames={harbor:'🌊 HARBOR',downtown:'🏙 DOWNTOWN',soho:'🏘 SOHO / TRIBECA',village:'🌳 GREENWICH VILLAGE',midtown:'⭐ MIDTOWN',park:'🌿 CENTRAL PARK',nj:'🏠 NEW JERSEY'};
-
   cats.forEach(cat=>{
-    // Category header
     const h=document.createElement('div');
     h.style.cssText=`padding:7px 12px 4px;font-size:9px;letter-spacing:0.2em;color:${CAT_COLOR[cat]||'#888'};background:rgba(200,160,50,0.03);border-top:1px solid rgba(200,160,50,0.1);flex-shrink:0`;
     h.textContent=catNames[cat]||cat.toUpperCase();
     el.appendChild(h);
-
     LANDMARKS.filter(l=>l.cat===cat).forEach(lm=>{
       const d=document.createElement('div');
       d.style.cssText='padding:6px 12px;border-bottom:1px solid rgba(200,160,50,0.05);cursor:pointer;transition:background 0.1s;flex-shrink:0';
-      d.innerHTML=`
-        <div style="display:flex;align-items:center;gap:6px">
-          <div style="width:6px;height:6px;border-radius:50%;background:${CAT_COLOR[lm.cat]};flex-shrink:0"></div>
-          <span style="font-size:9px;color:rgba(200,160,50,0.9);flex:1">${lm.n}</span>
-          <span style="font-size:7px;color:rgba(100,200,255,0.5);border:1px solid rgba(100,200,255,0.2);padding:1px 4px">+ ADD</span>
-        </div>
-        <div style="font-size:7px;color:rgba(200,160,50,0.3);margin-top:3px;padding-left:12px;line-height:1.5">${lm.note}</div>`;
+      d.innerHTML=`<div style="display:flex;align-items:center;gap:6px"><div style="width:6px;height:6px;border-radius:50%;background:${CAT_COLOR[lm.cat]};flex-shrink:0"></div><span style="font-size:9px;color:rgba(200,160,50,0.9);flex:1">${lm.n}</span><span style="font-size:7px;color:rgba(100,200,255,0.5);border:1px solid rgba(100,200,255,0.2);padding:1px 4px">+ ADD</span></div><div style="font-size:7px;color:rgba(200,160,50,0.3);margin-top:3px;padding-left:12px;line-height:1.5">${lm.note}</div>`;
       d.onmouseover=()=>d.style.background='rgba(200,160,50,0.05)';
       d.onmouseout=()=>d.style.background='';
-      d.onclick=()=>{
-        addWP(lm.lat,lm.lng,lm.n,25,16,-10,0);
-        map.setView([lm.lat,lm.lng],16);
-        setRTab('wp');
-      };
+      d.onclick=()=>{addWP(lm.lat,lm.lng,lm.n,25,16,-10,0);map.setView([lm.lat,lm.lng],16);setRTab('wp');};
       el.appendChild(d);
     });
   });
@@ -611,26 +426,9 @@ function buildLmList(){
 
 function updateStats(){
   totalDur=waypoints.reduce((s,w)=>s+w.dur,0);
-  document.getElementById('rp-stats').textContent=
-    `${waypoints.length} waypoints · ${totalDur}s · ${(totalDur/60).toFixed(1)}min`;
-  updateTimeline();
+  document.getElementById('rp-stats').textContent=`${waypoints.length} waypoints · ${totalDur}s · ${(totalDur/60).toFixed(1)}min`;
 }
 
-function delWP(i,e){
-  e.stopPropagation();
-  waypoints.splice(i,1);
-  if(selIdx>=waypoints.length)selIdx=waypoints.length-1;
-  renderMap();buildList();
-}
-
-function clearAll(){
-  if(waypoints.length&&!confirm('Clear all waypoints?'))return;
-  waypoints=[];selIdx=-1;renderMap();buildList();
-}
-
-// ══════════════════════════════════════════════════════════════
-// TIMELINE
-// ══════════════════════════════════════════════════════════════
 function updateTimeline(){
   const total=waypoints.reduce((s,w)=>s+w.dur,0);
   const m=Math.floor(total/60),s=total%60;
@@ -651,109 +449,101 @@ function timelineClick(e){
   playStart=performance.now()-pct*totalDur*1000;
 }
 
-// ══════════════════════════════════════════════════════════════
-// EDITOR
-// ══════════════════════════════════════════════════════════════
+function delWP(i,e){e.stopPropagation();waypoints.splice(i,1);if(selIdx>=waypoints.length)selIdx=waypoints.length-1;renderMap();buildList();}
+function undoLast(){if(!waypoints.length){setStatus('⚠ No waypoints to remove');return;}const r=waypoints.pop();if(selIdx>=waypoints.length)selIdx=waypoints.length-1;renderMap();buildList();updateTimeline();setStatus('↩ Removed: '+(r.name||'unnamed'));}
+function clearAll(){if(waypoints.length&&!confirm('Discard all waypoints?'))return;waypoints=[];selIdx=-1;renderMap();buildList();updateTimeline();}
+function duplicateWP(idx,e){if(e)e.stopPropagation();const wp=waypoints[idx];const copy={...wp,name:wp.name+' copy',lat:wp.lat+0.0002,lng:wp.lng+0.0002};waypoints.splice(idx+1,0,copy);selIdx=idx+1;renderMap();buildList();setStatus('✓ Duplicated WP'+(idx+1)+' — drag to reposition');}
+
 function openEditor(i,e){
   if(e)e.stopPropagation();
-  editIdx=i;
-  const wp=waypoints[i];
+  editIdx=i;const wp=waypoints[i];
   document.getElementById('editor-title').textContent=`WAYPOINT ${i+1} — ${wp.name||'(unnamed)'}`;
   document.getElementById('ae-name').value=wp.name||'';
-  document.getElementById('ae-alt').value=wp.alt; document.getElementById('av').textContent=wp.alt+'m';
-  document.getElementById('ae-dur').value=wp.dur; document.getElementById('dv').textContent=wp.dur+'s';
-  document.getElementById('ae-hdg').value=wp.hdg; document.getElementById('hv').textContent=wp.hdg+'°';
-  document.getElementById('ae-pitch').value=wp.pitch; document.getElementById('pv').textContent=wp.pitch+'°';
+  document.getElementById('ae-alt').value=wp.alt;document.getElementById('av').textContent=wp.alt+'m';
+  document.getElementById('ae-dur').value=wp.dur;document.getElementById('dv').textContent=wp.dur+'s';
+  document.getElementById('ae-hdg').value=wp.hdg;document.getElementById('hv').textContent=wp.hdg+'°';
+  document.getElementById('ae-pitch').value=wp.pitch;document.getElementById('pv').textContent=wp.pitch+'°';
   document.getElementById('editor').style.display='block';
 }
-function closeEditor(){ document.getElementById('editor').style.display='none'; }
+function closeEditor(){document.getElementById('editor').style.display='none';}
 function saveEdit(){
   if(editIdx<0||editIdx>=waypoints.length)return;
   const wp=waypoints[editIdx];
-  wp.name  =document.getElementById('ae-name').value;
-  wp.alt   =parseInt(document.getElementById('ae-alt').value)||25;
-  wp.dur   =parseInt(document.getElementById('ae-dur').value)||16;
-  wp.hdg   =parseInt(document.getElementById('ae-hdg').value)||0;
-  wp.pitch =parseInt(document.getElementById('ae-pitch').value)||-10;
-  closeEditor(); renderMap(); buildList();
+  wp.name=document.getElementById('ae-name').value;
+  wp.alt=parseInt(document.getElementById('ae-alt').value)||25;
+  wp.dur=parseInt(document.getElementById('ae-dur').value)||16;
+  wp.hdg=parseInt(document.getElementById('ae-hdg').value)||0;
+  wp.pitch=parseInt(document.getElementById('ae-pitch').value)||-10;
+  closeEditor();renderMap();buildList();
 }
-function previewFromEditor(){ saveEdit(); previewWP(editIdx); }
-function previewWP(i,e){ if(e)e.stopPropagation(); openCesium(i); }
-function updateCompassFromEditor(){
-  const hdg=parseInt(document.getElementById('ae-hdg').value)||0;
-  rotateCompassNeedle(hdg);
-}
+function previewFromEditor(){saveEdit();previewWP(editIdx);}
+function previewWP(i,e){if(e)e.stopPropagation();openCesium(i);}
+function updateCompassFromEditor(){const hdg=parseInt(document.getElementById('ae-hdg').value)||0;rotateCompassNeedle(hdg);}
 
-// ══════════════════════════════════════════════════════════════
-// CESIUM
-// ══════════════════════════════════════════════════════════════
+// CESIUM — load lazily
 async function openCesium(wpIdx,e){
   if(e)e.stopPropagation();
   previewIdx=wpIdx;
-  cesiumOpen=true;
   document.getElementById('cesium-wrap').classList.add('open');
-  document.getElementById('cesium-status-bar').textContent='Loading 3D tiles...';
-
-  if(!cesiumReady) await initCesium();
+  setStatus('Loading 3D...');
+  if(!cesiumReady){
+    await loadCesiumScript();
+    await initCesium();
+  }
   positionCamera(wpIdx);
-  if(wpIdx<0) startPlayback();
+  if(wpIdx<0)startPlayback();
+}
+
+function loadCesiumScript(){
+  return new Promise((resolve,reject)=>{
+    if(typeof Cesium!=='undefined'){resolve();return;}
+    const link=document.createElement('link');
+    link.rel='stylesheet';
+    link.href='https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Widgets/widgets.css';
+    document.head.appendChild(link);
+    const s=document.createElement('script');
+    s.src='https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Cesium.js';
+    s.onload=resolve;s.onerror=()=>reject(new Error('Failed to load Cesium'));
+    document.head.appendChild(s);
+  });
 }
 
 async function initCesium(){
   let cesiumToken='',googleKey='';
   try{
     const r=await fetch('https://caci-worker.timtkosuge.workers.dev/api/map-keys');
-    if(r.ok){const k=await r.json();cesiumToken=k.cesiumToken||'';googleKey=k.googleKey||'';}
+    if(r.ok){const k=await r.json();cesiumToken=k.cesiumToken||k.token||'';googleKey=k.googleKey||''}
   }catch(e){}
-  if(!cesiumToken){document.getElementById('cesium-status-bar').textContent='KEY FETCH FAILED';return;}
-
+  if(!cesiumToken){setStatus('❌ KEY FETCH FAILED');return;}
   Cesium.Ion.defaultAccessToken=cesiumToken;
-  viewer=new Cesium.Viewer('cesiumContainer',{
-    baseLayerPicker:false,geocoder:false,homeButton:false,sceneModePicker:false,
-    navigationHelpButton:false,animation:false,timeline:false,fullscreenButton:false,
-    infoBox:false,selectionIndicator:false,shadows:false,requestRenderMode:false,targetFrameRate:60,
-  });
+  viewer=new Cesium.Viewer('cesiumContainer',{baseLayerPicker:false,geocoder:false,homeButton:false,sceneModePicker:false,navigationHelpButton:false,animation:false,timeline:false,fullscreenButton:false,infoBox:false,selectionIndicator:false,shadows:false,requestRenderMode:false,targetFrameRate:60});
   viewer.scene.screenSpaceCameraController.enableInputs=false;
   if(viewer.cesiumWidget?._keyboardEventHandler)viewer.cesiumWidget._keyboardEventHandler.destroy();
   viewer.canvas.setAttribute('tabindex','-1');
-
-  // Night
   const d=new Date();d.setUTCHours(3,0,0,0);
   viewer.clock.currentTime=Cesium.JulianDate.fromDate(d);
   viewer.scene.skyAtmosphere.brightnessShift=-0.75;
-  viewer.scene.fog.enabled=true; viewer.scene.fog.density=0.00012;
-
+  viewer.scene.fog.enabled=true;viewer.scene.fog.density=0.00012;
   try{
     if(googleKey){
-      window._googleTileset=await Cesium.Cesium3DTileset.fromUrl(
-        `https://tile.googleapis.com/v1/3dtiles/root.json?key=${googleKey}`,
-        {showCreditsOnScreen:false,maximumScreenSpaceError:16,maximumMemoryUsage:2048,
-         dynamicScreenSpaceError:true,skipLevelOfDetail:true,preferLeaves:true}
-      );
+      window._googleTileset=await Cesium.Cesium3DTileset.fromUrl(`https://tile.googleapis.com/v1/3dtiles/root.json?key=${googleKey}`,{showCreditsOnScreen:false,maximumScreenSpaceError:16,maximumMemoryUsage:2048,dynamicScreenSpaceError:true,skipLevelOfDetail:true,preferLeaves:true});
       viewer.scene.primitives.add(window._googleTileset);
       viewer.scene.globe.show=false;
-    } else {
+    }else{
       viewer.scene.primitives.add(await Cesium.createOsmBuildingsAsync());
     }
   }catch(err){console.error(err);}
-
   cesiumReady=true;
-  startFreeFlyLoop();
+  setTimeout(()=>{if(viewer)viewer.resize();},100);
+  setTimeout(()=>{if(viewer)viewer.resize();},500);
   setupCesiumInput();
-
-  // Wait for tiles
+  startFreeFlyLoop();
   await new Promise(resolve=>{
     const t0=performance.now();
-    function chk(){
-      viewer.scene.render();
-      const ts=window._googleTileset;
-      const rdy=ts&&ts.statistics&&ts.statistics.numberOfTilesWithContentReady>3;
-      if(rdy||performance.now()-t0>15000){resolve();return;}
-      requestAnimationFrame(chk);
-    }
+    function chk(){viewer.scene.render();const ts=window._googleTileset;const rdy=ts&&ts.statistics&&ts.statistics.numberOfTilesWithContentReady>3;if(rdy||performance.now()-t0>15000){resolve();return;}requestAnimationFrame(chk);}
     requestAnimationFrame(chk);
   });
-  document.getElementById('cesium-status-bar').textContent='Ready — fly around and use ⊕ CAPTURE to save camera angle';
+  setStatus('Ready — fly around and click ⊕ CAPTURE to save camera angle');
 }
 
 function positionCamera(wpIdx){
@@ -764,671 +554,276 @@ function positionCamera(wpIdx){
   ffHdg=Cesium.Math.toRadians(wp.hdg||0);
   ffPitch=Cesium.Math.toRadians(wp.pitch||-10);
   ffRoll=0;
-  viewer.camera.setView({
-    destination:Cesium.Cartesian3.fromDegrees(wp.lng,wp.lat,(wp.alt||25)+2),
-    orientation:{heading:ffHdg,pitch:ffPitch,roll:ffRoll}
-  });
+  viewer.camera.setView({destination:Cesium.Cartesian3.fromDegrees(wp.lng,wp.lat,(wp.alt||25)+2),orientation:{heading:ffHdg,pitch:ffPitch,roll:ffRoll}});
 }
 
-function closeCesium(){
-  cesiumOpen=false;
-  stopPlayback();
-  document.getElementById('cesium-wrap').classList.remove('open');
-}
+function closeCesium(){stopPlayback();document.getElementById('cesium-wrap').classList.remove('open');}
 
-// ── Input setup ──
 function setupCesiumInput(){
   document.addEventListener('keydown',handleCesiumKey,{capture:true});
-  document.addEventListener('keyup',e=>{if(cesiumOpen)cesiumKeys[e.key.toLowerCase()]=false;},{capture:true});
+  document.addEventListener('keyup',e=>{cesiumKeys[e.key.toLowerCase()]=false;},{capture:true});
   viewer.canvas.addEventListener('mousedown',e=>{ffMouseDown=true;ffLastX=e.clientX;ffLastY=e.clientY;e.preventDefault();});
   viewer.canvas.addEventListener('mouseup',()=>ffMouseDown=false);
-  viewer.canvas.addEventListener('mousemove',ffMouseMove);
-  viewer.canvas.addEventListener('wheel',ffWheel,{passive:true});
+  viewer.canvas.addEventListener('mousemove',e=>{
+    if(!ffMouseDown||playing)return;
+    const dx=e.clientX-ffLastX,dy=e.clientY-ffLastY;
+    ffLastX=e.clientX;ffLastY=e.clientY;
+    ffHdg+=dx*0.003;ffPitch-=dy*0.003;
+    ffPitch=Math.max(-Math.PI*0.49,Math.min(Math.PI*0.49,ffPitch));
+    viewer.camera.setView({destination:viewer.camera.position,orientation:{heading:ffHdg,pitch:ffPitch,roll:ffRoll}});
+  });
+  viewer.canvas.addEventListener('wheel',e=>{if(!playing)ffZoomV-=e.deltaY*0.5;},{passive:true});
   viewer.canvas.addEventListener('contextmenu',e=>e.preventDefault());
 }
 
 function handleCesiumKey(e){
-  if(!cesiumOpen)return;
+  if(!document.getElementById('cesium-wrap').classList.contains('open'))return;
   const k=e.key.toLowerCase();
   if(playing&&e.key==='Escape'){stopPlayback();e.preventDefault();e.stopImmediatePropagation();return;}
-  cesiumKeys[k]=true;
-  e.stopImmediatePropagation();
-  e.preventDefault();
-  // Visual feedback on dashboard keys
-  highlightKey(k);
+  cesiumKeys[k]=true;e.stopImmediatePropagation();e.preventDefault();
+  const id=keyMap[k];if(id){const el=document.getElementById(id);if(el){el.classList.add('active');setTimeout(()=>el.classList.remove('active'),150);}}
 }
 
-const keyMap={
-  'w':'ck-w','s':'ck-s','a':'ck-a','d':'ck-d','q':'ck-q','e':'ck-e',
-  'arrowup':'ck-up','arrowdown':'ck-down','arrowleft':'ck-left','arrowright':'ck-right',
-  '[':'ck-ob',']':'ck-cb'
-};
-function highlightKey(k){
-  const id=keyMap[k];
-  if(id){const el=document.getElementById(id);if(el){el.classList.add('active');setTimeout(()=>el.classList.remove('active'),150);}}
-}
+function kd(k){cesiumKeys[k]=true;const id=keyMap[k];if(id)document.getElementById(id)?.classList.add('active');}
+function ku(k){cesiumKeys[k]=false;const id=keyMap[k];if(id)document.getElementById(id)?.classList.remove('active');}
 
-// Mouse look
-function ffMouseMove(e){
-  if(!ffMouseDown||playing)return;
-  const dx=e.clientX-ffLastX,dy=e.clientY-ffLastY;
-  ffLastX=e.clientX;ffLastY=e.clientY;
-  ffHdg+=dx*0.003;
-  ffPitch-=dy*0.003;
-  ffPitch=Math.max(-Math.PI*0.49,Math.min(Math.PI*0.49,ffPitch));
-  viewer.camera.setView({destination:viewer.camera.position,
-    orientation:{heading:ffHdg,pitch:ffPitch,roll:ffRoll}});
-}
-
-function ffWheel(e){
-  if(playing)return;
-  ffZoomV-=e.deltaY*0.5;
-}
-
-// ── Free fly loop ──
 function startFreeFlyLoop(){
   lastFfT=performance.now();
   function loop(){
     if(!viewer){ffRaf=requestAnimationFrame(loop);return;}
-    const now=performance.now(),dt=Math.min((now-lastFfT)/1000,0.05);
-    lastFfT=now;
-
+    const now=performance.now(),dt=Math.min((now-lastFfT)/1000,0.05);lastFfT=now;
     if(!playing){
-      const s=flySpeed*dt;
-      if(cesiumKeys['w'])viewer.camera.moveForward(s);
-      if(cesiumKeys['s'])viewer.camera.moveBackward(s);
-      if(cesiumKeys['a'])viewer.camera.moveLeft(s*0.8);
-      if(cesiumKeys['d'])viewer.camera.moveRight(s*0.8);
-      if(cesiumKeys['q'])viewer.camera.moveUp(s);
-      if(cesiumKeys['e'])viewer.camera.moveDown(s);
-
-      const tr=1.5*dt;
+      const s=flySpeed*dt,tr=1.5*dt,pr=1.2*dt,rr=1.0*dt;
+      if(cesiumKeys['w'])viewer.camera.moveForward(s);if(cesiumKeys['s'])viewer.camera.moveBackward(s);
+      if(cesiumKeys['a'])viewer.camera.moveLeft(s*0.8);if(cesiumKeys['d'])viewer.camera.moveRight(s*0.8);
+      if(cesiumKeys['q'])viewer.camera.moveUp(s);if(cesiumKeys['e'])viewer.camera.moveDown(s);
       if(cesiumKeys['arrowleft']){ffHdg-=tr;viewer.camera.setView({destination:viewer.camera.position,orientation:{heading:ffHdg,pitch:ffPitch,roll:ffRoll}});}
       if(cesiumKeys['arrowright']){ffHdg+=tr;viewer.camera.setView({destination:viewer.camera.position,orientation:{heading:ffHdg,pitch:ffPitch,roll:ffRoll}});}
-      const pr=1.2*dt;
       if(cesiumKeys['arrowup']){ffPitch=Math.min(ffPitch+pr,Math.PI*0.49);viewer.camera.setView({destination:viewer.camera.position,orientation:{heading:ffHdg,pitch:ffPitch,roll:ffRoll}});}
       if(cesiumKeys['arrowdown']){ffPitch=Math.max(ffPitch-pr,-Math.PI*0.49);viewer.camera.setView({destination:viewer.camera.position,orientation:{heading:ffHdg,pitch:ffPitch,roll:ffRoll}});}
-      const rr=1.0*dt;
       if(cesiumKeys['[']){ffRoll-=rr;viewer.camera.setView({destination:viewer.camera.position,orientation:{heading:ffHdg,pitch:ffPitch,roll:ffRoll}});}
       if(cesiumKeys[']']){ffRoll+=rr;viewer.camera.setView({destination:viewer.camera.position,orientation:{heading:ffHdg,pitch:ffPitch,roll:ffRoll}});}
-
       if(Math.abs(ffZoomV)>0.1){viewer.camera.moveForward(ffZoomV*dt*80);ffZoomV*=0.87;}
       if(!ffMouseDown){ffHdg=viewer.camera.heading;ffPitch=viewer.camera.pitch;ffRoll=viewer.camera.roll;}
     }
-
-    // Update camera display
-    updateCamDisplay();
+    if(viewer.camera.positionCartographic){
+      const hdg=((Math.round(Cesium.Math.toDegrees(viewer.camera.heading))%360)+360)%360;
+      const pitch=Math.round(Cesium.Math.toDegrees(viewer.camera.pitch));
+      const alt=Math.round(viewer.camera.positionCartographic.height||0);
+      const roll=Math.round(Cesium.Math.toDegrees(viewer.camera.roll));
+      document.getElementById('cd-hdg').textContent=hdg+'°';document.getElementById('cd-pitch').textContent=pitch+'°';
+      document.getElementById('cd-alt').textContent=alt+'m';document.getElementById('cd-roll').textContent=roll+'°';
+      document.getElementById('speed-display').textContent='SPEED: '+flySpeed+'m/s';
+      rotateCompassNeedle(hdg);
+    }
     ffRaf=requestAnimationFrame(loop);
   }
   ffRaf=requestAnimationFrame(loop);
 }
 
-function updateCamDisplay(){
-  if(!viewer)return;
-  const hdg=((Math.round(Cesium.Math.toDegrees(viewer.camera.heading))%360)+360)%360;
-  const pitch=Math.round(Cesium.Math.toDegrees(viewer.camera.pitch));
-  const alt=Math.round(viewer.camera.positionCartographic?.height||0);
-  const roll=Math.round(Cesium.Math.toDegrees(viewer.camera.roll));
-  document.getElementById('cd-hdg').textContent=hdg+'°';
-  document.getElementById('cd-pitch').textContent=pitch+'°';
-  document.getElementById('cd-alt').textContent=alt+'m';
-  document.getElementById('cd-roll').textContent=roll+'°';
-  rotateCompassNeedle(hdg);
-  document.getElementById('speed-display').textContent=`SPEED: ${flySpeed}m/s`;
-}
-
 function rotateCompassNeedle(hdgDeg){
   const rad=hdgDeg*Math.PI/180;
-  const x2=40+32*Math.sin(rad), y2=40-32*Math.cos(rad);
+  const x2=40+32*Math.sin(rad),y2=40-32*Math.cos(rad);
   document.getElementById('compass-needle').setAttribute('x2',x2.toFixed(1));
   document.getElementById('compass-needle').setAttribute('y2',y2.toFixed(1));
 }
 
-// ── Capture ──
 function captureAngle(){
   if(!viewer)return;
   const i=previewIdx>=0?previewIdx:selIdx;
-  if(i<0||i>=waypoints.length){
-    document.getElementById('cesium-status-bar').textContent='⚠ Select a waypoint first';return;
-  }
+  if(i<0||i>=waypoints.length){setStatus('⚠ Select a waypoint first');return;}
   const hdg=((Math.round(Cesium.Math.toDegrees(viewer.camera.heading))%360)+360)%360;
   const pitch=Math.round(Cesium.Math.toDegrees(viewer.camera.pitch));
   const alt=Math.max(5,Math.round(viewer.camera.positionCartographic?.height||25));
-  waypoints[i].hdg=hdg; waypoints[i].pitch=pitch; waypoints[i].alt=alt;
-
-  // Sync editor if open
-  document.getElementById('ae-hdg').value=hdg; document.getElementById('hv').textContent=hdg+'°';
-  document.getElementById('ae-pitch').value=pitch; document.getElementById('pv').textContent=pitch+'°';
-  document.getElementById('ae-alt').value=alt; document.getElementById('av').textContent=alt+'m';
-
-  renderMap(); buildList();
-  document.getElementById('cesium-status-bar').textContent=
-    `✓ WP ${i+1} captured — hdg:${hdg}° pitch:${pitch}° alt:${alt}m`;
+  waypoints[i].hdg=hdg;waypoints[i].pitch=pitch;waypoints[i].alt=alt;
+  document.getElementById('ae-hdg').value=hdg;document.getElementById('hv').textContent=hdg+'°';
+  document.getElementById('ae-pitch').value=pitch;document.getElementById('pv').textContent=pitch+'°';
+  document.getElementById('ae-alt').value=alt;document.getElementById('av').textContent=alt+'m';
+  renderMap();buildList();
+  setStatus(`✓ WP ${i+1} captured — hdg:${hdg}° pitch:${pitch}° alt:${alt}m`);
 }
 
-// ── Playback ──
-function togglePlayback(){ playing?stopPlayback():startPlayback(); }
-
+function togglePlayback(){playing?stopPlayback():startPlayback();}
 function startPlayback(){
-  if(!viewer||waypoints.length<2)return;
-  playing=true;
-  playStart=performance.now();
-  document.getElementById('play-key').querySelector('.ckey-label').textContent='STOP';
-  document.getElementById('play-key').innerHTML=document.getElementById('play-key').innerHTML.replace('▶ PLAY','⏹ STOP');
+  if(!viewer||waypoints.length<2){setStatus('⚠ Need at least 2 waypoints');return;}
+  playing=true;playStart=performance.now();
+  document.getElementById('play-key').innerHTML='⏹ STOP<div class="ckey-label">ESC</div>';
   playFrame();
 }
-
 function stopPlayback(){
-  playing=false;
-  if(playRaf){cancelAnimationFrame(playRaf);playRaf=null;}
-  const pk=document.getElementById('play-key');
-  pk.innerHTML='▶ PLAY<div class="ckey-label">TEST PATH</div>';
+  playing=false;if(playRaf){cancelAnimationFrame(playRaf);playRaf=null;}
+  document.getElementById('play-key').innerHTML='▶ PLAY<div class="ckey-label">TEST PATH</div>';
   if(viewer){ffHdg=viewer.camera.heading;ffPitch=viewer.camera.pitch;ffRoll=viewer.camera.roll;}
-  setTimelineProgress(0);
-  document.getElementById('playback-info').textContent='—';
+  setTimelineProgress(0);document.getElementById('playback-info').textContent='—';
 }
-
 function playFrame(){
   if(!playing||!viewer){playing=false;return;}
   const elapsed=(performance.now()-playStart)/1000;
   const total=waypoints.reduce((s,w)=>s+w.dur,0);
   if(elapsed>=total){stopPlayback();return;}
-
-  // Find segment
   let segStart=0,si=0;
-  for(let i=0;i<waypoints.length-1;i++){
-    if(elapsed<segStart+waypoints[i].dur){si=i;break;}
-    segStart+=waypoints[i].dur;si=i+1;
-  }
+  for(let i=0;i<waypoints.length-1;i++){if(elapsed<segStart+waypoints[i].dur){si=i;break;}segStart+=waypoints[i].dur;si=i+1;}
   si=Math.min(si,waypoints.length-2);
   const a=waypoints[si],b=waypoints[(si+1)%waypoints.length];
-  const raw=(elapsed-segStart)/a.dur;
-  const t=Math.max(0,Math.min(1,raw));
+  const t=Math.max(0,Math.min(1,(elapsed-segStart)/a.dur));
   const et=t<0.5?2*t*t:-1+(4-2*t)*t;
-
-  // Drone position (smooth ease)
-  const lng=a.lng+(b.lng-a.lng)*et;
-  const lat=a.lat+(b.lat-a.lat)*et;
-  const alt=a.alt+(b.alt-a.alt)*et;
-
-  // Camera — smooth spherical lerp between keyframes
-  let dh=((b.hdg||0)-(a.hdg||0));
-  while(dh>180)dh-=360;while(dh<-180)dh+=360;
+  const lng=a.lng+(b.lng-a.lng)*et,lat=a.lat+(b.lat-a.lat)*et,alt=a.alt+(b.alt-a.alt)*et;
+  let dh=((b.hdg||0)-(a.hdg||0));while(dh>180)dh-=360;while(dh<-180)dh+=360;
   const hdgDeg=((a.hdg||0)+dh*et+360)%360;
   const pitchDeg=(a.pitch||0)+((b.pitch||0)-(a.pitch||0))*et;
-
-  // Subtle organic micro-movement
   const mh=Math.sin(elapsed*0.28)*0.6,mp=Math.sin(elapsed*0.37)*0.35;
-  viewer.camera.setView({
-    destination:Cesium.Cartesian3.fromDegrees(lng,lat,alt),
-    orientation:{
-      heading:Cesium.Math.toRadians(hdgDeg+mh),
-      pitch:Cesium.Math.toRadians(pitchDeg+mp),
-      roll:0
-    }
-  });
-
-  // UI updates
+  viewer.camera.setView({destination:Cesium.Cartesian3.fromDegrees(lng,lat,alt),orientation:{heading:Cesium.Math.toRadians(hdgDeg+mh),pitch:Cesium.Math.toRadians(pitchDeg+mp),roll:0}});
   setTimelineProgress(elapsed);
-  const pct=Math.floor(elapsed/total*100);
   const m=Math.floor(elapsed/60),s=Math.floor(elapsed%60);
-  document.getElementById('playback-info').textContent=
-    `${m}:${String(s).padStart(2,'0')} · ${pct}% · WP ${si+1}→${si+2} · ${a.name||'?'}`;
-  document.getElementById('cesium-status-bar').textContent=
-    `▶ PLAYING — ESC to stop · Camera smoothly interpolating heading ${Math.round(hdgDeg)}° pitch ${Math.round(pitchDeg)}°`;
-
+  document.getElementById('playback-info').textContent=`${m}:${String(s).padStart(2,'0')} · ${Math.floor(elapsed/total*100)}% · WP ${si+1}→${si+2}: ${a.name||'?'}`;
+  setStatus(`▶ PLAYING — hdg:${Math.round(hdgDeg)}° pitch:${Math.round(pitchDeg)}° — ESC to stop`);
   playRaf=requestAnimationFrame(playFrame);
 }
 
-// ── Dashboard key buttons ──
-function kd(k){
-  cesiumKeys[k]=true;
-  const id=keyMap[k];if(id)document.getElementById(id)?.classList.add('active');
-}
-function ku(k){
-  cesiumKeys[k]=false;
-  const id=keyMap[k];if(id)document.getElementById(id)?.classList.remove('active');
-}
-
-// ══════════════════════════════════════════════════════════════
-// EXPORT
-// ══════════════════════════════════════════════════════════════
 function generateJS(){
   let js='const WP = [\n';
-  waypoints.forEach((wp,i)=>{
-    js+=`  {lng:${wp.lng.toFixed(6)},lat:${wp.lat.toFixed(6)},alt:${wp.alt},`;
-    js+=`cam_hdg:${wp.hdg},cam_pitch:${wp.pitch},dur:${wp.dur},\n`;
-    js+=`   label:${JSON.stringify(wp.name||'')},fact:''},\n`;
-  });
-  js+='];\n';
-  return js;
+  waypoints.forEach(wp=>{js+=`  {lng:${wp.lng.toFixed(6)},lat:${wp.lat.toFixed(6)},alt:${wp.alt},cam_hdg:${wp.hdg},cam_pitch:${wp.pitch},dur:${wp.dur},\n   label:${JSON.stringify(wp.name||'')},fact:''},\n`;});
+  js+='];\n';return js;
 }
-function doExport(){
-  document.getElementById('export-text').textContent=generateJS();
-  document.getElementById('export-overlay').classList.add('open');
-}
-function copyExport(){
-  navigator.clipboard.writeText(generateJS())
-    .then(()=>{document.getElementById('export-overlay').classList.remove('open');alert('Copied! Paste into manhattan_cesium_keyed.html — replace the entire const WP = [...] block.');})
-    .catch(()=>alert('Select the text above and copy manually.'));
-}
+function doExport(){document.getElementById('export-text').textContent=generateJS();document.getElementById('export-overlay').classList.add('open');}
+function copyExport(){navigator.clipboard.writeText(generateJS()).then(()=>{document.getElementById('export-overlay').classList.remove('open');alert('Copied! Paste into manhattan_cesium_keyed.html — replace the entire const WP = [...] block.');}).catch(()=>alert('Select the text above and copy manually.'));}
 
-// ══════════════════════════════════════════════════════════════
-// DEFAULT PATH: Times Square → Little Ferry
-// ══════════════════════════════════════════════════════════════
 function loadDefault(){
   if(waypoints.length&&!confirm('Replace with default Times Square → Little Ferry path?'))return;
   waypoints=[
-    {lat:40.75800,lng:-73.98550,name:'TIMES SQUARE',            alt:20,dur:22,hdg:0,  pitch:-5},
-    {lat:40.76172,lng:-73.98803,name:'7TH AVE THEATER DISTRICT',alt:18,dur:16,hdg:0,  pitch:-12},
-    {lat:40.76424,lng:-73.98803,name:"57TH ST BILLIONAIRES ROW",alt:22,dur:18,hdg:88, pitch:25},
-    {lat:40.76820,lng:-73.98220,name:'COLUMBUS CIRCLE',         alt:25,dur:14,hdg:180,pitch:-10},
-    {lat:40.77250,lng:-73.98480,name:'LINCOLN CENTER',          alt:20,dur:14,hdg:180,pitch:-8},
-    {lat:40.75360,lng:-74.00200,name:'THE VESSEL HUDSON YARDS', alt:22,dur:16,hdg:90, pitch:30},
-    {lat:40.76450,lng:-74.00050,name:'USS INTREPID PIER 86',    alt:22,dur:14,hdg:90, pitch:-5},
-    {lat:40.75654,lng:-73.99874,name:'42ND ST CANYON START',    alt:16,dur:20,hdg:88, pitch:-15},
-    {lat:40.75649,lng:-73.98040,name:'BRYANT PARK',             alt:14,dur:16,hdg:88, pitch:-15},
-    {lat:40.75270,lng:-73.97220,name:'GRAND CENTRAL TERMINAL',  alt:16,dur:16,hdg:80, pitch:-8},
-    {lat:40.76000,lng:-74.01300,name:'HUDSON RIVER CROSSING',   alt:12,dur:14,hdg:270,pitch:-5},
-    {lat:40.76800,lng:-74.02200,name:'WEEHAWKEN NJ',            alt:55,dur:14,hdg:100,pitch:-15},
-    {lat:40.80000,lng:-74.02500,name:'NJ TURNPIKE NORTH',       alt:65,dur:12,hdg:355,pitch:-10},
-    {lat:40.84000,lng:-74.03200,name:'US ROUTE 46',             alt:25,dur:12,hdg:5,  pitch:-8},
+    {lat:40.75800,lng:-73.98550,name:'TIMES SQUARE',alt:20,dur:22,hdg:0,pitch:-5},
+    {lat:40.76172,lng:-73.98803,name:'7TH AVE THEATER DISTRICT',alt:18,dur:16,hdg:0,pitch:-12},
+    {lat:40.76424,lng:-73.98803,name:'57TH ST BILLIONAIRES ROW',alt:22,dur:18,hdg:88,pitch:25},
+    {lat:40.76820,lng:-73.98220,name:'COLUMBUS CIRCLE',alt:25,dur:14,hdg:180,pitch:-10},
+    {lat:40.77250,lng:-73.98480,name:'LINCOLN CENTER',alt:20,dur:14,hdg:180,pitch:-8},
+    {lat:40.75360,lng:-74.00200,name:'THE VESSEL HUDSON YARDS',alt:22,dur:16,hdg:90,pitch:30},
+    {lat:40.76450,lng:-74.00050,name:'USS INTREPID PIER 86',alt:22,dur:14,hdg:90,pitch:-5},
+    {lat:40.75654,lng:-73.99874,name:'42ND ST CANYON START',alt:16,dur:20,hdg:88,pitch:-15},
+    {lat:40.75649,lng:-73.98040,name:'BRYANT PARK',alt:14,dur:16,hdg:88,pitch:-15},
+    {lat:40.75270,lng:-73.97220,name:'GRAND CENTRAL TERMINAL',alt:16,dur:16,hdg:80,pitch:-8},
+    {lat:40.76000,lng:-74.01300,name:'HUDSON RIVER CROSSING',alt:12,dur:14,hdg:270,pitch:-5},
+    {lat:40.76800,lng:-74.02200,name:'WEEHAWKEN NJ',alt:55,dur:14,hdg:100,pitch:-15},
+    {lat:40.80000,lng:-74.02500,name:'NJ TURNPIKE NORTH',alt:65,dur:12,hdg:355,pitch:-10},
+    {lat:40.84000,lng:-74.03200,name:'US ROUTE 46',alt:25,dur:12,hdg:5,pitch:-8},
     {lat:40.84720,lng:-74.03340,name:'BEYOND HELLO LITTLE FERRY',alt:45,dur:22,hdg:180,pitch:-25},
   ];
-  selIdx=-1;renderMap();buildList();updateTimeline();
-  map.setView([40.76,-73.99],13);
+  selIdx=-1;renderMap();buildList();updateTimeline();map.setView([40.76,-73.99],13);
 }
 
-// Keyboard shortcuts when Cesium is closed
-document.addEventListener('keydown',e=>{
-  if(cesiumOpen)return;
-  if(e.key==='Escape'){closeEditor();document.getElementById('export-overlay').classList.remove('open');}
-});
+// TOOLS
+function setStatus(msg){document.getElementById('cesium-status-bar').textContent=msg||'Ready';}
 
-// ══ TOOLS ══
-// ══════════════════════════════════════════════════════════════
-// TOOL: LOOK-AT TARGET
-// Click a landmark or map point, then click a waypoint
-// Computes exact heading + pitch to look at that target
-// ══════════════════════════════════════════════════════════════
-let lookAtMode = false;
-let lookAtTarget = null; // {lat, lng, alt}
-let lookAtMarker = null;
-
-function toggleLookAt() {
-  lookAtMode = !lookAtMode;
-  const btn = document.getElementById('tool-lookat');
-  if (lookAtMode) {
-    btn.style.color = '#ff8080';
-    btn.style.borderColor = 'rgba(255,80,80,0.6)';
-    btn.textContent = '🎯 CLICK TARGET ON MAP';
-    setStatus('LOOK-AT MODE: Click anywhere on the map to set the target point');
-    map.getContainer().style.cursor = 'crosshair';
-  } else {
-    btn.style.color = '';
-    btn.style.borderColor = '';
-    btn.textContent = '🎯 LOOK-AT TARGET';
-    setStatus('');
-    map.getContainer().style.cursor = '';
-    if (lookAtMarker) { map.removeLayer(lookAtMarker); lookAtMarker = null; }
-    lookAtTarget = null;
-  }
+function toggleLookAt(){
+  lookAtMode=!lookAtMode;
+  const btn=document.getElementById('tool-lookat');
+  if(lookAtMode){btn.style.color='#ff8080';btn.style.borderColor='rgba(255,80,80,0.6)';btn.textContent='🎯 CLICK TARGET ON MAP';setStatus('LOOK-AT MODE: Click map or a ★ landmark to set target');map.getContainer().style.cursor='crosshair';}
+  else{btn.style.color='';btn.style.borderColor='';btn.textContent='🎯 LOOK-AT TARGET';setStatus('');map.getContainer().style.cursor='';if(lookAtMarker){map.removeLayer(lookAtMarker);lookAtMarker=null;}lookAtTarget=null;}
 }
 
-function applyLookAt(wpIdx) {
-  if (!lookAtTarget) { setStatus('⚠ Set a look-at target first (click 🎯 LOOK-AT TARGET)'); return; }
-  const wp = waypoints[wpIdx];
-  if (!wp) return;
-  const result = computeLookAt(wp.lat, wp.lng, wp.alt, lookAtTarget.lat, lookAtTarget.lng, lookAtTarget.alt || 0);
-  wp.hdg = result.hdg;
-  wp.pitch = result.pitch;
-  renderMap(); buildList();
-  setStatus(`✓ WP ${wpIdx+1} now looking at target — hdg:${result.hdg}° pitch:${result.pitch}°`);
+function applyLookAt(wpIdx,e){
+  if(e)e.stopPropagation();
+  if(!lookAtTarget){setStatus('⚠ Set a look-at target first — click 🎯 LOOK-AT TARGET then click on map');return;}
+  const wp=waypoints[wpIdx];if(!wp)return;
+  const dx=(lookAtTarget.lng-wp.lng)*0.7547*111320,dy=(lookAtTarget.lat-wp.lat)*111320,dz=(lookAtTarget.alt||0)-wp.alt;
+  const horiz=Math.sqrt(dx*dx+dy*dy);
+  let hdg=Math.round(Math.atan2(dx,dy)*180/Math.PI);hdg=((hdg%360)+360)%360;
+  const pitch=Math.round(Math.atan2(dz,Math.max(horiz,1))*180/Math.PI);
+  wp.hdg=hdg;wp.pitch=pitch;renderMap();buildList();
+  setStatus(`✓ WP ${wpIdx+1} pointing at target — hdg:${hdg}° pitch:${pitch}°`);
 }
 
-function computeLookAt(fromLat, fromLng, fromAlt, toLat, toLng, toAlt) {
-  const dx = (toLng - fromLng) * 0.7547 * 111320;
-  const dy = (toLat - fromLat) * 111320;
-  const dz = toAlt - fromAlt;
-  const horiz = Math.sqrt(dx*dx + dy*dy);
-  let hdg = Math.round(Math.atan2(dx, dy) * 180 / Math.PI);
-  hdg = ((hdg % 360) + 360) % 360;
-  const pitch = Math.round(Math.atan2(dz, Math.max(horiz, 1)) * 180 / Math.PI);
-  return { hdg, pitch };
+const STREETS={avenues:[{name:'West St',lng:-74.01555},{name:'10th Ave',lng:-73.99874},{name:'9th Ave',lng:-73.99571},{name:'8th Ave',lng:-73.99149},{name:'7th Ave',lng:-73.98803},{name:'Broadway',lng:-73.98520},{name:'6th Ave',lng:-73.98045},{name:'5th Ave',lng:-73.97709},{name:'Park Ave',lng:-73.97740},{name:'Lexington',lng:-73.97470},{name:'3rd Ave',lng:-73.97140},{name:'2nd Ave',lng:-73.96800}],streets:[{name:'Wall St',lat:40.70740},{name:'Fulton St',lat:40.70980},{name:'Canal St',lat:40.71787},{name:'Houston St',lat:40.72820},{name:'14th St',lat:40.73829},{name:'23rd St',lat:40.74342},{name:'34th St',lat:40.74953},{name:'42nd St',lat:40.75654},{name:'49th St',lat:40.76172},{name:'57th St',lat:40.76424},{name:'72nd St',lat:40.77330},{name:'79th St',lat:40.77780},{name:'86th St',lat:40.78510}]};
+
+function snapToStreet(wpIdx,e){
+  if(e)e.stopPropagation();
+  const wp=waypoints[wpIdx];if(!wp)return;
+  if(wp.lng<-74.020||wp.lng>-73.930||wp.lat<40.700||wp.lat>40.820){setStatus(`WP ${wpIdx+1} outside Manhattan grid`);return;}
+  let bestAve=STREETS.avenues[0],bestAveDist=Math.abs(wp.lng-bestAve.lng)*111320*0.7547;
+  for(const ave of STREETS.avenues){const d=Math.abs(wp.lng-ave.lng)*111320*0.7547;if(d<bestAveDist){bestAveDist=d;bestAve=ave;}}
+  let bestSt=STREETS.streets[0],bestStDist=Math.abs(wp.lat-bestSt.lat)*111320;
+  for(const st of STREETS.streets){const d=Math.abs(wp.lat-st.lat)*111320;if(d<bestStDist){bestStDist=d;bestSt=st;}}
+  if(bestAveDist<bestStDist){wp.lng=bestAve.lng;setStatus(`✓ WP ${wpIdx+1} snapped to ${bestAve.name}`);}
+  else{wp.lat=bestSt.lat;setStatus(`✓ WP ${wpIdx+1} snapped to ${bestSt.name}`);}
+  renderMap();buildList();
 }
+function snapAll(){waypoints.forEach((wp,i)=>{if(wp.lng>=-74.020&&wp.lng<=-73.930&&wp.lat>=40.700&&wp.lat<=40.820)snapToStreet(i);});setStatus('✓ All Manhattan waypoints snapped');}
 
-// ══════════════════════════════════════════════════════════════
-// TOOL: SNAP TO STREET
-// Moves waypoint to nearest verified street centerline
-// ══════════════════════════════════════════════════════════════
-const STREET_CENTERLINES = {
-  // Avenues (N-S) — longitude
-  avenues: [
-    { name: 'West St',    lng: -74.01555 },
-    { name: '10th Ave',   lng: -73.99874 },
-    { name: '9th Ave',    lng: -73.99571 },
-    { name: '8th Ave',    lng: -73.99149 },
-    { name: '7th Ave',    lng: -73.98803 },
-    { name: 'Broadway',   lng: -73.98520 },
-    { name: '6th Ave',    lng: -73.98045 },
-    { name: '5th Ave',    lng: -73.97709 },
-    { name: 'Park Ave',   lng: -73.97740 },
-    { name: 'Lexington',  lng: -73.97470 },
-    { name: '3rd Ave',    lng: -73.97140 },
-    { name: '2nd Ave',    lng: -73.96800 },
-  ],
-  // Streets (E-W) — latitude
-  streets: [
-    { name: 'Wall St',    lat: 40.70740 },
-    { name: 'Fulton St',  lat: 40.70980 },
-    { name: 'Canal St',   lat: 40.71787 },
-    { name: 'Houston St', lat: 40.72820 },
-    { name: '14th St',    lat: 40.73829 },
-    { name: '23rd St',    lat: 40.74342 },
-    { name: '34th St',    lat: 40.74953 },
-    { name: '42nd St',    lat: 40.75654 },
-    { name: '49th St',    lat: 40.76172 },
-    { name: '57th St',    lat: 40.76424 },
-    { name: '72nd St',    lat: 40.77330 },
-    { name: '79th St',    lat: 40.77780 },
-    { name: '86th St',    lat: 40.78510 },
-  ]
-};
-
-function snapToStreet(wpIdx) {
-  const wp = waypoints[wpIdx];
-  if (!wp) return;
-
-  // Only snap if within Manhattan bounds
-  if (wp.lng < -74.020 || wp.lng > -73.930 || wp.lat < 40.700 || wp.lat > 40.820) {
-    setStatus(`WP ${wpIdx+1} is outside Manhattan grid — no snap`);
-    return;
-  }
-
-  // Find nearest avenue
-  let bestAve = STREET_CENTERLINES.avenues[0];
-  let bestAveDist = Math.abs(wp.lng - bestAve.lng) * 111320 * 0.7547;
-  for (const ave of STREET_CENTERLINES.avenues) {
-    const d = Math.abs(wp.lng - ave.lng) * 111320 * 0.7547;
-    if (d < bestAveDist) { bestAveDist = d; bestAve = ave; }
-  }
-
-  // Find nearest street
-  let bestSt = STREET_CENTERLINES.streets[0];
-  let bestStDist = Math.abs(wp.lat - bestSt.lat) * 111320;
-  for (const st of STREET_CENTERLINES.streets) {
-    const d = Math.abs(wp.lat - st.lat) * 111320;
-    if (d < bestStDist) { bestStDist = d; bestSt = st; }
-  }
-
-  // Snap to whichever axis is closer
-  if (bestAveDist < bestStDist) {
-    wp.lng = bestAve.lng;
-    setStatus(`✓ WP ${wpIdx+1} snapped to ${bestAve.name} (${bestAveDist.toFixed(0)}m from center)`);
-  } else {
-    wp.lat = bestSt.lat;
-    setStatus(`✓ WP ${wpIdx+1} snapped to ${bestSt.name} (${bestStDist.toFixed(0)}m from center)`);
-  }
-
-  renderMap(); buildList();
-}
-
-function snapAll() {
-  waypoints.forEach((wp, i) => {
-    if (wp.lng >= -74.020 && wp.lng <= -73.930 && wp.lat >= 40.700 && wp.lat <= 40.820) {
-      snapToStreet(i);
-    }
-  });
-  setStatus(`✓ All Manhattan waypoints snapped to street centerlines`);
-}
-
-// ══════════════════════════════════════════════════════════════
-// TOOL: PATH SMOOTHER
-// Inserts intermediate waypoints to smooth sharp turns
-// ══════════════════════════════════════════════════════════════
-function smoothPath() {
-  if (waypoints.length < 2) { setStatus('⚠ Need at least 2 waypoints to smooth'); return; }
-
-  const smoothed = [];
-  for (let i = 0; i < waypoints.length - 1; i++) {
-    const a = waypoints[i];
-    const b = waypoints[i + 1];
-    smoothed.push(a);
-
-    // Compute turn angle
-    if (i > 0 && i < waypoints.length - 2) {
-      const prev = waypoints[i - 1];
-      const hdg1 = Math.atan2((a.lng - prev.lng) * 0.7547, a.lat - prev.lat) * 180 / Math.PI;
-      const hdg2 = Math.atan2((b.lng - a.lng) * 0.7547, b.lat - a.lat) * 180 / Math.PI;
-      let turnAngle = Math.abs(hdg2 - hdg1);
-      if (turnAngle > 180) turnAngle = 360 - turnAngle;
-
-      // Insert intermediate point if turn is sharp (>30 degrees)
-      if (turnAngle > 30) {
-        smoothed.push({
-          lat: (a.lat * 0.7 + b.lat * 0.3),
-          lng: (a.lng * 0.7 + b.lng * 0.3),
-          name: `smooth-${i}`,
-          alt: Math.round((a.alt + b.alt) / 2),
-          dur: Math.max(8, Math.round(a.dur * 0.4)),
-          hdg: Math.round((a.hdg + b.hdg) / 2),
-          pitch: Math.round((a.pitch + b.pitch) / 2),
-        });
-      }
+function smoothPath(){
+  if(waypoints.length<2){setStatus('⚠ Need at least 2 waypoints');return;}
+  const smoothed=[];
+  for(let i=0;i<waypoints.length-1;i++){
+    const a=waypoints[i],b=waypoints[i+1];smoothed.push(a);
+    if(i>0&&i<waypoints.length-2){
+      const prev=waypoints[i-1];
+      const h1=Math.atan2((a.lng-prev.lng)*0.7547,a.lat-prev.lat)*180/Math.PI;
+      const h2=Math.atan2((b.lng-a.lng)*0.7547,b.lat-a.lat)*180/Math.PI;
+      let turn=Math.abs(h2-h1);if(turn>180)turn=360-turn;
+      if(turn>30)smoothed.push({lat:a.lat*0.7+b.lat*0.3,lng:a.lng*0.7+b.lng*0.3,name:'smooth',alt:Math.round((a.alt+b.alt)/2),dur:Math.max(8,Math.round(a.dur*0.4)),hdg:Math.round((a.hdg+b.hdg)/2),pitch:Math.round((a.pitch+b.pitch)/2)});
     }
   }
-  smoothed.push(waypoints[waypoints.length - 1]);
-
-  const added = smoothed.length - waypoints.length;
-  waypoints = smoothed;
-  renderMap(); buildList();
-  setStatus(`✓ Path smoothed — ${added} intermediate points added`);
+  smoothed.push(waypoints[waypoints.length-1]);
+  const added=smoothed.length-waypoints.length;waypoints=smoothed;renderMap();buildList();
+  setStatus(`✓ Path smoothed — ${added} points added`);
 }
 
-// ══════════════════════════════════════════════════════════════
-// TOOL: ALTITUDE PROFILER
-// Shows altitude graph across the flight
-// ══════════════════════════════════════════════════════════════
-let profilerOpen = false;
+function reversePath(){if(waypoints.length<2)return;if(!confirm('Reverse the entire flight path?'))return;waypoints.reverse();waypoints.forEach(wp=>{wp.hdg=((wp.hdg+180)%360);});selIdx=-1;renderMap();buildList();setStatus('✓ Path reversed');}
 
-function toggleProfiler() {
-  profilerOpen = !profilerOpen;
-  const el = document.getElementById('profiler-panel');
-  el.style.display = profilerOpen ? 'block' : 'none';
-  if (profilerOpen) drawProfiler();
+function showImport(){
+  const txt=prompt('Paste your const WP = [...] JavaScript here:');if(!txt)return;
+  try{
+    const match=txt.match(/const WP\s*=\s*(\[[\s\S]*?\]);/);if(!match)throw new Error('Could not find const WP = [...]');
+    const arr=new Function('return '+match[1])();if(!Array.isArray(arr))throw new Error('Not an array');
+    waypoints=arr.map(w=>({lat:w.lat||0,lng:w.lng||0,alt:w.alt||25,hdg:w.cam_hdg||w.hdg||0,pitch:w.cam_pitch||w.pitch||-10,dur:w.dur||16,name:w.label||w.name||''}));
+    selIdx=-1;renderMap();buildList();updateTimeline();
+    if(waypoints.length>0)map.fitBounds(waypoints.map(w=>[w.lat,w.lng]));
+    setStatus(`✓ Imported ${waypoints.length} waypoints`);setRTab('wp');
+  }catch(e){alert('Import failed: '+e.message);}
 }
 
-function drawProfiler() {
-  const canvas = document.getElementById('profiler-canvas');
-  const ctx = canvas.getContext('2d');
-  const W = canvas.width = canvas.offsetWidth;
-  const H = canvas.height = 80;
-  ctx.clearRect(0, 0, W, H);
-
-  if (waypoints.length < 2) return;
-
-  const maxAlt = Math.max(...waypoints.map(w => w.alt), 50);
-  const totalDur = waypoints.reduce((s, w) => s + w.dur, 0);
-
-  // Background
-  ctx.fillStyle = '#04040e';
-  ctx.fillRect(0, 0, W, H);
-
-  // Grid lines
-  ctx.strokeStyle = 'rgba(200,160,50,0.08)';
-  ctx.lineWidth = 1;
-  [0, 50, 100, 200, 300].forEach(alt => {
-    if (alt > maxAlt * 1.1) return;
-    const y = H - (alt / (maxAlt * 1.1)) * H;
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
-    ctx.fillStyle = 'rgba(200,160,50,0.2)';
-    ctx.font = '7px Courier New';
-    ctx.fillText(alt + 'm', 2, y - 2);
+function showTimeCalc(){
+  const total=waypoints.reduce((s,w)=>s+w.dur,0);if(!total){setStatus('⚠ No waypoints');return;}
+  let msg=`FLIGHT: ${total}s (${(total/60).toFixed(1)}min)\n\nRECORDING TIME ESTIMATES:\n`;
+  [{name:'1080p 30fps',fps:30,spf:2},{name:'2K 30fps',fps:30,spf:3},{name:'4K 30fps',fps:30,spf:6},{name:'4K 60fps',fps:60,spf:6}].forEach(p=>{
+    const frames=Math.round(total*p.fps);msg+=`\n${p.name}:\n  ${frames.toLocaleString()} frames\n  ~${(frames*p.spf/3600).toFixed(1)} hours\n`;
   });
-
-  // Altitude curve
-  let elapsed = 0;
-  ctx.beginPath();
-  ctx.strokeStyle = '#c9a832';
-  ctx.lineWidth = 2;
-
-  waypoints.forEach((wp, i) => {
-    const x = (elapsed / totalDur) * W;
-    const y = H - (wp.alt / (maxAlt * 1.1)) * H;
-    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-    elapsed += wp.dur;
-  });
-  // Last point
-  const xLast = W;
-  const yLast = H - (waypoints[waypoints.length-1].alt / (maxAlt * 1.1)) * H;
-  ctx.lineTo(xLast, yLast);
-  ctx.stroke();
-
-  // Fill under curve
-  ctx.lineTo(W, H); ctx.lineTo(0, H);
-  ctx.fillStyle = 'rgba(200,160,50,0.08)';
-  ctx.fill();
-
-  // Waypoint dots
-  elapsed = 0;
-  waypoints.forEach((wp, i) => {
-    const x = (elapsed / totalDur) * W;
-    const y = H - (wp.alt / (maxAlt * 1.1)) * H;
-    ctx.beginPath();
-    ctx.arc(x, y, 3, 0, Math.PI * 2);
-    ctx.fillStyle = altColor(wp.alt);
-    ctx.fill();
-    elapsed += wp.dur;
-  });
-
-  // 30m street level line
-  const streetY = H - (30 / (maxAlt * 1.1)) * H;
-  ctx.strokeStyle = 'rgba(100,200,255,0.3)';
-  ctx.setLineDash([4, 4]);
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(0, streetY); ctx.lineTo(W, streetY); ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.fillStyle = 'rgba(100,200,255,0.4)';
-  ctx.font = '7px Courier New';
-  ctx.fillText('street level', 2, streetY - 2);
-}
-
-// ══════════════════════════════════════════════════════════════
-// TOOL: TIME CALCULATOR
-// Shows recording time estimates at each quality
-// ══════════════════════════════════════════════════════════════
-function showTimeCalc() {
-  const total = waypoints.reduce((s, w) => s + w.dur, 0);
-  if (total === 0) { setStatus('⚠ No waypoints — add some first'); return; }
-
-  const presets = [
-    { name: '1080p 30fps', fps: 30, frames: total * 30, secPerFrame: 2 },
-    { name: '2K 30fps',    fps: 30, frames: total * 30, secPerFrame: 3 },
-    { name: '4K 30fps',    fps: 30, frames: total * 30, secPerFrame: 6 },
-    { name: '4K 60fps',    fps: 60, frames: total * 60, secPerFrame: 6 },
-  ];
-
-  let msg = `FLIGHT: ${total}s (${(total/60).toFixed(1)}min)\n\nRECORDING TIME ESTIMATES:\n`;
-  presets.forEach(p => {
-    const frames = Math.round(total * p.fps);
-    const recSec = frames * p.secPerFrame;
-    const recHrs = (recSec / 3600).toFixed(1);
-    msg += `\n${p.name}:\n  ${frames.toLocaleString()} frames\n  ~${recHrs} hours render time\n`;
-  });
-  msg += '\nThese are estimates. Actual time depends on tile loading speed.';
   alert(msg);
 }
 
-// ══════════════════════════════════════════════════════════════
-// TOOL: DUPLICATE WAYPOINT
-// ══════════════════════════════════════════════════════════════
-function duplicateWP(idx) {
-  const wp = waypoints[idx];
-  if (!wp) return;
-  const copy = { ...wp, name: wp.name + ' (copy)', lat: wp.lat + 0.0002, lng: wp.lng + 0.0002 };
-  waypoints.splice(idx + 1, 0, copy);
-  selIdx = idx + 1;
-  renderMap(); buildList();
-  setStatus(`✓ Duplicated WP ${idx+1} — drag to reposition`);
+function toggleProfiler(){
+  profilerOpen=!profilerOpen;
+  document.getElementById('profiler-panel').style.display=profilerOpen?'block':'none';
+  if(profilerOpen)drawProfiler();
+}
+function drawProfiler(){
+  const canvas=document.getElementById('profiler-canvas');
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width=canvas.offsetWidth,H=canvas.height=80;
+  ctx.clearRect(0,0,W,H);if(waypoints.length<2)return;
+  const maxAlt=Math.max(...waypoints.map(w=>w.alt),50);
+  const total=waypoints.reduce((s,w)=>s+w.dur,0);
+  ctx.fillStyle='#04040e';ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='rgba(200,160,50,0.08)';ctx.lineWidth=1;
+  [0,50,100,200,300].forEach(alt=>{if(alt>maxAlt*1.1)return;const y=H-(alt/(maxAlt*1.1))*H;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();ctx.fillStyle='rgba(200,160,50,0.2)';ctx.font='7px Courier New';ctx.fillText(alt+'m',2,y-2);});
+  let elapsed=0;ctx.beginPath();ctx.strokeStyle='#c9a832';ctx.lineWidth=2;
+  waypoints.forEach((wp,i)=>{const x=(elapsed/total)*W,y=H-(wp.alt/(maxAlt*1.1))*H;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);elapsed+=wp.dur;});
+  ctx.lineTo(W,H-(waypoints[waypoints.length-1].alt/(maxAlt*1.1))*H);ctx.stroke();
+  ctx.lineTo(W,H);ctx.lineTo(0,H);ctx.fillStyle='rgba(200,160,50,0.08)';ctx.fill();
+  elapsed=0;waypoints.forEach(wp=>{const x=(elapsed/total)*W,y=H-(wp.alt/(maxAlt*1.1))*H;ctx.beginPath();ctx.arc(x,y,3,0,Math.PI*2);ctx.fillStyle=altColor(wp.alt);ctx.fill();elapsed+=wp.dur;});
+  const sy=H-(30/(maxAlt*1.1))*H;ctx.strokeStyle='rgba(100,200,255,0.3)';ctx.setLineDash([4,4]);ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,sy);ctx.lineTo(W,sy);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle='rgba(100,200,255,0.4)';ctx.font='7px Courier New';ctx.fillText('street level',2,sy-2);
 }
 
-// ══════════════════════════════════════════════════════════════
-// TOOL: REVERSE PATH
-// ══════════════════════════════════════════════════════════════
-function reversePath() {
-  if (waypoints.length < 2) return;
-  if (!confirm('Reverse the entire flight path?')) return;
-  waypoints.reverse();
-  // Flip camera headings by 180°
-  waypoints.forEach(wp => { wp.hdg = ((wp.hdg + 180) % 360); });
-  selIdx = -1;
-  renderMap(); buildList();
-  setStatus('✓ Path reversed — camera headings flipped 180°');
+function toggleLandmarks(){
+  landmarksVisible=!landmarksVisible;
+  if(landmarksVisible)map.addLayer(lmLayer);else map.removeLayer(lmLayer);
+  document.getElementById('lm-toggle-btn').textContent=landmarksVisible?'★ HIDE LANDMARKS':'★ SHOW LANDMARKS';
 }
 
-// ══════════════════════════════════════════════════════════════
-// TOOL: IMPORT FROM FLIGHT FILE
-// Paste const WP = [...] and it loads into the planner
-// ══════════════════════════════════════════════════════════════
-function showImport() {
-  const txt = prompt('Paste your const WP = [...] JavaScript here:');
-  if (!txt) return;
-  try {
-    // Extract array content
-    const match = txt.match(/const WP\s*=\s*(\[[\s\S]*?\]);/);
-    if (!match) throw new Error('Could not find const WP = [...] in pasted text');
-
-    // Safe eval using Function
-    const arr = new Function('return ' + match[1])();
-    if (!Array.isArray(arr)) throw new Error('Not an array');
-
-    waypoints = arr.map(w => ({
-      lat:   w.lat   || 0,
-      lng:   w.lng   || 0,
-      alt:   w.alt   || 25,
-      hdg:   w.cam_hdg || w.hdg || 0,
-      pitch: w.cam_pitch || w.pitch || -10,
-      dur:   w.dur   || 16,
-      name:  w.label || w.name || '',
-    }));
-
-    selIdx = -1;
-    renderMap(); buildList(); updateTimeline();
-    if (waypoints.length > 0) map.fitBounds(waypoints.map(w => [w.lat, w.lng]));
-    setStatus(`✓ Imported ${waypoints.length} waypoints from flight file`);
-    setRTab('wp');
-  } catch(e) {
-    alert('Import failed: ' + e.message + '\n\nMake sure you copied the entire const WP = [...]; block.');
-  }
-}
-
-// ══════════════════════════════════════════════════════════════
-// STATUS BAR
-// ══════════════════════════════════════════════════════════════
-function setStatus(msg) {
-  document.getElementById('cesium-status-bar').textContent = msg || 'Ready';
-}
-
-
-
-// ══ MAP CLICK HANDLER — handles look-at mode ══
-const _origMapClick = map._events?.click;
-map.on('click', e => {
-  if (lookAtMode) {
-    lookAtTarget = { lat: e.latlng.lat, lng: e.latlng.lng, alt: 0 };
-    if (lookAtMarker) map.removeLayer(lookAtMarker);
-    lookAtMarker = L.circleMarker([e.latlng.lat, e.latlng.lng], {
-      radius: 8, color: '#ff5050', fillColor: '#ff5050', fillOpacity: 0.4, weight: 2
-    }).addTo(map).bindPopup('<b>LOOK-AT TARGET</b><br>Now click a waypoint → LOOK-AT');
-    lookAtMarker.openPopup();
-    setStatus(`✓ Target set at (${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}) — now click a waypoint and use LOOK-AT`);
-  }
+document.addEventListener('keydown',e=>{
+  if(document.getElementById('cesium-wrap').classList.contains('open'))return;
+  if(e.key==='Escape'){closeEditor();document.getElementById('export-overlay').classList.remove('open');}
 });
 
-// Redraw profiler when waypoints change
-const _origRenderMap = renderMap;
-
-// Init — start empty, landmarks tab visible
+// Init
 setRTab('lm');
 buildLmList();
 renderMap();
