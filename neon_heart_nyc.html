@@ -12,10 +12,9 @@
   .cesium-widget-credits,.cesium-credit-container,
   .cesium-credit-logoContainer,.cesium-credit-textContainer{display:none!important;}
   #info{position:absolute;top:12px;left:12px;color:#f0f;font:12px monospace;
-    background:rgba(0,0,0,0.7);padding:8px 12px;border-radius:4px;
-    pointer-events:none;z-index:20;min-width:280px;}
+    background:rgba(0,0,0,0.7);padding:8px 12px;border-radius:4px;pointer-events:none;z-index:20;min-width:280px;}
   #progressBar{width:100%;height:4px;background:rgba(255,255,255,0.15);border-radius:2px;margin-top:6px;overflow:hidden;}
-  #progressFill{height:100%;background:#f0f;width:0%;transition:width 0.1s linear;}
+  #progressFill{height:100%;background:#f0f;width:0%;}
   #actName{color:#fff;font-weight:bold;margin-top:4px;}
   #loadOverlay{position:fixed;inset:0;background:#000010;display:flex;flex-direction:column;
     align-items:center;justify-content:center;z-index:999;font-family:'Courier New',monospace;gap:16px;}
@@ -50,21 +49,17 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
 <script>
 (function(){
   'use strict';
-
   const canvas = document.getElementById('c');
-  const tEl = document.getElementById('actName');
-
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, preserveDrawingBuffer: true });
+  const tEl    = document.getElementById('actName');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:false, preserveDrawingBuffer:true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setClearColor(0x060812, 1);
-
   const scene = new THREE.Scene();
   scene.fog = new THREE.FogExp2(0x0a0e1e, 0.00018);
-
   const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 8000);
   camera.position.set(0, 200, 250);
   camera.lookAt(0, 150, 0);
-
+  const clock = new THREE.Clock();
   const resize = () => {
     if (window.__recording) return;
     const w = window.innerWidth, h = window.innerHeight;
@@ -76,9 +71,6 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
   window.addEventListener('resize', resize);
 
 
-  // ══════════════════════════════════════════════════════
-  // CESIUM BACKGROUND: NYC skyline blit into Three.js texture
-  // ══════════════════════════════════════════════════════
   const bgCanvas = document.createElement('canvas');
   bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight;
   const bgCtx = bgCanvas.getContext('2d');
@@ -86,7 +78,6 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
   bgTexture.minFilter = THREE.LinearFilter;
   bgTexture.magFilter = THREE.LinearFilter;
   scene.background = bgTexture;
-
   window.addEventListener('resize', () => {
     if (window.__recording) return;
     bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight;
@@ -94,7 +85,6 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
   });
 
   let cesiumViewer = null, cesiumReady = false;
-
   const setLoad = (msg, pct) => {
     document.getElementById('loadMsg').textContent = msg;
     document.getElementById('loadFill').style.width = pct + '%';
@@ -106,11 +96,10 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
     try {
       const r = await fetch('https://caci-worker.timtkosuge.workers.dev/api/map-keys');
       if (r.ok) { const k = await r.json(); cesiumToken=k.cesiumToken||''; googleKey=k.googleKey||''; }
-    } catch(e) { console.warn('Key fetch failed', e); }
+    } catch(e) {}
 
     setLoad('INITIALIZING CESIUM', 30);
     if (cesiumToken) Cesium.Ion.defaultAccessToken = cesiumToken;
-
     cesiumViewer = new Cesium.Viewer('cesiumContainer', {
       baseLayerPicker:false, geocoder:false, homeButton:false,
       sceneModePicker:false, navigationHelpButton:false,
@@ -124,26 +113,22 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
     cesiumViewer.scene.postProcessStages.fxaa.enabled = true;
     cesiumViewer.scene.fog.enabled = true;
     cesiumViewer.scene.fog.density = 0.00012;
-
-    // Night mode
     const d = new Date(); d.setUTCHours(3,0,0,0);
     cesiumViewer.clock.currentTime = Cesium.JulianDate.fromDate(d);
     cesiumViewer.clock.shouldAnimate = false;
-    cesiumViewer.scene.skyAtmosphere.brightnessShift = -0.85;
-    cesiumViewer.scene.skyAtmosphere.saturationShift = -0.5;
+    cesiumViewer.scene.skyAtmosphere.brightnessShift = -0.4;
+    cesiumViewer.scene.skyAtmosphere.saturationShift = -0.2;
     cesiumViewer.scene.moon.show = true;
-
-    // Weehawken ferry bluff → looking east at Midtown Manhattan
     cesiumViewer.camera.setView({
-      destination: Cesium.Cartesian3.fromDegrees(-74.023, 40.767, 180),
-      orientation: { heading: Cesium.Math.toRadians(90), pitch: Cesium.Math.toRadians(-8), roll: 0 }
+      destination: Cesium.Cartesian3.fromDegrees(-74.023, 40.767, 80),
+      orientation: { heading: Cesium.Math.toRadians(90), pitch: Cesium.Math.toRadians(-2), roll: 0 }
     });
 
     setLoad('LOADING TILES', 50);
     if (googleKey) {
       try {
         window._googleTileset = await Cesium.Cesium3DTileset.fromUrl(
-          `https://tile.googleapis.com/v1/3dtiles/root.json?key=${googleKey}`,
+          'https://tile.googleapis.com/v1/3dtiles/root.json?key=' + googleKey,
           { showCreditsOnScreen:false, maximumScreenSpaceError:8, maximumMemoryUsage:2048,
             dynamicScreenSpaceError:true, dynamicScreenSpaceErrorDensity:0.00278, dynamicScreenSpaceErrorFactor:4.0 }
         );
@@ -151,7 +136,6 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
         cesiumViewer.scene.globe.show = false;
         window._googleTileset.luminanceAtZenith = 0.025;
       } catch(e) {
-        console.warn('Google tiles failed, OSM fallback:', e);
         try { cesiumViewer.scene.primitives.add(await Cesium.createOsmBuildingsAsync()); } catch(e2) {}
       }
     } else {
@@ -169,9 +153,9 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
         const pending = ts && ts._requestedTiles ? ts._requestedTiles.length : 0;
         if (ready > 5 && pending === 0) {
           stable++;
-          setLoad(`TILES LOADED (${ready})`, 70 + Math.min(stable*3, 25));
+          setLoad('TILES LOADED (' + ready + ')', 70 + Math.min(stable*3, 25));
           if (stable >= 5) { resolve(); return; }
-        } else { stable = 0; setLoad(`LOADING (${ready} ready)`, 75); }
+        } else { stable = 0; setLoad('LOADING (' + ready + ' ready)', 75); }
         if (performance.now() > deadline) { resolve(); return; }
         requestAnimationFrame(check);
       }
@@ -188,34 +172,28 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
     clock.start();
     frame();
   }
-
   (function wait() {
     if (typeof Cesium !== 'undefined') initCesium();
     else setTimeout(wait, 80);
   })();
 
 
-
-  // ── STUBS: fake city objects replaced by Cesium background ──
-  const buildings = [], aviationLights = [];
-  const carLights = [], driftingBoats = [], extraAircrafts = [];
-  const starMat      = { uniforms:{ uTime:{value:0}, uPixelScale:{value:1} } };
-  const waterMat     = { uniforms:{ uTime:{value:0}, uCameraPos:{value:new THREE.Vector3()}, uCityInfluence:{value:1} } };
-  const quayLampsMat = { uniforms:{ uTime:{value:0} } };
-  const streetGlowMat= { uniforms:{ uTime:{value:0}, uOpacity:{value:1} } };
-  const signatureMat = { uniforms:{ uTime:{value:0}, uOpacity:{value:0} } };
+  const buildings = [], aviationLights = [], carLights = [], driftingBoats = [], extraAircrafts = [];
+  const starMat       = { uniforms:{ uTime:{value:0}, uPixelScale:{value:1} } };
+  const waterMat      = { uniforms:{ uTime:{value:0}, uCameraPos:{value:new THREE.Vector3()}, uCityInfluence:{value:1} } };
+  const quayLampsMat  = { uniforms:{ uTime:{value:0} } };
+  const streetGlowMat = { uniforms:{ uTime:{value:0}, uOpacity:{value:1} } };
+  const signatureMat  = { uniforms:{ uTime:{value:0}, uOpacity:{value:0} } };
   const signatureGlowMat = { uniforms:{ uOpacity:{value:0} } };
-  const signature    = { lookAt:()=>{} };
-  const signatureGlow= { lookAt:()=>{} };
-  const aircraft     = { position:new THREE.Vector3(), userData:{mat:{color:{setRGB:()=>{}},opacity:0}} };
+  const signature     = { lookAt:()=>{} };
+  const signatureGlow = { lookAt:()=>{} };
+  const aircraft      = { position:new THREE.Vector3(), userData:{mat:{color:{setRGB:()=>{}},opacity:0}} };
   const HIGHWAY_Y = 0, HIGHWAY_Z = 0;
-  const skylineGroup = { visible:true };
-  const horizonGlowMat = { uniforms:{ uOpacity:{value:1} } };
+  const skylineGroup  = { visible:true };
+  const horizonGlowMat= { uniforms:{ uOpacity:{value:1} } };
 
-
-  // ── NEON MATERIALS ──
-  const NEON_PINK = new THREE.Color(0xff3fb5);
-  const NEON_GLOW_OUTER = new THREE.Color(0xc03490);
+  const NEON_PINK = new THREE.Color(0xff3fb5);      // core color — slightly blue-shifted
+  const NEON_GLOW_OUTER = new THREE.Color(0xc03490); // outer halo — more purple
   const neonVert = `varying vec3 vNormal; varying vec3 vViewPos; void main() { vNormal = normalize(normalMatrix * normal); vec4 mv = modelViewMatrix * vec4(position, 1.0); vViewPos = -mv.xyz; gl_Position = projectionMatrix * mv; }`;
   const neonFrag = `
     varying vec3 vNormal;
@@ -245,6 +223,7 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
     neonMats.push(m);
     return m;
   }
+  
   const glowFrag = `
     varying vec3 vNormal;
     varying vec3 vViewPos;
@@ -492,58 +471,10 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
   // (Haze layers removed - they were tinting the whole scene purple)
   const hazeLayers = [];
   
-  // ════════════════════════════════════════════════════════════
-  // MOON — distant soft glow patch in the sky
-  // ════════════════════════════════════════════════════════════
-  const moonMat = new THREE.ShaderMaterial({
-    vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-    fragmentShader: `
-      varying vec2 vUv;
-      void main() {
-        vec2 c = vUv - 0.5;
-        float d = length(c);
-        // Soft core + halo
-        float core = smoothstep(0.15, 0.05, d);
-        float halo = smoothstep(0.5, 0.2, d) * 0.35;
-        vec3 col = vec3(0.95, 0.92, 0.85);
-        float a = max(core, halo);
-        gl_FragColor = vec4(col, a * 0.9);
-      }
-    `,
-    transparent: true,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-    side: THREE.DoubleSide
-  });
-  const moon = new THREE.Mesh(new THREE.PlaneGeometry(280, 280), moonMat);
-  moon.position.set(-1200, 520, -2400);
-  scene.add(moon);
-  
-  // ════════════════════════════════════════════════════════════
-  // SIGNATURE — artist's mark integrated into the scene
-  // Floats above the water off to one side. Pink neon glow styling to match
-  // the main sign. Visible only during the final 4-second hold.
-  // ════════════════════════════════════════════════════════════
 
+  function setCityOpacity(v) {}
 
-  function setCityOpacity(v) { /* Cesium handles it */ }
-
-
-
-  // SIGN SWAY — the sign is mounted and subtly sways with air currents
-  // Applied each frame in the render loop
-  // ════════════════════════════════════════════════════════════
-  // (handled below; sign is signGroup, we rotate signGroup)
-  
-  // CAMERA — narrative arc with building tension
   const CAM_DUR = 38.0;  // 34s motion + 4s hold on final frame
-  const clock = new THREE.Clock();
-  // City visible from the start — it's the environment, not a reveal
-  skylineGroup.visible = true;
-  buildings.forEach(b => { b.userData.mat.uniforms.uOpacity.value = 1.0; });
-  horizonGlowMat.uniforms.uOpacity.value = 1.0;
-  streetGlowMat.uniforms.uOpacity.value = 1.0;
-  
   function ease(t) { return t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t+2, 2)/2; }
   function easeOutExpo(t) { return t === 1 ? 1 : 1 - Math.pow(2, -10*t); }
   function easeInOutSine(t) { return -(Math.cos(Math.PI * t) - 1) / 2; }
@@ -557,20 +488,48 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
   const lowerSignWorld = new THREE.Vector3(10, SIGN_ALTITUDE - 35, 0);
 
   function updateCamera(t) {
+    // Raw cycle time is t mod CAM_DUR (= 38s). But we only choreograph the
+    // first 34s — the last 4s are a HOLD showing the final locked frame.
     const rawCycleT = t % CAM_DUR;
     const MOTION_DUR = 34.0;
+    // Effective cycle time: clamps to motion duration during hold window
     const effectiveCycleT = Math.min(rawCycleT, MOTION_DUR - 0.001);
     const u = effectiveCycleT / MOTION_DUR;
     let camPos, camLook;
+    
+    // CHOREOGRAPHY (the "approach from the side" narrative):
+    //   Act 1 EDGE (0-10%):          Start at 90° side view, abstract profile, spinning
+    //                                 sign unreadable. Camera drifts independently,
+    //                                 moving toward the sign's placard side.
+    //   Act 2 PLACARD (10-27%):      Arrive super-close on JERSEY placard side of sign.
+    //                                 Camera position has moved to sign's right side
+    //                                 (where placard is). Sign still hasn't rotated to
+    //                                 face us — we're seeing the PLACARD up close from
+    //                                 its own facing direction.
+    //   Act 3 PAN TO LIBERTY (27-48%): Camera holds position but pans/rotates (look
+    //                                 target slides) revealing Liberty coming into frame
+    //                                 to left of placard. Still super close — sign +
+    //                                 Liberty fill screen, whole heart NOT yet visible.
+    //   Act 4 PULL BACK (48-78%):    Slow pull-back as we continue to track with sign.
+    //                                 City rotates into background. Heart becomes
+    //                                 progressively visible but city not yet at full.
+    //   Act 5 SETTLE (78-88%):       Whole heart visible; city completes its reveal.
+    //                                 Both land simultaneously.
+    //   Act 6 LOCK (88-100%):        Camera + city locked; heart keeps spinning.
+    
+    const SIGN_ROT_RATE = 0.35;
+    // Use effective cycle time so camera orbit freezes during hold
     const cycleT = effectiveCycleT;
     const camOrbitAng = cycleT * 0.35 * 0.97;
+    
     let radius, altitude, lookTarget, offsetAng;
     let cityOpacityTarget = 0;
     let neonIntensity = 1.0;
-    let useTracking = true;
-    let fixedWorldAng = 0;
-
+    let useTracking = true;  // Whether to apply counter-rotation
+    let fixedWorldAng = 0;   // If !useTracking, this is camera's world-space angle
+    
     if (u < 0.12) {
+      // ── ACT 1 PLACARD (0-4s) — tight on JERSEY placard ──
       const p = u / 0.12;
       const pE = easeInOutSine(p);
       radius = lerp(50, 45, pE);
@@ -580,11 +539,14 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
       fixedWorldAng = lerp(0.85, 0.55, pE);
       cityOpacityTarget = 0.55;
       neonIntensity = lerp(0.9, 1.05, pE);
-      camera.fov = 50; camera.updateProjectionMatrix();
+      camera.fov = 50;
+      camera.updateProjectionMatrix();
     }
     else if (u < 0.29) {
+      // ── ACT 2 PAN LIBERTY (4-10s) — head turn ──
+      // Linear motion (not eased) so velocity doesn't drop to zero at seams.
       const p = (u - 0.12) / 0.17;
-      const pE = easeInOutSine(p);
+      const pE = easeInOutSine(p);  // keep ease on look-target pan only
       radius = lerp(45, 60, p);
       altitude = lerp(SIGN_ALTITUDE - 50, SIGN_ALTITUDE - 45, p);
       lookTarget = lerpV3(placardWorld, lowerSignWorld, pE);
@@ -594,16 +556,26 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
       neonIntensity = lerp(1.05, 1.1, p);
     }
     else if (u < 0.88) {
+      // ── ACT 3 DRIFT (10-30s) — one leg of a unified three-act decel curve ──
+      // Radius, altitude, and angle all move LINEARLY at velocities that will
+      // continue unchanged into Act 4, then decelerate smoothly in Act 5.
+      // No velocity jumps at the 30s seam. Angle never reverses direction.
       const p = (u - 0.29) / 0.59;
+      
       radius = lerp(60, 142.43, p);
       altitude = lerp(SIGN_ALTITUDE - 45, SIGN_ALTITUDE - 4.22, p);
       lookTarget = lerpV3(lowerSignWorld, signCenter, p);
       useTracking = false;
       fixedWorldAng = lerp(0.38, 0.094, p);
+      
       cityOpacityTarget = lerp(0.6, 0.8, p);
       neonIntensity = lerp(1.1, 1.2, p);
     }
     else if (u < 0.94) {
+      // ── ACT 4 CONTINUE (30-32s) — same velocity as Act 3, no seam jump ──
+      // Radius/altitude/angle keep moving at exactly the rate they had at t=30
+      // so there's no perceived acceleration or direction change. City opacity
+      // completes its reveal during this stretch.
       const p = (u - 0.88) / 0.06;
       radius = lerp(142.43, 150.81, p);
       altitude = lerp(SIGN_ALTITUDE - 4.22, SIGN_ALTITUDE - 0.07, p);
@@ -612,19 +584,27 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
       fixedWorldAng = lerp(0.094, 0.065, p);
       cityOpacityTarget = lerp(0.8, 1.0, p);
       neonIntensity = 1.2;
-      camera.fov = 50; camera.updateProjectionMatrix();
+      camera.fov = 50;
+      camera.updateProjectionMatrix();
     }
     else {
+      // ── ACT 5 LOCK (32-34s) — velocity-matched easeOut to rest ──
+      // Starts at Act 4's exit velocity, decelerates to zero via easeOut k=2.
+      // Nothing changes character — the motion just slows to a stop.
       const act5P = (u - 0.94) / 0.06;
       const act5E = 1 - Math.pow(1 - act5P, 2);
+      
       radius = lerp(150.81, 155, act5E);
       altitude = lerp(SIGN_ALTITUDE - 0.07, SIGN_ALTITUDE + 2, act5E);
       lookTarget = signCenter.clone();
       cityOpacityTarget = 1.0;
       neonIntensity = 1.25;
-      camera.fov = 50; camera.updateProjectionMatrix();
+      camera.fov = 50;
+      camera.updateProjectionMatrix();
+      
       const breathR = Math.sin(t * 0.19) * 1;
       const breathY = Math.cos(t * 0.23) * 0.6;
+      // Angle decelerates with same easeOut — so sign/camera angle also smoothly stops
       const finalAngThisFrame = lerp(0.065, 0.05, act5E);
       camPos = new THREE.Vector3(
         Math.sin(finalAngThisFrame) * (radius + breathR),
@@ -632,28 +612,31 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
         Math.cos(finalAngThisFrame) * (radius + breathR)
       );
       camLook = lookTarget;
+      
       setCityOpacity(cityOpacityTarget);
       setNeonIntensity(neonIntensity);
       camera.position.copy(camPos);
       camera.lookAt(camLook);
       return;
     }
-
+    
+    // Build final camera angle
     const breathR = Math.sin(t * 0.19) * 2;
     const breathY = Math.cos(t * 0.23) * 1.3;
     const finalAng = useTracking ? (camOrbitAng + offsetAng) : fixedWorldAng;
+    
     camPos = new THREE.Vector3(
       Math.sin(finalAng) * (radius + breathR),
       altitude + breathY,
       Math.cos(finalAng) * (radius + breathR)
     );
     camLook = lookTarget;
+    
     setCityOpacity(cityOpacityTarget);
     setNeonIntensity(neonIntensity);
     camera.position.copy(camPos);
     camera.lookAt(camLook);
   }
-
   
 
   function setNeonIntensity(val) {
@@ -664,18 +647,7 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
     });
   }
   
-  // ════════════════════════════════════════════════════════════
-  // NEON FLICKER — real neon signs dip briefly when the gas momentarily
-  // fails to ionize. Physics of the flicker:
-  //   - Fast drop (~80ms) to ~30-40% intensity
-  //   - Slower recovery (~200-400ms) back to full
-  //   - Sometimes a stutter: 2-3 quick dips in succession
-  //   - Affects the WHOLE sign as one unit (same power line)
-  // Schedule is cycle-local so it fires at same moments each loop.
-  // ════════════════════════════════════════════════════════════
-  // Each event has dips (values <1.0 = dim, values >1.0 = surge bright).
-  // Trigger time is cycle-local seconds. Events compose multiplicatively so
-  // overlapping effects blend naturally.
+
   const flickerSchedule = [
     // t=3.4s — quick single dip, subtle, during placard close-up
     { t: 3.4, dips: [{ offset: 0.0, depth: 0.55, dur: 0.20 }] },
@@ -756,10 +728,6 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
   // Four quality presets chosen at record time:
   //   1: 1080p @ 60fps — safest, ~2GB, works on any modern browser
   //   2: 2K (1440p) @ 60fps — excellent quality, ~6GB, needs decent RAM
-  //   3: 4K @ 30fps — max resolution, 30fps smoothness, ~6GB
-  //   4: 4K @ 60fps — ULTRA, ~12GB, browser may crash on limited RAM
-  // Each preset has its own fade-at-seam so the clip loops seamlessly.
-  // ════════════════════════════════════════════════════════════
 
   const RECORD_PRESETS = {
     '1': { label: '1080p60',       w: 1920, h: 1080, fps: 60 },
@@ -962,9 +930,9 @@ To add music and loop:
   });
   
   // RENDER LOOP
+
+
   let lastDebug = 0;
-
-
   function frame() {
     let t;
     if (recording) {
@@ -973,29 +941,21 @@ To add music and loop:
     } else {
       t = clock.getElapsedTime();
     }
-
-    // Blit Cesium → Three.js background
     if (cesiumViewer && cesiumReady) {
       try {
         cesiumViewer.scene.render();
         const cc = cesiumViewer.canvas;
-        if (cc.width > 0) {
-          bgCtx.drawImage(cc, 0, 0, bgCanvas.width, bgCanvas.height);
-          bgTexture.needsUpdate = true;
-        }
+        if (cc.width > 0) { bgCtx.drawImage(cc, 0, 0, bgCanvas.width, bgCanvas.height); bgTexture.needsUpdate = true; }
       } catch(e) {}
     }
-
     neonMats.forEach(m => { m.uniforms.uTime.value = t; });
     innerWashMat.uniforms.uTime.value = t;
     particleMat.uniforms.uTime.value = t;
 
-    // Sign rotation — decelerates in Act 5, locks at a nice angle
     const MOTION_DUR = 34.0;
     const rawCycleT = t % CAM_DUR;
     const cycleT = Math.min(rawCycleT, MOTION_DUR - 0.001);
     const u_local = cycleT / MOTION_DUR;
-
     let signRotation;
     if (u_local < 0.94) {
       signRotation = cycleT * 0.35;
@@ -1014,7 +974,6 @@ To add music and loop:
     signGroup.position.y = SIGN_ALTITUDE + Math.sin(t * 0.22) * 1.0;
 
     updateCamera(t);
-
     const flickerMult = computeFlickerMultiplier(t % CAM_DUR);
     applyFlicker(flickerMult);
 
@@ -1022,27 +981,24 @@ To add music and loop:
       lastDebug = t;
       const u = cycleT / MOTION_DUR;
       let actName;
-      if (rawCycleT >= MOTION_DUR) actName = `HOLD (${rawCycleT.toFixed(1)}s)`;
-      else if (u < 0.10) actName = `ACT 1 EDGE (${cycleT.toFixed(1)}s)`;
-      else if (u < 0.27) actName = `ACT 2 PLACARD (${cycleT.toFixed(1)}s)`;
-      else if (u < 0.55) actName = `ACT 3 ORBIT (${cycleT.toFixed(1)}s)`;
-      else if (u < 0.88) actName = `ACT 4 DRIFT (${cycleT.toFixed(1)}s)`;
-      else if (u < 0.94) actName = `ACT 5 REVEAL (${cycleT.toFixed(1)}s)`;
-      else actName = `LOCK (${cycleT.toFixed(1)}s)`;
-      tEl.textContent = `${rawCycleT.toFixed(1)}s / ${CAM_DUR.toFixed(0)}s`;
+      if (rawCycleT >= MOTION_DUR) actName = 'HOLD';
+      else if (u < 0.12) actName = 'ACT 1';
+      else if (u < 0.29) actName = 'ACT 2';
+      else if (u < 0.88) actName = 'ACT 3';
+      else if (u < 0.94) actName = 'ACT 4';
+      else actName = 'ACT 5 LOCK';
+      tEl.textContent = rawCycleT.toFixed(1) + 's / ' + CAM_DUR.toFixed(0) + 's';
       document.getElementById('actName').textContent = actName;
       document.getElementById('progressFill').style.width = ((rawCycleT / CAM_DUR) * 100).toFixed(1) + '%';
     }
 
     renderer.render(scene, camera);
-
     if (recording) {
       captureCurrentFrame().then(() => { if (recording) requestAnimationFrame(frame); });
     } else {
       requestAnimationFrame(frame);
     }
   }
-
 
   frame();
 })();
