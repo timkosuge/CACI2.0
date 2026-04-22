@@ -1690,14 +1690,20 @@ To add music and loop:
       const anchor = Cesium.Cartesian3.fromDegrees(
         window.__SIGN_ANCHOR_LON, window.__SIGN_ANCHOR_LAT, window.__SIGN_ANCHOR_ALT
       );
-      const relECEF = Cesium.Cartesian3.subtract(cesiumCam.position, anchor, new Cesium.Cartesian3());
+      // Build ENU frame at the anchor. We extract ONLY the rotation part for
+      // converting ECEF deltas → ENU deltas (translation is handled by subtracting anchor).
       const enuMatrix = Cesium.Transforms.eastNorthUpToFixedFrame(anchor);
-      const invENU = Cesium.Matrix4.inverseTransformation(enuMatrix, new Cesium.Matrix4());
-      const relENU = Cesium.Matrix4.multiplyByPointAsVector(invENU, relECEF, new Cesium.Cartesian3());
+      const rot = Cesium.Matrix4.getMatrix3(enuMatrix, new Cesium.Matrix3());
+      const invRot = Cesium.Matrix3.transpose(rot, new Cesium.Matrix3()); // rotation inverse = transpose
+
+      // Position: delta from anchor, rotated into ENU
+      const relECEF = Cesium.Cartesian3.subtract(cesiumCam.position, anchor, new Cesium.Cartesian3());
+      const relENU = Cesium.Matrix3.multiplyByVector(invRot, relECEF, new Cesium.Cartesian3());
       // ENU(x=East,y=North,z=Up) → Three.js(x=East, y=Up, z=-North)
       camera.position.set(relENU.x, relENU.z, -relENU.y);
 
-      const dirENU = Cesium.Matrix4.multiplyByPointAsVector(invENU, cesiumCam.direction, new Cesium.Cartesian3());
+      // Direction: rotate ECEF direction into ENU (no translation, it's a direction)
+      const dirENU = Cesium.Matrix3.multiplyByVector(invRot, cesiumCam.direction, new Cesium.Cartesian3());
       camera.lookAt(
         camera.position.x + dirENU.x,
         camera.position.y + dirENU.z,
