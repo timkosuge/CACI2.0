@@ -1811,9 +1811,11 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
               // Distance from this pixel's world position to the sign
               float dist = length(world.xyz - uSignECEF);
 
-              // Falloff: smooth quadratic, clamped. Very close = 1.0, at radius = 0.0.
-              float falloff = 1.0 - smoothstep(0.0, uLightRadius, dist);
-              falloff = falloff * falloff;  // sharper falloff near sign
+              // Sharp falloff: bright within 30% of radius, fades fast after.
+              // Uses pow(n, 4) so the glow drops off aggressively.
+              float t = clamp(dist / uLightRadius, 0.0, 1.0);
+              float falloff = 1.0 - t;
+              falloff = falloff * falloff * falloff * falloff;  // pow 4 — sharp
 
               // Add glow
               vec3 glow = uLightColor * falloff * uLightPower * uTimeMult;
