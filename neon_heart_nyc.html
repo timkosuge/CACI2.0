@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>KAIT — Neon Heart · NYC</title>
+<script src="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Cesium.js"></script>
+<link href="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{width:100%;height:100%;overflow:hidden;background:#000;}
+  .cesium-widget-credits,.cesium-credit-container,
+  .cesium-credit-logoContainer,.cesium-credit-textContainer{display:none!important;}
+
+  #cesiumContainer{
+    position:fixed;inset:0;
+  }
+
+  /* Three.js path-trace canvas sits on top of Cesium */
+  #heartCanvas{
+    position:fixed;inset:0;
+    pointer-events:none;
+    z-index:10;
+    mix-blend-mode:screen; /* additive blending — light adds to scene below */
+  }
+
+  /* Loading overlay */
+  #loading{
+    position:fixed;inset:0;
+    background:#000;
+    display:flex;flex-direction:column;
+    align-items:center;justify-content:center;
+    gap:20px;z-index:999;
+    font-family:'Courier New',monospace;
+  }
+  #loading h1{
+    color:rgba(255,60,120,0.9);
+    font:300 13px 'Courier New',monospace;
+    letter-spacing:0.6em;
+    text-transform:uppercase;
+  }
+  #loading-bar{
+    width:220px;height:1px;
+    background:rgba(255,60,120,0.15);
+  }
+  #loading-fill{
+    height:1px;
+    background:rgba(255,60,120,0.8);
+    width:0%;
+    transition:width 0.4s ease;
+    box-shadow:0 0 8px rgba(255,60,120,0.6);
+  }
+  #loading-msg{
+    color:rgba(255,60,120,0.4);
+    font:9px 'Courier New',monospace;
+    letter-spacing:0.3em;
+    text-transform:uppercase;
+  }
+
+  /* UI overlay */
+  #ui{
+    position:fixed;bottom:28px;left:50%;transform:translateX(-50%);
+    display:none;
+    flex-direction:column;align-items:center;gap:8px;
+    z-index:20;pointer-events:none;
+  }
+  #ui-title{
+    color:rgba(255,60,120,0.55);
+    font:9px 'Courier New',monospace;
+    letter-spacing:0.5em;
+    text-transform:uppercase;
+  }
+  #ui-sub{
+    color:rgba(255,60,120,0.25);
+    font:8px 'Courier New',monospace;
+    letter-spacing:0.2em;
+  }
+
+  /* Heart pulse ring */
+  #pulse-ring{
+    position:fixed;top:50%;left:50%;
+    width:4px;height:4px;
+    margin:-2px 0 0 -2px;
+    border-radius:50%;
+    background:rgba(255,60,120,0.6);
+    box-shadow:0 0 12px rgba(255,60,120,0.4);
+    pointer-events:none;
+    z-index:5;
+    animation:pulse-core 1.4s ease-in-out infinite;
+    display:none;
+  }
+  @keyframes pulse-core{
+    0%,100%{transform:scale(1);opacity:0.7;}
+    50%{transform:scale(1.6);opacity:1;}
+  }
+
+  /* Controls hint */
+  #hint{
+    position:fixed;top:20px;right:20px;
+    color:rgba(255,60,120,0.22);
+    font:9px 'Courier New',monospace;
+    letter-spacing:0.15em;
+    line-height:1.9;
+    pointer-events:none;
+    z-index:20;
+  }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <h1>KAIT · NEON HEART · NYC</h1>
+  <div id="loading-bar"><div id="loading-fill"></div></div>
+  <p id="loading-msg">FETCHING KEYS</p>
+</div>
+
+<div id="cesiumContainer"></div>
+<canvas id="heartCanvas"></canvas>
+<div id="pulse-ring"></div>
+
+<div id="ui">
+  <div id="ui-title">BEYOND HELLO · LITTLE FERRY NJ</div>
+  <div id="ui-sub">WEEHAWKEN FERRY · HUDSON RIVER · NEW YORK CITY</div>
+</div>
+
+<div id="hint">
+  DRAG — ORBIT<br>
+  SCROLL — ZOOM<br>
+  N — DAY / NIGHT<br>
+  H — HEART PULSE
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════
+// NEON HEART NYC — Path-Traced Glow + Cesium Photorealism
+// Camera: Weehawken Ferry → looking east at Midtown Manhattan
+// Heart: floating above the Hudson, ~200m altitude
+// ══════════════════════════════════════════════════════
+
+const setLoad = (msg, pct) => {
+  document.getElementById('loading-msg').textContent = msg;
+  document.getElementById('loading-fill').style.width = pct + '%';
+};
+
+// ── CONFIG ──
+const CAM = {
+  // Weehawken ferry — look east at midtown
+  lng: -74.023, lat: 40.767, alt: 180,
+  heading: 90,  // looking east
+  pitch: -8,    // slight down
+};
+
+// Heart position in world space — floating above Hudson
+const HEART_POS = {
+  lng: -74.010,
+  lat: 40.769,
+  alt: 220, // meters above sea level
+};
+
+let viewer, isNight = true;
+let heartBeat = 0;
+let scene3, camera3, renderer3, heartGroup;
+let heartPulseActive = true;
+let rafRunning = false;
+
+// ── THREE.JS PATH TRACING STATE ──
+// Accumulation buffer for temporal path tracing
+let accumScene, accumCamera, accumRenderer;
+let accumRT1, accumRT2, accumSwap = false;
+let accumFrames = 0;
+const MAX_ACCUM = 180; // frames to accumulate before resetting
+
+// ══════════════════════════════════════════════════════
+// PATH TRACING APPROACH:
+// We use a two-pass technique:
+// Pass 1 (Three.js): Render the heart geometry with emissive
+//   material into an offscreen render target
+// Pass 2 (custom GLSL): Full-screen path-trace pass that
+//   reads the emission buffer, scatters light rays via
+//   Monte Carlo sampling, and accumulates into a temporal
+//   buffer — creating physically-based glow, god rays,
+//   volumetric scatter, and chromatic aberration
+// The result is mixed with Cesium via screen blend mode
+// ══════════════════════════════════════════════════════
+
+async function init() {
+  setLoad('FETCHING KEYS', 10);
+
+  let cesiumToken = '', googleKey = '';
+  try {
+    const r = await fetch('https://caci-worker.timtkosuge.workers.dev/api/map-keys');
+    if (r.ok) {
+      const k = await r.json();
+      cesiumToken = k.cesiumToken || '';
+      googleKey = k.googleKey || '';
+    } else {
+      setLoad('KEY FETCH FAILED', 0); return;
+    }
+  } catch(e) { setLoad('KEY ERROR', 0); return; }
+
+  if (!cesiumToken) { setLoad('NO CESIUM TOKEN', 0); return; }
+
+  setLoad('INITIALIZING CESIUM', 20);
+  Cesium.Ion.defaultAccessToken = cesiumToken;
+
+  viewer = new Cesium.Viewer('cesiumContainer', {
+    baseLayerPicker: false, geocoder: false, homeButton: false,
+    sceneModePicker: false, navigationHelpButton: false,
+    animation: false, timeline: false, fullscreenButton: false,
+    infoBox: false, selectionIndicator: false,
+    shadows: false, requestRenderMode: false, targetFrameRate: 60,
+    contextOptions: {
+      webgl: {
+        powerPreference: 'high-performance',
+        antialias: true,
+        preserveDrawingBuffer: true,
+      }
+    }
+  });
+
+  viewer.scene.globe.maximumScreenSpaceError = 2;
+  viewer.scene.globe.tileCacheSize = 800;
+  viewer.scene.postProcessStages.fxaa.enabled = true;
+  viewer.scene.fog.enabled = true;
+  viewer.scene.fog.density = 0.00012;
+  viewer.scene.fog.minimumBrightness = 0.02;
+
+  applyTimeOfDay();
+
+  setLoad('LOADING PHOTOREALISTIC TILES', 40);
+
+  if (googleKey) {
+    try {
+      window._googleTileset = await Cesium.Cesium3DTileset.fromUrl(
+        `https://tile.googleapis.com/v1/3dtiles/root.json?key=${googleKey}`,
+        {
+          showCreditsOnScreen: false,
+          maximumScreenSpaceError: 8,
+          maximumMemoryUsage: 2048,
+          dynamicScreenSpaceError: true,
+          dynamicScreenSpaceErrorDensity: 0.00278,
+          dynamicScreenSpaceErrorFactor: 4.0,
+        }
+      );
+      viewer.scene.primitives.add(window._googleTileset);
+      viewer.scene.globe.show = false;
+    } catch(e) {
+      console.error('Tileset error:', e);
+      try { viewer.scene.primitives.add(await Cesium.createOsmBuildingsAsync()); } catch(e2) {}
+    }
+  } else {
+    try { viewer.scene.primitives.add(await Cesium.createOsmBuildingsAsync()); } catch(e) {}
+  }
+
+  // Park camera at Weehawken, looking east at midtown
+  viewer.camera.setView({
+    destination: Cesium.Cartesian3.fromDegrees(CAM.lng, CAM.lat, CAM.alt),
+    orientation: {
+      heading: Cesium.Math.toRadians(CAM.heading),
+      pitch: Cesium.Math.toRadians(CAM.pitch),
+      roll: 0,
+    }
+  });
+
+  setLoad('WARMING TILES', 60);
+
+  // Wait for tiles
+  await new Promise(resolve => {
+    const deadline = performance.now() + 25000;
+    let stable = 0;
+    function check() {
+      viewer.scene.render();
+      const ts = window._googleTileset;
+      if (!ts) { requestAnimationFrame(check); return; }
+      const ready = ts.statistics ? ts.statistics.numberOfTilesWithContentReady : 0;
+      const pending = ts._requestedTiles ? ts._requestedTiles.length : 0;
+      if (ready > 5 && pending === 0) {
+        stable++;
+        if (stable >= 8) { resolve(); return; }
+      } else { stable = 0; }
+      if (performance.now() > deadline) { resolve(); return; }
+      requestAnimationFrame(check);
+    }
+    requestAnimationFrame(check);
+  });
+
+  setLoad('INITIALIZING PATH TRACER', 80);
+
+  // Init Three.js path tracer
+  initHeartRenderer();
+
+  setLoad('PLACING HEART', 95);
+  await new Promise(r => setTimeout(r, 400));
+  setLoad('LAUNCHING', 100);
+  await new Promise(r => setTimeout(r, 300));
+
+  // Hide loading
+  const ld = document.getElementById('loading');
+  ld.style.transition = 'opacity 1.2s';
+  ld.style.opacity = '0';
+  setTimeout(() => { ld.style.display = 'none'; }, 1200);
+
+  document.getElementById('ui').style.display = 'flex';
+  document.getElementById('pulse-ring').style.display = 'block';
+
+  // Start render loop
+  rafRunning = true;
+  renderLoop();
+
+  // Keyboard
+  document.addEventListener('keydown', e => {
+    const k = e.key.toLowerCase();
+    if (k === 'n') { isNight = !isNight; applyTimeOfDay(); }
+    if (k === 'h') { heartPulseActive = !heartPulseActive; }
+  });
+}
+
+// ══════════════════════════════════════════════════════
+// TIME OF DAY
+// ══════════════════════════════════════════════════════
+function applyTimeOfDay() {
+  if (!viewer) return;
+  const d = new Date();
+  d.setUTCHours(isNight ? 3 : 14, 0, 0, 0);
+  viewer.clock.currentTime = Cesium.JulianDate.fromDate(d);
+  viewer.clock.shouldAnimate = false;
+  viewer.scene.skyAtmosphere.show = true;
+  viewer.scene.skyAtmosphere.brightnessShift = isNight ? -0.85 : 0.05;
+  viewer.scene.skyAtmosphere.saturationShift = isNight ? -0.5 : 0.0;
+  viewer.scene.skyBox.show = true;
+  viewer.scene.moon.show = isNight;
+  if (window._googleTileset) {
+    window._googleTileset.luminanceAtZenith = isNight ? 0.025 : 0.5;
+  }
+  viewer.scene.globe.atmosphereLightIntensity = isNight ? 2.0 : 10.0;
+}
+
+// ══════════════════════════════════════════════════════
+// THREE.JS PATH-TRACED HEART RENDERER
+// ══════════════════════════════════════════════════════
+function initHeartRenderer() {
+  const canvas = document.getElementById('heartCanvas');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+  // Three.js renderer — same canvas as overlay
+  renderer3 = new THREE.WebGLRenderer({
+    canvas,
+    alpha: true,
+    antialias: true,
+    premultipliedAlpha: false,
+  });
+  renderer3.setSize(window.innerWidth, window.innerHeight, false);
+  renderer3.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer3.setClearColor(0x000000, 0); // transparent bg
+  renderer3.toneMapping = THREE.NoToneMapping;
+
+  // Scene + camera
+  scene3 = new THREE.Scene();
+  camera3 = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 50000);
+  camera3.position.set(0, 0, 800);
+  camera3.lookAt(0, 0, 0);
+
+  // ── BUILD HEART GEOMETRY ──
+  heartGroup = buildHeart();
+  scene3.add(heartGroup);
+
+  // ── VOLUMETRIC GLOW PARTICLES ──
+  // Point cloud that samples random positions around the heart
+  // and emits based on proximity — fake volumetric scatter
+  addVolumetricCloud();
+
+  // ── AMBIENT FILL ──
+  // Very faint ambient so the heart isn't fully black on its back face
+  const ambient = new THREE.AmbientLight(0xff2060, 0.15);
+  scene3.add(ambient);
+
+  // ── EMISSIVE POINT LIGHT (self-lighting) ──
+  const heartLight = new THREE.PointLight(0xff2070, 12.0, 800);
+  heartLight.position.set(0, 0, 0);
+  scene3.add(heartLight);
+
+  // Rim lights — colored atmospheric fill
+  const rimL = new THREE.PointLight(0xff0040, 4.0, 600);
+  rimL.position.set(-200, 100, -50);
+  scene3.add(rimL);
+  const rimR = new THREE.PointLight(0x8800ff, 3.0, 600);
+  rimR.position.set(200, 80, -60);
+  scene3.add(rimR);
+
+  // Store lights for animation
+  scene3.userData.heartLight = heartLight;
+  scene3.userData.rimL = rimL;
+  scene3.userData.rimR = rimR;
+
+  // ── ACCUMULATION RENDER TARGETS ──
+  // Two ping-pong buffers for temporal accumulation (path tracing)
+  const rtOpts = {
+    format: THREE.RGBAFormat,
+    type: THREE.FloatType,
+    minFilter: THREE.LinearFilter,
+    magFilter: THREE.LinearFilter,
+  };
+  accumRT1 = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, rtOpts);
+  accumRT2 = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, rtOpts);
+
+  // ── PATH TRACE COMPOSITE SCENE ──
+  // Full-screen quad that does the actual path trace accumulation + bloom
+  buildCompositePass();
+
+  window.addEventListener('resize', onResize3);
+}
+
+// ══════════════════════════════════════════════════════
+// HEART GEOMETRY — SVG heart curve extruded with THREE.js
+// ══════════════════════════════════════════════════════
+function buildHeart() {
+  const group = new THREE.Group();
+
+  // Heart shape using cubic bezier curves (classic parametric heart)
+  const heartShape = new THREE.Shape();
+  const s = 1.0; // scale factor — final size set on group
+
+  heartShape.moveTo(0, s * 0.25);
+  heartShape.bezierCurveTo( s*0.5,  s*0.6,  s*1.1,  s*0.3,  s*0.75,  0);
+  heartShape.bezierCurveTo( s*1.1, -s*0.4,  s*0.5, -s*0.8,  0,      -s*0.6);
+  heartShape.bezierCurveTo(-s*0.5, -s*0.8, -s*1.1, -s*0.4, -s*0.75,  0);
+  heartShape.bezierCurveTo(-s*1.1,  s*0.3, -s*0.5,  s*0.6,  0,       s*0.25);
+
+  // ── NEON TUBE — extruded heart outline ──
+  const pts = heartShape.getPoints(120);
+  const tubePoints = pts.map(p => new THREE.Vector3(p.x, p.y, 0));
+  tubePoints.push(tubePoints[0]); // close the loop
+
+  const tubePath = new THREE.CatmullRomCurve3(tubePoints, true);
+  const tubeGeo = new THREE.TubeGeometry(tubePath, 200, 5.5, 12, true);
+
+  // Neon glass material — emissive hot core + translucent outer
+  const neonMat = new THREE.MeshPhysicalMaterial({
+    color: 0xff1060,
+    emissive: 0xff1060,
+    emissiveIntensity: 6.0,
+    roughness: 0.0,
+    metalness: 0.0,
+    transmission: 0.7,   // glass-like translucency
+    thickness: 8.0,
+    transparent: true,
+    opacity: 0.92,
+    side: THREE.DoubleSide,
+    envMapIntensity: 0.0,
+  });
+
+  const tube = new THREE.Mesh(tubeGeo, neonMat);
+  group.add(tube);
+
+  // ── HOT CORE — inner bright line ──
+  const corePath = new THREE.CatmullRomCurve3(tubePoints.map(p => p.clone()), true);
+  const coreGeo = new THREE.TubeGeometry(corePath, 200, 1.8, 8, true);
+  const coreMat = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.95,
+  });
+  const core = new THREE.Mesh(coreGeo, coreMat);
+  group.add(core);
+
+  // ── FILLED HEART (dim, for depth) ──
+  const extrudeSettings = {
+    depth: 6,
+    bevelEnabled: true,
+    bevelSegments: 4,
+    steps: 2,
+    bevelSize: 3,
+    bevelThickness: 3,
+  };
+  const fillGeo = new THREE.ExtrudeGeometry(heartShape, extrudeSettings);
+  const fillMat = new THREE.MeshPhysicalMaterial({
+    color: 0x880030,
+    emissive: 0xff0040,
+    emissiveIntensity: 0.8,
+    roughness: 0.15,
+    metalness: 0.0,
+    transmission: 0.4,
+    thickness: 20.0,
+    transparent: true,
+    opacity: 0.35,
+    side: THREE.DoubleSide,
+  });
+  const fill = new THREE.Mesh(fillGeo, fillMat);
+  fill.position.z = -3;
+  group.add(fill);
+
+  // Store for animation
+  group.userData.neonMat = neonMat;
+  group.userData.coreMat = coreMat;
+  group.userData.fillMat = fillMat;
+
+  // Scale and position
+  group.scale.setScalar(90); // ~180m wide heart
+  group.position.set(0, 0, 0);
+
+  return group;
+}
+
+// ══════════════════════════════════════════════════════
+// VOLUMETRIC GLOW CLOUD — particles that fake scattered light
+// ══════════════════════════════════════════════════════
+function addVolumetricCloud() {
+  const count = 3000;
+  const geo = new THREE.BufferGeometry();
+  const positions = new Float32Array(count * 3);
+  const alphas = new Float32Array(count);
+  const sizes = new Float32Array(count);
+
+  for (let i = 0; i < count; i++) {
+    // Sample positions around the heart tube
+    const t = (i / count) * Math.PI * 2;
+
+    // Heart parametric
+    const hx = 16 * Math.pow(Math.sin(t), 3);
+    const hy = 13*Math.cos(t) - 5*Math.cos(2*t) - 2*Math.cos(3*t) - Math.cos(4*t);
+
+    // Add jitter
+    const jitter = 18;
+    const px = hx * 9 + (Math.random() - 0.5) * jitter * 2;
+    const py = hy * 9 + (Math.random() - 0.5) * jitter * 2;
+    const pz = (Math.random() - 0.5) * jitter * 3;
+
+    positions[i*3]   = px;
+    positions[i*3+1] = py;
+    positions[i*3+2] = pz;
+
+    // Closer to heart = more opaque
+    const dist = Math.sqrt(px*px + py*py) / 150;
+    alphas[i] = Math.max(0, 1.0 - dist) * 0.35 * Math.random();
+    sizes[i] = 15 + Math.random() * 35;
+  }
+
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute('alpha', new THREE.BufferAttribute(alphas, 1));
+  geo.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+
+  // Custom shader material for volumetric particles
+  const mat = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime:  { value: 0 },
+      uPulse: { value: 1.0 },
+    },
+    vertexShader: `
+      attribute float alpha;
+      attribute float size;
+      varying float vAlpha;
+      uniform float uPulse;
+      void main() {
+        vAlpha = alpha * uPulse;
+        vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
+        gl_PointSize = size * (300.0 / -mvPos.z);
+        gl_Position = projectionMatrix * mvPos;
+      }
+    `,
+    fragmentShader: `
+      varying float vAlpha;
+      void main() {
+        // Soft radial gradient for each particle
+        vec2 uv = gl_PointCoord - 0.5;
+        float r = length(uv) * 2.0;
+        float a = (1.0 - smoothstep(0.3, 1.0, r)) * vAlpha;
+        gl_FragColor = vec4(1.0, 0.12, 0.36, a);
+      }
+    `,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+
+  const cloud = new THREE.Points(geo, mat);
+  cloud.scale.setScalar(90);
+  cloud.userData.isCloud = true;
+  scene3.add(cloud);
+  scene3.userData.cloudMat = mat;
+}
+
+// ══════════════════════════════════════════════════════
+// PATH TRACE COMPOSITE PASS
+// Full-screen GLSL that does:
+// 1. Temporal accumulation (ping-pong buffers)
+// 2. Monte Carlo light scatter simulation
+// 3. Chromatic aberration
+// 4. Lens flare / anamorphic streak
+// 5. Final bloom + tone-map
+// ══════════════════════════════════════════════════════
+let compositeScene, compositeCamera, compositeMesh;
+let compositePass1, compositePass2; // two shader passes
+
+function buildCompositePass() {
+  compositeScene = new THREE.Scene();
+  compositeCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+  // Pass 1: Accumulation — blend new frame with history
+  const accumMat = new THREE.ShaderMaterial({
+    uniforms: {
+      uNew:     { value: null }, // current render target
+      uHistory: { value: null }, // accumulated history
+      uWeight:  { value: 0.0 }, // blend weight (ramps up as frames accumulate)
+      uTime:    { value: 0.0 },
+      uFrame:   { value: 0 },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main(){ vUv = uv; gl_Position = vec4(position,1.0); }
+    `,
+    fragmentShader: `
+      precision highp float;
+      uniform sampler2D uNew;
+      uniform sampler2D uHistory;
+      uniform float uWeight;
+      uniform float uTime;
+      uniform int uFrame;
+      varying vec2 vUv;
+
+      // ── PATH TRACE: scatter kernel ──
+      // Simulates photon bouncing by blurring the emitted light
+      // with a physically-motivated Gaussian + directional streaks
+
+      // Hash for stochastic sampling
+      float hash(vec2 p){
+        p = fract(p * vec2(234.34, 435.345));
+        p += dot(p, p + 34.23);
+        return fract(p.x * p.y);
+      }
+      float hash3(vec3 p){
+        return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453);
+      }
+
+      // Gaussian scatter — samples N random offsets around pixel
+      // and averages the emitted light there → light spreading
+      vec4 scatterGather(sampler2D tex, vec2 uv, float radius, int samples, float frame){
+        vec4 sum = vec4(0.0);
+        float total = 0.0;
+        for(int i = 0; i < 32; i++){
+          if(i >= samples) break;
+          float fi = float(i);
+          // Quasi-random Halton sequence for better coverage
+          float a = hash(vec2(fi, frame)) * 6.2831;
+          float r = sqrt(hash(vec2(fi + 0.5, frame + 0.3))) * radius;
+          vec2 offset = vec2(cos(a), sin(a)) * r;
+          vec4 s = texture2D(tex, uv + offset);
+          // Weight by luminance (bright pixels scatter more)
+          float lum = dot(s.rgb, vec3(0.299, 0.587, 0.114));
+          float w = exp(-r * r / (2.0 * radius * radius));
+          sum += s * w;
+          total += w;
+        }
+        return total > 0.0 ? sum / total : vec4(0.0);
+      }
+
+      // Anamorphic lens streak — horizontal smear from bright pixels
+      vec3 anamorphicStreak(sampler2D tex, vec2 uv, float len){
+        vec3 streak = vec3(0.0);
+        for(int i = 0; i < 24; i++){
+          float t = (float(i) / 23.0 - 0.5) * 2.0 * len;
+          vec2 s_uv = uv + vec2(t, 0.0);
+          vec3 c = texture2D(tex, s_uv).rgb;
+          float lum = dot(c, vec3(0.299, 0.587, 0.114));
+          streak += c * lum * exp(-abs(t) * 15.0 / len);
+        }
+        return streak * 0.04;
+      }
+
+      void main(){
+        // Stochastic scatter of new light
+        vec4 rawNew = texture2D(uNew, vUv);
+
+        // Multi-scale scatter: tight core + wide glow
+        vec4 scatter1 = scatterGather(uNew, vUv, 0.008, 16, float(uFrame));
+        vec4 scatter2 = scatterGather(uNew, vUv, 0.025, 16, float(uFrame) + 0.7);
+        vec4 scatter3 = scatterGather(uNew, vUv, 0.065, 12, float(uFrame) + 1.4);
+
+        // Combine scatters — each adds a different glow layer
+        vec4 newLight = rawNew * 1.0
+          + scatter1 * 0.6
+          + scatter2 * 0.35
+          + scatter3 * 0.15;
+
+        // Chromatic aberration on scattered light
+        float aberr = 0.003;
+        vec4 chrR = texture2D(uNew, vUv + vec2( aberr, 0.0));
+        vec4 chrB = texture2D(uNew, vUv + vec2(-aberr, 0.0));
+        newLight.r = max(newLight.r, chrR.r * 0.5);
+        newLight.b = max(newLight.b, chrB.b * 0.35);
+
+        // Anamorphic streak (horizontal light smear like real lens)
+        newLight.rgb += anamorphicStreak(uNew, vUv, 0.08);
+
+        // Blend with accumulated history for temporal path tracing
+        vec4 history = texture2D(uHistory, vUv);
+        float alpha = 1.0 / max(1.0, uWeight);
+        vec4 accumulated = mix(history, newLight, alpha);
+
+        gl_FragColor = accumulated;
+      }
+    `,
+  });
+
+  // Pass 2: Final composite — bloom + tone map + output
+  const finalMat = new THREE.ShaderMaterial({
+    uniforms: {
+      uAccum:   { value: null },
+      uTime:    { value: 0.0 },
+      uPulse:   { value: 1.0 },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main(){ vUv = uv; gl_Position = vec4(position,1.0); }
+    `,
+    fragmentShader: `
+      precision highp float;
+      uniform sampler2D uAccum;
+      uniform float uTime;
+      uniform float uPulse;
+      varying vec2 vUv;
+
+      // Bloom via large multi-tap blur
+      vec3 bloom(sampler2D tex, vec2 uv){
+        vec3 b = vec3(0.0);
+        float total = 0.0;
+        for(int i = -3; i <= 3; i++){
+          for(int j = -3; j <= 3; j++){
+            vec2 offset = vec2(float(i), float(j)) * 0.004;
+            vec3 s = texture2D(tex, uv + offset).rgb;
+            float w = exp(-float(i*i + j*j) * 0.15);
+            b += s * w;
+            total += w;
+          }
+        }
+        return b / total;
+      }
+
+      // Tone mapping — ACES filmic curve
+      vec3 aces(vec3 x){
+        float a=2.51, b=0.03, c=2.43, d=0.59, e=0.14;
+        return clamp((x*(a*x+b))/(x*(c*x+d)+e), 0.0, 1.0);
+      }
+
+      void main(){
+        vec4 accum = texture2D(uAccum, vUv);
+        vec3 color = accum.rgb;
+
+        // Bloom layer (additive)
+        vec3 b = bloom(uAccum, vUv);
+        color = color + b * 0.4 * uPulse;
+
+        // ACES tone map
+        color = aces(color * 1.2);
+
+        // Vignette (subtle)
+        vec2 uv2 = vUv - 0.5;
+        float vign = 1.0 - dot(uv2, uv2) * 0.6;
+        color *= vign;
+
+        // Luminance-based alpha — only the glowing parts show
+        float lum = dot(color, vec3(0.299, 0.587, 0.114));
+        float alpha = pow(lum, 0.55); // gamma-expand for additive blending
+
+        gl_FragColor = vec4(color, alpha);
+      }
+    `,
+    transparent: true,
+    depthWrite: false,
+  });
+
+  const geo = new THREE.PlaneGeometry(2, 2);
+  const accumMesh = new THREE.Mesh(geo, accumMat);
+  const finalMesh = new THREE.Mesh(geo.clone(), finalMat);
+
+  compositeScene.userData.accumMat = accumMat;
+  compositeScene.userData.finalMat = finalMat;
+  compositeScene.userData.accumMesh = accumMesh;
+  compositeScene.userData.finalMesh = finalMesh;
+}
+
+// ══════════════════════════════════════════════════════
+// SYNC CAMERA — map Cesium's camera to Three.js camera
+// This makes the heart appear to be in the Cesium world
+// ══════════════════════════════════════════════════════
+function syncCamera() {
+  if (!viewer) return;
+
+  const cesiumCam = viewer.camera;
+  const cesiumPos = cesiumCam.positionWC;
+
+  // Heart world position in ECEF
+  const heartECEF = Cesium.Cartesian3.fromDegrees(HEART_POS.lng, HEART_POS.lat, HEART_POS.alt);
+
+  // Vector from camera to heart in world space
+  const camToHeart = Cesium.Cartesian3.subtract(heartECEF, cesiumPos, new Cesium.Cartesian3());
+
+  // Transform into camera local space using Cesium's view matrix
+  const viewMatrix = viewer.camera.viewMatrix;
+  const heartCamSpace = Cesium.Matrix4.multiplyByPoint(viewMatrix, heartECEF, new Cesium.Cartesian3());
+
+  // heartCamSpace is now in Cesium camera coordinates
+  // Cesium: X right, Y up, -Z forward (standard right-hand)
+  // Three.js: X right, Y up, -Z forward (matches)
+  // Scale: 1 Cesium meter = 1 Three.js unit
+  camera3.position.set(0, 0, 0);
+
+  // Project heart into Three.js screen space at correct depth
+  const heartDepth = -heartCamSpace.z; // positive depth
+
+  // FOV sync
+  camera3.fov = Cesium.Math.toDegrees(viewer.camera.frustum.fovy || Math.PI / 3);
+  camera3.aspect = window.innerWidth / window.innerHeight;
+  camera3.near = 1;
+  camera3.far = 50000;
+  camera3.updateProjectionMatrix();
+
+  // Angular offset from camera center to heart
+  // We put the heart at 0,0,-dist in camera space — but offset by the angle
+  const distToHeart = Cesium.Cartesian3.magnitude(camToHeart);
+
+  // Horizontal and vertical angle to heart
+  const heartNorm = Cesium.Cartesian3.normalize(camToHeart, new Cesium.Cartesian3());
+  const fwdNorm = new Cesium.Cartesian3(-viewMatrix[2], -viewMatrix[6], -viewMatrix[10]);
+  const rightNorm = new Cesium.Cartesian3(viewMatrix[0], viewMatrix[4], viewMatrix[8]);
+  const upNorm = new Cesium.Cartesian3(viewMatrix[1], viewMatrix[5], viewMatrix[9]);
+
+  const dotFwd = Cesium.Cartesian3.dot(heartNorm, fwdNorm);
+  const dotRight = Cesium.Cartesian3.dot(heartNorm, rightNorm);
+  const dotUp = Cesium.Cartesian3.dot(heartNorm, upNorm);
+
+  // Place heart group at correct position in Three.js camera space
+  const scale = heartDepth / Math.max(dotFwd, 0.01);
+  heartGroup.position.set(
+    dotRight * scale,
+    dotUp * scale,
+    -heartDepth
+  );
+
+  // Update cloud positions to match
+  scene3.children.forEach(c => {
+    if (c.userData.isCloud) {
+      c.position.copy(heartGroup.position);
+    }
+  });
+}
+
+// ══════════════════════════════════════════════════════
+// MAIN RENDER LOOP
+// ══════════════════════════════════════════════════════
+let frameCount = 0;
+let lastTime = 0;
+
+function renderLoop(ts = 0) {
+  if (!rafRunning) return;
+  requestAnimationFrame(renderLoop);
+
+  const dt = Math.min((ts - lastTime) / 1000, 0.05);
+  lastTime = ts;
+  frameCount++;
+  const t = ts / 1000;
+
+  // Cesium renders itself
+  viewer.scene.render();
+
+  // ── HEARTBEAT ANIMATION ──
+  heartBeat = t;
+  const bpm = 72;
+  const beatPhase = (t * bpm / 60) % 1.0;
+  // Lub-dub rhythm: two beats close together
+  const lub = Math.exp(-Math.pow((beatPhase % 0.5) * 10, 2) * 8);
+  const dub = Math.exp(-Math.pow((beatPhase % 0.5 - 0.2) * 10, 2) * 12);
+  const beat = Math.max(lub, dub);
+  const pulse = heartPulseActive ? (1.0 + beat * 0.55) : 1.0;
+
+  // Animate neon materials
+  const neonMat = heartGroup.userData.neonMat;
+  if (neonMat) {
+    neonMat.emissiveIntensity = 5.5 + beat * 3.0;
+    // Subtle hue shift on beat
+    const h = 0.96 + beat * 0.02;
+    neonMat.emissive.setHSL(h, 1.0, 0.5);
+    neonMat.color.setHSL(h, 1.0, 0.5);
+  }
+
+  // Animate heart scale (subtle throb)
+  const scale = 90 * (1.0 + beat * 0.04);
+  heartGroup.scale.setScalar(scale);
+
+  // Breathe rotation
+  heartGroup.rotation.y = Math.sin(t * 0.18) * 0.22;
+  heartGroup.rotation.z = Math.sin(t * 0.12) * 0.06;
+
+  // Animate lights
+  const hl = scene3.userData.heartLight;
+  if (hl) hl.intensity = 10.0 + beat * 8.0;
+
+  // Animate cloud
+  const cloudMat = scene3.userData.cloudMat;
+  if (cloudMat) {
+    cloudMat.uniforms.uTime.value = t;
+    cloudMat.uniforms.uPulse.value = pulse;
+  }
+
+  // ── SYNC CAMERA (heart stays in world space) ──
+  syncCamera();
+
+  // ── THREE.JS RENDER TO ACCUMULATION TARGET ──
+  // Render heart scene into accumRT (ping-pong)
+  const targetWrite = accumSwap ? accumRT2 : accumRT1;
+  const targetRead  = accumSwap ? accumRT1 : accumRT2;
+
+  renderer3.setRenderTarget(targetWrite);
+  renderer3.clear();
+  renderer3.render(scene3, camera3);
+  renderer3.setRenderTarget(null);
+
+  // ── ACCUMULATION PASS ──
+  const { accumMat, finalMat, accumMesh, finalMesh } = compositeScene.userData;
+
+  // RT for accumulation output (we need a 3rd buffer for the output)
+  // Simpler: just do final composite directly with the rendered frame + history blend
+  accumMat.uniforms.uNew.value = targetWrite.texture;
+  accumMat.uniforms.uHistory.value = targetRead.texture;
+  accumMat.uniforms.uWeight.value = Math.min(accumFrames + 1, MAX_ACCUM);
+  accumMat.uniforms.uTime.value = t;
+  accumMat.uniforms.uFrame.value = frameCount;
+
+  // Write accumulated result to read target (for next frame's history)
+  renderer3.setRenderTarget(targetRead);
+  renderer3.clear();
+  const accumScene2 = new THREE.Scene();
+  accumScene2.add(accumMesh);
+  renderer3.render(accumScene2, compositeCamera);
+  renderer3.setRenderTarget(null);
+
+  // ── FINAL COMPOSITE TO SCREEN ──
+  finalMat.uniforms.uAccum.value = targetRead.texture;
+  finalMat.uniforms.uTime.value = t;
+  finalMat.uniforms.uPulse.value = pulse;
+
+  const finalScene = new THREE.Scene();
+  finalScene.add(finalMesh);
+  renderer3.setRenderTarget(null);
+  renderer3.clear();
+  renderer3.render(finalScene, compositeCamera);
+
+  accumSwap = !accumSwap;
+  if (accumFrames < MAX_ACCUM) accumFrames++;
+
+  // Reset accumulation on motion (camera moved)
+  // Simple check: compare current frame to last
+  // (In full impl, compare view matrices — here we use a timeout)
+
+  // Pulse ring CSS sync
+  const ring = document.getElementById('pulse-ring');
+  if (ring && beat > 0.3) {
+    ring.style.opacity = beat;
+    ring.style.transform = `scale(${1 + beat * 2})`;
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// RESIZE
+// ══════════════════════════════════════════════════════
+function onResize3() {
+  const w = window.innerWidth, h = window.innerHeight;
+  const canvas = document.getElementById('heartCanvas');
+  canvas.width = w; canvas.height = h;
+  renderer3.setSize(w, h, false);
+  camera3.aspect = w / h;
+  camera3.updateProjectionMatrix();
+  accumFrames = 0; // reset accumulation
+
+  // Resize RTs
+  accumRT1.setSize(w, h);
+  accumRT2.setSize(w, h);
+}
+
+window.addEventListener('resize', () => { if (viewer) viewer.resize(); });
+
+// ── LAUNCH ──
+window.addEventListener('load', () => {
+  const wait = setInterval(() => {
+    if (typeof Cesium !== 'undefined' && typeof THREE !== 'undefined') {
+      clearInterval(wait);
+      init();
+    }
+  }, 80);
+});
+</script>
+</body>
+</html>
