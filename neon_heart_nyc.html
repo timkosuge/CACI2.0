@@ -212,6 +212,29 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
         cesiumViewer.scene.primitives.add(window._googleTileset);
         cesiumViewer.scene.globe.show = false;
         window._googleTileset.luminanceAtZenith = 0.025;
+
+        // ── NIGHT COLOR GRADE via Cesium PostProcessStage ──
+        // Runs inside Cesium's own WebGL pipeline — actually works on tile textures
+        const nightGrade = new Cesium.PostProcessStage({
+          fragmentShader: `
+            uniform sampler2D colorTexture;
+            varying vec2 v_textureCoordinates;
+            void main() {
+              vec4 col = texture2D(colorTexture, v_textureCoordinates);
+              // Desaturate
+              float lum = dot(col.rgb, vec3(0.299, 0.587, 0.114));
+              vec3 desat = mix(col.rgb, vec3(lum), 0.55);
+              // Darken
+              desat *= 0.28;
+              // Blue shift — push toward cool night tone
+              desat.r *= 0.75;
+              desat.g *= 0.85;
+              desat.b *= 1.25;
+              gl_FragColor = vec4(desat, col.a);
+            }
+          `
+        });
+        cesiumViewer.scene.postProcessStages.add(nightGrade);
       } catch(e) {
         try { cesiumViewer.scene.primitives.add(await Cesium.createOsmBuildingsAsync()); } catch(e2) {}
       }
@@ -1023,17 +1046,7 @@ To add music and loop:
         cesiumViewer.scene.render();
         const cc = cesiumViewer.canvas;
         if (cc.width > 0) {
-          // Blit the raw Cesium frame
           bgCtx.drawImage(cc, 0, 0, bgCanvas.width, bgCanvas.height);
-          // Night colour grade — darken + blue shift without killing the city
-          bgCtx.globalCompositeOperation = 'multiply';
-          bgCtx.fillStyle = 'rgb(80, 90, 140)';  // lighter navy — keeps buildings visible
-          bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
-          // Second pass: slight additional darkening
-          bgCtx.globalCompositeOperation = 'multiply';
-          bgCtx.fillStyle = 'rgb(160, 165, 180)';
-          bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
-          bgCtx.globalCompositeOperation = 'source-over';
           bgTexture.needsUpdate = true;
         }
       } catch(e) {}
