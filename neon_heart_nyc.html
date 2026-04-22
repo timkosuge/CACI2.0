@@ -56,7 +56,7 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
   renderer.setClearColor(0x060812, 1);
   const scene = new THREE.Scene();
   scene.fog = new THREE.FogExp2(0x0a0e1e, 0.00018);
-  const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 8000);
+  const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.5, 100000);
   camera.position.set(0, 200, 250);
   camera.lookAt(0, 150, 0);
   const clock = new THREE.Clock();
@@ -211,6 +211,53 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
           modeEl.style.color = '#ff0';
         }
       }
+      // ── PLAYBACK ──
+      const k = e.key.toLowerCase();
+      if (k === 'p') {
+        e.preventDefault();
+        window.__paused = !window.__paused;
+        if (window.__paused && window.__manualT === null) {
+          window.__manualT = clock.getElapsedTime();
+        } else if (!window.__paused && window.__manualT !== null) {
+          clock.elapsedTime = window.__manualT;
+          window.__manualT = null;
+        }
+      }
+      if (k === ',') {  // frame step back
+        e.preventDefault();
+        if (!window.__paused) { window.__paused = true; window.__manualT = clock.getElapsedTime(); }
+        window.__manualT = Math.max(0, window.__manualT - 1/60);
+      }
+      if (k === '.') {  // frame step forward
+        e.preventDefault();
+        if (!window.__paused) { window.__paused = true; window.__manualT = clock.getElapsedTime(); }
+        window.__manualT = window.__manualT + 1/60;
+      }
+      if (e.key === '<' || (e.shiftKey && k === ',')) {  // slower
+        e.preventDefault();
+        window.__playbackRate = Math.max(0.125, window.__playbackRate / 2);
+      }
+      if (e.key === '>' || (e.shiftKey && k === '.')) {  // faster
+        e.preventDefault();
+        window.__playbackRate = Math.min(8, window.__playbackRate * 2);
+      }
+      if (k === '\\') {  // reset time
+        e.preventDefault();
+        clock.elapsedTime = 0;
+        window.__manualT = window.__paused ? 0 : null;
+        window.__playbackRate = 1.0;
+      }
+
+      // ── SIGN PLACEMENT ──
+      if (k === 'x') {
+        e.preventDefault();
+        if (window.__dropSignAtCam) window.__dropSignAtCam();
+      }
+      if (k === 'c') {
+        e.preventDefault();
+        if (window.__dropSignAtLook) window.__dropSignAtLook();
+      }
+
       if (e.key.startsWith('Arrow')) e.preventDefault();
     });
     window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
@@ -264,8 +311,15 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
       if (keys['s']) cam.moveBackward(speed);
       if (keys['a']) cam.moveLeft(speed);
       if (keys['d']) cam.moveRight(speed);
-      if (keys['r']) cam.moveUp(speed);       // R = rise
-      if (keys['f']) cam.moveDown(speed);     // F = fall
+      // Up/Down: use Cesium's moveUp/moveDown but aligned to WGS84 up at camera position
+      if (keys['r']) {
+        const up = Cesium.Cartesian3.normalize(cam.position, new Cesium.Cartesian3());
+        cam.position = Cesium.Cartesian3.add(cam.position, Cesium.Cartesian3.multiplyByScalar(up, speed, new Cesium.Cartesian3()), new Cesium.Cartesian3());
+      }
+      if (keys['f']) {
+        const up = Cesium.Cartesian3.normalize(cam.position, new Cesium.Cartesian3());
+        cam.position = Cesium.Cartesian3.add(cam.position, Cesium.Cartesian3.multiplyByScalar(up, -speed, new Cesium.Cartesian3()), new Cesium.Cartesian3());
+      }
 
       // ── LOOK (pitch/yaw) ──
       if (keys['arrowleft'])  cam.lookLeft(rate);
@@ -327,7 +381,111 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
     // look back at it from miles away.
     window.__SIGN_ANCHOR_LON = -74.013;     // middle of Hudson River
     window.__SIGN_ANCHOR_LAT = 40.758;      // roughly abeam of Midtown
-    window.__SIGN_ANCHOR_ALT = 250;         // 250m altitude — above sight lines
+    window.__SIGN_ANCHOR_ALT = 0;           // ground/sea level; sign at Y=180 Three.js units (=180m) above this
+
+    // ── SIGN PLACEMENT UI ──
+    // Presets, drop-where-looking, manual GPS input
+    const PRESETS = {
+      'Hudson River (default)':  { lon: -74.013, lat: 40.758, alt: 0 },
+      'Times Square':            { lon: -73.9855, lat: 40.7580, alt: 0 },
+      'Empire State Building':   { lon: -73.9857, lat: 40.7484, alt: 0 },
+      'Brooklyn Bridge':         { lon: -73.9969, lat: 40.7061, alt: 0 },
+      'Statue of Liberty':       { lon: -74.0445, lat: 40.6892, alt: 0 },
+      'Central Park':            { lon: -73.9654, lat: 40.7829, alt: 0 },
+      'One World Trade':         { lon: -74.0134, lat: 40.7127, alt: 0 },
+      'Williamsburg Waterfront': { lon: -73.9616, lat: 40.7208, alt: 0 },
+      'Over Midtown (500m up)':  { lon: -73.9857, lat: 40.7580, alt: 500 },
+    };
+
+    function moveSignTo(lon, lat, alt) {
+      window.__SIGN_ANCHOR_LON = lon;
+      window.__SIGN_ANCHOR_LAT = lat;
+      window.__SIGN_ANCHOR_ALT = alt;
+      document.getElementById('signCoords').textContent =
+        `${lon.toFixed(5)}, ${lat.toFixed(5)}, ${alt.toFixed(0)}m`;
+    }
+    window.__moveSignTo = moveSignTo;
+
+    // Build UI panel
+    const placer = document.createElement('div');
+    placer.style.cssText = 'position:fixed;top:12px;left:12px;padding:12px 14px;background:rgba(0,0,0,0.8);color:#f0f;font:11px monospace;border-radius:4px;z-index:25;border:1px solid rgba(255,0,255,0.3);min-width:260px;max-width:280px;';
+    placer.innerHTML = `
+      <div style="color:#fff;font-weight:bold;margin-bottom:6px;">SIGN PLACEMENT</div>
+      <div style="font-size:10px;color:#faa;margin-bottom:8px;" id="signCoords">
+        ${window.__SIGN_ANCHOR_LON.toFixed(5)}, ${window.__SIGN_ANCHOR_LAT.toFixed(5)}, ${window.__SIGN_ANCHOR_ALT.toFixed(0)}m
+      </div>
+      <div style="color:#fff;font-size:9px;margin-bottom:4px;">PRESETS</div>
+      <select id="presetSel" style="width:100%;background:#111;color:#f0f;border:1px solid #555;padding:3px;font:11px monospace;margin-bottom:8px;">
+        ${Object.keys(PRESETS).map(k=>`<option>${k}</option>`).join('')}
+      </select>
+      <div style="color:#fff;font-size:9px;margin-bottom:4px;">MANUAL GPS</div>
+      <div style="display:flex;gap:4px;margin-bottom:4px;">
+        <input id="inLon" type="number" step="0.0001" value="${window.__SIGN_ANCHOR_LON}" style="flex:1;background:#111;color:#f0f;border:1px solid #555;padding:3px;font:10px monospace;width:0;" placeholder="lon">
+        <input id="inLat" type="number" step="0.0001" value="${window.__SIGN_ANCHOR_LAT}" style="flex:1;background:#111;color:#f0f;border:1px solid #555;padding:3px;font:10px monospace;width:0;" placeholder="lat">
+        <input id="inAlt" type="number" step="10" value="${window.__SIGN_ANCHOR_ALT}" style="width:55px;background:#111;color:#f0f;border:1px solid #555;padding:3px;font:10px monospace;" placeholder="alt m">
+      </div>
+      <button id="applyBtn" style="width:100%;background:rgba(255,0,255,0.2);color:#f0f;border:1px solid rgba(255,0,255,0.5);padding:4px;font:11px monospace;cursor:pointer;margin-bottom:8px;">APPLY GPS</button>
+      <div style="color:#aaa;font-size:9px;line-height:1.4;">
+        Press <b style="color:#fff;">X</b> to drop sign at Cesium cam position<br>
+        Press <b style="color:#fff;">C</b> to drop sign where camera is looking
+      </div>
+    `;
+    document.body.appendChild(placer);
+
+    // Preset dropdown
+    document.getElementById('presetSel').addEventListener('change', e => {
+      const p = PRESETS[e.target.value];
+      if (p) {
+        moveSignTo(p.lon, p.lat, p.alt);
+        document.getElementById('inLon').value = p.lon;
+        document.getElementById('inLat').value = p.lat;
+        document.getElementById('inAlt').value = p.alt;
+      }
+    });
+
+    // Manual apply
+    document.getElementById('applyBtn').addEventListener('click', () => {
+      const lon = parseFloat(document.getElementById('inLon').value);
+      const lat = parseFloat(document.getElementById('inLat').value);
+      const alt = parseFloat(document.getElementById('inAlt').value);
+      if (isFinite(lon) && isFinite(lat) && isFinite(alt)) {
+        moveSignTo(lon, lat, alt);
+      }
+    });
+
+    // Drop handlers — X = camera position, C = where camera is looking
+    window.__dropSignAtCam = () => {
+      if (!cesiumViewer) return;
+      const cart = Cesium.Cartographic.fromCartesian(cesiumViewer.camera.position);
+      moveSignTo(Cesium.Math.toDegrees(cart.longitude), Cesium.Math.toDegrees(cart.latitude), cart.height);
+      document.getElementById('inLon').value = window.__SIGN_ANCHOR_LON.toFixed(6);
+      document.getElementById('inLat').value = window.__SIGN_ANCHOR_LAT.toFixed(6);
+      document.getElementById('inAlt').value = window.__SIGN_ANCHOR_ALT.toFixed(0);
+    };
+
+    window.__dropSignAtLook = () => {
+      if (!cesiumViewer) return;
+      // Raycast from camera along its direction, find where it hits terrain/tiles
+      const scene = cesiumViewer.scene;
+      const ray = new Cesium.Ray(cesiumViewer.camera.position, cesiumViewer.camera.direction);
+      const hit = scene.pickFromRay(ray);
+      let target;
+      if (hit && hit.position) {
+        target = hit.position;
+      } else {
+        // Fallback — project 500m ahead along camera direction
+        target = Cesium.Cartesian3.add(
+          cesiumViewer.camera.position,
+          Cesium.Cartesian3.multiplyByScalar(cesiumViewer.camera.direction, 500, new Cesium.Cartesian3()),
+          new Cesium.Cartesian3()
+        );
+      }
+      const cart = Cesium.Cartographic.fromCartesian(target);
+      moveSignTo(Cesium.Math.toDegrees(cart.longitude), Cesium.Math.toDegrees(cart.latitude), cart.height);
+      document.getElementById('inLon').value = window.__SIGN_ANCHOR_LON.toFixed(6);
+      document.getElementById('inLat').value = window.__SIGN_ANCHOR_LAT.toFixed(6);
+      document.getElementById('inAlt').value = window.__SIGN_ANCHOR_ALT.toFixed(0);
+    };
 
     // Controls HUD
     const controlsHint = document.createElement('div');
@@ -1207,22 +1365,40 @@ To add music and loop:
 
   let lastDebug = 0;
   function frame() {
-    let t;
+    // Two time streams:
+    //   signT — drives the sign's own animations (rotation, flicker, bob). ALWAYS ticks.
+    //   camT  — drives the v9 camera choreography. Freezes in free-fly mode.
+    let signT, camT;
+
     if (recording) {
       const rawFrameT = recordFrameIdx / RECORD_FPS;
-      t = Math.min(rawFrameT, CAM_DUR - 0.001);
-    } else if (window.__cameraMode === 'free') {
-      // Freeze the sign choreography on whatever time we were at
-      if (window.__frozenT === undefined) window.__frozenT = clock.getElapsedTime();
-      t = window.__frozenT;
+      signT = camT = Math.min(rawFrameT, CAM_DUR - 0.001);
+    } else if (window.__paused && window.__manualT !== null) {
+      signT = camT = window.__manualT;
     } else {
-      // Sync mode — if we just resumed from free, adjust clock so time keeps continuity
-      if (window.__frozenT !== undefined) {
-        clock.elapsedTime = window.__frozenT;
-        window.__frozenT = undefined;
+      // Playback-rate-aware clock advance (affects both streams equally when playing)
+      const rate = window.__playbackRate || 1.0;
+      if (rate !== 1.0) {
+        const delta = clock.getDelta() * rate;
+        clock.elapsedTime += delta;
       }
-      t = clock.getElapsedTime();
+      signT = clock.getElapsedTime();
+
+      if (window.__cameraMode === 'free') {
+        // Sign keeps animating, but camera choreography freezes on entry
+        if (window.__frozenCamT === undefined) window.__frozenCamT = signT;
+        camT = window.__frozenCamT;
+      } else {
+        if (window.__frozenCamT !== undefined) window.__frozenCamT = undefined;
+        camT = signT;
+      }
     }
+
+    // Use signT for sign animation, camT for camera choreography
+    const t = signT;
+
+    // Update playback HUD
+    if (window.__updatePlaybackHud) window.__updatePlaybackHud();
     if (cesiumViewer && cesiumReady) {
       try {
         if (window.__updateCesiumCam) window.__updateCesiumCam();
@@ -1271,7 +1447,7 @@ To add music and loop:
     signGroup.rotation.y = signRotation;
     signGroup.position.y = SIGN_ALTITUDE + Math.sin(t * 0.22) * 1.0;
 
-    updateCamera(t);
+    updateCamera(camT);
 
     // ── CAMERA LINK: in FREE mode, Three.js mirrors Cesium relative to sign anchor ──
     if (window.__cameraMode === 'free' && cesiumViewer && cesiumReady) {
