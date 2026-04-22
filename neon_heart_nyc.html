@@ -258,6 +258,58 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
         if (window.__dropSignAtLook) window.__dropSignAtLook();
       }
 
+      // ── CARRY / HIDE ──
+      if (k === 'g') {
+        e.preventDefault();
+        if (window.__toggleCarry) window.__toggleCarry();
+      }
+      if (k === 'h') {
+        // Careful: H also used for orbit left in free-fly. Only trigger here if no Ctrl/Shift modifiers
+        // AND we're not using H for camera orbit (when both are pressed we prioritise this because
+        // H for orbit requires being in free mode and is a hold-key).
+        if (!e.ctrlKey && !e.metaKey) {
+          // Allow orbit H in free fly still — just toggle only on key release
+          // Simpler approach: toggle on key-down always, since H-orbit still repeats via keys map
+          if (window.__cameraMode !== 'free') {
+            e.preventDefault();
+            if (window.__toggleHideSign) window.__toggleHideSign();
+          }
+          // In free mode, H is orbit-left (already handled by keys map). No hide-toggle.
+        }
+      }
+
+      // ── UNDO / REDO ──
+      if ((e.ctrlKey || e.metaKey) && k === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          if (window.__signRedo) window.__signRedo();
+        } else {
+          if (window.__signUndo) window.__signUndo();
+        }
+      }
+
+      // ── SIGN SIZE ──
+      if (e.key === '+' || e.key === '=') {
+        if (e.key === '=') {
+          // = resets to 1.0
+          if (!e.shiftKey) {
+            e.preventDefault();
+            if (window.__setSignSize) window.__setSignSize(1.0);
+          } else {
+            // Shift+= is '+' — scale up
+            e.preventDefault();
+            if (window.__setSignSize) window.__setSignSize((window.__signScale || 1) * 1.15);
+          }
+        } else {
+          e.preventDefault();
+          if (window.__setSignSize) window.__setSignSize((window.__signScale || 1) * 1.15);
+        }
+      }
+      if (e.key === '-' || e.key === '_') {
+        e.preventDefault();
+        if (window.__setSignSize) window.__setSignSize((window.__signScale || 1) / 1.15);
+      }
+
       if (e.key.startsWith('Arrow')) e.preventDefault();
     });
     window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
@@ -397,14 +449,121 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
       'Over Midtown (500m up)':  { lon: -73.9857, lat: 40.7580, alt: 500 },
     };
 
-    function moveSignTo(lon, lat, alt) {
+    function moveSignTo(lon, lat, alt, opts) {
+      opts = opts || {};
+      // Push the previous location onto undo stack (unless this IS an undo/redo op)
+      if (!opts.skipHistory) {
+        window.__signHistory = window.__signHistory || [];
+        window.__signRedoStack = window.__signRedoStack || [];
+        window.__signHistory.push({
+          lon: window.__SIGN_ANCHOR_LON,
+          lat: window.__SIGN_ANCHOR_LAT,
+          alt: window.__SIGN_ANCHOR_ALT
+        });
+        if (window.__signHistory.length > 40) window.__signHistory.shift();
+        if (!opts.preserveRedo) window.__signRedoStack = [];  // new move clears redo
+      }
       window.__SIGN_ANCHOR_LON = lon;
       window.__SIGN_ANCHOR_LAT = lat;
       window.__SIGN_ANCHOR_ALT = alt;
-      document.getElementById('signCoords').textContent =
-        `${lon.toFixed(5)}, ${lat.toFixed(5)}, ${alt.toFixed(0)}m`;
+      const coordsEl = document.getElementById('signCoords');
+      if (coordsEl) coordsEl.textContent = `${lon.toFixed(5)}, ${lat.toFixed(5)}, ${alt.toFixed(0)}m`;
+      // Sync the manual input fields
+      const lonIn = document.getElementById('inLon'), latIn = document.getElementById('inLat'), altIn = document.getElementById('inAlt');
+      if (lonIn) lonIn.value = lon.toFixed(6);
+      if (latIn) latIn.value = lat.toFixed(6);
+      if (altIn) altIn.value = alt.toFixed(0);
     }
     window.__moveSignTo = moveSignTo;
+
+    // ── UNDO / REDO ──
+    window.__signUndo = () => {
+      if (!window.__signHistory || window.__signHistory.length === 0) return;
+      const last = window.__signHistory.pop();
+      window.__signRedoStack = window.__signRedoStack || [];
+      window.__signRedoStack.push({
+        lon: window.__SIGN_ANCHOR_LON, lat: window.__SIGN_ANCHOR_LAT, alt: window.__SIGN_ANCHOR_ALT
+      });
+      moveSignTo(last.lon, last.lat, last.alt, { skipHistory: true });
+    };
+    window.__signRedo = () => {
+      if (!window.__signRedoStack || window.__signRedoStack.length === 0) return;
+      const next = window.__signRedoStack.pop();
+      moveSignTo(next.lon, next.lat, next.alt, { preserveRedo: true });
+    };
+
+    // ── CARRY MODE ──
+    // When on, sign follows camera at a fixed distance ahead. Toggle to "drop" it.
+    window.__signCarrying = false;
+    window.__signCarryDistance = 400;  // metres ahead of camera
+    window.__toggleCarry = () => {
+      window.__signCarrying = !window.__signCarrying;
+      const btn = document.getElementById('carryBtn');
+      if (btn) {
+        btn.textContent = window.__signCarrying ? '📌 DROP SIGN (G)' : '✋ CARRY SIGN (G)';
+        btn.style.background = window.__signCarrying ? 'rgba(255,200,0,0.3)' : 'rgba(255,0,255,0.2)';
+      }
+    };
+
+    // ── HIDE SIGN ──
+    window.__signHidden = false;
+    window.__toggleHideSign = () => {
+      window.__signHidden = !window.__signHidden;
+      signGroup.visible = !window.__signHidden;
+      innerWash.visible = !window.__signHidden;
+      outerWash.visible = !window.__signHidden;
+      particleGroup.visible = !window.__signHidden;
+      const btn = document.getElementById('hideBtn');
+      if (btn) btn.textContent = window.__signHidden ? '👁 SHOW SIGN (H)' : '🙈 HIDE SIGN (H)';
+    };
+
+    // ── SAVED LOCATIONS / BOOKMARKS ──
+    // Persist to localStorage so bookmarks survive reloads
+    function loadBookmarks() {
+      try { return JSON.parse(localStorage.getItem('beyondHelloBookmarks') || '[]'); }
+      catch(e) { return []; }
+    }
+    function saveBookmarks(bms) {
+      try { localStorage.setItem('beyondHelloBookmarks', JSON.stringify(bms)); } catch(e) {}
+    }
+    window.__bookmarks = loadBookmarks();
+
+    window.__saveBookmark = () => {
+      const name = prompt('Name this location:');
+      if (!name) return;
+      const bm = {
+        name,
+        lon: window.__SIGN_ANCHOR_LON,
+        lat: window.__SIGN_ANCHOR_LAT,
+        alt: window.__SIGN_ANCHOR_ALT,
+        scale: window.__signScale || 1,
+        ts: Date.now()
+      };
+      window.__bookmarks.push(bm);
+      saveBookmarks(window.__bookmarks);
+      refreshBookmarkList();
+    };
+
+    window.__loadBookmark = idx => {
+      const bm = window.__bookmarks[idx];
+      if (!bm) return;
+      moveSignTo(bm.lon, bm.lat, bm.alt);
+      if (bm.scale && window.__setSignSize) window.__setSignSize(bm.scale);
+    };
+
+    window.__deleteBookmark = idx => {
+      window.__bookmarks.splice(idx, 1);
+      saveBookmarks(window.__bookmarks);
+      refreshBookmarkList();
+    };
+
+    function refreshBookmarkList() {
+      const sel = document.getElementById('bookmarkSel');
+      if (!sel) return;
+      sel.innerHTML = '<option value="">— saved locations —</option>' +
+        window.__bookmarks.map((b, i) => `<option value="${i}">${b.name}</option>`).join('');
+    }
+    window.__refreshBookmarkList = refreshBookmarkList;
 
     // Build UI panel
     const placer = document.createElement('div');
@@ -429,6 +588,34 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
         Press <b style="color:#fff;">X</b> to drop sign at Cesium cam position<br>
         Press <b style="color:#fff;">C</b> to drop sign where camera is looking
       </div>
+      <div style="color:#fff;font-size:9px;margin:10px 0 4px 0;">SIZE</div>
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px;">
+        <input id="sizeSlider" type="range" min="0.05" max="20" step="0.05" value="1" style="flex:1;accent-color:#f0f;">
+        <span id="sizeLabel" style="font-size:10px;color:#faa;min-width:44px;text-align:right;">1.00×</span>
+      </div>
+      <div style="color:#aaa;font-size:9px;line-height:1.4;">
+        Keys <b style="color:#fff;">+</b> / <b style="color:#fff;">-</b> scale, <b style="color:#fff;">=</b> reset
+      </div>
+
+      <div style="color:#fff;font-size:9px;margin:12px 0 4px 0;">MOVE & EDIT</div>
+      <button id="carryBtn" style="width:100%;background:rgba(255,0,255,0.2);color:#f0f;border:1px solid rgba(255,0,255,0.5);padding:5px;font:10px monospace;cursor:pointer;margin-bottom:4px;">✋ CARRY SIGN (G)</button>
+      <button id="hideBtn" style="width:100%;background:rgba(255,0,255,0.2);color:#f0f;border:1px solid rgba(255,0,255,0.5);padding:5px;font:10px monospace;cursor:pointer;margin-bottom:4px;">🙈 HIDE SIGN (H)</button>
+      <div style="display:flex;gap:4px;margin-bottom:4px;">
+        <button id="undoBtn" style="flex:1;background:rgba(255,0,255,0.15);color:#f0f;border:1px solid rgba(255,0,255,0.4);padding:4px;font:10px monospace;cursor:pointer;">↶ UNDO</button>
+        <button id="redoBtn" style="flex:1;background:rgba(255,0,255,0.15);color:#f0f;border:1px solid rgba(255,0,255,0.4);padding:4px;font:10px monospace;cursor:pointer;">↷ REDO</button>
+      </div>
+      <div style="color:#aaa;font-size:9px;line-height:1.4;margin-bottom:8px;">
+        <b style="color:#fff;">Ctrl+Z</b> undo · <b style="color:#fff;">Ctrl+Shift+Z</b> redo
+      </div>
+
+      <div style="color:#fff;font-size:9px;margin-bottom:4px;">SAVED LOCATIONS</div>
+      <select id="bookmarkSel" style="width:100%;background:#111;color:#f0f;border:1px solid #555;padding:3px;font:10px monospace;margin-bottom:4px;">
+        <option value="">— saved locations —</option>
+      </select>
+      <div style="display:flex;gap:4px;">
+        <button id="saveBookmarkBtn" style="flex:2;background:rgba(255,0,255,0.2);color:#f0f;border:1px solid rgba(255,0,255,0.5);padding:4px;font:10px monospace;cursor:pointer;">⭐ SAVE LOCATION</button>
+        <button id="deleteBookmarkBtn" style="flex:1;background:rgba(100,0,0,0.25);color:#faa;border:1px solid rgba(200,50,50,0.4);padding:4px;font:10px monospace;cursor:pointer;">🗑</button>
+      </div>
     `;
     document.body.appendChild(placer);
 
@@ -452,6 +639,34 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
         moveSignTo(lon, lat, alt);
       }
     });
+
+    // Size slider + setter
+    const sizeSlider = document.getElementById('sizeSlider');
+    const sizeLabel = document.getElementById('sizeLabel');
+    function setSignSize(s) {
+      s = Math.max(0.05, Math.min(20, s));
+      window.__signScale = s;
+      sizeSlider.value = s;
+      sizeLabel.textContent = s.toFixed(2) + '×';
+    }
+    window.__setSignSize = setSignSize;
+    sizeSlider.addEventListener('input', e => setSignSize(parseFloat(e.target.value)));
+
+    // ── WIRE NEW BUTTONS ──
+    document.getElementById('carryBtn').addEventListener('click', () => window.__toggleCarry());
+    document.getElementById('hideBtn').addEventListener('click', () => window.__toggleHideSign());
+    document.getElementById('undoBtn').addEventListener('click', () => window.__signUndo());
+    document.getElementById('redoBtn').addEventListener('click', () => window.__signRedo());
+    document.getElementById('saveBookmarkBtn').addEventListener('click', () => window.__saveBookmark());
+    document.getElementById('bookmarkSel').addEventListener('change', e => {
+      if (e.target.value !== '') window.__loadBookmark(parseInt(e.target.value));
+    });
+    document.getElementById('deleteBookmarkBtn').addEventListener('click', () => {
+      const sel = document.getElementById('bookmarkSel');
+      if (sel.value === '') return;
+      if (confirm('Delete this saved location?')) window.__deleteBookmark(parseInt(sel.value));
+    });
+    window.__refreshBookmarkList();
 
     // Drop handlers — X = camera position, C = where camera is looking
     window.__dropSignAtCam = () => {
@@ -694,6 +909,7 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
   const signGroup = new THREE.Group();
   const SIGN_ALTITUDE = 180;
   signGroup.position.set(0, SIGN_ALTITUDE, 0);
+  window.__signScale = 1.0;  // live-tweakable size multiplier
   scene.add(signGroup);
   
   const depthHintMeshes = [];  // populated below; hidden during the rest hold
@@ -1445,9 +1661,28 @@ To add music and loop:
       signRotation = startRot + (targetRot - startRot) * easeO;
     }
     signGroup.rotation.y = signRotation;
+    signGroup.scale.setScalar(window.__signScale || 1.0);
     signGroup.position.y = SIGN_ALTITUDE + Math.sin(t * 0.22) * 1.0;
 
     updateCamera(camT);
+
+    // ── CARRY MODE: sign follows camera at fixed distance ahead ──
+    if (window.__signCarrying && cesiumViewer && cesiumReady) {
+      const cam = cesiumViewer.camera;
+      const dist = window.__signCarryDistance || 400;
+      const ahead = Cesium.Cartesian3.add(
+        cam.position,
+        Cesium.Cartesian3.multiplyByScalar(cam.direction, dist, new Cesium.Cartesian3()),
+        new Cesium.Cartesian3()
+      );
+      const cart = Cesium.Cartographic.fromCartesian(ahead);
+      // Update anchors directly (skipping history — carry is continuous movement)
+      window.__SIGN_ANCHOR_LON = Cesium.Math.toDegrees(cart.longitude);
+      window.__SIGN_ANCHOR_LAT = Cesium.Math.toDegrees(cart.latitude);
+      window.__SIGN_ANCHOR_ALT = cart.height;
+      const coordsEl = document.getElementById('signCoords');
+      if (coordsEl) coordsEl.textContent = `${window.__SIGN_ANCHOR_LON.toFixed(5)}, ${window.__SIGN_ANCHOR_LAT.toFixed(5)}, ${window.__SIGN_ANCHOR_ALT.toFixed(0)}m (carrying)`;
+    }
 
     // ── CAMERA LINK: in FREE mode, Three.js mirrors Cesium relative to sign anchor ──
     if (window.__cameraMode === 'free' && cesiumViewer && cesiumReady) {
