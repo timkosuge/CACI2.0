@@ -293,6 +293,25 @@
       </div>
     </div>
   </div>
+  <div class="section" id="secBloom">
+    <div class="section-header" data-target="secBloom"><span>✨ Bloom / Glow</span><span class="caret">▾</span></div>
+    <div class="section-body">
+      <div class="row">
+        <label style="display:flex;align-items:center;gap:8px;color:#e8d7ff;font:500 11px -apple-system,sans-serif;cursor:pointer;">
+          <input id="bloomToggle" type="checkbox" style="accent-color:#f0f;cursor:pointer;">
+          <span>Enable bloom</span>
+        </label>
+      </div>
+      <div class="row"><span class="tag">Strength</span>
+        <input id="bloomStrengthSlider" type="range" min="0" max="3" step="0.05" value="0.9">
+        <span class="val" id="bloomStrengthLabel">0.90</span></div>
+      <div class="row"><span class="tag">Threshold</span>
+        <input id="bloomThresholdSlider" type="range" min="0" max="1" step="0.01" value="0.65">
+        <span class="val" id="bloomThresholdLabel">0.65</span></div>
+      <div class="hint">Bloom can shift the outer tube color slightly. Turn off if you prefer the raw neon look.</div>
+    </div>
+  </div>
+
   <div class="section" id="secTime">
     <div class="section-header" data-target="secTime"><span>☀ Time of Day</span><span class="caret">▾</span></div>
     <div class="section-body">
@@ -512,11 +531,15 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
   // 4. compositeScene: draw sceneRT + blurred bloom additively to screen
   // ────────────────────────────────────────────────────────────
   function makeRT(w, h) {
-    return new THREE.WebGLRenderTarget(w, h, {
+    const rt = new THREE.WebGLRenderTarget(w, h, {
       minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter,
       format: THREE.RGBAFormat, type: THREE.UnsignedByteType,
       depthBuffer: true, stencilBuffer: false
     });
+    // Match the direct-to-screen encoding so colors don't shift
+    // (r128 uses sRGBEncoding for screen output by default)
+    rt.texture.encoding = THREE.LinearEncoding;
+    return rt;
   }
   let rtW = window.innerWidth, rtH = window.innerHeight;
   let sceneRT  = makeRT(rtW, rtH);
@@ -631,7 +654,7 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
     renderer.setRenderTarget(null);
   }
 
-  window.__bloomEnabled = true;
+  window.__bloomEnabled = false;  // off by default — user can enable via panel
   window.__bloomStrength = 0.9;
   window.__bloomThreshold = 0.65;
 
@@ -1104,6 +1127,29 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
         applyTimeOfDay(v);
       });
     });
+
+    // ── BLOOM CONTROLS ──
+    const bloomToggle = document.getElementById('bloomToggle');
+    const bStrSlider  = document.getElementById('bloomStrengthSlider');
+    const bStrLabel   = document.getElementById('bloomStrengthLabel');
+    const bThrSlider  = document.getElementById('bloomThresholdSlider');
+    const bThrLabel   = document.getElementById('bloomThresholdLabel');
+    if (bloomToggle) {
+      bloomToggle.checked = window.__bloomEnabled;
+      bloomToggle.addEventListener('change', e => { window.__bloomEnabled = e.target.checked; });
+    }
+    if (bStrSlider) {
+      bStrSlider.addEventListener('input', e => {
+        window.__bloomStrength = parseFloat(e.target.value);
+        bStrLabel.textContent = window.__bloomStrength.toFixed(2);
+      });
+    }
+    if (bThrSlider) {
+      bThrSlider.addEventListener('input', e => {
+        window.__bloomThreshold = parseFloat(e.target.value);
+        bThrLabel.textContent = window.__bloomThreshold.toFixed(2);
+      });
+    }
 
     // ── MINIMAP ──
     // Stylized NYC — Manhattan polygon, water, landmasses. Pink dot = sign, yellow arrow = camera.
