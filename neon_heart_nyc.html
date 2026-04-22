@@ -613,6 +613,9 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
     refreshModeUI();
 
     const keys = {};
+    // Clear all pressed-key state whenever the window loses focus (e.g. modal alert/prompt).
+    // Prevents a keydown-without-keyup situation from sending the camera flying forever.
+    window.addEventListener('blur', () => { for (const k in keys) delete keys[k]; });
     window.addEventListener('keydown', e => {
       keys[e.key.toLowerCase()] = true;
       if (e.key === ' ') {
@@ -784,6 +787,17 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
         const up = Cesium.Cartesian3.normalize(cam.position, new Cesium.Cartesian3());
         cam.position = Cesium.Cartesian3.add(cam.position, Cesium.Cartesian3.multiplyByScalar(up, -speed, new Cesium.Cartesian3()), new Cesium.Cartesian3());
       }
+      // Safety: clamp altitude so stuck keys don't send us into deep space or through the Earth
+      try {
+        const cart = Cesium.Cartographic.fromCartesian(cam.position);
+        if (cart.height > 50000) {
+          cart.height = 50000;
+          cam.position = Cesium.Cartographic.toCartesian(cart);
+        } else if (cart.height < -50) {
+          cart.height = -50;
+          cam.position = Cesium.Cartographic.toCartesian(cart);
+        }
+      } catch(e) {}
 
       // ── LOOK (pitch/yaw) ──
       if (keys['arrowleft'])  cam.lookLeft(rate);
@@ -2140,6 +2154,7 @@ To add music and loop:
     const lbl = document.getElementById('recLabel');
     if (!btn) return;
     btn.addEventListener('click', () => {
+      btn.blur();  // don't keep focus — keyboard would re-trigger it
       if (window.__recording) return;  // already recording
       const choice = prompt(
         'Recording quality (enter 1-4):\n' +
