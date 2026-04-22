@@ -1727,11 +1727,11 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
       try {
         const signLight = new Cesium.PostProcessStage({
           uniforms: {
-            uSignECEF:    new Cesium.Cartesian3(0, 0, 0),  // updated each frame
-            uLightColor:  new Cesium.Cartesian3(1.0, 0.25, 0.7),  // neon pink
-            uLightRadius: 800.0,    // metres — distance at which glow falls to ~0
-            uLightPower:  1.0,      // master brightness
-            uTimeMult:    1.0,      // ramps with time-of-day (off in daylight)
+            uSignECEF:    { x: 0, y: 0, z: 0 },
+            uLightColor:  { x: 1.0, y: 0.25, z: 0.7 },
+            uLightRadius: 800.0,
+            uLightPower:  1.0,
+            uTimeMult:    1.0,
           },
           fragmentShader: `
             uniform sampler2D colorTexture;
@@ -2638,22 +2638,22 @@ To add music and loop:
 
     // ── UPDATE SIGN-LIGHT UNIFORMS ──
     if (window.__signLight) {
-      // Sign's real ECEF position: GPS anchor + 180m altitude (SIGN_ALTITUDE in metres)
+      // Sign's real ECEF position: GPS anchor + SIGN_ALTITUDE (180m) above sea level
       const signCart = Cesium.Cartesian3.fromDegrees(
         window.__SIGN_ANCHOR_LON,
         window.__SIGN_ANCHOR_LAT,
         window.__SIGN_ANCHOR_ALT + SIGN_ALTITUDE
       );
-      window.__signLight.uniforms.uSignECEF = signCart;
-      // Ramp intensity with time-of-day (full at night, fades to 0 at noon)
-      // Also apply a master `window.__signLightPower` knob
+      // Cesium PostProcessStage: uniform must be re-assigned as a plain object
+      // for the stage to pick up the change each frame.
+      window.__signLight.uniforms.uSignECEF = { x: signCart.x, y: signCart.y, z: signCart.z };
       const tMult = (window.__timeNeonMult !== undefined) ? window.__timeNeonMult : 1.0;
       window.__signLight.uniforms.uTimeMult = tMult;
-      window.__signLight.uniforms.uLightPower = (window.__signLightPower !== undefined) ? window.__signLightPower : 1.0;
-      window.__signLight.uniforms.uLightRadius = (window.__signLightRadius !== undefined) ? window.__signLightRadius : 800.0;
-      // Also scale with sign size — bigger sign = farther-reaching light
+      const power = (window.__signLightPower !== undefined) ? window.__signLightPower : 1.0;
+      window.__signLight.uniforms.uLightPower = power;
+      const baseRadius = (window.__signLightRadius !== undefined) ? window.__signLightRadius : 800.0;
       const scale = window.__signScale || 1;
-      window.__signLight.uniforms.uLightRadius = (window.__signLightRadius || 800) * Math.max(0.3, Math.sqrt(scale));
+      window.__signLight.uniforms.uLightRadius = baseRadius * Math.max(0.3, Math.sqrt(scale));
     }
     if (cesiumViewer && cesiumReady) {
       try {
@@ -2745,11 +2745,10 @@ To add music and loop:
       const relENU = Cesium.Matrix3.multiplyByVector(invRot, relECEF, new Cesium.Cartesian3());
       camera.position.set(relENU.x, relENU.z, -relENU.y);
 
-      // Direction and up both need to follow Cesium to preserve rotation/roll/pitch
+      // Direction and up follow Cesium
       const dirENU = Cesium.Matrix3.multiplyByVector(invRot, cesiumCam.direction, new Cesium.Cartesian3());
       const upENU  = Cesium.Matrix3.multiplyByVector(invRot, cesiumCam.up, new Cesium.Cartesian3());
 
-      // ENU(x=E,y=N,z=U) → Three(x=E, y=U, z=-N)
       camera.up.set(upENU.x, upENU.z, -upENU.y);
       camera.lookAt(
         camera.position.x + dirENU.x,
@@ -2759,8 +2758,11 @@ To add music and loop:
 
       camera.fov = Cesium.Math.toDegrees(cesiumCam.frustum.fov);
       camera.updateProjectionMatrix();
+
+      // Expose for debugging
+      window.__dbgCamPos = camera.position.toArray();
+      window.__dbgSignAnchor = [window.__SIGN_ANCHOR_LON, window.__SIGN_ANCHOR_LAT, window.__SIGN_ANCHOR_ALT];
     } else {
-      // Reset Three.js up to world-Y in synced mode so v9 choreography behaves correctly
       camera.up.set(0, 1, 0);
     }
 
