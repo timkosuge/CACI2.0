@@ -381,6 +381,21 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
   // collapse UI, top-bar buttons. Runs immediately on DOM ready.
   // ════════════════════════════════════════════════════════════
   (function initChrome(){
+    // GLOBAL: after any button is clicked, blur it so focused-button keypresses
+    // don't intercept navigation keys like R (which would re-fire the button via Enter/Space accesskey).
+    document.addEventListener('click', e => {
+      if (e.target.tagName === 'BUTTON') {
+        e.target.blur();
+      }
+    }, true);
+    // Also clear focus if user starts a nav key while a button is focused
+    window.addEventListener('keydown', e => {
+      const k = e.key.toLowerCase();
+      const navKeys = ['w','a','s','d','r','f','q','e','t','g','h','y',' '];
+      if (navKeys.includes(k) && document.activeElement && document.activeElement.tagName === 'BUTTON') {
+        document.activeElement.blur();
+      }
+    }, true);
     // Section collapse (click header to toggle body)
     document.querySelectorAll('.section-header').forEach(h => {
       h.addEventListener('click', () => {
