@@ -188,6 +188,124 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
     // Narrow the FOV so Manhattan fills the Cesium canvas
     cesiumViewer.camera.frustum.fov = Cesium.Math.toRadians(35);
 
+    // ── FULL 6-DOF CAMERA CONTROLS ──
+    // Sign choreography keeps running; you have total control over Cesium camera.
+    const keys = {};
+    window.addEventListener('keydown', e => {
+      keys[e.key.toLowerCase()] = true;
+      // Prevent arrow keys from scrolling
+      if (e.key.startsWith('Arrow') || e.key === ' ') e.preventDefault();
+    });
+    window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+    // Mouse drag to orbit/look (like Cesium default)
+    let mouseDown = false, lastX = 0, lastY = 0, mouseBtn = 0;
+    canvas.addEventListener('mousedown', e => {
+      mouseDown = true; mouseBtn = e.button;
+      lastX = e.clientX; lastY = e.clientY;
+    });
+    window.addEventListener('mouseup', () => { mouseDown = false; });
+    window.addEventListener('mousemove', e => {
+      if (!mouseDown) return;
+      const dx = (e.clientX - lastX) * 0.003;
+      const dy = (e.clientY - lastY) * 0.003;
+      lastX = e.clientX; lastY = e.clientY;
+      const cam = cesiumViewer.camera;
+      if (mouseBtn === 0) {
+        // Left drag = look around (FPS style)
+        cam.lookLeft(dx);
+        cam.lookUp(-dy);
+      } else if (mouseBtn === 2) {
+        // Right drag = 360 pivot around current look target
+        cam.rotateRight(dx);
+        cam.rotateUp(-dy);
+      }
+    });
+    canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+    // Mouse wheel = zoom (dolly forward/back)
+    canvas.addEventListener('wheel', e => {
+      e.preventDefault();
+      const amt = e.deltaY * 0.5;
+      cesiumViewer.camera.moveBackward(amt);
+    }, { passive: false });
+
+    function updateCesiumCam() {
+      const cam = cesiumViewer.camera;
+      const fast  = keys['shift'];
+      const slow  = keys['control'] || keys['alt'];
+      const speed = fast ? 15 : (slow ? 0.5 : 3);          // metres per frame
+      const rate  = fast ? 0.025 : (slow ? 0.002 : 0.008); // radians per frame
+
+      // ── TRANSLATION ──
+      if (keys['w']) cam.moveForward(speed);
+      if (keys['s']) cam.moveBackward(speed);
+      if (keys['a']) cam.moveLeft(speed);
+      if (keys['d']) cam.moveRight(speed);
+      if (keys['r']) cam.moveUp(speed);       // R = rise
+      if (keys['f']) cam.moveDown(speed);     // F = fall
+
+      // ── LOOK (pitch/yaw) ──
+      if (keys['arrowleft'])  cam.lookLeft(rate);
+      if (keys['arrowright']) cam.lookRight(rate);
+      if (keys['arrowup'])    cam.lookUp(rate);
+      if (keys['arrowdown'])  cam.lookDown(rate);
+
+      // ── ROLL (Z-axis twist, Q/E) ──
+      if (keys['q']) cam.twistLeft(rate);
+      if (keys['e']) cam.twistRight(rate);
+
+      // ── PIVOT / ORBIT (360 around target) — T/G/H/Y ──
+      if (keys['t']) cam.rotateUp(rate);
+      if (keys['g']) cam.rotateDown(rate);
+      if (keys['h']) cam.rotateLeft(rate);
+      if (keys['y']) cam.rotateRight(rate);
+
+      // ── ZOOM / FOV — [ ] ──
+      if (keys['[']) {
+        cam.frustum.fov = Math.min(Cesium.Math.toRadians(120), cam.frustum.fov + 0.01);
+      }
+      if (keys[']']) {
+        cam.frustum.fov = Math.max(Cesium.Math.toRadians(5), cam.frustum.fov - 0.01);
+      }
+
+      // ── RESET VIEW (0 key) ──
+      if (keys['0']) {
+        cam.setView({
+          destination: Cesium.Cartesian3.fromDegrees(-74.016, 40.758, 180),
+          orientation: { heading: Cesium.Math.toRadians(95), pitch: Cesium.Math.toRadians(-6), roll: 0 }
+        });
+        cam.frustum.fov = Cesium.Math.toRadians(35);
+        keys['0'] = false;
+      }
+    }
+    window.__updateCesiumCam = updateCesiumCam;
+
+    // Controls HUD
+    const controlsHint = document.createElement('div');
+    controlsHint.style.cssText = 'position:fixed;top:12px;right:12px;padding:12px 16px;background:rgba(0,0,0,0.75);color:#f0f;font:10px monospace;border-radius:4px;z-index:20;pointer-events:none;line-height:1.6;border:1px solid rgba(255,0,255,0.3);';
+    controlsHint.innerHTML = `
+      <b style="color:#fff;font-size:11px;">CAMERA · 6-DOF</b><br>
+      <span style="color:#fff;">MOVE</span><br>
+      W/S &nbsp;forward/back<br>
+      A/D &nbsp;strafe L/R<br>
+      R/F &nbsp;up/down<br><br>
+      <span style="color:#fff;">LOOK</span><br>
+      ARROWS &nbsp;pan/tilt<br>
+      MOUSE drag &nbsp;free look<br><br>
+      <span style="color:#fff;">ROLL / ORBIT</span><br>
+      Q/E &nbsp;roll L/R<br>
+      T/G/H/Y &nbsp;orbit target<br>
+      RIGHT-CLICK drag &nbsp;orbit<br><br>
+      <span style="color:#fff;">ZOOM</span><br>
+      [ ] &nbsp;FOV wide/tele<br>
+      WHEEL &nbsp;dolly<br><br>
+      <span style="color:#fff;">SPEED</span><br>
+      SHIFT fast · CTRL slow<br>
+      0 &nbsp;reset view
+    `;
+    document.body.appendChild(controlsHint);
+
     setLoad('LOADING TILES', 50);
     if (googleKey) {
       try {
@@ -1047,6 +1165,7 @@ To add music and loop:
     }
     if (cesiumViewer && cesiumReady) {
       try {
+        if (window.__updateCesiumCam) window.__updateCesiumCam();
         cesiumViewer.scene.render();
         const cc = cesiumViewer.canvas;
         if (cc.width > 0) {
