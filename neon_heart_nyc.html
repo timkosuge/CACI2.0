@@ -77,6 +77,9 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
   const bgTexture = new THREE.CanvasTexture(bgCanvas);
   bgTexture.minFilter = THREE.LinearFilter;
   bgTexture.magFilter = THREE.LinearFilter;
+  bgTexture.generateMipmaps = false;
+  bgTexture.format = THREE.RGBAFormat;
+  bgTexture.flipY = true;
   scene.background = bgTexture;
 
   // ── V9 NIGHT SKY SPHERE ──
