@@ -1025,9 +1025,13 @@ To add music and loop:
         if (cc.width > 0) {
           // Blit the raw Cesium frame
           bgCtx.drawImage(cc, 0, 0, bgCanvas.width, bgCanvas.height);
-          // Darken + blue-shift to simulate night — multiply over a dark navy colour
+          // Night colour grade — darken + blue shift without killing the city
           bgCtx.globalCompositeOperation = 'multiply';
-          bgCtx.fillStyle = 'rgb(20, 25, 60)';   // dark blue-navy tint
+          bgCtx.fillStyle = 'rgb(80, 90, 140)';  // lighter navy — keeps buildings visible
+          bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+          // Second pass: slight additional darkening
+          bgCtx.globalCompositeOperation = 'multiply';
+          bgCtx.fillStyle = 'rgb(160, 165, 180)';
           bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
           bgCtx.globalCompositeOperation = 'source-over';
           bgTexture.needsUpdate = true;
