@@ -91,34 +91,7 @@ window.SIGN_PATHS = {"w":1079,"h":1080,"paths":[[[332,41],[334,39],[341,40],[344
   bgScene.add(bgQuad);
   scene.background = null;
 
-  // ── V9 NIGHT SKY SPHERE ──
-  // Renders on top of bgTexture for the upper sky — gives the dark blue
-  // city-light-pollution gradient instead of a black void
-  const skyMat = new THREE.ShaderMaterial({
-    vertexShader: `varying vec3 vPos; void main() { vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-    fragmentShader: `
-      varying vec3 vPos;
-      void main() {
-        vec3 nd = normalize(vPos);
-        float h = nd.y;
-        // DISCARD lower hemisphere — let Cesium city show through
-        if (h < 0.0) discard;
-        vec3 zenith  = vec3(0.008, 0.010, 0.028);
-        vec3 midSky  = vec3(0.04,  0.03,  0.08);
-        vec3 horizon = vec3(0.12,  0.07,  0.10);
-        vec3 col;
-        if (h > 0.3) col = mix(midSky, zenith, smoothstep(0.3, 0.9, h));
-        else         col = mix(horizon, midSky, smoothstep(0.0, 0.3, h));
-        float lateralWarmth = max(0.0, nd.z) * 0.3 + 0.75;
-        col *= lateralWarmth;
-        gl_FragColor = vec4(col, 1.0);
-      }
-    `,
-    side: THREE.BackSide,
-    depthWrite: false,
-    transparent: true,
-  });
-  scene.add(new THREE.Mesh(new THREE.SphereGeometry(6000, 32, 16), skyMat));
+  // (Sky sphere removed — Cesium's rendered output already contains sky between buildings)
 
   // ── V9 STARS ──
   const starGeom = new THREE.BufferGeometry();
