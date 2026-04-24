@@ -8698,11 +8698,13 @@ html body[data-theme="light"] #discovery-greeting-strip .dgs-text strong {
 <div id="app">
   <div id="app-glimmer"></div>
 
-  <!-- Sidebar -->
-  <aside id="sidebar">
+  <!-- Sidebar toggle — lives outside <aside> so sidebar's overflow:hidden can't clip it -->
   <button id="sb-toggle" title="Toggle sidebar" aria-label="Toggle sidebar">
     <svg viewBox="0 0 8 12" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="6,1 2,6 6,11"/></svg>
   </button>
+
+  <!-- Sidebar -->
+  <aside id="sidebar">
     <div class="sb-header">
       <div class="sb-brand-plate">
         <div class="sb-plaque">
