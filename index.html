@@ -10041,7 +10041,7 @@ html body[data-theme="light"] #discovery-greeting-strip .dgs-text strong {
       </div>
     </div>
     <div style="font-family:var(--f-mono);font-size:9px;color:var(--smoke4);letter-spacing:0.06em;margin:4px 0 12px;flex-shrink:0" id="fv-meta"></div>
-    <div id="fv-content" style="flex:1;overflow-y:auto;background:rgba(0,0,0,0.2);border:1px solid var(--line);border-radius:4px;padding:16px;font-family:var(--f-mono);font-size:10px;line-height:1.7;color:var(--smoke2);white-space:pre-wrap;word-break:break-word;scrollbar-width:thin;scrollbar-color:rgba(212,168,50,0.3) transparent">Loading...</div>
+    <div id="fv-content" style="flex:1;overflow-y:auto;background:rgba(0,0,0,0.2);border:1px solid var(--line);border-radius:4px;padding:14px 8px;scrollbar-width:thin;scrollbar-color:rgba(212,168,50,0.3) transparent">Loading...</div>
   </div>
 </div>
 
@@ -11911,12 +11911,16 @@ function appendMsg(role, text, sources, scope, model = '', responseId = '', imag
   // Make sources clickable - each source becomes a link that opens the document viewer
   let src = '';
   if (sources && sources.length) {
-    const sourceLinks = sources.map(sourceName => {
-      // Strip folder path to get just the filename (sources may include "Folder / filename")
+    const sourceLinks = sources.map(source => {
+      // Support both {name, id} objects (new) and plain strings (legacy)
+      const sourceName = typeof source === 'object' ? (source.name || '') : source;
+      const directId   = typeof source === 'object' ? source.id : null;
+
+      // Prefer the id from the source object; fall back to the name→id map
       const justFilename = sourceName.includes(' / ') ? sourceName.split(' / ').pop() : sourceName;
-      const fileId = _fileNameToIdMap[justFilename];
+      const fileId = directId || _fileNameToIdMap[justFilename] || _fileNameToIdMap[sourceName];
+
       if (fileId) {
-        // Escape for HTML attributes - replace quotes
         const escapedName = String(sourceName).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
         return `<span class="source-link" data-file-id="${fileId}" data-file-name="${escapedName}">${esc(sourceName)}</span>`;
       } else {
@@ -12961,7 +12965,7 @@ async function openFileViewer(id, name) {
 
   title.textContent = name || 'Document';
   meta.textContent = 'Loading…';
-  content.textContent = 'Loading…';
+  content.innerHTML = '<div style="color:var(--smoke4);font-family:var(--f-mono);font-size:10px;padding:20px 0;text-align:center">Loading document…</div>';
   modal.style.display = 'flex';
 
   // Close handlers
@@ -12973,12 +12977,66 @@ async function openFileViewer(id, name) {
     const d = await res.json();
     if (!d.ok) { content.textContent = 'Error: ' + (d.error || 'Failed to load'); return; }
 
-    meta.textContent = `${(d.chunkCount||0)} chunks · ${(d.charCount||0).toLocaleString()} chars`;
-    
-    // Show chunks with dividers if we have the raw chunk data, otherwise just text
-    if (d.text) {
-      // Split on double newlines to show logical sections
-      content.textContent = d.text;
+    // Build metadata line
+    const metaParts = [];
+    if (d.meta?.reportName && d.meta.reportName !== d.name) metaParts.push(d.meta.reportName);
+    if (d.collection) metaParts.push(d.collection);
+    if (d.meta?.period) metaParts.push(d.meta.period);
+    if (d.meta?.states) metaParts.push(d.meta.states);
+    if (d.meta?.store) metaParts.push(d.meta.store);
+    const chunkInfo = `${(d.chunkCount||0)} chunks · ${(d.charCount||0).toLocaleString()} chars`;
+    const dateInfo = d.uploadedAt ? ' · uploaded ' + new Date(d.uploadedAt).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '';
+    meta.innerHTML = `<span style="color:var(--gold);opacity:0.7">${metaParts.join(' · ')}</span>${metaParts.length ? ' · ' : ''}${chunkInfo}${dateInfo}`;
+
+    // Render chunks as styled sections
+    if (d.chunks && d.chunks.length) {
+      const frag = document.createDocumentFragment();
+
+      d.chunks.forEach((chunk, i) => {
+        // Chunk container
+        const chunkEl = document.createElement('div');
+        chunkEl.style.cssText = 'margin-bottom:0;';
+
+        // Chunk header bar
+        const header = document.createElement('div');
+        header.style.cssText = `
+          display:flex;align-items:center;gap:8px;
+          padding:5px 10px;margin-bottom:6px;
+          background:rgba(212,168,50,0.04);
+          border-left:2px solid rgba(212,168,50,0.25);
+          border-radius:0 3px 3px 0;
+        `;
+        header.innerHTML = `
+          <span style="font-family:var(--f-mono);font-size:8px;letter-spacing:0.12em;color:rgba(212,168,50,0.40);text-transform:uppercase;flex-shrink:0">§ ${i + 1}</span>
+          <span style="font-family:var(--f-mono);font-size:8px;color:rgba(212,168,50,0.25);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(chunk.slice(0,80).replace(/\n/g,' '))}</span>
+        `;
+
+        // Chunk body — render markdown
+        const body = document.createElement('div');
+        body.style.cssText = `
+          font-family:var(--f-mono);font-size:10px;line-height:1.75;
+          color:var(--smoke2);padding:4px 10px 16px 12px;
+          white-space:pre-wrap;word-break:break-word;
+        `;
+        body.innerHTML = renderMarkdown(chunk);
+
+        chunkEl.appendChild(header);
+        chunkEl.appendChild(body);
+
+        // Divider between chunks (not after last)
+        if (i < d.chunks.length - 1) {
+          const div = document.createElement('div');
+          div.style.cssText = 'border-top:1px solid rgba(212,168,50,0.08);margin:0 0 14px 0;';
+          chunkEl.appendChild(div);
+        }
+
+        frag.appendChild(chunkEl);
+      });
+
+      content.innerHTML = '';
+      content.appendChild(frag);
+    } else if (d.text) {
+      content.innerHTML = `<div style="font-family:var(--f-mono);font-size:10px;line-height:1.75;color:var(--smoke2);white-space:pre-wrap;word-break:break-word">${renderMarkdown(d.text)}</div>`;
     } else {
       content.textContent = '(No text content extracted)';
     }
