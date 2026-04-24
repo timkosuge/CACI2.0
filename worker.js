@@ -800,7 +800,7 @@ async function handleGetFileContent(path, env, request) {
     if (!stored) return json({ error: 'File not found' }, 404);
     const chunks = stored.chunks || [];
     const text = chunks.join('\n\n────────────────────\n\n');
-    return json({ ok: true, id, name: stored.name || id, text, chunks, chunkCount: chunks.length, charCount: text.length });
+    return json({ ok: true, id, name: stored.name || id, text, chunks, chunkCount: chunks.length, charCount: text.length, meta: stored.meta || {}, collection: stored.collection || '', uploadedAt: stored.uploadedAt || '' });
   } catch (e) { return json({ error: e.message }, 500); }
 }
 
@@ -1949,10 +1949,18 @@ async function buildContextMultiCollection({ message, dept, env, maxCollections 
 
     const top = deduped.slice(0, 22);
     const text = top.map(c => c.chunk).join('\n\n---\n\n');
-    const sources = [...new Set(top.map(c => {
-      const m = c.chunk.match(/^\[([^\]]+)\]/);
-      return m ? m[1] : c.colName;
-    }))];
+    // Collect {name, id} sources from all sub-results (already enriched by buildContextTwoPass)
+    const seenMulti = new Set();
+    const sources = [];
+    for (const r of results) {
+      for (const s of (r.sources || [])) {
+        const key = typeof s === 'object' ? s.name : s;
+        if (!seenMulti.has(key)) {
+          seenMulti.add(key);
+          sources.push(typeof s === 'object' ? s : { name: s, id: null });
+        }
+      }
+    }
 
     const manifest = colScores.map(c =>
       `- ${c.name} (score:${c._colScore}, ${c.fileCount || '?'} files${c.summary ? ' — ' + c.summary : ''})`
@@ -2312,7 +2320,7 @@ async function buildContextTwoPass({ message, dept, collection, env }) {
       if (!fileData.chunks?.length || seenSummaryFiles.has(fileData.name)) continue;
       const first = fileData.chunks[0];
       if (first.toLowerCase().startsWith('file summary') || first.toLowerCase().startsWith('sheet:')) {
-        guaranteedChunks.push({ chunk: first, score: 999, filename: fileData.name, collection: fileData.collection, meta: fileData.meta || {}, _guaranteed: true });
+        guaranteedChunks.push({ chunk: first, score: 999, filename: fileData.name, fileId: fileData.id, collection: fileData.collection, meta: fileData.meta || {}, _guaranteed: true });
         seenSummaryFiles.add(fileData.name);
       }
     }
@@ -2353,6 +2361,7 @@ async function buildContextTwoPass({ message, dept, collection, env }) {
           kwScore,
           semScore:   semSim,
           filename:   fileData.name,
+          fileId:     fileData.id,
           collection: fileData.collection,
           meta:       fileData.meta || {},
         });
@@ -2393,7 +2402,15 @@ async function buildContextTwoPass({ message, dept, collection, env }) {
     // Re-rank before final assembly
     const reranked = rerankChunks(top, keywords2, intent2);
 
-    const sources = [...new Set(reranked.map(x => x.filename))];
+    // Build sources as {name, id} objects so the frontend can link directly
+    const seenSourceNames = new Set();
+    const sources = [];
+    for (const x of reranked) {
+      if (!seenSourceNames.has(x.filename)) {
+        seenSourceNames.add(x.filename);
+        sources.push({ name: x.filename, id: x.fileId });
+      }
+    }
     const text = reranked.map(x => {
       const period = x.meta?.period ? ` [${x.meta.period}]` : '';
       return `[${x.collection}${period} / ${x.filename}]\n${x.chunk}`;
@@ -2553,7 +2570,7 @@ async function buildContext({ message, dept, collection, fileId, scope, env }) {
       if (!fileData.chunks?.length || seenSummary.has(fileData.name)) continue;
       const first = fileData.chunks[0];
       if (first.toLowerCase().startsWith('file summary') || first.toLowerCase().startsWith('sheet:')) {
-        summaryChunks.push({ chunk: first, score: 999, filename: fileData.name, collection: fileData.collection, meta: fileData.meta || {} });
+        summaryChunks.push({ chunk: first, score: 999, filename: fileData.name, fileId: fileData.id, collection: fileData.collection, meta: fileData.meta || {} });
         seenSummary.add(fileData.name);
       }
     }
@@ -2586,6 +2603,7 @@ async function buildContext({ message, dept, collection, fileId, scope, env }) {
           chunk,
           score:      blended + fileBoost * 0.05,
           filename:   fileData.name,
+          fileId:     fileData.id,
           collection: fileData.collection,
           meta:       fileData.meta || {},
         });
@@ -2612,10 +2630,12 @@ async function buildContext({ message, dept, collection, fileId, scope, env }) {
 
     if (!top.length) {
       const fallback = filesToSearch.slice(0, 3).flatMap(f =>
-        (f.chunks || []).slice(0, 2).map(chunk => ({ chunk, filename: f.name, collection: f.collection, meta: f.meta || {} }))
+        (f.chunks || []).slice(0, 2).map(chunk => ({ chunk, filename: f.name, fileId: f.id, collection: f.collection, meta: f.meta || {} }))
       );
       if (!fallback.length) return { text: '', sources: [], statsContext: statsLines.join('\n'), focusFile: filesToSearch[0]?.name };
-      const sources = [...new Set(fallback.map(x => x.filename))];
+      const seenFb = new Set();
+      const sources = [];
+      for (const x of fallback) { if (!seenFb.has(x.filename)) { seenFb.add(x.filename); sources.push({ name: x.filename, id: x.fileId }); } }
       const text = fallback.map(x => {
         const period = x.meta?.period ? ` [${x.meta.period}]` : '';
         return `[${x.collection}${period} / ${x.filename}]\n${x.chunk}`;
@@ -2626,7 +2646,9 @@ async function buildContext({ message, dept, collection, fileId, scope, env }) {
     // Re-rank before final assembly
     const rerankedTop = rerankChunks(top, keywords, intent);
 
-    const sources = [...new Set(rerankedTop.map(x => x.filename))];
+    const seenRt = new Set();
+    const sources = [];
+    for (const x of rerankedTop) { if (!seenRt.has(x.filename)) { seenRt.add(x.filename); sources.push({ name: x.filename, id: x.fileId }); } }
     const text = rerankedTop.map(x => {
       const period = x.meta?.period ? ` [${x.meta.period}]` : '';
       return `[${x.collection}${period} / ${x.filename}]\n${x.chunk}`;
@@ -3437,10 +3459,12 @@ function filterUsedSources(sources, responseText) {
   
   const usedSources = sources.filter(src => {
     if (!src) return false;
-    const srcLower = src.toLowerCase();
+    // Support both plain strings and {name, id} objects
+    const srcName = typeof src === 'object' ? (src.name || '') : src;
+    const srcLower = srcName.toLowerCase();
     
     // Strip path prefix (e.g., "Collection / filename.pdf" -> "filename.pdf")
-    const justName = src.includes(' / ') ? src.split(' / ').pop() : src;
+    const justName = srcName.includes(' / ') ? srcName.split(' / ').pop() : srcName;
     const nameLower = justName.toLowerCase();
     const nameNoExt = nameLower.replace(/\.[a-z]+$/, '');
     
@@ -3448,11 +3472,9 @@ function filterUsedSources(sources, responseText) {
     if (respLower.includes(nameLower) || respLower.includes(nameNoExt)) return true;
     
     // Check 2: Extract rule/section codes from filename
-    // Handles formats like: OH_1301_18_8_02, 1301-18-8-02, 1301:18:8:02
     const codeMatches = justName.match(/\b\d{3,}[_:\-\.]\d+[_:\-\.]\d+[_:\-\.]?\d*/g);
     if (codeMatches) {
       for (const code of codeMatches) {
-        // Normalize the code to various formats the LLM might use
         const normalized = code.replace(/[_\-\.]/g, ':');
         const withHyphens = code.replace(/[_:\.]/g, '-');
         const withDots = code.replace(/[_:\-]/g, '.');
@@ -3464,18 +3486,15 @@ function filterUsedSources(sources, responseText) {
       }
     }
     
-    // Check 3: Extract distinctive keywords from filename (3+ chars, not common words)
-    // e.g., "Dispensary_Operating_Procedures" → ["Dispensary", "Operating", "Procedures"]
+    // Check 3: Extract distinctive keywords from filename
     const stopWords = new Set(['the','and','for','with','from','this','that','what','have','has','had','been','were','are','was','can']);
     const keywords = nameNoExt
       .split(/[_\-\s\.]+/)
       .filter(w => w.length >= 5 && !stopWords.has(w.toLowerCase()) && !/^\d+$/.test(w));
     
-    // If at least 2 distinctive keywords from the filename appear, consider it used
     if (keywords.length >= 2) {
       const matches = keywords.filter(kw => respLower.includes(kw.toLowerCase())).length;
       if (matches >= 2) return true;
-      // Or if a single very distinctive keyword (8+ chars) matches
       if (keywords.some(kw => kw.length >= 8 && respLower.includes(kw.toLowerCase()))) return true;
     }
     
@@ -3483,7 +3502,6 @@ function filterUsedSources(sources, responseText) {
   });
   
   // Safety fallback: if filter removed ALL sources, return original list
-  // (better to over-cite than leave user with no way to verify)
   if (usedSources.length === 0 && sources.length > 0) {
     return sources;
   }
