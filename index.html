@@ -18882,14 +18882,28 @@ async function wtDeleteReport(id) {
 let _docxLibPromise = null;
 function loadDocxLib() {
   if (_docxLibPromise) return _docxLibPromise;
-  _docxLibPromise = new Promise((resolve, reject) => {
-    if (window.docx) return resolve(window.docx);
-    const s = document.createElement('script');
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/docx/8.5.0/docx.min.js';
-    s.onload = () => window.docx ? resolve(window.docx) : reject(new Error('docx library failed to expose global'));
-    s.onerror = () => reject(new Error('Failed to load docx library from CDN'));
-    document.head.appendChild(s);
-  });
+  // Try multiple CDNs in case one is unavailable. UMD build exposes window.docx.
+  const URLS = [
+    'https://unpkg.com/docx@8.5.0/build/index.umd.js',
+    'https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js',
+  ];
+  _docxLibPromise = (async () => {
+    if (window.docx) return window.docx;
+    let lastErr = null;
+    for (const url of URLS) {
+      try {
+        await new Promise((resolve, reject) => {
+          const s = document.createElement('script');
+          s.src = url;
+          s.onload = () => resolve();
+          s.onerror = () => reject(new Error('load failed: ' + url));
+          document.head.appendChild(s);
+        });
+        if (window.docx) return window.docx;
+      } catch (e) { lastErr = e; }
+    }
+    throw lastErr || new Error('docx library failed to load from any CDN');
+  })();
   return _docxLibPromise;
 }
 
