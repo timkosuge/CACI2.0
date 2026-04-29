@@ -9684,6 +9684,7 @@ html body[data-theme="light"] #discovery-greeting-strip .dgs-text strong {
             <div class="wt-actions">
               <button class="wt-btn wt-btn-secondary" id="wt-watchlist-btn">Operational Watchlist</button>
               <button class="wt-btn wt-btn-secondary" id="wt-history-btn" title="View past scans and what each one analyzed">Scan History</button>
+              <button class="wt-btn wt-btn-secondary" id="wt-settings-btn" title="Choose which department and collection Watchtower scans">Settings</button>
               <button class="wt-btn wt-btn-secondary" id="wt-reset-btn" title="Clear all scan memory so the next scan re-examines every document from scratch. Findings are kept.">Reset Memory</button>
               <button class="wt-btn wt-btn-primary" id="wt-scan-btn">Scan Library</button>
             </div>
@@ -10269,6 +10270,20 @@ html body[data-theme="light"] #discovery-greeting-strip .dgs-text strong {
         <button class="lbtn" id="chpw-cancel" style="color:var(--smoke4);border-color:var(--line2)">Cancel</button>
         <div class="afb" id="chpw-fb" style="flex:1"></div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- WATCHTOWER SETTINGS MODAL -->
+<div class="modal-bg" id="wt-settings-modal">
+  <div class="modal-sheet" style="max-width:560px">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Watchtower Settings</div>
+    <div class="modal-sub">Choose which department and collection Watchtower scans. Changing this does not delete findings from the previous scope, but new scans will work against the new selection.</div>
+    <div id="wt-settings-content" style="margin-top:16px"></div>
+    <div style="margin-top:20px;display:flex;gap:8px;justify-content:flex-end">
+      <button class="wt-btn wt-btn-secondary" id="wt-settings-cancel">Cancel</button>
+      <button class="wt-btn wt-btn-primary" id="wt-settings-save">Save</button>
     </div>
   </div>
 </div>
@@ -18660,6 +18675,10 @@ function initWatchtower() {
   $('wt-reset-btn')?.addEventListener('click', wtResetScans);
   $('wt-watchlist-btn')?.addEventListener('click', wtOpenWatchlist);
   $('wt-history-btn')?.addEventListener('click', wtOpenHistory);
+  $('wt-settings-btn')?.addEventListener('click', wtOpenSettings);
+  $('wt-settings-cancel')?.addEventListener('click', () => $('wt-settings-modal').classList.remove('open'));
+  $('wt-settings-save')?.addEventListener('click', wtSaveSettings);
+  $('wt-settings-modal')?.addEventListener('click', e => { if (e.target === $('wt-settings-modal')) $('wt-settings-modal').classList.remove('open'); });
   $('wt-ask-btn')?.addEventListener('click', wtAsk);
   $('wt-ask-input')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') wtAsk(); });
   $('wt-wl-add')?.addEventListener('click', wtAddWatchlistEntry);
@@ -18890,7 +18909,7 @@ async function wtCheckStaleness() {
     const res = await apiFetch('/watchtower/scan-plan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dept: 'compliance', collection: 'Ohio Regulations' })
+      body: JSON.stringify({})
     });
     const data = await res.json();
     if (!data.ok) { banner.style.display = 'none'; return; }
@@ -18925,7 +18944,7 @@ async function wtRunScan() {
     const res = await apiFetch('/watchtower/scan-plan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dept: 'compliance', collection: 'Ohio Regulations' })
+      body: JSON.stringify({})
     });
     plan = await res.json();
     if (!plan.ok) throw new Error(plan.error || 'unknown');
@@ -18936,7 +18955,7 @@ async function wtRunScan() {
   }
 
   if (plan.total === 0) {
-    alert('No documents found in Compliance / Ohio Regulations.');
+    alert('No documents found in the configured collection. Check Settings.');
     btn.disabled = false; btn.textContent = 'Scan Library';
     return;
   }
@@ -19021,7 +19040,7 @@ async function wtExecuteScan() {
       const res = await apiFetch('/watchtower/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dept: 'compliance', collection: 'Ohio Regulations', cursor, batchSize: 8, scanId })
+        body: JSON.stringify({ cursor, batchSize: 8, scanId })
       });
       const data = await res.json();
       if (!data.ok) {
@@ -19071,6 +19090,83 @@ async function wtExecuteScan() {
   btn.disabled = false; btn.textContent = 'Scan Library';
   await loadWatchtowerFindings();
   await wtCheckStaleness();
+}
+
+async function wtOpenSettings() {
+  const modal = $('wt-settings-modal');
+  const content = $('wt-settings-content');
+  if (!modal || !content) return;
+  content.innerHTML = '<div class="wt-empty">Loading&hellip;</div>';
+  modal.classList.add('open');
+  try {
+    const res = await apiFetch('/watchtower/config');
+    const data = await res.json();
+    if (!data.ok) { content.innerHTML = `<div class="wt-empty">Error: ${esc(data.error||'')}</div>`; return; }
+    const cfg = data.config || {};
+    const depts = data.availableDepartments || [];
+    const cols = data.availableCollections || [];
+
+    const deptOptions = depts.map(d => `<option value="${esc(d)}"${d === cfg.dept ? ' selected' : ''}>${esc(d)}</option>`).join('');
+    const colOptions = cols.length
+      ? '<option value="">— pick a collection —</option>' + cols.map(c => `<option value="${esc(c)}"${c === cfg.collection ? ' selected' : ''}>${esc(c)}</option>`).join('')
+      : '<option value="">No collections found in this department</option>';
+
+    content.innerHTML = `
+      <div style="margin-bottom:14px">
+        <div class="wt-detail-h" style="margin-bottom:6px">Department</div>
+        <select class="wt-input" id="wt-set-dept">${deptOptions}</select>
+        <div style="font-size:11px;color:var(--smoke4);margin-top:4px">Where the regulatory documents live in KAIT's library.</div>
+      </div>
+      <div style="margin-bottom:14px">
+        <div class="wt-detail-h" style="margin-bottom:6px">Collection</div>
+        <select class="wt-input" id="wt-set-col">${colOptions}</select>
+        <div style="font-size:11px;color:var(--smoke4);margin-top:4px">Which collection inside that department to scan. Pick from existing collections, or type a custom name below.</div>
+        <input class="wt-input" id="wt-set-col-custom" placeholder="Or type a custom name..." style="margin-top:6px" value="${esc(cfg.collection || '')}"/>
+      </div>
+      <div style="font-size:11px;color:var(--smoke4);padding-top:10px;border-top:1px solid var(--line2);margin-top:10px">
+        Current: <strong>${esc(cfg.dept || '')}</strong> / <strong>${esc(cfg.collection || '')}</strong>
+      </div>
+    `;
+
+    // Wire dept change to refresh available collections
+    const deptSel = $('wt-set-dept');
+    if (deptSel) {
+      deptSel.addEventListener('change', async () => {
+        // Re-fetch by sending an unsaved dept hint? Simpler: just leave the custom name field as-is.
+        // The user can pick from the dropdown OR type a custom name.
+      });
+    }
+
+    // Wire dropdown to mirror into the custom field (user-friendly)
+    const colSel = $('wt-set-col');
+    const colCustom = $('wt-set-col-custom');
+    if (colSel && colCustom) {
+      colSel.addEventListener('change', () => { if (colSel.value) colCustom.value = colSel.value; });
+    }
+  } catch (e) {
+    content.innerHTML = `<div class="wt-empty">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+async function wtSaveSettings() {
+  const dept = $('wt-set-dept')?.value;
+  // Custom field wins if it has a value; otherwise the dropdown
+  const customCol = $('wt-set-col-custom')?.value.trim();
+  const dropdownCol = $('wt-set-col')?.value;
+  const collection = customCol || dropdownCol;
+  if (!dept || !collection) { alert('Please select both a department and a collection.'); return; }
+  try {
+    const res = await apiFetch('/watchtower/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dept, collection })
+    });
+    const data = await res.json();
+    if (!data.ok) { alert('Save failed: ' + (data.error || 'unknown')); return; }
+    $('wt-settings-modal').classList.remove('open');
+    await wtCheckStaleness();
+    await loadWatchtowerFindings();
+  } catch (e) { alert('Error: ' + e.message); }
 }
 
 async function wtOpenHistory() {
