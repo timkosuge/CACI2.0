@@ -5528,7 +5528,7 @@ const WT_DEFAULT_WATCHLIST = [
 ];
 
 // Prompt version — bump when wtAnalyzeDocument's prompt changes meaningfully
-const WT_PROMPT_VERSION = 1;
+const WT_PROMPT_VERSION = 2;
 
 // Config: where Watchtower scans. Stored in KV so it can be changed from the UI.
 const WT_CONFIG_DEFAULTS = {
@@ -6142,63 +6142,140 @@ async function handleFindingHistory(path, env) {
   } catch (e) { return json({ error: e.message }, 500); }
 }
 
+// ── Filename classifier: extract type, topic, date from filename ──
+// Returns { type, topic, date, isLikelyMultiTopic, displayLabel } — pure code, no API calls.
+function wtClassifyFilename(rawName) {
+  const name = (rawName || '').replace(/\.[^.]+$/, ''); // drop extension
+  const lower = name.toLowerCase();
+
+  // Detect date in filename (YYYY-MM-DD, Month DD YYYY, "April 21 2026", etc)
+  let date = null;
+  let mDate = name.match(/(\d{4})[_\- ](\d{1,2})[_\- ](\d{1,2})/); // 2026-04-21
+  if (!mDate) mDate = name.match(/(\d{1,2})[_\- ](\d{1,2})[_\- ](\d{4})/); // 4-21-2026
+  if (mDate) {
+    const a = parseInt(mDate[1]), b = parseInt(mDate[2]), c = parseInt(mDate[3]);
+    if (a > 1900) date = `${a}-${String(b).padStart(2,'0')}-${String(c).padStart(2,'0')}`;
+    else if (c > 1900) date = `${c}-${String(a).padStart(2,'0')}-${String(b).padStart(2,'0')}`;
+  }
+  if (!date) {
+    const months = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+    const monMatch = lower.match(new RegExp(`(${months.join('|')})[_\\- ]+(\\d{1,2})[_\\-,. ]+(\\d{4})`));
+    if (monMatch) {
+      const mi = months.indexOf(monMatch[1]) + 1;
+      date = `${monMatch[3]}-${String(mi).padStart(2,'0')}-${String(parseInt(monMatch[2])).padStart(2,'0')}`;
+    }
+  }
+
+  // Detect type
+  let type = 'Unknown';
+  let isLikelyMultiTopic = false;
+  if (/\bSB[_\s-]?\d+/i.test(name) || /senate[_\s-]?bill/i.test(name) || /\bHB[_\s-]?\d+/i.test(name)) {
+    type = 'Legislative Bill'; isLikelyMultiTopic = true;
+  } else if (/rules?[_\s-]?package/i.test(name)) {
+    type = 'Rules Package'; isLikelyMultiTopic = true;
+  } else if (/dcc[_\s-]?guidance|dcc[_\s-]?memo|dcc[_\s-]?bulletin/i.test(name)) {
+    type = 'DCC Guidance/Memo';
+    // Multi-topic markers in DCC memo names
+    if (/\bmultiple\b|\bvarious\b|\bupdates?\b|\bchanges?\b|\bbulletin\b/i.test(name)) isLikelyMultiTopic = true;
+  } else if (/dcc[_\s-]?newsletter/i.test(name) || /licensee[_\s-]?(meeting|update)/i.test(name)) {
+    type = 'DCC Newsletter/Update'; isLikelyMultiTopic = true;
+  } else if (/^OH[_\s-]?\d{4}/i.test(name) || /^\d{4}[_\-:]/i.test(name) || /OAC|administrative[_\s-]?code/i.test(name)) {
+    type = 'OAC Rule';
+  } else if (/^ORC|revised[_\s-]?code/i.test(name)) {
+    type = 'ORC Statute';
+  } else if (/illinois|IL[_\s-]?cannabis/i.test(name)) {
+    type = 'Illinois Regulation';
+  }
+
+  // Topic phrase = the human-readable middle of the filename, with separators normalized
+  let topic = name
+    .replace(/^OH[_\s-]?DCC[_\s-]?Guidance[_\s-]?/i, '')
+    .replace(/^OH[_\s-]?DCC[_\s-]?(Memo|Bulletin|Newsletter)[_\s-]?/i, '')
+    .replace(/^OH[_\s-]?\d{4}[_\s-]?\d{1,2}[_\s-]?\d{1,2}[_\s-]?\d{1,2}[_\s-]?/i, '')  // OH_1301_18_10_07_
+    .replace(/[_\-]/g, ' ')
+    .replace(/\d{4}[_\s-]\d{1,2}[_\s-]\d{1,2}/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  // Trim trailing/leading dates
+  topic = topic.replace(/(January|February|March|April|May|June|July|August|September|October|November|December)\s*\d{1,2}\s*,?\s*\d{4}/gi, '').trim();
+  if (!topic || topic.length < 3) topic = name;
+
+  const dateLabel = date ? ` (${date})` : '';
+  const displayLabel = `${type}: ${topic}${dateLabel}`;
+
+  return { type, topic, date, isLikelyMultiTopic, displayLabel };
+}
+
 async function wtAnalyzeDocument({ fullText, fileMeta, watchlist, apiKey }) {
   const today = new Date().toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
   const watchlistText = watchlist.map((w, i) => `${i+1}. [${w.category}] ${w.item} — Why: ${w.why}`).join('\n');
   const deptList = WT_DEPARTMENTS.join(', ');
 
-  const system = `You are KAIT's Watchtower analyst. Your job is to read a regulatory document and identify discrete CHANGES OR REQUIREMENTS that could impact a multi-state cannabis operator's operations.
+  const filename = fileMeta.name || fileMeta.fileName || '(unknown)';
+  const classification = wtClassifyFilename(filename);
+
+  // Different scaffold language depending on whether the document is likely single- or multi-topic.
+  // The model still has the final say — we're just shaping its expectation.
+  const scopeGuidance = classification.isLikelyMultiTopic
+    ? `This document is likely MULTI-TOPIC (a bill, rules package, newsletter, or comprehensive memo covering multiple subjects). Identify EACH distinct operational change or requirement as a separate finding. A document like this typically produces 3-15 findings, one per substantive topic. Don't compress unrelated changes into one finding.`
+    : `This document is likely SINGLE-TOPIC — most regulatory items in this library cover one subject. The expected output is ONE finding describing what this document requires/changes, OR ZERO findings if the document is purely procedural (e.g., a definition, a hearing procedure, an internal DCC process) with no direct operational impact on a cannabis operator. If you discover the document actually covers multiple distinct topics, produce a finding for each — but don't manufacture variety where there is none.`;
+
+  const system = `You are KAIT's Watchtower analyst. Your job is to read a regulatory document and identify operational changes or requirements that could impact a multi-state cannabis operator.
 
 Today is ${today}.
 
 You are operating on behalf of a cannabis company with these departments: ${deptList}.
 
-The company's Operational Watchlist — the things they specifically care about being notified of:
+The company's Operational Watchlist — the things they specifically care about:
 ${watchlistText}
 
-For each distinct change or notable requirement in the document, produce a Finding. A Finding is a single, actionable item — not a summary of the whole document. If the document contains 5 distinct changes that touch different things, produce 5 Findings. If it contains 1, produce 1. If it contains nothing operationally relevant (e.g., it's a meeting agenda or unrelated content), produce zero Findings.
+DOCUMENT EXPECTATION
+${scopeGuidance}
 
 For EACH Finding, provide:
 - title: A short descriptive title (under 80 chars)
-- summary: One plain-language sentence explaining what changed/is required
-- whatChanged: 1-3 sentences describing the change in detail
+- summary: One plain-language sentence explaining what this requires/changes
+- whatChanged: 1-3 sentences describing the requirement/change in detail
 - whatItTouches: 2-4 sentences on the operational categories this affects (financial models, packaging, systems, training, etc.) — be SPECIFIC about why this is operationally significant
-- departmentImpacts: An object mapping department names (use exact names from the list above) to a 1-3 sentence specific instruction for that department about what to investigate or do. Only include departments that are genuinely affected. Be concrete: "Finance/Accounting should verify whether month-end COGS calculations use unit-of-measure X..." NOT "Finance should review."
-- watchlistMatches: Array of watchlist item IDs (like "wl_uom") that this finding touches. Empty array if none match directly.
+- departmentImpacts: An object mapping department names (use exact names from the list above) to a 1-3 sentence specific instruction. Only include departments that are genuinely affected. Be concrete: "Finance/Accounting should verify whether month-end COGS calculations use unit-of-measure X..." NOT "Finance should review."
+- watchlistMatches: Array of watchlist item IDs (like "wl_uom") that this finding touches. Empty array if none.
 - tier: "🔴" (high) | "🟡" (medium) | "🟢" (low)
-  • 🔴 = affects financial models, system integrations, license compliance, product safety, OR has hard deadline within 30 days
-  • 🟡 = affects operations or procedures but not critical systems, OR deadline 30-90 days out
+  • 🔴 = affects financial models, system integrations, license compliance, product safety, OR hard deadline within 30 days
+  • 🟡 = affects operations/procedures but not critical systems, OR deadline 30-90 days out
   • 🟢 = informational, advisory, or narrow scope, no imminent deadline
-- tierReasoning: 1 sentence explaining why this tier
-- state: The state this regulation applies to (e.g., "Ohio", "Illinois", "Pennsylvania"). Best guess from the document.
-- effectiveDate: ISO date (YYYY-MM-DD) if explicitly stated, or null
-- deadline: ISO date for any compliance deadline mentioned, or null
-- sourceQuote: A short verbatim quote (under 300 chars) from the document supporting this finding. Use this exact quote, do not paraphrase.
+- tierReasoning: 1 sentence explaining the tier
+- state: e.g., "Ohio", "Illinois", "Pennsylvania". Best guess from the document.
+- effectiveDate: ISO date (YYYY-MM-DD) if stated, else null
+- deadline: ISO date for any compliance deadline, else null
+- sourceQuote: A short verbatim quote (under 300 chars) from the document. Exact quote, do not paraphrase.
 
-DATE REASONING: When a date appears, compare it against today (${today}). Do not absorb the document's tense — compute it. If a deadline is upcoming, say upcoming. If it has passed, say so explicitly in the whatItTouches section.
+DATE REASONING: When a date appears, compare it against today (${today}). Do not absorb the document's tense — compute it. If a deadline is upcoming, say upcoming. If it has passed, say so in whatItTouches.
 
-Return a JSON object: { "findings": [ ... ] }
-If no findings, return { "findings": [] }.
+Return JSON: { "findings": [ ... ] }. If genuinely nothing operationally relevant, return { "findings": [] }.
 
-Be honest. If the document is not regulatory in nature, return empty. Do not invent findings to seem productive. The point of this system is to surface things that matter, not to manufacture noise.`;
+Be honest about scope. Single-topic documents produce one finding (or zero if purely procedural). Multi-topic documents produce many. Do not manufacture findings to seem productive, and do not collapse multi-topic content into one finding to seem efficient.`;
 
-  const userMsg = `DOCUMENT METADATA:
-Filename: ${fileMeta.name || fileMeta.fileName || '(unknown)'}
-Collection: ${fileMeta.collection || '(none)'}
-Uploaded: ${fileMeta.uploadedAt || '(unknown)'}
-Department: ${fileMeta.dept || '(unknown)'}
+  const userMsg = `DOCUMENT CLASSIFICATION (from filename):
+${classification.displayLabel}
+Filename: ${filename}
+Type: ${classification.type}
+Topic phrase: ${classification.topic}
+${classification.date ? `Date in filename: ${classification.date}` : 'Date in filename: (not detected)'}
+Multi-topic likelihood: ${classification.isLikelyMultiTopic ? 'YES — expect multiple findings' : 'NO — expect one finding or zero'}
+
+The classification above was extracted automatically from the filename. Confirm it as you read the document; if the document is actually about something different, defer to the document content. The classification is a hint, not an instruction.
 
 DOCUMENT CONTENT:
 ${fullText}
 
-Analyze this document and return findings as JSON.`;
+Analyze and return findings as JSON.`;
 
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 4000,
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: classification.isLikelyMultiTopic ? 8000 : 2500,
       system,
       messages: [{ role: 'user', content: userMsg }],
     }),
@@ -6257,7 +6334,7 @@ ${findingsContext}`;
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1500, system, messages }),
+      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 1500, system, messages }),
     });
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
