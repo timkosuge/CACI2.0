@@ -125,6 +125,18 @@ export default {
     if (path.startsWith('/files/') && path.endsWith('/meta') && method === 'PATCH') return handlePatchFileMeta(path, request, env);
     if (path.startsWith('/files/') && path.endsWith('/promote-to-context') && method === 'POST') return handlePromoteToContext(path, request, env);
     if (path.startsWith('/files/') && path.endsWith('/demote-to-document') && method === 'POST') return handleDemoteToDocument(path, request, env);
+
+    // ── Watchtower (Regulatory Update Response) ──
+    if (path === '/watchtower/watchlist' && method === 'GET')    return handleWatchlistList(env);
+    if (path === '/watchtower/watchlist' && method === 'POST')   return handleWatchlistAdd(request, env);
+    if (path.startsWith('/watchtower/watchlist/') && method === 'PATCH')  return handleWatchlistUpdate(path, request, env);
+    if (path.startsWith('/watchtower/watchlist/') && method === 'DELETE') return handleWatchlistDelete(path, env);
+    if (path === '/watchtower/findings' && method === 'GET')     return handleFindingsList(url, env);
+    if (path.startsWith('/watchtower/findings/') && path.endsWith('/status') && method === 'PATCH') return handleFindingStatus(path, request, env);
+    if (path.startsWith('/watchtower/findings/') && method === 'GET' && path.split('/').length === 4) return handleFindingGet(path, env);
+    if (path.startsWith('/watchtower/findings/') && method === 'DELETE') return handleFindingDelete(path, env);
+    if (path === '/watchtower/scan' && method === 'POST')        return handleWatchtowerScan(request, env);
+    if (path === '/watchtower/ask' && method === 'POST')         return handleWatchtowerAsk(request, env);
     if (path.startsWith('/files/') && method === 'DELETE') return handleDeleteFile(path.replace('/files/', ''), env, url, verifyToken(request, env));
     if (path === '/collections' && method === 'GET')  return handleListCollections(url, env);
     if (path === '/collections/create' && method === 'POST') return handleCreateCollection(request, env);
@@ -5476,4 +5488,363 @@ async function handleScenarioList(url, env) {
   } catch (err) {
     return json({ error: err.message }, 500);
   }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// WATCHTOWER — Regulatory Update Response System
+// ═══════════════════════════════════════════════════════════════
+// Data model:
+//   wt:watchlist                     → JSON array of operational dependency entries
+//   wt:findings:index                → JSON array of finding metadata (id, date, tier, dept, status, source)
+//   wt:finding:{id}                  → JSON full finding record (analysis text, etc.)
+//   wt:scanned:{fileId}              → JSON array of finding IDs produced from this file (for dedup)
+
+const WT_DEPARTMENTS = [
+  'Retail', 'Compliance', 'Commercial', 'Finance/Accounting',
+  'Marketing', 'Grower/Processor', 'IT', 'Learning and Development', 'HR'
+];
+
+const WT_DEFAULT_WATCHLIST = [
+  { id: 'wl_uom',       category: 'Systems & Data',  item: 'Unit-of-measure conventions in METRC (grams vs each, package counts)', why: 'Cost accounting and revenue models depend on stable unit definitions. Changes break month-end financial models.' },
+  { id: 'wl_packaging', category: 'Products',        item: 'Packaging specifications, child-resistance requirements, and labeling rules', why: 'Affects product design, vendor orders, and existing inventory compliance.' },
+  { id: 'wl_testing',   category: 'Quality',         item: 'Testing requirements, frequencies, and lab protocols', why: 'Drives lab spend, batch release timing, and inventory holding periods.' },
+  { id: 'wl_reporting', category: 'Compliance',      item: 'Reporting cadences and submission deadlines (METRC reports, license filings)', why: 'Missed deadlines trigger violations regardless of whether the change is operationally minor.' },
+  { id: 'wl_potency',   category: 'Products',        item: 'Potency caps, dosing limits, and serving size definitions', why: 'Constrains what products can be sold and at what price points.' },
+  { id: 'wl_buffer',    category: 'Real Estate',     item: 'Buffer zone requirements (schools, playgrounds, churches)', why: 'Can affect new store siting and existing license renewal.' },
+  { id: 'wl_renewal',   category: 'Compliance',      item: 'License renewal terms, fees, and timing windows', why: 'Renewal failures are existential. Fee changes hit budget.' },
+  { id: 'wl_transport', category: 'Operations',      item: 'Transport rules (vehicle requirements, original packaging, manifest formats)', why: 'Affects delivery logistics, store-to-store transfers, and patient transport.' },
+  { id: 'wl_advertising', category: 'Marketing',     item: 'Advertising and promotional rules, claims restrictions, and signage', why: 'Marketing campaigns and store signage may need rework on short notice.' },
+  { id: 'wl_employment', category: 'People',         item: 'Employee licensing, badging, training requirements, and background check rules', why: 'HR and L&D have to update onboarding and existing staff compliance.' },
+  { id: 'wl_inventory',  category: 'Operations',     item: 'Inventory tracking, reconciliation, waste/destruction protocols', why: 'Operational workflows and audit-readiness depend on these procedures.' },
+  { id: 'wl_taxes',      category: 'Finance',        item: 'Excise tax rates, allocation rules, and remittance procedures', why: 'Direct revenue and pricing impact.' },
+];
+
+async function wtGetWatchlist(env) {
+  const wl = await env.CACI_KV.get('wt:watchlist', 'json');
+  if (wl && Array.isArray(wl) && wl.length > 0) return wl;
+  await env.CACI_KV.put('wt:watchlist', JSON.stringify(WT_DEFAULT_WATCHLIST));
+  return WT_DEFAULT_WATCHLIST;
+}
+
+async function handleWatchlistList(env) {
+  try {
+    const list = await wtGetWatchlist(env);
+    return json({ ok: true, items: list, departments: WT_DEPARTMENTS });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+async function handleWatchlistAdd(request, env) {
+  try {
+    const { category, item, why } = await request.json();
+    if (!item) return json({ error: 'item required' }, 400);
+    const list = await wtGetWatchlist(env);
+    const id = 'wl_' + Math.random().toString(36).slice(2, 10);
+    list.push({ id, category: category || 'General', item, why: why || '' });
+    await env.CACI_KV.put('wt:watchlist', JSON.stringify(list));
+    return json({ ok: true, id });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+async function handleWatchlistUpdate(path, request, env) {
+  try {
+    const id = path.split('/')[3];
+    const { category, item, why } = await request.json();
+    const list = await wtGetWatchlist(env);
+    const idx = list.findIndex(w => w.id === id);
+    if (idx < 0) return json({ error: 'not found' }, 404);
+    if (category !== undefined) list[idx].category = category;
+    if (item !== undefined)     list[idx].item     = item;
+    if (why !== undefined)      list[idx].why      = why;
+    await env.CACI_KV.put('wt:watchlist', JSON.stringify(list));
+    return json({ ok: true });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+async function handleWatchlistDelete(path, env) {
+  try {
+    const id = path.split('/')[3];
+    const list = await wtGetWatchlist(env);
+    const filtered = list.filter(w => w.id !== id);
+    await env.CACI_KV.put('wt:watchlist', JSON.stringify(filtered));
+    return json({ ok: true });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+async function handleFindingsList(url, env) {
+  try {
+    const idx = await env.CACI_KV.get('wt:findings:index', 'json') || [];
+    const tier   = url.searchParams.get('tier');
+    const state  = url.searchParams.get('state');
+    const dept   = url.searchParams.get('dept');
+    const status = url.searchParams.get('status');
+    let items = idx;
+    if (tier)   items = items.filter(f => f.tier === tier);
+    if (state)  items = items.filter(f => (f.state || '').toLowerCase() === state.toLowerCase());
+    if (dept)   items = items.filter(f => (f.affectedDepartments || []).includes(dept));
+    if (status) items = items.filter(f => f.status === status);
+    return json({ ok: true, items });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+async function handleFindingGet(path, env) {
+  try {
+    const id = path.split('/')[3];
+    const f = await env.CACI_KV.get(`wt:finding:${id}`, 'json');
+    if (!f) return json({ error: 'not found' }, 404);
+    return json({ ok: true, finding: f });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+async function handleFindingStatus(path, request, env) {
+  try {
+    const parts = path.split('/'); // /watchtower/findings/{id}/status
+    const id = parts[3];
+    const { status, note } = await request.json();
+    if (!['New','In Review','Acknowledged','Resolved','Dismissed'].includes(status)) {
+      return json({ error: 'invalid status' }, 400);
+    }
+    const f = await env.CACI_KV.get(`wt:finding:${id}`, 'json');
+    if (!f) return json({ error: 'not found' }, 404);
+    f.status = status;
+    f.statusUpdatedAt = new Date().toISOString();
+    if (note) {
+      f.statusNotes = f.statusNotes || [];
+      f.statusNotes.push({ ts: f.statusUpdatedAt, status, note });
+    }
+    await env.CACI_KV.put(`wt:finding:${id}`, JSON.stringify(f));
+    const idx = await env.CACI_KV.get('wt:findings:index', 'json') || [];
+    const i = idx.findIndex(x => x.id === id);
+    if (i >= 0) { idx[i].status = status; idx[i].statusUpdatedAt = f.statusUpdatedAt; await env.CACI_KV.put('wt:findings:index', JSON.stringify(idx)); }
+    return json({ ok: true });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+async function handleFindingDelete(path, env) {
+  try {
+    const id = path.split('/')[3];
+    await env.CACI_KV.delete(`wt:finding:${id}`);
+    const idx = await env.CACI_KV.get('wt:findings:index', 'json') || [];
+    const filtered = idx.filter(f => f.id !== id);
+    await env.CACI_KV.put('wt:findings:index', JSON.stringify(filtered));
+    return json({ ok: true });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+// ── Scan: analyze documents in the Compliance department for new findings ──
+async function handleWatchtowerScan(request, env) {
+  try {
+    const body = await request.json().catch(() => ({}));
+    const dept = body.dept || 'compliance';
+    const force = !!body.force;
+    const limit = body.limit || 50;
+
+    const apiKey = (await env.CACI_KV.get('config:ANTHROPIC_API_KEY')) || env.ANTHROPIC_API_KEY;
+    if (!apiKey) return json({ error: 'Anthropic API key not configured' }, 400);
+
+    const watchlist = await wtGetWatchlist(env);
+    const deptIdx = await env.CACI_KV.get(`index:${dept}`, 'json') || [];
+    const candidates = deptIdx.slice(0, limit);
+
+    let scanned = 0, newFindings = 0, skipped = 0, errors = 0;
+    const findingsIndex = await env.CACI_KV.get('wt:findings:index', 'json') || [];
+
+    for (const meta of candidates) {
+      try {
+        const already = await env.CACI_KV.get(`wt:scanned:${meta.id}`, 'json');
+        if (already && !force) { skipped++; continue; }
+
+        const file = await env.CACI_KV.get(`file:${meta.id}`, 'json');
+        if (!file || !file.chunks || file.chunks.length === 0) { skipped++; continue; }
+
+        const fullText = file.chunks.map(c => c.text || '').join('\n\n').slice(0, 60000);
+
+        const findings = await wtAnalyzeDocument({
+          fullText,
+          fileMeta: meta,
+          watchlist,
+          apiKey,
+        });
+
+        const producedIds = [];
+        for (const f of findings) {
+          const fid = 'wf_' + Math.random().toString(36).slice(2, 12);
+          const record = {
+            id: fid,
+            createdAt: new Date().toISOString(),
+            sourceFileId: meta.id,
+            sourceFileName: meta.name || meta.fileName || '(unknown)',
+            sourceUploadedAt: meta.uploadedAt || null,
+            sourceCollection: meta.collection || '',
+            state: f.state || '',
+            tier: f.tier,
+            tierReasoning: f.tierReasoning || '',
+            title: f.title,
+            summary: f.summary,
+            whatChanged: f.whatChanged,
+            whatItTouches: f.whatItTouches,
+            departmentImpacts: f.departmentImpacts || {},
+            affectedDepartments: Object.keys(f.departmentImpacts || {}),
+            watchlistMatches: f.watchlistMatches || [],
+            sourceQuote: f.sourceQuote || '',
+            effectiveDate: f.effectiveDate || null,
+            deadline: f.deadline || null,
+            status: 'New',
+          };
+          await env.CACI_KV.put(`wt:finding:${fid}`, JSON.stringify(record));
+          findingsIndex.unshift({
+            id: fid,
+            createdAt: record.createdAt,
+            sourceFileName: record.sourceFileName,
+            state: record.state,
+            tier: record.tier,
+            title: record.title,
+            summary: record.summary,
+            affectedDepartments: record.affectedDepartments,
+            status: 'New',
+            effectiveDate: record.effectiveDate,
+            deadline: record.deadline,
+          });
+          producedIds.push(fid);
+          newFindings++;
+        }
+        await env.CACI_KV.put(`wt:scanned:${meta.id}`, JSON.stringify({ ts: new Date().toISOString(), findingIds: producedIds }));
+        scanned++;
+      } catch (e) {
+        errors++;
+        console.error('wt scan error for ' + meta.id + ':', e.message);
+      }
+    }
+
+    if (findingsIndex.length > 1000) findingsIndex.splice(1000);
+    await env.CACI_KV.put('wt:findings:index', JSON.stringify(findingsIndex));
+
+    return json({ ok: true, scanned, newFindings, skipped, errors });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+async function wtAnalyzeDocument({ fullText, fileMeta, watchlist, apiKey }) {
+  const today = new Date().toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+  const watchlistText = watchlist.map((w, i) => `${i+1}. [${w.category}] ${w.item} — Why: ${w.why}`).join('\n');
+  const deptList = WT_DEPARTMENTS.join(', ');
+
+  const system = `You are KAIT's Watchtower analyst. Your job is to read a regulatory document and identify discrete CHANGES OR REQUIREMENTS that could impact a multi-state cannabis operator's operations.
+
+Today is ${today}.
+
+You are operating on behalf of a cannabis company with these departments: ${deptList}.
+
+The company's Operational Watchlist — the things they specifically care about being notified of:
+${watchlistText}
+
+For each distinct change or notable requirement in the document, produce a Finding. A Finding is a single, actionable item — not a summary of the whole document. If the document contains 5 distinct changes that touch different things, produce 5 Findings. If it contains 1, produce 1. If it contains nothing operationally relevant (e.g., it's a meeting agenda or unrelated content), produce zero Findings.
+
+For EACH Finding, provide:
+- title: A short descriptive title (under 80 chars)
+- summary: One plain-language sentence explaining what changed/is required
+- whatChanged: 1-3 sentences describing the change in detail
+- whatItTouches: 2-4 sentences on the operational categories this affects (financial models, packaging, systems, training, etc.) — be SPECIFIC about why this is operationally significant
+- departmentImpacts: An object mapping department names (use exact names from the list above) to a 1-3 sentence specific instruction for that department about what to investigate or do. Only include departments that are genuinely affected. Be concrete: "Finance/Accounting should verify whether month-end COGS calculations use unit-of-measure X..." NOT "Finance should review."
+- watchlistMatches: Array of watchlist item IDs (like "wl_uom") that this finding touches. Empty array if none match directly.
+- tier: "🔴" (high) | "🟡" (medium) | "🟢" (low)
+  • 🔴 = affects financial models, system integrations, license compliance, product safety, OR has hard deadline within 30 days
+  • 🟡 = affects operations or procedures but not critical systems, OR deadline 30-90 days out
+  • 🟢 = informational, advisory, or narrow scope, no imminent deadline
+- tierReasoning: 1 sentence explaining why this tier
+- state: The state this regulation applies to (e.g., "Ohio", "Illinois", "Pennsylvania"). Best guess from the document.
+- effectiveDate: ISO date (YYYY-MM-DD) if explicitly stated, or null
+- deadline: ISO date for any compliance deadline mentioned, or null
+- sourceQuote: A short verbatim quote (under 300 chars) from the document supporting this finding. Use this exact quote, do not paraphrase.
+
+DATE REASONING: When a date appears, compare it against today (${today}). Do not absorb the document's tense — compute it. If a deadline is upcoming, say upcoming. If it has passed, say so explicitly in the whatItTouches section.
+
+Return a JSON object: { "findings": [ ... ] }
+If no findings, return { "findings": [] }.
+
+Be honest. If the document is not regulatory in nature, return empty. Do not invent findings to seem productive. The point of this system is to surface things that matter, not to manufacture noise.`;
+
+  const userMsg = `DOCUMENT METADATA:
+Filename: ${fileMeta.name || fileMeta.fileName || '(unknown)'}
+Collection: ${fileMeta.collection || '(none)'}
+Uploaded: ${fileMeta.uploadedAt || '(unknown)'}
+Department: ${fileMeta.dept || '(unknown)'}
+
+DOCUMENT CONTENT:
+${fullText}
+
+Analyze this document and return findings as JSON.`;
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 4000,
+      system,
+      messages: [{ role: 'user', content: userMsg }],
+    }),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`Anthropic API ${res.status}: ${errText.slice(0, 200)}`);
+  }
+  const data = await res.json();
+  const text = (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n').trim();
+  const cleaned = text.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
+
+  let parsed;
+  try { parsed = JSON.parse(cleaned); }
+  catch (e) {
+    const match = cleaned.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('Could not parse analysis as JSON');
+    parsed = JSON.parse(match[0]);
+  }
+  const findings = Array.isArray(parsed.findings) ? parsed.findings : [];
+  return findings.filter(f => f && f.title && f.tier);
+}
+
+// ── Ask Watchtower: chat scoped to findings ──
+async function handleWatchtowerAsk(request, env) {
+  try {
+    const { question, history = [], clientDatetime, clientTimezone } = await request.json();
+    if (!question) return json({ error: 'question required' }, 400);
+
+    const apiKey = (await env.CACI_KV.get('config:ANTHROPIC_API_KEY')) || env.ANTHROPIC_API_KEY;
+    if (!apiKey) return json({ error: 'Anthropic API key not configured' }, 400);
+
+    const findingsIndex = await env.CACI_KV.get('wt:findings:index', 'json') || [];
+    const recent = findingsIndex.slice(0, 60);
+    const findingsContext = recent.length === 0
+      ? '(No findings yet. Suggest the user run a Scan from the Watchtower screen.)'
+      : recent.map(f => `[${f.tier}] ${f.state} | ${f.createdAt.slice(0,10)} | ${f.title}\n  Summary: ${f.summary}\n  Affects: ${(f.affectedDepartments||[]).join(', ')}\n  Status: ${f.status}\n  Source: ${f.sourceFileName}\n  Deadline: ${f.deadline || 'none'}\n  Effective: ${f.effectiveDate || 'none'}\n  ID: ${f.id}`).join('\n\n');
+
+    const today = clientDatetime || new Date().toLocaleString('en-US', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+
+    const system = `You are Kait, answering questions about the Watchtower regulatory findings feed.
+
+Today is ${today}${clientTimezone ? ` (${clientTimezone})` : ''}.
+
+DATE REASONING: When a date appears in a finding, compare it against today. Do not describe a future deadline as "passed" or a past effective date as "upcoming." Compute the comparison. When a deadline is within the next 30 days, say so explicitly with day count.
+
+You have access to the most recent findings below. Answer the user's question using ONLY these findings. If they ask about something not in the findings, say so directly. Be brief, clear, and warm. If they ask for a summary, group by tier or by department in a way that's useful — not just a wall of text. If they ask "what's outstanding," focus on findings with status New or In Review, and lead with the highest tier.
+
+Cite findings by source filename and date when referencing them.
+
+CURRENT FINDINGS:
+${findingsContext}`;
+
+    const messages = [...history.slice(-10), { role: 'user', content: question }];
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1500, system, messages }),
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      return json({ error: `Anthropic API ${res.status}: ${errText.slice(0, 200)}` }, 500);
+    }
+    const data = await res.json();
+    const text = (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n').trim();
+    return json({ ok: true, response: text });
+  } catch (e) { return json({ error: e.message }, 500); }
 }
