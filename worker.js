@@ -136,6 +136,12 @@ export default {
     if (path.startsWith('/watchtower/findings/') && method === 'GET' && path.split('/').length === 4) return handleFindingGet(path, env);
     if (path.startsWith('/watchtower/findings/') && method === 'DELETE') return handleFindingDelete(path, env);
     if (path === '/watchtower/scan' && method === 'POST')        return handleWatchtowerScan(request, env);
+    if (path === '/watchtower/scan-plan' && method === 'POST')   return handleWatchtowerScanPlan(request, env);
+    if (path === '/watchtower/reset-scans' && method === 'POST') return handleWatchtowerResetScans(request, env);
+    if (path === '/watchtower/scans' && method === 'GET')        return handleScansList(url, env);
+    if (path.startsWith('/watchtower/scans/') && method === 'GET') return handleScanGet(path, env);
+    if (path.startsWith('/watchtower/doc-history/') && method === 'GET') return handleDocHistory(path, env);
+    if (path.startsWith('/watchtower/finding-history/') && method === 'GET') return handleFindingHistory(path, env);
     if (path === '/watchtower/ask' && method === 'POST')         return handleWatchtowerAsk(request, env);
     if (path.startsWith('/files/') && method === 'DELETE') return handleDeleteFile(path.replace('/files/', ''), env, url, verifyToken(request, env));
     if (path === '/collections' && method === 'GET')  return handleListCollections(url, env);
@@ -5519,6 +5525,44 @@ const WT_DEFAULT_WATCHLIST = [
   { id: 'wl_taxes',      category: 'Finance',        item: 'Excise tax rates, allocation rules, and remittance procedures', why: 'Direct revenue and pricing impact.' },
 ];
 
+// Prompt version — bump when wtAnalyzeDocument's prompt changes meaningfully
+const WT_PROMPT_VERSION = 1;
+
+// Watchlist version is stored separately and bumps on any add/edit/delete
+async function wtGetWatchlistVersion(env) {
+  const v = await env.CACI_KV.get('wt:watchlist:version', 'text');
+  return parseInt(v || '1', 10);
+}
+async function wtBumpWatchlistVersion(env) {
+  const v = await wtGetWatchlistVersion(env);
+  await env.CACI_KV.put('wt:watchlist:version', String(v + 1));
+  return v + 1;
+}
+
+// Context-docs version: a hash of (id+uploadedAt) for every isContext file in compliance/Ohio Regulations.
+// Recomputed on demand. Bumps automatically when context docs are added/edited/removed.
+async function wtGetContextDocsSignature(env, dept = 'compliance', collection = 'Ohio Regulations') {
+  const ctx = await env.CACI_KV.get(`ctx:${dept}:${collection}`, 'json') || [];
+  const parts = ctx.map(c => `${c.id}:${c.uploadedAt || ''}`).sort();
+  // Simple non-cryptographic hash sufficient for change detection
+  let h = 5381;
+  for (const p of parts) for (let i = 0; i < p.length; i++) h = (((h << 5) + h) ^ p.charCodeAt(i)) >>> 0;
+  return { signature: h.toString(16), count: ctx.length, items: ctx.map(c => ({ id: c.id, name: c.name, uploadedAt: c.uploadedAt })) };
+}
+
+// Compute a per-document version context: file content hash + watchlist version + context sig + prompt version
+function wtFileContentHash(file) {
+  const text = (file.chunks || []).map(c => c.text || '').join('');
+  let h = 5381;
+  for (let i = 0; i < text.length; i++) h = (((h << 5) + h) ^ text.charCodeAt(i)) >>> 0;
+  // Include length to reduce false collisions
+  return `${(h >>> 0).toString(16)}:${text.length}`;
+}
+
+function wtVersionContextKey(vc) {
+  return `${vc.fileHash}|w${vc.watchlistVersion}|c${vc.contextSig}|p${vc.promptVersion}`;
+}
+
 async function wtGetWatchlist(env) {
   const wl = await env.CACI_KV.get('wt:watchlist', 'json');
   if (wl && Array.isArray(wl) && wl.length > 0) return wl;
@@ -5541,6 +5585,7 @@ async function handleWatchlistAdd(request, env) {
     const id = 'wl_' + Math.random().toString(36).slice(2, 10);
     list.push({ id, category: category || 'General', item, why: why || '' });
     await env.CACI_KV.put('wt:watchlist', JSON.stringify(list));
+    await wtBumpWatchlistVersion(env);
     return json({ ok: true, id });
   } catch (e) { return json({ error: e.message }, 500); }
 }
@@ -5556,6 +5601,7 @@ async function handleWatchlistUpdate(path, request, env) {
     if (item !== undefined)     list[idx].item     = item;
     if (why !== undefined)      list[idx].why      = why;
     await env.CACI_KV.put('wt:watchlist', JSON.stringify(list));
+    await wtBumpWatchlistVersion(env);
     return json({ ok: true });
   } catch (e) { return json({ error: e.message }, 500); }
 }
@@ -5566,6 +5612,7 @@ async function handleWatchlistDelete(path, env) {
     const list = await wtGetWatchlist(env);
     const filtered = list.filter(w => w.id !== id);
     await env.CACI_KV.put('wt:watchlist', JSON.stringify(filtered));
+    await wtBumpWatchlistVersion(env);
     return json({ ok: true });
   } catch (e) { return json({ error: e.message }, 500); }
 }
@@ -5630,41 +5677,219 @@ async function handleFindingDelete(path, env) {
   } catch (e) { return json({ error: e.message }, 500); }
 }
 
-// ── Scan: analyze documents in the Compliance department for new findings ──
+// ── Scan Plan: tell user what will be re-analyzed and why before they trigger ──
+// This is the "memory-aware preview" — KAIT consults its scan history before doing work.
+async function handleWatchtowerScanPlan(request, env) {
+  try {
+    const body = await request.json().catch(() => ({}));
+    const dept = body.dept || 'compliance';
+    const collection = body.collection || 'Ohio Regulations';
+    const force = !!body.force;
+
+    const colKey = `col:${dept}:${collection}`;
+    const candidates = await env.CACI_KV.get(colKey, 'json') || [];
+    const total = candidates.length;
+    if (total === 0) return json({ ok: true, total: 0, plan: [], reasons: {} });
+
+    const watchlistVersion = await wtGetWatchlistVersion(env);
+    const ctxSig = await wtGetContextDocsSignature(env, dept, collection);
+    const promptVersion = WT_PROMPT_VERSION;
+
+    let firstTime = 0, contentChanged = 0, watchlistChanged = 0, contextChanged = 0, promptChanged = 0, unchanged = 0, missingFile = 0;
+    const sample = { firstTime: [], contentChanged: [], watchlistChanged: [], contextChanged: [], promptChanged: [] };
+
+    // Walk every document and decide its category — but DON'T actually load every file blob,
+    // that would be too slow. We rely on the doc-history record instead, which captures the version context.
+    for (const meta of candidates) {
+      try {
+        if (force) { firstTime++; continue; }
+        const histIds = await env.CACI_KV.get(`wt:doc-history:${meta.id}`, 'json') || [];
+        if (histIds.length === 0) {
+          firstTime++;
+          if (sample.firstTime.length < 5) sample.firstTime.push(meta.name || meta.id);
+          continue;
+        }
+        const lastAnalysisId = histIds[0];
+        const last = await env.CACI_KV.get(`wt:analysis:${lastAnalysisId}`, 'json');
+        if (!last || !last.versionContext) {
+          firstTime++;
+          if (sample.firstTime.length < 5) sample.firstTime.push(meta.name || meta.id);
+          continue;
+        }
+        const vc = last.versionContext;
+
+        // Cheaper check: file uploadedAt change as a proxy for content change.
+        // If meta.uploadedAt differs from vc.uploadedAt, file was re-uploaded.
+        const uploadedAtNow = meta.uploadedAt || '';
+        if (vc.uploadedAt !== uploadedAtNow) {
+          contentChanged++;
+          if (sample.contentChanged.length < 5) sample.contentChanged.push(meta.name || meta.id);
+          continue;
+        }
+        if ((vc.watchlistVersion || 0) !== watchlistVersion) {
+          watchlistChanged++;
+          if (sample.watchlistChanged.length < 5) sample.watchlistChanged.push(meta.name || meta.id);
+          continue;
+        }
+        if ((vc.contextSig || '') !== ctxSig.signature) {
+          contextChanged++;
+          if (sample.contextChanged.length < 5) sample.contextChanged.push(meta.name || meta.id);
+          continue;
+        }
+        if ((vc.promptVersion || 0) !== promptVersion) {
+          promptChanged++;
+          if (sample.promptChanged.length < 5) sample.promptChanged.push(meta.name || meta.id);
+          continue;
+        }
+        unchanged++;
+      } catch (e) {
+        missingFile++;
+      }
+    }
+
+    const willRescan = firstTime + contentChanged + watchlistChanged + contextChanged + promptChanged;
+    return json({
+      ok: true,
+      total,
+      willRescan,
+      unchanged,
+      breakdown: { firstTime, contentChanged, watchlistChanged, contextChanged, promptChanged, missingFile },
+      sample,
+      currentVersions: {
+        watchlistVersion, contextSig: ctxSig.signature, contextDocCount: ctxSig.count, promptVersion,
+        contextDocs: ctxSig.items,
+      },
+    });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+// ── Scan: memory-aware analysis run ──
+// Each call processes a batch of candidates. The frontend loops with the cursor.
+// On the FIRST call (cursor==0), we open a new scan record. On subsequent calls,
+// we append to that scan record by passing scanId.
 async function handleWatchtowerScan(request, env) {
   try {
     const body = await request.json().catch(() => ({}));
     const dept = body.dept || 'compliance';
+    const collection = body.collection || 'Ohio Regulations';
     const force = !!body.force;
-    const limit = body.limit || 50;
+    const batchSize = Math.min(body.batchSize || 8, 20);
+    const cursor = Math.max(0, parseInt(body.cursor || 0, 10));
+    let scanId = body.scanId || null;
 
     const apiKey = (await env.CACI_KV.get('config:ANTHROPIC_API_KEY')) || env.ANTHROPIC_API_KEY;
     if (!apiKey) return json({ error: 'Anthropic API key not configured' }, 400);
 
     const watchlist = await wtGetWatchlist(env);
-    const deptIdx = await env.CACI_KV.get(`index:${dept}`, 'json') || [];
-    const candidates = deptIdx.slice(0, limit);
+    const watchlistVersion = await wtGetWatchlistVersion(env);
+    const ctxSig = await wtGetContextDocsSignature(env, dept, collection);
+    const promptVersion = WT_PROMPT_VERSION;
 
-    let scanned = 0, newFindings = 0, skipped = 0, errors = 0;
+    const colKey = `col:${dept}:${collection}`;
+    const candidates = await env.CACI_KV.get(colKey, 'json') || [];
+    const total = candidates.length;
+
+    if (total === 0) {
+      return json({ ok: true, total: 0, cursor: 0, done: true, scanId: null,
+        scanned: 0, newFindings: 0, supersededFindings: 0, skipped: 0, errors: 0, errorDetails: [],
+        warning: `No documents found in ${dept}/${collection}.`
+      });
+    }
+
+    // Open a scan record on cursor==0
+    if (cursor === 0 && !scanId) {
+      scanId = 'ws_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+      const scanRecord = {
+        id: scanId,
+        startedAt: new Date().toISOString(),
+        completedAt: null,
+        scope: { dept, collection },
+        force,
+        versionContext: {
+          watchlistVersion,
+          contextSig: ctxSig.signature,
+          contextDocCount: ctxSig.count,
+          promptVersion,
+        },
+        totals: { scanned: 0, newFindings: 0, supersededFindings: 0, skipped: 0, errors: 0, total },
+        analysisIds: [],
+      };
+      await env.CACI_KV.put(`wt:scan:${scanId}`, JSON.stringify(scanRecord));
+      // Index entry
+      const scansIdx = await env.CACI_KV.get('wt:scans:index', 'json') || [];
+      scansIdx.unshift({ id: scanId, startedAt: scanRecord.startedAt, scope: scanRecord.scope, totals: scanRecord.totals, completedAt: null });
+      if (scansIdx.length > 200) scansIdx.splice(200);
+      await env.CACI_KV.put('wt:scans:index', JSON.stringify(scansIdx));
+    }
+
+    let scanned = 0, newFindings = 0, supersededFindings = 0, skipped = 0, errors = 0;
+    const errorDetails = [];
     const findingsIndex = await env.CACI_KV.get('wt:findings:index', 'json') || [];
+    const newAnalysisIds = [];
 
-    for (const meta of candidates) {
+    let processed = 0;
+    let i = cursor;
+    while (i < candidates.length && processed < batchSize) {
+      const meta = candidates[i];
+      i++;
+      processed++;
       try {
-        const already = await env.CACI_KV.get(`wt:scanned:${meta.id}`, 'json');
-        if (already && !force) { skipped++; continue; }
+        // Check doc history for skip decision
+        const histIds = await env.CACI_KV.get(`wt:doc-history:${meta.id}`, 'json') || [];
+        let needsAnalysis = force || histIds.length === 0;
+        let reason = histIds.length === 0 ? 'first-scan' : '';
+
+        if (!needsAnalysis && histIds.length > 0) {
+          const lastAnalysis = await env.CACI_KV.get(`wt:analysis:${histIds[0]}`, 'json');
+          if (!lastAnalysis || !lastAnalysis.versionContext) {
+            needsAnalysis = true; reason = 'history-corrupted';
+          } else {
+            const vc = lastAnalysis.versionContext;
+            if ((vc.uploadedAt || '') !== (meta.uploadedAt || '')) { needsAnalysis = true; reason = 'content-changed'; }
+            else if (vc.watchlistVersion !== watchlistVersion)     { needsAnalysis = true; reason = 'watchlist-changed'; }
+            else if ((vc.contextSig || '') !== ctxSig.signature)    { needsAnalysis = true; reason = 'context-changed'; }
+            else if ((vc.promptVersion || 0) !== promptVersion)     { needsAnalysis = true; reason = 'prompt-changed'; }
+          }
+        }
+        if (!needsAnalysis) { skipped++; continue; }
 
         const file = await env.CACI_KV.get(`file:${meta.id}`, 'json');
-        if (!file || !file.chunks || file.chunks.length === 0) { skipped++; continue; }
-
+        if (!file || !file.chunks || file.chunks.length === 0) {
+          skipped++;
+          continue;
+        }
         const fullText = file.chunks.map(c => c.text || '').join('\n\n').slice(0, 60000);
+        const fileHash = wtFileContentHash(file);
 
         const findings = await wtAnalyzeDocument({
           fullText,
-          fileMeta: meta,
+          fileMeta: { ...meta, dept, collection },
           watchlist,
           apiKey,
         });
 
+        // Supersede prior "New"-status findings from THIS document
+        // (preserves user-engaged statuses: In Review / Acknowledged / Resolved / Dismissed)
+        const priorAnalysisIds = histIds;
+        for (const aid of priorAnalysisIds) {
+          const a = await env.CACI_KV.get(`wt:analysis:${aid}`, 'json');
+          if (!a || !a.findingIds) continue;
+          for (const fid of a.findingIds) {
+            const f = await env.CACI_KV.get(`wt:finding:${fid}`, 'json');
+            if (!f || f.current === false) continue;
+            if (f.status === 'New') {
+              f.current = false;
+              f.supersededAt = new Date().toISOString();
+              f.supersededByScan = scanId;
+              await env.CACI_KV.put(`wt:finding:${fid}`, JSON.stringify(f));
+              const ix = findingsIndex.findIndex(x => x.id === fid);
+              if (ix >= 0) { findingsIndex[ix].current = false; findingsIndex[ix].supersededAt = f.supersededAt; }
+              supersededFindings++;
+            }
+          }
+        }
+
+        // Record new findings
         const producedIds = [];
         for (const f of findings) {
           const fid = 'wf_' + Math.random().toString(36).slice(2, 12);
@@ -5674,7 +5899,11 @@ async function handleWatchtowerScan(request, env) {
             sourceFileId: meta.id,
             sourceFileName: meta.name || meta.fileName || '(unknown)',
             sourceUploadedAt: meta.uploadedAt || null,
-            sourceCollection: meta.collection || '',
+            sourceCollection: meta.collection || collection,
+            sourceDept: dept,
+            scanId,
+            current: true,
+            versionContext: { fileHash, uploadedAt: meta.uploadedAt || '', watchlistVersion, contextSig: ctxSig.signature, promptVersion },
             state: f.state || '',
             tier: f.tier,
             tierReasoning: f.tierReasoning || '',
@@ -5694,6 +5923,7 @@ async function handleWatchtowerScan(request, env) {
           findingsIndex.unshift({
             id: fid,
             createdAt: record.createdAt,
+            sourceFileId: meta.id,
             sourceFileName: record.sourceFileName,
             state: record.state,
             tier: record.tier,
@@ -5701,24 +5931,168 @@ async function handleWatchtowerScan(request, env) {
             summary: record.summary,
             affectedDepartments: record.affectedDepartments,
             status: 'New',
+            current: true,
+            scanId,
             effectiveDate: record.effectiveDate,
             deadline: record.deadline,
           });
           producedIds.push(fid);
           newFindings++;
         }
-        await env.CACI_KV.put(`wt:scanned:${meta.id}`, JSON.stringify({ ts: new Date().toISOString(), findingIds: producedIds }));
+
+        // Record this analysis event
+        const analysisId = 'wa_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+        const analysisRecord = {
+          id: analysisId,
+          scanId,
+          docId: meta.id,
+          docName: meta.name || meta.fileName || '(unknown)',
+          ts: new Date().toISOString(),
+          reason,
+          findingIds: producedIds,
+          findingCount: producedIds.length,
+          versionContext: { fileHash, uploadedAt: meta.uploadedAt || '', watchlistVersion, contextSig: ctxSig.signature, promptVersion },
+        };
+        await env.CACI_KV.put(`wt:analysis:${analysisId}`, JSON.stringify(analysisRecord));
+        // Prepend to doc history
+        const newHist = [analysisId, ...histIds].slice(0, 50);
+        await env.CACI_KV.put(`wt:doc-history:${meta.id}`, JSON.stringify(newHist));
+        newAnalysisIds.push(analysisId);
         scanned++;
       } catch (e) {
+        // Analysis FAILED — no marker written, will retry on next scan
         errors++;
+        const detail = `${(meta.name || meta.id).slice(0, 80)}: ${e.message}`;
+        errorDetails.push(detail.slice(0, 250));
         console.error('wt scan error for ' + meta.id + ':', e.message);
       }
     }
 
-    if (findingsIndex.length > 1000) findingsIndex.splice(1000);
+    if (findingsIndex.length > 5000) findingsIndex.splice(5000);
     await env.CACI_KV.put('wt:findings:index', JSON.stringify(findingsIndex));
 
-    return json({ ok: true, scanned, newFindings, skipped, errors });
+    // Update scan record
+    if (scanId) {
+      const scan = await env.CACI_KV.get(`wt:scan:${scanId}`, 'json');
+      if (scan) {
+        scan.totals.scanned += scanned;
+        scan.totals.newFindings += newFindings;
+        scan.totals.supersededFindings += supersededFindings;
+        scan.totals.skipped += skipped;
+        scan.totals.errors += errors;
+        scan.analysisIds = scan.analysisIds.concat(newAnalysisIds).slice(-2000);
+        const done = i >= candidates.length;
+        if (done) scan.completedAt = new Date().toISOString();
+        await env.CACI_KV.put(`wt:scan:${scanId}`, JSON.stringify(scan));
+        const scansIdx = await env.CACI_KV.get('wt:scans:index', 'json') || [];
+        const sIdx = scansIdx.findIndex(s => s.id === scanId);
+        if (sIdx >= 0) {
+          scansIdx[sIdx].totals = scan.totals;
+          if (done) scansIdx[sIdx].completedAt = scan.completedAt;
+          await env.CACI_KV.put('wt:scans:index', JSON.stringify(scansIdx));
+        }
+      }
+    }
+
+    const done = i >= candidates.length;
+    return json({
+      ok: true,
+      scanId,
+      scanned, newFindings, supersededFindings, skipped, errors, errorDetails,
+      cursor: i,
+      total,
+      done,
+    });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+// ── Reset: clear all memory so next scan re-analyzes everything ──
+// Wipes scan history, doc history, and analysis records. Findings are kept (status preserved).
+async function handleWatchtowerResetScans(request, env) {
+  try {
+    const body = await request.json().catch(() => ({}));
+    const wipeFindings = !!body.wipeFindings;
+    let cleared = 0;
+    for (const prefix of ['wt:scanned:', 'wt:scan:', 'wt:analysis:', 'wt:doc-history:']) {
+      let cursor;
+      do {
+        const list = await env.CACI_KV.list({ prefix, cursor });
+        for (const k of list.keys) { await env.CACI_KV.delete(k.name); cleared++; }
+        cursor = list.list_complete ? null : list.cursor;
+      } while (cursor);
+    }
+    await env.CACI_KV.delete('wt:scans:index');
+    if (wipeFindings) {
+      let cursor;
+      do {
+        const list = await env.CACI_KV.list({ prefix: 'wt:finding:', cursor });
+        for (const k of list.keys) { await env.CACI_KV.delete(k.name); cleared++; }
+        cursor = list.list_complete ? null : list.cursor;
+      } while (cursor);
+      await env.CACI_KV.delete('wt:findings:index');
+    }
+    return json({ ok: true, cleared, wipedFindings: wipeFindings });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+// ── Scan history listings ──
+async function handleScansList(url, env) {
+  try {
+    const idx = await env.CACI_KV.get('wt:scans:index', 'json') || [];
+    return json({ ok: true, items: idx });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+async function handleScanGet(path, env) {
+  try {
+    const id = path.split('/')[3];
+    const scan = await env.CACI_KV.get(`wt:scan:${id}`, 'json');
+    if (!scan) return json({ error: 'not found' }, 404);
+    // Hydrate the analysis records for this scan
+    const analysisRecords = [];
+    for (const aid of (scan.analysisIds || []).slice(-200)) {
+      const a = await env.CACI_KV.get(`wt:analysis:${aid}`, 'json');
+      if (a) analysisRecords.push({ id: a.id, ts: a.ts, docName: a.docName, docId: a.docId, reason: a.reason, findingCount: a.findingCount });
+    }
+    return json({ ok: true, scan, analyses: analysisRecords });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+async function handleDocHistory(path, env) {
+  try {
+    const docId = path.split('/')[3];
+    const histIds = await env.CACI_KV.get(`wt:doc-history:${docId}`, 'json') || [];
+    const file = await env.CACI_KV.get(`file:${docId}`, 'json');
+    const entries = [];
+    for (const aid of histIds) {
+      const a = await env.CACI_KV.get(`wt:analysis:${aid}`, 'json');
+      if (a) entries.push(a);
+    }
+    return json({ ok: true, docId, docName: file ? (file.name || file.fileName || '') : '', entries });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+async function handleFindingHistory(path, env) {
+  // Given a finding id, find all sibling findings from prior analyses of the same document
+  try {
+    const id = path.split('/')[3];
+    const f = await env.CACI_KV.get(`wt:finding:${id}`, 'json');
+    if (!f) return json({ error: 'not found' }, 404);
+    const histIds = await env.CACI_KV.get(`wt:doc-history:${f.sourceFileId}`, 'json') || [];
+    const siblings = [];
+    for (const aid of histIds) {
+      const a = await env.CACI_KV.get(`wt:analysis:${aid}`, 'json');
+      if (!a) continue;
+      for (const fid of a.findingIds || []) {
+        const sf = await env.CACI_KV.get(`wt:finding:${fid}`, 'json');
+        if (sf) siblings.push({
+          id: sf.id, scanId: sf.scanId, createdAt: sf.createdAt, current: sf.current !== false,
+          status: sf.status, tier: sf.tier, title: sf.title, summary: sf.summary,
+          supersededAt: sf.supersededAt || null,
+        });
+      }
+    }
+    return json({ ok: true, finding: f, siblings });
   } catch (e) { return json({ error: e.message }, 500); }
 }
 
