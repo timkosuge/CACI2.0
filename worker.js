@@ -6144,60 +6144,104 @@ async function handleFindingHistory(path, env) {
 
 // ── Filename classifier: extract type, topic, date from filename ──
 // Returns { type, topic, date, isLikelyMultiTopic, displayLabel } — pure code, no API calls.
+// Handles common Ohio cannabis library naming patterns:
+//   "Ohio DCC Guidance - Topic Name - April 21, 2026.txt"
+//   "Ohio DCC Guidance - Topic Name -April 21, 2026.txt"
+//   "OH_DCC_Guidance_Topic_Name_April_21_2026.txt"  (older)
+//   "OH_1301_18_10_07_Topic.txt"                   (OAC numbered)
 function wtClassifyFilename(rawName) {
   const name = (rawName || '').replace(/\.[^.]+$/, ''); // drop extension
   const lower = name.toLowerCase();
 
-  // Detect date in filename (YYYY-MM-DD, Month DD YYYY, "April 21 2026", etc)
+  // Detect date in filename — multiple formats
   let date = null;
-  let mDate = name.match(/(\d{4})[_\- ](\d{1,2})[_\- ](\d{1,2})/); // 2026-04-21
-  if (!mDate) mDate = name.match(/(\d{1,2})[_\- ](\d{1,2})[_\- ](\d{4})/); // 4-21-2026
+  const months = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+  const monRx = new RegExp(`(${months.join('|')})\\s*\\.?\\s*(\\d{1,2})\\s*[,\\-_ ]+\\s*(\\d{4})`, 'i');
+  let mDate = name.match(monRx);
   if (mDate) {
-    const a = parseInt(mDate[1]), b = parseInt(mDate[2]), c = parseInt(mDate[3]);
-    if (a > 1900) date = `${a}-${String(b).padStart(2,'0')}-${String(c).padStart(2,'0')}`;
-    else if (c > 1900) date = `${c}-${String(a).padStart(2,'0')}-${String(b).padStart(2,'0')}`;
+    const mi = months.indexOf(mDate[1].toLowerCase()) + 1;
+    date = `${mDate[3]}-${String(mi).padStart(2,'0')}-${String(parseInt(mDate[2])).padStart(2,'0')}`;
   }
   if (!date) {
-    const months = ['january','february','march','april','may','june','july','august','september','october','november','december'];
-    const monMatch = lower.match(new RegExp(`(${months.join('|')})[_\\- ]+(\\d{1,2})[_\\-,. ]+(\\d{4})`));
-    if (monMatch) {
-      const mi = months.indexOf(monMatch[1]) + 1;
-      date = `${monMatch[3]}-${String(mi).padStart(2,'0')}-${String(parseInt(monMatch[2])).padStart(2,'0')}`;
+    let m = name.match(/(\d{4})[_\- ](\d{1,2})[_\- ](\d{1,2})/); // 2026-04-21
+    if (m) {
+      const a = parseInt(m[1]), b = parseInt(m[2]), c = parseInt(m[3]);
+      if (a > 1900) date = `${a}-${String(b).padStart(2,'0')}-${String(c).padStart(2,'0')}`;
+    }
+  }
+  if (!date) {
+    let m = name.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/); // 4-21-2026 or 4/21/2026
+    if (m) {
+      const a = parseInt(m[1]), b = parseInt(m[2]), c = parseInt(m[3]);
+      date = `${c}-${String(a).padStart(2,'0')}-${String(b).padStart(2,'0')}`;
     }
   }
 
-  // Detect type
+  // Detect type — handle spaces, dashes, underscores interchangeably
   let type = 'Unknown';
   let isLikelyMultiTopic = false;
-  if (/\bSB[_\s-]?\d+/i.test(name) || /senate[_\s-]?bill/i.test(name) || /\bHB[_\s-]?\d+/i.test(name)) {
+
+  // Bills (SB 56, HB ###)
+  if (/\b(SB|HB)[\s_\-]?\d+/i.test(name) || /senate[\s_\-]?bill|house[\s_\-]?bill/i.test(name)) {
     type = 'Legislative Bill'; isLikelyMultiTopic = true;
-  } else if (/rules?[_\s-]?package/i.test(name)) {
+  }
+  // Rules Packages
+  else if (/rules?[\s_\-]?package/i.test(name)) {
     type = 'Rules Package'; isLikelyMultiTopic = true;
-  } else if (/dcc[_\s-]?guidance|dcc[_\s-]?memo|dcc[_\s-]?bulletin/i.test(name)) {
-    type = 'DCC Guidance/Memo';
-    // Multi-topic markers in DCC memo names
-    if (/\bmultiple\b|\bvarious\b|\bupdates?\b|\bchanges?\b|\bbulletin\b/i.test(name)) isLikelyMultiTopic = true;
-  } else if (/dcc[_\s-]?newsletter/i.test(name) || /licensee[_\s-]?(meeting|update)/i.test(name)) {
+  }
+  // DCC Newsletters / licensee meetings — typically multi-topic
+  else if (/dcc[\s_\-]?newsletter|licensee[\s_\-]?(meeting|update|bulletin)/i.test(lower) || /\bnewsletter\b/i.test(lower)) {
     type = 'DCC Newsletter/Update'; isLikelyMultiTopic = true;
-  } else if (/^OH[_\s-]?\d{4}/i.test(name) || /^\d{4}[_\-:]/i.test(name) || /OAC|administrative[_\s-]?code/i.test(name)) {
+  }
+  // DCC Guidance / Memo / Bulletin — typically single-topic, common case
+  else if (/dcc[\s_\-]?guidance|dcc[\s_\-]?memo|dcc[\s_\-]?bulletin/i.test(lower)) {
+    type = 'DCC Guidance/Memo';
+    // Multi-topic markers: only flag when the language clearly indicates a digest of unrelated items.
+    // "Multiple", "Various", "Many topics" → multi. Plain "Update" / "Updates" / "Changes" usually means a single update *about* something, not a digest.
+    if (/\bmultiple\b|\bvarious\b|\bnumerous\b|\bsundry\b|\bdigest\b|\bcompendium\b/i.test(name)) {
+      isLikelyMultiTopic = true;
+    }
+  }
+  // Regulatory Context (your standalone framing docs)
+  else if (/regulatory[\s_\-]?context|industry[\s_\-]?context|cannabis[\s_\-]?context/i.test(lower)) {
+    type = 'Regulatory Context';
+  }
+  // OAC numbered rules — the OH_1301_18_X_Y_Z pattern
+  else if (/\bOH[\s_\-]?\d{4}[\s_\-]?\d{1,2}[\s_\-]?\d{1,2}/i.test(name) || /\b1301[:\-_]?18\b/i.test(name) || /OAC|administrative[\s_\-]?code/i.test(lower)) {
     type = 'OAC Rule';
-  } else if (/^ORC|revised[_\s-]?code/i.test(name)) {
+  }
+  // ORC statutes
+  else if (/\bORC\b|revised[\s_\-]?code|chapter[\s_\-]?3796|chapter[\s_\-]?3780/i.test(lower)) {
     type = 'ORC Statute';
-  } else if (/illinois|IL[_\s-]?cannabis/i.test(name)) {
+  }
+  // Other states
+  else if (/illinois|IL[\s_\-]?cannabis/i.test(lower)) {
     type = 'Illinois Regulation';
   }
+  else if (/pennsylvania|\bpa[\s_\-]?cannabis/i.test(lower)) {
+    type = 'Pennsylvania Regulation';
+  }
+  else if (/virginia|\bva[\s_\-]?cannabis/i.test(lower)) {
+    type = 'Virginia Regulation';
+  }
 
-  // Topic phrase = the human-readable middle of the filename, with separators normalized
+  // Topic phrase: clean up the human-readable middle of the name
   let topic = name
-    .replace(/^OH[_\s-]?DCC[_\s-]?Guidance[_\s-]?/i, '')
-    .replace(/^OH[_\s-]?DCC[_\s-]?(Memo|Bulletin|Newsletter)[_\s-]?/i, '')
-    .replace(/^OH[_\s-]?\d{4}[_\s-]?\d{1,2}[_\s-]?\d{1,2}[_\s-]?\d{1,2}[_\s-]?/i, '')  // OH_1301_18_10_07_
-    .replace(/[_\-]/g, ' ')
-    .replace(/\d{4}[_\s-]\d{1,2}[_\s-]\d{1,2}/g, '')
+    .replace(/^Ohio[\s_\-]+DCC[\s_\-]+(Guidance|Memo|Bulletin|Newsletter)[\s_\-]+(\-[\s_\-]+)?/gi, '')
+    .replace(/^OH[\s_\-]+DCC[\s_\-]+(Guidance|Memo|Bulletin|Newsletter)[\s_\-]+(\-[\s_\-]+)?/gi, '')
+    .replace(/^Ohio[\s_\-]+DCC[\s_\-]+/gi, '')
+    .replace(/^OH[\s_\-]+\d{4}[\s_\-]+\d{1,2}[\s_\-]+\d{1,2}[\s_\-]+\d{1,2}[\s_\-]+/i, '')
+    .replace(/^OH[\s_\-]+\d{4}[\s_\-]+\d{1,2}[\s_\-]+\d{1,2}[\s_\-]+/i, '')
+    // Strip the date itself out of the topic
+    .replace(monRx, '')
+    .replace(/(\d{4})[\-_ ](\d{1,2})[\-_ ](\d{1,2})/, '')
+    .replace(/[_]/g, ' ')
+    .replace(/\s*-\s*-\s*/g, ' - ') // collapse "- -" adjacent
+    .replace(/\s*-\s*$/g, '')
+    .replace(/^\s*-\s*/g, '')
     .replace(/\s+/g, ' ')
+    .replace(/\s*,\s*$/, '')
     .trim();
-  // Trim trailing/leading dates
-  topic = topic.replace(/(January|February|March|April|May|June|July|August|September|October|November|December)\s*\d{1,2}\s*,?\s*\d{4}/gi, '').trim();
   if (!topic || topic.length < 3) topic = name;
 
   const dateLabel = date ? ` (${date})` : '';
