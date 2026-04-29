@@ -19045,25 +19045,52 @@ async function buildReportDocx(docx, report) {
   const INK = '1F1F1F';
   const SUBTLE = '595959';
   const HAIR = '8C8C8C';
+  // Tier colors — strong, professional, survive printing and email
+  const TIER_RED = 'C0392B';     // 🔴 HIGH
+  const TIER_AMBER = 'B8860B';   // 🟡 MEDIUM
+  const TIER_GREEN = '1E7E34';   // 🟢 LOW
 
   const Bold = (t, opts={}) => new TextRun({ text: t, bold: true, font: FONT, size: 22, ...opts });
   const Plain = (t, opts={}) => new TextRun({ text: t, font: FONT, size: 22, ...opts });
   const Italic = (t, opts={}) => new TextRun({ text: t, italics: true, font: FONT, size: 22, ...opts });
 
-  // Tiny inline-markdown -> TextRun[] (handles **bold** and *italic*)
+  // Replace tier emojis with colored text labels. Emojis don't always render in
+  // color across all Office installs (older Windows Word falls back to monochrome
+  // for non-emoji-named fonts). Colored text labels are guaranteed to render
+  // correctly everywhere and are clearer in a printed/forwarded document anyway.
+  function tierAwareRuns(text, baseOpts = {}) {
+    const out = [];
+    if (!text) return out;
+    // Split on tier emoji, preserving the tier as a distinct segment
+    const parts = text.split(/(🔴|🟡|🟢)/g);
+    for (const part of parts) {
+      if (!part) continue;
+      if (part === '🔴') {
+        out.push(new TextRun({ text: 'HIGH', bold: true, font: FONT, size: 22, color: TIER_RED, ...baseOpts }));
+      } else if (part === '🟡') {
+        out.push(new TextRun({ text: 'MEDIUM', bold: true, font: FONT, size: 22, color: TIER_AMBER, ...baseOpts }));
+      } else if (part === '🟢') {
+        out.push(new TextRun({ text: 'LOW', bold: true, font: FONT, size: 22, color: TIER_GREEN, ...baseOpts }));
+      } else {
+        out.push(new TextRun({ text: part, font: FONT, size: 22, ...baseOpts }));
+      }
+    }
+    return out;
+  }
+
+  // Tiny inline-markdown -> TextRun[] (handles **bold**, *italic*, and tier emojis)
   function inlineRuns(s, baseOpts = {}) {
     const out = [];
     if (!s) return out;
-    // tokenize: **bold**, *italic*, plain
     const re = /(\*\*[^*]+\*\*)|(\*[^*]+\*)/g;
     let last = 0; let m;
     while ((m = re.exec(s)) !== null) {
-      if (m.index > last) out.push(new TextRun({ text: s.slice(last, m.index), font: FONT, size: 22, ...baseOpts }));
-      if (m[1]) out.push(new TextRun({ text: m[1].slice(2, -2), bold: true, font: FONT, size: 22, ...baseOpts }));
-      else if (m[2]) out.push(new TextRun({ text: m[2].slice(1, -1), italics: true, font: FONT, size: 22, ...baseOpts }));
+      if (m.index > last) out.push(...tierAwareRuns(s.slice(last, m.index), baseOpts));
+      if (m[1]) out.push(...tierAwareRuns(m[1].slice(2, -2), { ...baseOpts, bold: true }));
+      else if (m[2]) out.push(...tierAwareRuns(m[2].slice(1, -1), { ...baseOpts, italics: true }));
       last = re.lastIndex;
     }
-    if (last < s.length) out.push(new TextRun({ text: s.slice(last), font: FONT, size: 22, ...baseOpts }));
+    if (last < s.length) out.push(...tierAwareRuns(s.slice(last), baseOpts));
     return out;
   }
 
