@@ -123,6 +123,8 @@ export default {
     if (path === '/files'     && method === 'GET')    return handleListFiles(url, env);
     if (path.startsWith('/files/') && method === 'GET' && !path.endsWith('/meta') && path.split('/').length === 3) return handleGetFileContent(path, env, request);
     if (path.startsWith('/files/') && path.endsWith('/meta') && method === 'PATCH') return handlePatchFileMeta(path, request, env);
+    if (path.startsWith('/files/') && path.endsWith('/promote-to-context') && method === 'POST') return handlePromoteToContext(path, request, env);
+    if (path.startsWith('/files/') && path.endsWith('/demote-to-document') && method === 'POST') return handleDemoteToDocument(path, request, env);
     if (path.startsWith('/files/') && method === 'DELETE') return handleDeleteFile(path.replace('/files/', ''), env, url, verifyToken(request, env));
     if (path === '/collections' && method === 'GET')  return handleListCollections(url, env);
     if (path === '/collections/create' && method === 'POST') return handleCreateCollection(request, env);
@@ -758,6 +760,83 @@ async function handlePatchFileMeta(path, request, env) {
       }
     }
 
+    return json({ ok: true });
+  } catch(e) { return json({ error: e.message }, 500); }
+}
+
+// ── Promote File to Context Doc ──────────────────────────────
+// Moves a file's index entry from col:dept:collection -> ctx:dept:collection
+// The file:{id} blob stays put. Reverses with handleDemoteToDocument.
+async function handlePromoteToContext(path, request, env) {
+  try {
+    const id = path.split('/')[2];
+    const stored = await env.CACI_KV.get(`file:${id}`, 'json');
+    if (!stored) return json({ error: 'File not found' }, 404);
+
+    const dept = stored.dept;
+    const collection = stored.collection;
+    if (!dept || !collection) return json({ error: 'File missing dept or collection — cannot promote' }, 400);
+
+    const colKey = `col:${dept}:${collection}`;
+    const ctxKey = `ctx:${dept}:${collection}`;
+
+    const colIdx = await env.CACI_KV.get(colKey, 'json') || [];
+    const entry  = colIdx.find(f => f.id === id);
+    if (!entry) return json({ error: 'File not found in collection index' }, 404);
+
+    const ctxIdx = await env.CACI_KV.get(ctxKey, 'json') || [];
+    if (ctxIdx.find(f => f.id === id)) {
+      await env.CACI_KV.put(colKey, JSON.stringify(colIdx.filter(f => f.id !== id)));
+      return json({ ok: true, alreadyContext: true });
+    }
+
+    const promoted = { ...entry, isContext: true };
+    ctxIdx.unshift(promoted);
+    await env.CACI_KV.put(ctxKey, JSON.stringify(ctxIdx));
+    await env.CACI_KV.put(colKey, JSON.stringify(colIdx.filter(f => f.id !== id)));
+
+    stored.isContext = true;
+    await env.CACI_KV.put(`file:${id}`, JSON.stringify(stored));
+
+    await env.CACI_KV.delete(`library:map:${dept}`).catch(() => {});
+    return json({ ok: true });
+  } catch(e) { return json({ error: e.message }, 500); }
+}
+
+// ── Demote Context Doc to Regular File ───────────────────────
+async function handleDemoteToDocument(path, request, env) {
+  try {
+    const id = path.split('/')[2];
+    const stored = await env.CACI_KV.get(`file:${id}`, 'json');
+    if (!stored) return json({ error: 'File not found' }, 404);
+
+    const dept = stored.dept;
+    const collection = stored.collection;
+    if (!dept || !collection) return json({ error: 'File missing dept or collection — cannot demote' }, 400);
+
+    const colKey = `col:${dept}:${collection}`;
+    const ctxKey = `ctx:${dept}:${collection}`;
+
+    const ctxIdx = await env.CACI_KV.get(ctxKey, 'json') || [];
+    const entry  = ctxIdx.find(f => f.id === id);
+    if (!entry) return json({ error: 'File not found in context index' }, 404);
+
+    const colIdx = await env.CACI_KV.get(colKey, 'json') || [];
+    if (colIdx.find(f => f.id === id)) {
+      await env.CACI_KV.put(ctxKey, JSON.stringify(ctxIdx.filter(f => f.id !== id)));
+      return json({ ok: true, alreadyDocument: true });
+    }
+
+    const demoted = { ...entry };
+    delete demoted.isContext;
+    colIdx.unshift(demoted);
+    await env.CACI_KV.put(colKey, JSON.stringify(colIdx));
+    await env.CACI_KV.put(ctxKey, JSON.stringify(ctxIdx.filter(f => f.id !== id)));
+
+    delete stored.isContext;
+    await env.CACI_KV.put(`file:${id}`, JSON.stringify(stored));
+
+    await env.CACI_KV.delete(`library:map:${dept}`).catch(() => {});
     return json({ ok: true });
   } catch(e) { return json({ error: e.message }, 500); }
 }
