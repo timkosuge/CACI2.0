@@ -136,6 +136,8 @@ export default {
     if (path.startsWith('/watchtower/findings/') && method === 'GET' && path.split('/').length === 4) return handleFindingGet(path, env);
     if (path.startsWith('/watchtower/findings/') && method === 'DELETE') return handleFindingDelete(path, env);
     if (path === '/watchtower/scan' && method === 'POST')        return handleWatchtowerScan(request, env);
+    if (path === '/watchtower/config' && method === 'GET')       return handleWatchtowerConfigGet(env);
+    if (path === '/watchtower/config' && method === 'POST')      return handleWatchtowerConfigSet(request, env);
     if (path === '/watchtower/scan-plan' && method === 'POST')   return handleWatchtowerScanPlan(request, env);
     if (path === '/watchtower/reset-scans' && method === 'POST') return handleWatchtowerResetScans(request, env);
     if (path === '/watchtower/scans' && method === 'GET')        return handleScansList(url, env);
@@ -5528,6 +5530,48 @@ const WT_DEFAULT_WATCHLIST = [
 // Prompt version — bump when wtAnalyzeDocument's prompt changes meaningfully
 const WT_PROMPT_VERSION = 1;
 
+// Config: where Watchtower scans. Stored in KV so it can be changed from the UI.
+const WT_CONFIG_DEFAULTS = {
+  dept: 'compliance',
+  collection: 'Ohio Cannabis Regulations',
+};
+async function wtGetConfig(env) {
+  const stored = await env.CACI_KV.get('wt:config', 'json');
+  return { ...WT_CONFIG_DEFAULTS, ...(stored || {}) };
+}
+async function wtSetConfig(env, patch) {
+  const current = await wtGetConfig(env);
+  const next = { ...current, ...patch };
+  await env.CACI_KV.put('wt:config', JSON.stringify(next));
+  return next;
+}
+
+async function handleWatchtowerConfigGet(env) {
+  try {
+    const cfg = await wtGetConfig(env);
+    // Also discover what collections exist in the configured dept, so the UI can offer choices
+    const reg = await env.CACI_KV.get(`colreg:${cfg.dept}`, 'json') || [];
+    const collections = Array.isArray(reg)
+      ? reg.map(c => typeof c === 'string' ? c : (c.name || c.collection || '')).filter(Boolean)
+      : [];
+    // Available departments from the standard dept set
+    const depts = ['retail', 'compliance', 'commercial', 'finance', 'marketing', 'grower', 'processor', 'it', 'hr', 'learning', 'admin'];
+    return json({ ok: true, config: cfg, availableCollections: collections, availableDepartments: depts });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+async function handleWatchtowerConfigSet(request, env) {
+  try {
+    const body = await request.json();
+    const patch = {};
+    if (typeof body.dept === 'string' && body.dept.trim())       patch.dept = body.dept.trim();
+    if (typeof body.collection === 'string' && body.collection.trim()) patch.collection = body.collection.trim();
+    if (Object.keys(patch).length === 0) return json({ error: 'No valid fields to update' }, 400);
+    const cfg = await wtSetConfig(env, patch);
+    return json({ ok: true, config: cfg });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
 // Watchlist version is stored separately and bumps on any add/edit/delete
 async function wtGetWatchlistVersion(env) {
   const v = await env.CACI_KV.get('wt:watchlist:version', 'text');
@@ -5682,8 +5726,9 @@ async function handleFindingDelete(path, env) {
 async function handleWatchtowerScanPlan(request, env) {
   try {
     const body = await request.json().catch(() => ({}));
-    const dept = body.dept || 'compliance';
-    const collection = body.collection || 'Ohio Regulations';
+    const cfg = await wtGetConfig(env);
+    const dept = body.dept || cfg.dept;
+    const collection = body.collection || cfg.collection;
     const force = !!body.force;
 
     const colKey = `col:${dept}:${collection}`;
@@ -5770,8 +5815,9 @@ async function handleWatchtowerScanPlan(request, env) {
 async function handleWatchtowerScan(request, env) {
   try {
     const body = await request.json().catch(() => ({}));
-    const dept = body.dept || 'compliance';
-    const collection = body.collection || 'Ohio Regulations';
+    const cfg = await wtGetConfig(env);
+    const dept = body.dept || cfg.dept;
+    const collection = body.collection || cfg.collection;
     const force = !!body.force;
     const batchSize = Math.min(body.batchSize || 8, 20);
     const cursor = Math.max(0, parseInt(body.cursor || 0, 10));
