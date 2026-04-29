@@ -18690,35 +18690,117 @@ async function wtRunScan() {
   const btn = $('wt-run-btn');
   const status = $('wt-scan-status');
   if (!btn || !status) return;
-  if (!confirm('Run a Regulatory Scan against the configured collection?\n\nThe scan uses the chat engine with full collection retrieval — typically 30-60 seconds and roughly $0.20-0.50 per scan.')) return;
 
-  btn.disabled = true; btn.textContent = 'Scanning…';
+  btn.disabled = true; btn.textContent = 'Checking…';
   status.style.display = 'block';
-  status.textContent = 'Reading the regulatory library and analyzing... this usually takes 30-60 seconds.';
+  status.textContent = 'Reviewing the library to find recent documents…';
 
+  const monthsBack = 18;
+
+  // Step 1: get the plan
+  let plan;
+  try {
+    const res = await apiFetch('/regscan/plan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ monthsBack })
+    });
+    plan = await res.json();
+    if (!plan.ok) throw new Error(plan.error || 'plan failed');
+  } catch (e) {
+    status.textContent = 'Could not check scan plan: ' + e.message;
+    btn.disabled = false; btn.textContent = 'Run Scan';
+    return;
+  }
+
+  if (plan.total === 0) {
+    status.textContent = 'No documents found in the configured collection. Check Settings.';
+    btn.disabled = false; btn.textContent = 'Run Scan';
+    return;
+  }
+
+  if (plan.recentCount === 0) {
+    status.textContent = `No documents from the last ${plan.monthsBack} months found. Try a wider window in Settings.`;
+    btn.disabled = false; btn.textContent = 'Run Scan';
+    return;
+  }
+
+  const sample = (plan.recentSample || []).slice(0, 3).map(s => `${s.name} (${s.dateStr || '—'})`).join(', ');
+  const confirmMsg = `Run a Regulatory Scan?\n\nLibrary: ${plan.total} documents total.\nRecent (last ${plan.monthsBack} months): ${plan.recentCount} documents — these will be analyzed individually.\nOlder regulations: ${plan.olderCount} (used as related context).\n${plan.undatedCount ? `Undated: ${plan.undatedCount} (treated as background).\n` : ''}\nEstimated cost: roughly $${(plan.recentCount * 0.02).toFixed(2)}-${(plan.recentCount * 0.04).toFixed(2)}.\nEstimated time: ${Math.ceil(plan.recentCount / 6 * 15)}–${Math.ceil(plan.recentCount / 6 * 30)} seconds.\n\nKeep this tab open during the scan.`;
+  if (!confirm(confirmMsg)) {
+    status.style.display = 'none';
+    btn.disabled = false; btn.textContent = 'Run Scan';
+    return;
+  }
+
+  // Step 2: loop through the scan with cursor + accumulated
   const now = new Date();
   const clientDatetime = now.toLocaleString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric', hour:'numeric', minute:'2-digit', hour12:true });
   const clientTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-  try {
-    const res = await apiFetch('/regscan/run', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ clientDatetime, clientTimezone })
-    });
-    const data = await res.json();
-    if (!data.ok) {
-      status.textContent = 'Scan failed: ' + (data.error || 'unknown');
+  btn.textContent = 'Scanning…';
+
+  let cursor = 0;
+  let totalAnalyzed = 0, totalErrors = 0;
+  const allErrorDetails = [];
+  let accumulated = [];
+  let done = false;
+  let report = null;
+  let meta = null;
+  const startedAt = new Date().toISOString();
+
+  while (!done) {
+    try {
+      const res = await apiFetch('/regscan/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientDatetime, clientTimezone, monthsBack,
+          cursor, batchSize: 6, accumulated, startedAt,
+        })
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        status.textContent = 'Scan failed: ' + (data.error || 'unknown');
+        btn.disabled = false; btn.textContent = 'Run Scan';
+        return;
+      }
+      if (data.warning) { status.textContent = data.warning; btn.disabled = false; btn.textContent = 'Run Scan'; return; }
+
+      totalAnalyzed += data.analyzed;
+      totalErrors  += data.errors;
+      if (data.errorDetails) allErrorDetails.push(...data.errorDetails);
+      cursor = data.cursor;
+      accumulated = data.accumulated || accumulated;
+      done = data.done;
+      report = data.report;
+      meta = data.meta;
+
+      const recentTotal = data.recentTotal;
+      const pct = recentTotal ? Math.round((cursor / recentTotal) * 100) : 0;
+      let msg = `Scanning recent documents… ${cursor} / ${recentTotal} (${pct}%) &middot; ${accumulated.length} findings so far`;
+      if (totalErrors) msg += ` &middot; ${totalErrors} errors`;
+      status.innerHTML = msg;
+    } catch (e) {
+      status.textContent = 'Scan error: ' + e.message + ' — partial progress saved. Click Run Scan to resume.';
       btn.disabled = false; btn.textContent = 'Run Scan';
       return;
     }
-    _rsCurrentReport = data.report;
-    _rsCurrentMeta = data.meta || {};
-    renderCurrentReport();
-    status.style.display = 'none';
-  } catch (e) {
-    status.textContent = 'Scan error: ' + e.message;
   }
+
+  if (report) {
+    _rsCurrentReport = report;
+    _rsCurrentMeta = meta || {};
+    renderCurrentReport();
+    let finalMsg = `Scan complete. ${totalAnalyzed} documents analyzed, ${accumulated.length} findings.`;
+    if (totalErrors) {
+      finalMsg += ` ${totalErrors} error(s):<br><div style="margin-top:6px;font-size:11px;color:var(--smoke3);max-height:80px;overflow-y:auto">`
+        + allErrorDetails.slice(0, 10).map(e => '&middot; ' + esc(e)).join('<br>') + '</div>';
+    }
+    status.innerHTML = finalMsg;
+    setTimeout(() => { if (status) status.style.display = 'none'; }, 8000);
+  }
+
   btn.disabled = false; btn.textContent = 'Run Scan';
 }
 
