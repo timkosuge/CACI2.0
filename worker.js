@@ -137,6 +137,7 @@ export default {
     if (path === '/regscan/config' && method === 'GET')          return handleRegscanConfigGet(env);
     if (path === '/regscan/config' && method === 'POST')         return handleRegscanConfigSet(request, env);
     if (path === '/regscan/run' && method === 'POST')            return handleRegscanRun(request, env);
+    if (path === '/regscan/plan' && method === 'POST')           return handleRegscanPlan(request, env);
     if (path === '/regscan/reports' && method === 'GET')         return handleRegscanReportsList(env);
     if (path === '/regscan/reports' && method === 'POST')        return handleRegscanReportSave(request, env);
     if (path.startsWith('/regscan/reports/') && method === 'GET'    && path.split('/').length === 4) return handleRegscanReportGet(path, env);
@@ -6428,6 +6429,196 @@ async function handleRegscanConfigSet(request, env) {
 }
 
 // ── Run a regulatory scan: builds a structured prompt, sends to Claude with full retrieval ──
+// ── Parse a date out of a filename. Returns ISO YYYY-MM-DD or null. ──
+function regscanParseFilenameDate(rawName) {
+  const name = (rawName || '').replace(/\.[^.]+$/, '');
+  const months = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+  const monRx = new RegExp(`(${months.join('|')})\\s*\\.?\\s*(\\d{1,2})\\s*[,\\-_ ]+\\s*(\\d{4})`, 'i');
+  let m = name.match(monRx);
+  if (m) {
+    const mi = months.indexOf(m[1].toLowerCase()) + 1;
+    return `${m[3]}-${String(mi).padStart(2,'0')}-${String(parseInt(m[2])).padStart(2,'0')}`;
+  }
+  m = name.match(/(\d{4})[_\- ](\d{1,2})[_\- ](\d{1,2})/);
+  if (m) {
+    const a = parseInt(m[1]), b = parseInt(m[2]), c = parseInt(m[3]);
+    if (a > 1900 && b >= 1 && b <= 12 && c >= 1 && c <= 31) {
+      return `${a}-${String(b).padStart(2,'0')}-${String(c).padStart(2,'0')}`;
+    }
+  }
+  m = name.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+  if (m) {
+    const a = parseInt(m[1]), b = parseInt(m[2]), c = parseInt(m[3]);
+    if (a >= 1 && a <= 12 && b >= 1 && b <= 31) {
+      return `${c}-${String(a).padStart(2,'0')}-${String(b).padStart(2,'0')}`;
+    }
+  }
+  return null;
+}
+
+// ── Build a recent-documents plan: which documents will be analyzed and why. ──
+async function regscanBuildPlan(env, dept, collection, monthsBack) {
+  const colKey = `col:${dept}:${collection}`;
+  const candidates = await env.CACI_KV.get(colKey, 'json') || [];
+
+  const cutoffMs = Date.now() - (monthsBack * 30 * 24 * 60 * 60 * 1000);
+
+  const recent = []; // documents with parseable date within window
+  const undated = []; // documents without parseable filename date
+  const older = []; // documents with parseable date older than cutoff
+
+  for (const meta of candidates) {
+    const fn = meta.name || meta.fileName || '';
+    const dateStr = regscanParseFilenameDate(fn);
+    let docDate = null;
+    if (dateStr) {
+      const d = new Date(dateStr);
+      if (!isNaN(d.getTime())) docDate = d;
+    }
+    // Fall back to uploadedAt if filename has no date
+    if (!docDate && meta.uploadedAt) {
+      const d = new Date(meta.uploadedAt);
+      if (!isNaN(d.getTime())) docDate = d;
+    }
+    const entry = { id: meta.id, name: fn, dateStr, uploadedAt: meta.uploadedAt };
+    if (!docDate) { undated.push(entry); continue; }
+    if (docDate.getTime() >= cutoffMs) {
+      entry.docDateMs = docDate.getTime();
+      recent.push(entry);
+    } else {
+      older.push(entry);
+    }
+  }
+  // Sort recent by date desc
+  recent.sort((a, b) => b.docDateMs - a.docDateMs);
+  return { recent, undated, older, total: candidates.length };
+}
+
+async function handleRegscanPlan(request, env) {
+  try {
+    const body = await request.json().catch(() => ({}));
+    const cfg = await regscanGetConfig(env);
+    const dept = body.dept || cfg.dept;
+    const collection = body.collection || cfg.collection;
+    const monthsBack = Math.max(1, Math.min(60, parseInt(body.monthsBack || 18, 10)));
+
+    const plan = await regscanBuildPlan(env, dept, collection, monthsBack);
+    return json({
+      ok: true,
+      total: plan.total,
+      monthsBack,
+      recentCount: plan.recent.length,
+      undatedCount: plan.undated.length,
+      olderCount: plan.older.length,
+      recentSample: plan.recent.slice(0, 10).map(r => ({ name: r.name, dateStr: r.dateStr })),
+      undatedSample: plan.undated.slice(0, 5).map(r => r.name),
+    });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+// ── Analyze a single recent document with related-context retrieval ──
+// Returns { findings: [...] } as parsed JSON.
+async function regscanAnalyzeRecentDoc(env, recentDoc, watchlist, ohioContext, stateName, today, apiKey) {
+  // Load the recent document's full text
+  const file = await env.CACI_KV.get(`file:${recentDoc.id}`, 'json');
+  if (!file || !file.chunks || file.chunks.length === 0) {
+    return { findings: [], skip: 'empty-file' };
+  }
+  const recentText = file.chunks.map(c => c.text || '').join('\n\n').slice(0, 30000);
+
+  // Build a retrieval query from the recent document's filename + first chunk
+  // to find related older regulations.
+  const queryBasis = (recentDoc.name + ' ' + (file.chunks[0]?.text || '').slice(0, 500)).slice(0, 800);
+  const sourceFilter = stateName.toLowerCase() === 'ohio'
+    ? ['ohio', 'oh_', 'oh-', 'dcc', '1301', 'oac']
+    : [stateName.toLowerCase()];
+  const { text: relatedContext } = await harvestRetrieveContext(env, queryBasis, 8, sourceFilter);
+
+  const watchlistText = watchlist.map((w, i) => `${i+1}. [${w.category}] ${w.item} — ${w.why}`).join('\n');
+  const departments = WT_DEPARTMENTS.join(', ');
+
+  const system = `You are KAIT analyzing ONE recent regulatory document for a multi-state cannabis operator. The document is recent — it is the change vector. Your job: identify every operational requirement or change introduced by this document, anchored against the older regulations it intersects with.
+
+Today is ${today}.
+
+DATE REASONING: When a date appears, compare it to TODAY. Don't absorb the document's tense — compute it. A May 15, 2026 deadline mentioned in an April memo is upcoming if today is in April. If a deadline has passed, say so.
+
+Departments at this organization: ${departments}.
+
+Operational watchlist:
+${watchlistText}
+
+${ohioContext ? `Ohio regulatory context:\n${ohioContext}\n` : ''}
+
+OUTPUT — return a JSON object: { "findings": [ ... ] }
+
+Each finding has these fields:
+- title (under 80 chars)
+- summary (1 sentence, plain language)
+- whatChanged (1-3 sentences describing the requirement/change)
+- whatItTouches (2-4 sentences on operational impact)
+- departmentImpacts (object mapping department names to specific actionable instructions)
+- watchlistMatches (array of watchlist categories touched)
+- tier ("🔴" | "🟡" | "🟢")
+- tierReasoning (1 sentence)
+- effectiveDate (YYYY-MM-DD or null)
+- deadline (YYYY-MM-DD or null)
+- sourceQuote (verbatim from the recent document, under 300 chars)
+- supersedesOrUpdates (string description, or null — "supersedes the 2024 packaging memo on child-resistance" or null if standalone)
+
+If the document genuinely contains nothing operationally relevant, return { "findings": [] }.
+
+PRINCIPLES:
+- One finding per discrete change. Multi-topic memos produce multiple findings.
+- Source filenames in findings refer to the RECENT document only. Related context is for your reasoning, not for citation.
+- When the recent document modifies/supersedes/clarifies an older regulation, mention that in supersedesOrUpdates.
+- Be specific in department instructions. "Verify month-end COGS calculations use unit-of-measure X" not "review this."
+- Be honest. Don't invent findings to seem thorough. Don't compress multi-topic content into one finding.`;
+
+  const userMsg = `RECENT DOCUMENT (the change being analyzed):
+Filename: ${recentDoc.name}
+Date: ${recentDoc.dateStr || 'unknown'}
+
+${recentText}
+
+---
+
+RELATED OLDER REGULATIONS (for context — these are what the recent document is in conversation with; do not analyze these as separate findings):
+
+${relatedContext || '(no related context retrieved)'}
+
+---
+
+Analyze the RECENT DOCUMENT above. Return findings as JSON.`;
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 4000,
+      system,
+      messages: [{ role: 'user', content: userMsg }],
+    }),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`API ${res.status}: ${errText.slice(0, 200)}`);
+  }
+  const data = await res.json();
+  const text = (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n').trim();
+  const cleaned = text.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
+  let parsed;
+  try { parsed = JSON.parse(cleaned); }
+  catch (e) {
+    const match = cleaned.match(/\{[\s\S]*\}/);
+    if (!match) return { findings: [], parseError: text.slice(0, 200) };
+    parsed = JSON.parse(match[0]);
+  }
+  return { findings: Array.isArray(parsed.findings) ? parsed.findings : [] };
+}
+
+// ── Run a regulatory scan: two-pass, batched, recent-document-anchored ──
 async function handleRegscanRun(request, env) {
   try {
     const body = await request.json().catch(() => ({}));
@@ -6438,115 +6629,169 @@ async function handleRegscanRun(request, env) {
     const dept = body.dept || cfg.dept;
     const collection = body.collection || cfg.collection;
     const stateName = body.state || cfg.state;
-    const customInstruction = (body.customInstruction || '').trim();
+    const monthsBack = Math.max(1, Math.min(60, parseInt(body.monthsBack || 18, 10)));
+    const cursor = Math.max(0, parseInt(body.cursor || 0, 10));
+    const batchSize = Math.min(body.batchSize || 6, 12);
     const clientDatetime = body.clientDatetime;
     const clientTimezone = body.clientTimezone;
 
     const watchlist = await wtGetWatchlist(env);
-    const watchlistText = watchlist.map((w, i) => `${i+1}. [${w.category}] ${w.item} — Why: ${w.why}`).join('\n');
 
-    // Build a retrieval query that pulls broadly from the regulatory collection.
-    // We pull across the collection — the chat engine retrieves the most relevant chunks.
-    const sourceFilter = stateName.toLowerCase() === 'ohio' ? ['ohio', 'oh_', 'oh-', 'dcc', '1301', 'oac'] : [stateName.toLowerCase()];
-    const retrieveQuery = `${stateName} cannabis regulations operational changes requirements compliance deadlines packaging labeling testing transport licensing fees inventory training reporting`;
-    const { text: contextText } = await harvestRetrieveContext(env, retrieveQuery, 30, sourceFilter);
+    // Pull Ohio context docs as primary interpretive frame
+    const ctx = await env.CACI_KV.get(`ctx:${dept}:${collection}`, 'json') || [];
+    let ohioContext = '';
+    for (const c of ctx.slice(0, 4)) {
+      const f = await env.CACI_KV.get(`file:${c.id}`, 'json');
+      if (f && f.chunks) {
+        ohioContext += '\n--- ' + (c.name || '') + ' ---\n';
+        ohioContext += f.chunks.map(ch => ch.text || '').join('\n').slice(0, 8000);
+      }
+    }
+    ohioContext = ohioContext.slice(0, 20000);
+
+    const plan = await regscanBuildPlan(env, dept, collection, monthsBack);
+
+    if (plan.recent.length === 0) {
+      return json({
+        ok: true, done: true, cursor: 0,
+        total: plan.total, recentTotal: 0,
+        analyzed: 0, errors: 0, accumulated: body.accumulated || [],
+        warning: `No recent documents found in ${dept}/${collection} within the last ${monthsBack} months.`
+      });
+    }
 
     const today = clientDatetime || new Date().toLocaleString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric', hour:'numeric', minute:'2-digit', hour12:true });
 
-    const departments = WT_DEPARTMENTS.join(', ');
+    const accumulated = Array.isArray(body.accumulated) ? body.accumulated : [];
+    let analyzed = 0, errors = 0;
+    const errorDetails = [];
 
-    const system = `You are Kait, performing a Regulatory Scan for a multi-state cannabis operator. Your job: read the available regulatory documents and produce a structured report of every operational requirement or change that could affect this organization.
-
-Today is ${today}${clientTimezone ? ` (${clientTimezone})` : ''}.
-
-DATE REASONING: When a date appears in a document — a deadline, an effective date, a compliance milestone — that date may be in the past, present, or future relative to TODAY. Do not absorb the document's tense. Compute it. If a deadline is upcoming, say upcoming. If it has passed, say so.
-
-Departments at this organization: ${departments}.
-
-THE OPERATIONAL WATCHLIST — things this organization specifically cares about:
-${watchlistText}
-
-YOUR OUTPUT FORMAT — strict markdown structure:
-
-# Regulatory Scan: ${stateName}
-*Generated [today's date]. Scope: ${stateName} regulatory environment.*
-
-## Summary
-A 2-3 sentence overview: what was scanned, how many findings, key high-tier items.
-
-## Findings
-
-For each requirement or change, output a section in this exact format:
-
-### [N]. [Short descriptive title]
-**Tier:** 🔴 (or 🟡 or 🟢)
-**State:** ${stateName}
-**Source:** [Filename of the source document, exactly as it appears]
-**Effective:** [date if known, else "—"]
-**Deadline:** [date if known, else "—"]
-
-**What it requires/changes:** [1-3 sentences]
-
-**Why it matters operationally:** [2-4 sentences explaining downstream impact — financial models, packaging, training, systems, etc. Be specific about why this is operationally significant, the way the Ohio METRC unit-of-measure change would have been described.]
-
-**Departments to investigate:**
-- **[Department Name]:** [Concrete instruction — what they should specifically check or update. Not "review this" — something actionable like "verify whether month-end COGS calculations use the unit-of-measure that's changing."]
-- **[Department Name]:** [Same shape]
-
-(Include only departments genuinely affected. Most findings affect 2-4 departments.)
-
-**Watchlist matches:** [comma-separated list of watchlist categories this touches, or "—"]
-
----
-
-TIER RULES:
-🔴 = affects financial models, system integrations, license compliance, or product safety; OR has a hard deadline within 30 days
-🟡 = affects operations or procedures but not critical systems; OR deadline 30-90 days out
-🟢 = informational, advisory, or narrow scope; no imminent deadline
-
-PRINCIPLES:
-1. Be exhaustive within the retrieved context. Don't summarize "and many more" — list everything you can identify from the documents.
-2. One finding per discrete requirement or change. A document covering 5 topics produces 5 findings. A document covering 1 topic produces 1.
-3. Cite source filenames exactly as they appear in the retrieved context. Do not invent filenames.
-4. Be specific about department impacts. "Finance/Accounting should verify whether COGS calculations rely on the unit-of-measure that's changing" — not "Finance should review."
-5. When the formal code (OAC, ORC) and DCC guidance say different things, surface both. Note the tension.
-6. Honesty about gaps: if you reach the end of the retrieved context and know the library is larger, say so explicitly at the bottom: "Coverage note: this scan reviewed [N] documents from the retrieved context. [State] regulations are extensive; additional findings may exist in documents not surfaced by this retrieval pass."`;
-
-    const userMsg = customInstruction
-      ? `${customInstruction}\n\nRegulatory documents available for this scan:\n\n${contextText}\n\nProduce the structured Regulatory Scan report as instructed.`
-      : `Produce a comprehensive Regulatory Scan for ${stateName}. Identify every operational requirement or change in the retrieved documents. Use the structured format defined in your system prompt.\n\nRegulatory documents:\n\n${contextText}`;
-
-    const startedAt = new Date().toISOString();
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 16000,
-        system,
-        messages: [{ role: 'user', content: userMsg }],
-      }),
-    });
-
-    if (!res.ok) {
-      const errText = await res.text().catch(() => '');
-      return json({ error: `Anthropic API ${res.status}: ${errText.slice(0, 300)}` }, 500);
+    let i = cursor;
+    let processed = 0;
+    while (i < plan.recent.length && processed < batchSize) {
+      const recentDoc = plan.recent[i];
+      i++;
+      processed++;
+      try {
+        const result = await regscanAnalyzeRecentDoc(env, recentDoc, watchlist, ohioContext, stateName, today, apiKey);
+        if (result.findings && result.findings.length) {
+          for (const f of result.findings) {
+            accumulated.push({ ...f, sourceFile: recentDoc.name, sourceDate: recentDoc.dateStr });
+          }
+        }
+        analyzed++;
+      } catch (e) {
+        errors++;
+        errorDetails.push(`${recentDoc.name.slice(0, 80)}: ${e.message.slice(0, 150)}`);
+      }
     }
-    const data = await res.json();
-    const reportText = (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n').trim();
-    const completedAt = new Date().toISOString();
+
+    const done = i >= plan.recent.length;
+    let report = null;
+
+    if (done) {
+      // Build the final markdown report from accumulated findings
+      report = regscanBuildReport({
+        stateName,
+        today,
+        plan,
+        findings: accumulated,
+        errors,
+        errorDetails,
+        monthsBack,
+      });
+    }
 
     return json({
       ok: true,
-      report: reportText,
-      meta: {
-        startedAt, completedAt,
+      done,
+      cursor: i,
+      total: plan.total,
+      recentTotal: plan.recent.length,
+      analyzed,
+      errors,
+      errorDetails,
+      accumulated,
+      report,
+      meta: done ? {
+        startedAt: body.startedAt || new Date().toISOString(),
+        completedAt: new Date().toISOString(),
         dept, collection, state: stateName,
+        monthsBack,
+        recentScanned: plan.recent.length,
+        olderInLibrary: plan.older.length,
+        undatedInLibrary: plan.undated.length,
         watchlistCount: watchlist.length,
-        usage: data.usage || null,
-      },
+        findingCount: accumulated.length,
+      } : null,
     });
   } catch (e) { return json({ error: e.message }, 500); }
+}
+
+function regscanBuildReport({ stateName, today, plan, findings, errors, errorDetails, monthsBack }) {
+  // Sort findings: 🔴 first, then 🟡, then 🟢; within each tier by source date desc
+  const tierRank = { '🔴': 0, '🟡': 1, '🟢': 2 };
+  findings.sort((a, b) => {
+    const ta = tierRank[a.tier] ?? 3, tb = tierRank[b.tier] ?? 3;
+    if (ta !== tb) return ta - tb;
+    return (b.sourceDate || '').localeCompare(a.sourceDate || '');
+  });
+
+  const tierCount = { '🔴': 0, '🟡': 0, '🟢': 0 };
+  for (const f of findings) tierCount[f.tier] = (tierCount[f.tier] || 0) + 1;
+
+  const lines = [];
+  lines.push(`# Regulatory Scan: ${stateName}`);
+  lines.push(`*Generated ${today}. Scope: ${stateName} regulatory environment, last ${monthsBack} months.*`);
+  lines.push('');
+  lines.push(`## Summary`);
+  lines.push(`This scan analyzed **${plan.recent.length} recent documents** (within the last ${monthsBack} months) from a library of ${plan.total} total documents in this collection. Each recent document was examined alongside related older regulations it intersects with.`);
+  lines.push('');
+  lines.push(`**${findings.length} findings produced** — ${tierCount['🔴']} 🔴 high tier, ${tierCount['🟡']} 🟡 medium tier, ${tierCount['🟢']} 🟢 low tier.`);
+  if (errors > 0) {
+    lines.push('');
+    lines.push(`Note: ${errors} document(s) could not be analyzed and are not represented in these findings.`);
+  }
+  lines.push('');
+  lines.push(`## Findings`);
+  lines.push('');
+
+  let n = 1;
+  for (const f of findings) {
+    lines.push(`### ${n}. ${f.title || '(untitled)'}`);
+    lines.push(`**Tier:** ${f.tier || '🟢'}`);
+    lines.push(`**State:** ${stateName}`);
+    lines.push(`**Source:** ${f.sourceFile || '(unknown)'}`);
+    lines.push(`**Effective:** ${f.effectiveDate || '—'}`);
+    lines.push(`**Deadline:** ${f.deadline || '—'}`);
+    if (f.supersedesOrUpdates) {
+      lines.push(`**Supersedes/updates:** ${f.supersedesOrUpdates}`);
+    }
+    lines.push('');
+    lines.push(`**What it requires/changes:** ${f.whatChanged || f.summary || ''}`);
+    lines.push('');
+    lines.push(`**Why it matters operationally:** ${f.whatItTouches || ''}`);
+    lines.push('');
+    if (f.departmentImpacts && Object.keys(f.departmentImpacts).length) {
+      lines.push(`**Departments to investigate:**`);
+      for (const [dept, instr] of Object.entries(f.departmentImpacts)) {
+        lines.push(`- **${dept}:** ${instr}`);
+      }
+      lines.push('');
+    }
+    if (f.watchlistMatches && f.watchlistMatches.length) {
+      lines.push(`**Watchlist matches:** ${Array.isArray(f.watchlistMatches) ? f.watchlistMatches.join(', ') : f.watchlistMatches}`);
+      lines.push('');
+    }
+    lines.push('---');
+    lines.push('');
+    n++;
+  }
+
+  lines.push('');
+  lines.push(`*Coverage: ${plan.recent.length} recent documents analyzed in detail. ${plan.older.length} older regulations were available as context. ${plan.undated.length} documents without parseable dates were not directly analyzed but may be surfaced as context for documents that reference them.*`);
+
+  return lines.join('\n');
 }
 
 // ── Save a report ──
