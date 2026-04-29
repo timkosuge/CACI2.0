@@ -12944,6 +12944,7 @@ async function loadFiles() {
           <button class="fact-btn view-file" data-id="${f.id}" data-name="${esc(f.name)}">View</button>
           <button class="fact-btn focus${chatFileId === f.id ? ' focus-active' : ''}" data-id="${f.id}" data-col="${esc(f.collection)}" data-name="${esc(f.name)}">Focus</button>
           <button class="fact-btn edit-meta" data-id="${f.id}" data-name="${esc(f.name)}" data-col="${esc(f.collection)}" data-reportname="${esc(f.meta?.reportName||f.reportName||'')}" data-category="${esc(f.meta?.category||f.category||'')}" data-period="${esc(f.meta?.period||f.period||'')}" data-reporttype="${esc(f.meta?.reportType||f.reportType||'')}">Edit</button>
+          <button class="fact-btn promote" data-id="${f.id}" data-name="${esc(f.name)}" title="Move to Context — AI reads this on every question in this collection">→ Context</button>
           <button class="fact-btn del" data-id="${f.id}">Remove</button>
         </div>
       </div>`).join('');
@@ -12954,6 +12955,20 @@ async function loadFiles() {
       switchPanel('chat'); loadFiles();
     }));
     list.querySelectorAll('.fact-btn.edit-meta').forEach(b => b.addEventListener('click', () => openEditFileModal(b.dataset)));
+    list.querySelectorAll('.fact-btn.promote').forEach(b => b.addEventListener('click', async () => {
+      if (!confirm('Move "' + b.dataset.name + '" into Context for this collection?\n\nContext docs are read on EVERY question in this collection — they shape how the AI interprets things. Use this for framing docs, SOPs, regulatory guides, and rule books. Don\'t use it for raw data or reports.')) return;
+      try {
+        const res = await apiFetch('/files/' + b.dataset.id + '/promote-to-context', { method: 'POST' });
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}));
+          alert('Move failed: ' + (d.error || res.status));
+          return;
+        }
+      } catch(e) { alert('Move error: ' + e.message); return; }
+      loadFiles();
+      loadCollections();
+      if (typeof loadContextDocs === 'function') loadContextDocs();
+    }));
     list.querySelectorAll('.fact-btn.del').forEach(b => b.addEventListener('click', () => deleteFile(b.dataset.id)));
   } catch(e) { $('flist').innerHTML = `<div class="fempty">${e.message}</div>`; }
 }
@@ -17414,12 +17429,29 @@ async function loadContextDocs() {
           \x3Cdiv class="ctx-meta">${(f.charCount||0).toLocaleString()} chars \u00b7 ${dstr(f.uploadedAt)}\x3C/div>
         \x3C/div>
         \x3Cdiv class="factions">
+          \x3Cbutton class="fact-btn ctx-view" data-id="${f.id}" data-name="${esc(f.name)}">View\x3C/button>
           \x3Cbutton class="fact-btn edit-meta" data-id="${f.id}" data-name="${esc(f.name)}" data-col="${esc(f.collection||selectedCollection||'')}" data-reportname="${esc(f.reportName||'')}" data-category="${esc(f.category||'')}" data-period="${esc(f.period||'')}" data-reporttype="${esc(f.reportType||'')}">Edit\x3C/button>
+          \x3Cbutton class="fact-btn ctx-demote" data-id="${f.id}" data-name="${esc(f.name)}" title="Move to Documents">\u2192 Documents\x3C/button>
           \x3Cbutton class="fact-btn del ctx-del" data-id="${f.id}" title="Remove">\u00d7 Remove\x3C/button>
         \x3C/div>
       \x3C/div>`).join('');
 
+    list.querySelectorAll('.ctx-view').forEach(b => b.addEventListener('click', () => openFileViewer(b.dataset.id, b.dataset.name)));
     list.querySelectorAll('.edit-meta').forEach(b => b.addEventListener('click', () => openEditFileModal(b.dataset)));
+    list.querySelectorAll('.ctx-demote').forEach(b => b.addEventListener('click', async () => {
+      if (!confirm('Move "' + b.dataset.name + '" out of Context and back into Documents?\n\nIt will go back to being retrieved by similarity search instead of being read on every question.')) return;
+      try {
+        const res = await apiFetch('/files/' + b.dataset.id + '/demote-to-document', { method: 'POST' });
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}));
+          alert('Move failed: ' + (d.error || res.status));
+          return;
+        }
+      } catch(e) { alert('Move error: ' + e.message); return; }
+      loadContextDocs();
+      loadCollections();
+      if (typeof loadFiles === 'function') loadFiles();
+    }));
     list.querySelectorAll('.ctx-del').forEach(b => b.addEventListener('click', async () => {
       if (!confirm('Remove this context document?')) return;
       const fileId = b.dataset.id;
