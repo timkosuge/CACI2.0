@@ -4868,6 +4868,36 @@ body[data-theme="light"] .login-frame-box {
   margin-top: 12px; padding: 10px 14px; border: 1px solid var(--line2); border-radius: 4px;
   font-family: var(--f-body); font-size: 13px; color: var(--smoke2); background: rgba(255,255,255,0.02);
 }
+.wt-stale-banner {
+  margin-top: 12px; padding: 12px 16px; border: 1px solid var(--gold-dim); border-left: 3px solid var(--gold);
+  border-radius: 4px; background: rgba(201,168,64,0.05); color: var(--smoke);
+  font-family: var(--f-body); font-size: 13px; line-height: 1.55;
+}
+.wt-stale-banner strong { color: var(--gold-lt); }
+.wt-toggle { display: flex; align-items: center; gap: 6px; font-family: var(--f-body); font-size: 12px; color: var(--smoke3); cursor: pointer; user-select: none; }
+.wt-toggle input { cursor: pointer; }
+
+.wt-plan-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--line2); gap: 14px; }
+.wt-plan-row:last-child { border-bottom: none; }
+.wt-plan-label { font-family: var(--f-body); font-size: 13px; color: var(--smoke); flex: 1; line-height: 1.5; }
+.wt-plan-label .wt-plan-sample { display: block; font-size: 11px; color: var(--smoke4); margin-top: 4px; font-style: italic; }
+.wt-plan-count { font-family: var(--f-display); font-size: 18px; color: var(--gold-lt); flex-shrink: 0; min-width: 50px; text-align: right; }
+.wt-plan-summary { padding: 12px 14px; background: rgba(201,168,64,0.04); border: 1px solid var(--gold-dim); border-radius: 4px; margin-top: 14px; font-family: var(--f-body); font-size: 13px; color: var(--smoke); line-height: 1.55; }
+
+.wt-history-row { padding: 12px 0; border-bottom: 1px solid var(--line2); cursor: pointer; transition: background 0.1s; }
+.wt-history-row:hover { background: rgba(255,255,255,0.02); }
+.wt-history-row:last-child { border-bottom: none; }
+.wt-history-date { font-family: var(--f-mono); font-size: 12px; color: var(--smoke3); }
+.wt-history-totals { font-family: var(--f-body); font-size: 13px; color: var(--smoke); margin-top: 4px; }
+.wt-history-totals strong { color: var(--gold-lt); }
+.wt-history-status { font-family: var(--f-display); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--smoke4); margin-top: 2px; }
+
+.wt-finding-superseded { opacity: 0.55; }
+.wt-finding-superseded::after { content: '— superseded'; font-size: 10px; color: var(--smoke4); margin-left: 6px; font-style: italic; }
+.wt-sibling-row { padding: 8px 0; border-bottom: 1px solid var(--line2); font-size: 12px; }
+.wt-sibling-row:last-child { border-bottom: none; }
+.wt-sibling-cur { color: var(--gold-lt); }
+.wt-sibling-old { color: var(--smoke4); }
 .wt-ask {
   display: flex; gap: 8px; flex-shrink: 0;
 }
@@ -9653,9 +9683,12 @@ html body[data-theme="light"] #discovery-greeting-strip .dgs-text strong {
             </div>
             <div class="wt-actions">
               <button class="wt-btn wt-btn-secondary" id="wt-watchlist-btn">Operational Watchlist</button>
+              <button class="wt-btn wt-btn-secondary" id="wt-history-btn" title="View past scans and what each one analyzed">Scan History</button>
+              <button class="wt-btn wt-btn-secondary" id="wt-reset-btn" title="Clear all scan memory so the next scan re-examines every document from scratch. Findings are kept.">Reset Memory</button>
               <button class="wt-btn wt-btn-primary" id="wt-scan-btn">Scan Library</button>
             </div>
           </div>
+          <div class="wt-stale-banner" id="wt-stale-banner" style="display:none"></div>
           <div class="wt-scan-status" id="wt-scan-status" style="display:none"></div>
         </div>
 
@@ -9684,6 +9717,9 @@ html body[data-theme="light"] #discovery-greeting-strip .dgs-text strong {
             <option value="Dismissed">Dismissed</option>
           </select>
           <input class="wt-select" id="wt-filter-state" placeholder="State..." style="width:120px"/>
+          <label class="wt-toggle" title="Include findings that have been superseded by re-analysis">
+            <input type="checkbox" id="wt-show-superseded"/> <span>Show superseded</span>
+          </label>
         </div>
 
         <div class="wt-feed" id="wt-feed">
@@ -10233,6 +10269,30 @@ html body[data-theme="light"] #discovery-greeting-strip .dgs-text strong {
         <button class="lbtn" id="chpw-cancel" style="color:var(--smoke4);border-color:var(--line2)">Cancel</button>
         <div class="afb" id="chpw-fb" style="flex:1"></div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- WATCHTOWER SCAN HISTORY MODAL -->
+<div class="modal-bg" id="wt-history-modal">
+  <div class="modal-sheet" style="max-width:900px">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Scan History</div>
+    <div class="modal-sub">Every scan Watchtower has run, with what triggered each one and what came out.</div>
+    <div id="wt-history-content" style="margin-top:16px"></div>
+  </div>
+</div>
+
+<!-- WATCHTOWER SCAN PLAN MODAL -->
+<div class="modal-bg" id="wt-plan-modal">
+  <div class="modal-sheet" style="max-width:680px">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Scan Plan</div>
+    <div class="modal-sub">Watchtower checked its memory before scanning. Here's what it intends to do.</div>
+    <div id="wt-plan-content" style="margin-top:16px"></div>
+    <div style="margin-top:20px;display:flex;gap:8px;justify-content:flex-end">
+      <button class="wt-btn wt-btn-secondary" id="wt-plan-cancel">Cancel</button>
+      <button class="wt-btn wt-btn-primary" id="wt-plan-confirm">Run Scan</button>
     </div>
   </div>
 </div>
@@ -18551,6 +18611,7 @@ let _wtFilterTier = '';
 let _wtFilterDept = '';
 let _wtFilterStatus = '';
 let _wtFilterState = '';
+let _wtShowSuperseded = false;
 let _wtFindings = [];
 let _wtAskHistory = [];
 let _wtInitialized = false;
@@ -18558,6 +18619,7 @@ let _wtInitialized = false;
 async function loadWatchtower() {
   if (!_wtInitialized) initWatchtower();
   await loadWatchtowerFindings();
+  wtCheckStaleness();
 }
 
 function initWatchtower() {
@@ -18582,6 +18644,9 @@ function initWatchtower() {
     });
   }
 
+  const supSel = $('wt-show-superseded');
+  if (supSel) supSel.addEventListener('change', () => { _wtShowSuperseded = supSel.checked; loadWatchtowerFindings(); });
+
   document.querySelectorAll('#wt-filter-tier .wt-chip').forEach(c => {
     c.addEventListener('click', () => {
       document.querySelectorAll('#wt-filter-tier .wt-chip').forEach(x => x.classList.remove('active'));
@@ -18592,7 +18657,9 @@ function initWatchtower() {
   });
 
   $('wt-scan-btn')?.addEventListener('click', wtRunScan);
+  $('wt-reset-btn')?.addEventListener('click', wtResetScans);
   $('wt-watchlist-btn')?.addEventListener('click', wtOpenWatchlist);
+  $('wt-history-btn')?.addEventListener('click', wtOpenHistory);
   $('wt-ask-btn')?.addEventListener('click', wtAsk);
   $('wt-ask-input')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') wtAsk(); });
   $('wt-wl-add')?.addEventListener('click', wtAddWatchlistEntry);
@@ -18600,6 +18667,9 @@ function initWatchtower() {
   // Modal close on bg click
   $('wt-finding-modal')?.addEventListener('click', e => { if (e.target === $('wt-finding-modal')) $('wt-finding-modal').classList.remove('open'); });
   $('wt-watchlist-modal')?.addEventListener('click', e => { if (e.target === $('wt-watchlist-modal')) $('wt-watchlist-modal').classList.remove('open'); });
+  $('wt-history-modal')?.addEventListener('click', e => { if (e.target === $('wt-history-modal')) $('wt-history-modal').classList.remove('open'); });
+  $('wt-plan-modal')?.addEventListener('click', e => { if (e.target === $('wt-plan-modal')) $('wt-plan-modal').classList.remove('open'); });
+  $('wt-plan-cancel')?.addEventListener('click', () => $('wt-plan-modal').classList.remove('open'));
 }
 
 async function loadWatchtowerFindings() {
@@ -18630,14 +18700,16 @@ async function loadWatchtowerFindings() {
 function renderWatchtowerFeed() {
   const feed = $('wt-feed');
   if (!feed) return;
-  if (!_wtFindings.length) {
+  // Filter out superseded findings unless toggle is on
+  const visible = _wtShowSuperseded ? _wtFindings : _wtFindings.filter(f => f.current !== false);
+  if (!visible.length) {
     feed.innerHTML = `<div class="wt-empty">
       No findings yet${(_wtFilterTier||_wtFilterDept||_wtFilterStatus||_wtFilterState) ? ' for the current filters' : ''}.<br><br>
       ${(!_wtFilterTier && !_wtFilterDept && !_wtFilterStatus && !_wtFilterState) ? 'Click <strong>Scan Library</strong> to analyze documents in the Compliance department against your Operational Watchlist.' : ''}
     </div>`;
     return;
   }
-  feed.innerHTML = _wtFindings.map(f => renderWtCard(f)).join('');
+  feed.innerHTML = visible.map(f => renderWtCard(f)).join('');
   feed.querySelectorAll('[data-fid]').forEach(el => {
     el.addEventListener('click', () => wtOpenFinding(el.dataset.fid));
   });
@@ -18648,7 +18720,7 @@ function renderWtCard(f) {
   const statusCls = wtStatusClass(f.status);
   const depts = (f.affectedDepartments || []).slice(0, 5);
   const moreCount = (f.affectedDepartments || []).length - depts.length;
-  return `<div class="wt-card" data-fid="${esc(f.id)}">
+  return `<div class="wt-card${f.current === false ? ' wt-finding-superseded' : ''}" data-fid="${esc(f.id)}">
     <div class="wt-card-header">
       <span class="wt-tier">${f.tier || ''}</span>
       ${f.state ? `<span class="wt-card-state">${esc(f.state)}</span>` : ''}
@@ -18692,6 +18764,8 @@ async function wtOpenFinding(id) {
     content.querySelectorAll('[data-set-status]').forEach(b => {
       b.addEventListener('click', () => wtSetStatus(f.id, b.dataset.setStatus));
     });
+    // Hydrate finding history (siblings from prior analyses of the same source doc)
+    wtLoadFindingHistory(f.id);
   } catch (e) {
     content.innerHTML = `<div class="wt-empty">Error: ${esc(e.message)}</div>`;
   }
@@ -18754,7 +18828,44 @@ function renderWtFindingDetail(f) {
       <button class="wt-btn wt-btn-primary" data-set-status="Resolved">Mark Resolved</button>
       <button class="wt-btn" data-set-status="Dismissed">Dismiss</button>
     </div>
+
+    <div class="wt-detail-section" id="wt-finding-history-section" style="margin-top:18px;display:none">
+      <div class="wt-detail-h">Analysis History</div>
+      <div id="wt-finding-history-list" class="wt-detail-body"></div>
+    </div>
   </div>`;
+}
+
+async function wtLoadFindingHistory(id) {
+  const sec = document.getElementById('wt-finding-history-section');
+  const list = document.getElementById('wt-finding-history-list');
+  if (!sec || !list) return;
+  try {
+    const res = await apiFetch('/watchtower/finding-history/' + encodeURIComponent(id));
+    const data = await res.json();
+    if (!data.ok || !data.siblings || data.siblings.length <= 1) { sec.style.display = 'none'; return; }
+    // Show siblings — past findings from the same document
+    const others = data.siblings.filter(s => s.id !== id);
+    if (others.length === 0) { sec.style.display = 'none'; return; }
+    sec.style.display = 'block';
+    // Group: current vs superseded
+    const cur = others.filter(s => s.current);
+    const old = others.filter(s => !s.current);
+    let html = '<div style="font-size:12px;color:var(--smoke3);margin-bottom:8px">This document has been analyzed before. Previous findings from the same source:</div>';
+    [...cur, ...old].forEach(s => {
+      const date = s.createdAt ? new Date(s.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '';
+      const cls = s.current ? 'wt-sibling-cur' : 'wt-sibling-old';
+      const tag = s.current ? 'current' : 'superseded';
+      html += `<div class="wt-sibling-row ${cls}">
+        <span style="font-size:10px;text-transform:uppercase;letter-spacing:0.05em;margin-right:6px">[${tag}]</span>
+        ${s.tier || ''} <strong>${esc(s.title || '')}</strong>
+        <span style="color:var(--smoke4);margin-left:6px">— ${date} &middot; ${esc(s.status || '')}</span>
+      </div>`;
+    });
+    list.innerHTML = html;
+  } catch (e) {
+    sec.style.display = 'none';
+  }
 }
 
 async function wtSetStatus(id, status) {
@@ -18771,31 +18882,239 @@ async function wtSetStatus(id, status) {
   } catch (e) { alert('Error: ' + e.message); }
 }
 
-async function wtRunScan() {
-  const btn = $('wt-scan-btn');
-  const status = $('wt-scan-status');
-  if (!btn || !status) return;
-  if (!confirm('Scan all Compliance documents against the Operational Watchlist?\n\nThis can take several minutes for large libraries. Documents already analyzed will be skipped (unless you re-run with force).')) return;
-
-  btn.disabled = true; btn.textContent = 'Scanning…';
-  status.style.display = 'block';
-  status.textContent = 'Reading documents and analyzing against the watchlist…';
-
+async function wtCheckStaleness() {
+  // Quick scan-plan to populate the stale banner. Doesn't actually scan.
+  const banner = $('wt-stale-banner');
+  if (!banner) return;
   try {
-    const res = await apiFetch('/watchtower/scan', {
+    const res = await apiFetch('/watchtower/scan-plan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dept: 'compliance' })
+      body: JSON.stringify({ dept: 'compliance', collection: 'Ohio Regulations' })
     });
     const data = await res.json();
-    if (!data.ok) { status.textContent = 'Scan failed: ' + (data.error || 'unknown'); btn.disabled = false; btn.textContent = 'Scan Library'; return; }
-    status.textContent = `Scan complete. ${data.scanned} documents analyzed, ${data.newFindings} new findings, ${data.skipped} already-scanned skipped${data.errors ? `, ${data.errors} errors` : ''}.`;
-    btn.disabled = false; btn.textContent = 'Scan Library';
-    await loadWatchtowerFindings();
+    if (!data.ok) { banner.style.display = 'none'; return; }
+    if (data.total === 0) { banner.style.display = 'none'; return; }
+
+    const b = data.breakdown || {};
+    const willRescan = data.willRescan || 0;
+    if (willRescan === 0) { banner.style.display = 'none'; return; }
+
+    const reasons = [];
+    if (b.firstTime)        reasons.push(`<strong>${b.firstTime}</strong> never analyzed`);
+    if (b.contentChanged)   reasons.push(`<strong>${b.contentChanged}</strong> re-uploaded`);
+    if (b.contextChanged)   reasons.push(`<strong>${b.contextChanged}</strong> waiting on updated context`);
+    if (b.watchlistChanged) reasons.push(`<strong>${b.watchlistChanged}</strong> waiting on updated watchlist`);
+    if (b.promptChanged)    reasons.push(`<strong>${b.promptChanged}</strong> waiting on updated analysis logic`);
+
+    banner.style.display = 'block';
+    banner.innerHTML = `Watchtower memory: <strong>${willRescan}</strong> of ${data.total} documents need (re-)analysis &mdash; ${reasons.join(', ')}. Click <strong>Scan Library</strong> to run.`;
   } catch (e) {
-    status.textContent = 'Scan error: ' + e.message;
-    btn.disabled = false; btn.textContent = 'Scan Library';
+    banner.style.display = 'none';
   }
+}
+
+async function wtRunScan() {
+  // Step 1: get the plan
+  const btn = $('wt-scan-btn');
+  if (!btn) return;
+  btn.disabled = true; btn.textContent = 'Checking…';
+
+  let plan;
+  try {
+    const res = await apiFetch('/watchtower/scan-plan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dept: 'compliance', collection: 'Ohio Regulations' })
+    });
+    plan = await res.json();
+    if (!plan.ok) throw new Error(plan.error || 'unknown');
+  } catch (e) {
+    alert('Could not check scan plan: ' + e.message);
+    btn.disabled = false; btn.textContent = 'Scan Library';
+    return;
+  }
+
+  if (plan.total === 0) {
+    alert('No documents found in Compliance / Ohio Regulations.');
+    btn.disabled = false; btn.textContent = 'Scan Library';
+    return;
+  }
+
+  if (plan.willRescan === 0) {
+    alert('Everything is current. No documents need re-analysis based on the current watchlist, context docs, and prompt version.\n\nUse Reset Memory if you want to force a complete re-scan.');
+    btn.disabled = false; btn.textContent = 'Scan Library';
+    return;
+  }
+
+  // Step 2: render plan in modal, get user confirmation
+  const planContent = $('wt-plan-content');
+  const planModal = $('wt-plan-modal');
+  if (!planContent || !planModal) {
+    btn.disabled = false; btn.textContent = 'Scan Library';
+    return;
+  }
+
+  const b = plan.breakdown || {};
+  const s = plan.sample || {};
+  const rows = [];
+  const renderRow = (label, count, samples) => {
+    if (!count) return '';
+    const sampleHtml = samples && samples.length
+      ? `<span class="wt-plan-sample">e.g. ${samples.slice(0,3).map(esc).join(', ')}${count > samples.length ? '…' : ''}</span>`
+      : '';
+    return `<div class="wt-plan-row">
+      <div class="wt-plan-label">${label}${sampleHtml}</div>
+      <div class="wt-plan-count">${count}</div>
+    </div>`;
+  };
+
+  rows.push(renderRow('Never analyzed before', b.firstTime, s.firstTime));
+  rows.push(renderRow('Document was re-uploaded since last analysis', b.contentChanged, s.contentChanged));
+  rows.push(renderRow('Operational Watchlist has changed since last analysis', b.watchlistChanged, s.watchlistChanged));
+  rows.push(renderRow('Ohio context docs have changed since last analysis', b.contextChanged, s.contextChanged));
+  rows.push(renderRow('Analysis prompt has been updated since last analysis', b.promptChanged, s.promptChanged));
+  rows.push(renderRow('Up-to-date — will skip', plan.unchanged, []));
+
+  const cv = plan.currentVersions || {};
+  const ctxNames = (cv.contextDocs || []).map(d => d.name).filter(Boolean).slice(0, 5).join(', ');
+  planContent.innerHTML = `
+    <div>${rows.filter(Boolean).join('')}</div>
+    <div class="wt-plan-summary">
+      <strong>${plan.willRescan}</strong> of <strong>${plan.total}</strong> documents will be analyzed.
+      Up-to-date documents (${plan.unchanged}) are skipped — Watchtower already knows them under the current criteria.
+      <br><br>
+      <span style="font-size:11px;color:var(--smoke4)">
+        Current context: watchlist v${cv.watchlistVersion}, ${cv.contextDocCount} context docs (${esc(ctxNames || '—')}${(cv.contextDocs||[]).length > 5 ? '…' : ''}), prompt v${cv.promptVersion}
+      </span>
+    </div>
+  `;
+  planModal.classList.add('open');
+
+  // Wire up confirm; cancel is wired in init
+  const confirmBtn = $('wt-plan-confirm');
+  const onConfirm = async () => {
+    confirmBtn.removeEventListener('click', onConfirm);
+    planModal.classList.remove('open');
+    await wtExecuteScan();
+  };
+  confirmBtn.addEventListener('click', onConfirm);
+
+  btn.disabled = false; btn.textContent = 'Scan Library';
+}
+
+async function wtExecuteScan() {
+  const btn = $('wt-scan-btn');
+  const status = $('wt-scan-status');
+  const banner = $('wt-stale-banner');
+  if (!btn || !status) return;
+  btn.disabled = true; btn.textContent = 'Scanning…';
+  status.style.display = 'block';
+  if (banner) banner.style.display = 'none';
+
+  let totalScanned = 0, totalNew = 0, totalSuperseded = 0, totalSkipped = 0, totalErrors = 0;
+  const allErrorDetails = [];
+  let cursor = 0, total = null, done = false, scanId = null;
+
+  while (!done) {
+    try {
+      const res = await apiFetch('/watchtower/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dept: 'compliance', collection: 'Ohio Regulations', cursor, batchSize: 8, scanId })
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        status.textContent = 'Scan failed: ' + (data.error || 'unknown');
+        btn.disabled = false; btn.textContent = 'Scan Library';
+        await loadWatchtowerFindings();
+        return;
+      }
+      if (data.warning) { status.textContent = data.warning; btn.disabled = false; btn.textContent = 'Scan Library'; return; }
+
+      totalScanned    += data.scanned;
+      totalNew        += data.newFindings;
+      totalSuperseded += data.supersededFindings || 0;
+      totalSkipped    += data.skipped;
+      totalErrors     += data.errors;
+      if (data.errorDetails) allErrorDetails.push(...data.errorDetails);
+      cursor = data.cursor;
+      total  = data.total;
+      done   = data.done;
+      if (data.scanId) scanId = data.scanId;
+
+      const pct = total ? Math.round((cursor / total) * 100) : 0;
+      let msg = `Scanning… ${cursor} / ${total} (${pct}%) &middot; ${totalNew} new findings &middot; ${totalSkipped} skipped (current)`;
+      if (totalSuperseded) msg += ` &middot; ${totalSuperseded} superseded`;
+      if (totalErrors) msg += ` &middot; ${totalErrors} errors`;
+      status.innerHTML = msg;
+
+      if (totalNew > 0 && totalScanned % 16 === 0) await loadWatchtowerFindings();
+    } catch (e) {
+      status.textContent = 'Scan error: ' + e.message + ' — partial progress saved. Click Scan Library to resume.';
+      btn.disabled = false; btn.textContent = 'Scan Library';
+      await loadWatchtowerFindings();
+      return;
+    }
+  }
+
+  let finalMsg = `Scan complete. ${totalScanned} analyzed, ${totalNew} new findings, ${totalSuperseded} superseded, ${totalSkipped} unchanged (skipped)`;
+  if (totalErrors) {
+    finalMsg += `, ${totalErrors} errors:<br><div style="margin-top:8px;font-size:12px;color:var(--smoke3);max-height:120px;overflow-y:auto">`
+      + allErrorDetails.slice(0, 20).map(e => '&middot; ' + esc(e)).join('<br>')
+      + (allErrorDetails.length > 20 ? `<br>&hellip; and ${allErrorDetails.length - 20} more` : '')
+      + '</div>';
+  } else {
+    finalMsg += '.';
+  }
+  status.innerHTML = finalMsg;
+  btn.disabled = false; btn.textContent = 'Scan Library';
+  await loadWatchtowerFindings();
+  await wtCheckStaleness();
+}
+
+async function wtOpenHistory() {
+  const modal = $('wt-history-modal');
+  const content = $('wt-history-content');
+  if (!modal || !content) return;
+  content.innerHTML = '<div class="wt-empty">Loading scan history&hellip;</div>';
+  modal.classList.add('open');
+  try {
+    const res = await apiFetch('/watchtower/scans');
+    const data = await res.json();
+    if (!data.ok) { content.innerHTML = `<div class="wt-empty">Error: ${esc(data.error||'')}</div>`; return; }
+    if (!data.items.length) { content.innerHTML = '<div class="wt-empty">No scans yet. Click <strong>Scan Library</strong> to run the first one.</div>'; return; }
+    content.innerHTML = data.items.map(s => {
+      const t = s.totals || {};
+      const date = s.startedAt ? new Date(s.startedAt).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit',hour12:true}) : '';
+      const stat = s.completedAt ? 'completed' : 'in progress / interrupted';
+      return `<div class="wt-history-row" data-sid="${esc(s.id)}">
+        <div class="wt-history-date">${date}</div>
+        <div class="wt-history-totals">
+          <strong>${t.scanned || 0}</strong> analyzed,
+          <strong>${t.newFindings || 0}</strong> new findings,
+          ${t.supersededFindings || 0} superseded,
+          ${t.skipped || 0} unchanged${t.errors ? `, <strong>${t.errors}</strong> errors` : ''}
+        </div>
+        <div class="wt-history-status">${stat} &middot; ${esc(s.scope?.dept || '')} / ${esc(s.scope?.collection || '')}</div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    content.innerHTML = `<div class="wt-empty">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+async function wtResetScans() {
+  if (!confirm('Reset Watchtower\'s memory?\n\nClears scan history, document analysis history, and the "this is up-to-date" markers. Findings themselves are kept (with their current statuses).\n\nNext scan will re-analyze every document from scratch.')) return;
+  const btn = $('wt-reset-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Resetting…'; }
+  try {
+    const res = await apiFetch('/watchtower/reset-scans', { method: 'POST' });
+    const data = await res.json();
+    if (!data.ok) { alert('Reset failed: ' + (data.error || 'unknown')); }
+    else { alert(`Cleared ${data.cleared} scanned-markers. Click Scan Library to re-analyze.`); }
+  } catch (e) { alert('Error: ' + e.message); }
+  if (btn) { btn.disabled = false; btn.textContent = 'Reset Scans'; }
 }
 
 async function wtAsk() {
