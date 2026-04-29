@@ -9741,6 +9741,7 @@ html body[data-theme="light"] #discovery-greeting-strip .dgs-text strong {
             <div class="rs-current-title" id="rs-current-title">Latest Scan</div>
             <div class="rs-current-actions">
               <button class="wt-btn wt-btn-secondary" id="rs-current-discard">Discard</button>
+              <button class="wt-btn wt-btn-secondary" id="rs-current-download">Download .docx</button>
               <button class="wt-btn wt-btn-primary" id="rs-current-save">Save Report</button>
             </div>
           </div>
@@ -18673,6 +18674,16 @@ function initRegscan() {
     $('rs-current').style.display = 'none';
   });
   $('rs-current-save')?.addEventListener('click', wtSaveCurrentReport);
+  $('rs-current-download')?.addEventListener('click', () => {
+    if (!_rsCurrentReport) return;
+    wtDownloadReport({
+      title: `${_rsCurrentMeta?.state || 'Regulatory'} Scan — ${new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`,
+      state: _rsCurrentMeta?.state || '',
+      createdAt: new Date().toISOString(),
+      report: _rsCurrentReport,
+      meta: _rsCurrentMeta || {},
+    });
+  });
 }
 
 async function wtRunScan() {
@@ -18828,12 +18839,14 @@ async function wtOpenSavedReport(id) {
           <button class="wt-btn" data-set-status="Acknowledged">Acknowledge</button>
           <button class="wt-btn wt-btn-primary" data-set-status="Resolved">Mark Resolved</button>
           <button class="wt-btn" data-set-status="Archived">Archive</button>
+          <button class="wt-btn wt-btn-primary" id="rs-download">Download .docx</button>
           <button class="wt-btn" id="rs-delete">Delete</button>
         </div>
       </div>
     `;
     content.querySelectorAll('[data-set-status]').forEach(b => b.addEventListener('click', () => wtSetReportStatus(r.id, b.dataset.setStatus)));
     content.querySelector('#rs-delete')?.addEventListener('click', () => wtDeleteReport(r.id));
+    content.querySelector('#rs-download')?.addEventListener('click', () => wtDownloadReport(r));
   } catch (e) {
     content.innerHTML = `<div class="wt-empty">Error: ${esc(e.message)}</div>`;
   }
@@ -18862,6 +18875,233 @@ async function wtDeleteReport(id) {
     $('wt-finding-modal').classList.remove('open');
     await loadRegscanReports();
   } catch (e) { alert('Error: ' + e.message); }
+}
+
+// ── Download a report as .docx ──
+// Lazy-loads docx library on first use to avoid adding 200KB to page load for a feature most won't use.
+let _docxLibPromise = null;
+function loadDocxLib() {
+  if (_docxLibPromise) return _docxLibPromise;
+  _docxLibPromise = new Promise((resolve, reject) => {
+    if (window.docx) return resolve(window.docx);
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/docx/8.5.0/docx.min.js';
+    s.onload = () => window.docx ? resolve(window.docx) : reject(new Error('docx library failed to expose global'));
+    s.onerror = () => reject(new Error('Failed to load docx library from CDN'));
+    document.head.appendChild(s);
+  });
+  return _docxLibPromise;
+}
+
+async function wtDownloadReport(report) {
+  const btn = document.getElementById('rs-download') || document.getElementById('rs-current-download');
+  const orig = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Building…'; }
+  try {
+    const docx = await loadDocxLib();
+    const blob = await buildReportDocx(docx, report);
+    const url = URL.createObjectURL(blob);
+    const safeName = (report.title || 'Regulatory_Scan').replace(/[^\w\-]+/g, '_').replace(/_+/g, '_').slice(0, 100);
+    const a = document.createElement('a');
+    a.href = url; a.download = safeName + '.docx';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  } catch (e) {
+    alert('Download failed: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = orig; }
+  }
+}
+
+// Build a Word document from a saved report. Markdown structure -> Word paragraphs.
+async function buildReportDocx(docx, report) {
+  const { Document, Packer, Paragraph, TextRun, AlignmentType, BorderStyle, HeadingLevel, LevelFormat } = docx;
+
+  const FONT = 'Arial';
+  const GOLD = 'C9A832';
+  const INK = '1F1F1F';
+  const SUBTLE = '595959';
+  const HAIR = '8C8C8C';
+
+  const Bold = (t, opts={}) => new TextRun({ text: t, bold: true, font: FONT, size: 22, ...opts });
+  const Plain = (t, opts={}) => new TextRun({ text: t, font: FONT, size: 22, ...opts });
+  const Italic = (t, opts={}) => new TextRun({ text: t, italics: true, font: FONT, size: 22, ...opts });
+
+  // Tiny inline-markdown -> TextRun[] (handles **bold** and *italic*)
+  function inlineRuns(s, baseOpts = {}) {
+    const out = [];
+    if (!s) return out;
+    // tokenize: **bold**, *italic*, plain
+    const re = /(\*\*[^*]+\*\*)|(\*[^*]+\*)/g;
+    let last = 0; let m;
+    while ((m = re.exec(s)) !== null) {
+      if (m.index > last) out.push(new TextRun({ text: s.slice(last, m.index), font: FONT, size: 22, ...baseOpts }));
+      if (m[1]) out.push(new TextRun({ text: m[1].slice(2, -2), bold: true, font: FONT, size: 22, ...baseOpts }));
+      else if (m[2]) out.push(new TextRun({ text: m[2].slice(1, -1), italics: true, font: FONT, size: 22, ...baseOpts }));
+      last = re.lastIndex;
+    }
+    if (last < s.length) out.push(new TextRun({ text: s.slice(last), font: FONT, size: 22, ...baseOpts }));
+    return out;
+  }
+
+  const children = [];
+
+  // Title block
+  children.push(new Paragraph({
+    spacing: { after: 100 },
+    children: [new TextRun({ text: 'REGULATORY SCAN', bold: true, size: 36, font: FONT, color: INK })],
+  }));
+  children.push(new Paragraph({
+    spacing: { after: 60 },
+    children: [new TextRun({ text: report.title || 'Untitled', italics: true, size: 22, font: FONT, color: SUBTLE })],
+  }));
+  const dateStr = report.createdAt ? new Date(report.createdAt).toLocaleString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric', hour:'numeric', minute:'2-digit', hour12:true }) : '';
+  const subtitleParts = [];
+  if (report.state) subtitleParts.push(`State: ${report.state}`);
+  if (dateStr) subtitleParts.push(`Generated: ${dateStr}`);
+  if (report.status) subtitleParts.push(`Status: ${report.status}`);
+  children.push(new Paragraph({
+    spacing: { after: 280 },
+    border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: GOLD, space: 1 } },
+    children: [new TextRun({ text: subtitleParts.join('  ·  '), size: 18, font: FONT, color: HAIR })],
+  }));
+
+  // Parse the markdown body into Word paragraphs
+  const md = report.report || '';
+  const lines = md.split('\n');
+
+  let inListType = null; // 'ul' | 'ol'
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i];
+    const line = raw.replace(/\s+$/, '');
+    if (!line.trim()) { inListType = null; continue; }
+
+    if (/^---+$/.test(line.trim())) {
+      children.push(new Paragraph({
+        spacing: { before: 120, after: 200 },
+        border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: 'BFBFBF', space: 1 } },
+        children: [new TextRun({ text: '' })],
+      }));
+      inListType = null;
+      continue;
+    }
+
+    let m;
+    if ((m = line.match(/^#\s+(.*)/))) {
+      children.push(new Paragraph({
+        heading: HeadingLevel.HEADING_1,
+        spacing: { before: 320, after: 140 },
+        children: [new TextRun({ text: m[1], bold: true, size: 28, font: FONT, color: INK })],
+      }));
+      inListType = null; continue;
+    }
+    if ((m = line.match(/^##\s+(.*)/))) {
+      children.push(new Paragraph({
+        heading: HeadingLevel.HEADING_2,
+        spacing: { before: 240, after: 100 },
+        children: [new TextRun({ text: m[1], bold: true, size: 24, font: FONT, color: INK })],
+      }));
+      inListType = null; continue;
+    }
+    if ((m = line.match(/^###\s+(.*)/))) {
+      // Finding header — emphasized with gold left border via top spacing
+      children.push(new Paragraph({
+        heading: HeadingLevel.HEADING_3,
+        spacing: { before: 280, after: 100 },
+        border: { left: { style: BorderStyle.SINGLE, size: 24, color: GOLD, space: 8 } },
+        children: [new TextRun({ text: m[1], bold: true, size: 22, font: FONT, color: INK })],
+      }));
+      inListType = null; continue;
+    }
+    if ((m = line.match(/^[-*]\s+(.*)/))) {
+      const content = m[1];
+      // Detect "**Department:** instruction" pattern as a styled item
+      const deptM = content.match(/^\*\*([^*]+)\*\*\s*:?\s*(.*)$/);
+      if (deptM) {
+        children.push(new Paragraph({
+          spacing: { after: 80, line: 280 },
+          indent: { left: 360 },
+          children: [
+            new TextRun({ text: '• ', font: FONT, size: 22, color: GOLD, bold: true }),
+            new TextRun({ text: deptM[1], bold: true, font: FONT, size: 22, color: INK }),
+            new TextRun({ text: ' — ', font: FONT, size: 22 }),
+            ...inlineRuns(deptM[2]),
+          ],
+        }));
+      } else {
+        children.push(new Paragraph({
+          spacing: { after: 80, line: 280 },
+          indent: { left: 360 },
+          children: [new TextRun({ text: '• ', font: FONT, size: 22, color: GOLD }), ...inlineRuns(content)],
+        }));
+      }
+      inListType = 'ul'; continue;
+    }
+    if ((m = line.match(/^\d+\.\s+(.*)/))) {
+      children.push(new Paragraph({
+        spacing: { after: 80, line: 280 },
+        indent: { left: 360 },
+        children: inlineRuns(line),
+      }));
+      inListType = 'ol'; continue;
+    }
+    // Italic-only metadata line (e.g. *Generated...*)
+    if (/^\*[^*]+\*$/.test(line.trim())) {
+      children.push(new Paragraph({
+        spacing: { after: 120, line: 280 },
+        children: [new TextRun({ text: line.trim().slice(1, -1), italics: true, font: FONT, size: 20, color: SUBTLE })],
+      }));
+      inListType = null; continue;
+    }
+    // "**Tier:** 🔴" key/value lines — emphasize the key, leave the rest
+    const kvM = line.match(/^\*\*([^*]+)\*\*\s*:?\s*(.*)$/);
+    if (kvM && kvM[2].length < 200) {
+      children.push(new Paragraph({
+        spacing: { after: 100, line: 280 },
+        children: [
+          new TextRun({ text: kvM[1] + ':', bold: true, font: FONT, size: 22, color: INK }),
+          new TextRun({ text: ' ', font: FONT, size: 22 }),
+          ...inlineRuns(kvM[2]),
+        ],
+      }));
+      continue;
+    }
+    // Default paragraph
+    children.push(new Paragraph({
+      spacing: { after: 120, line: 280 },
+      children: inlineRuns(line),
+    }));
+    inListType = null;
+  }
+
+  // Footer
+  children.push(new Paragraph({
+    spacing: { before: 400, after: 0 },
+    border: { top: { style: BorderStyle.SINGLE, size: 4, color: GOLD, space: 1 } },
+    children: [new TextRun({ text: '' })],
+  }));
+  children.push(new Paragraph({
+    spacing: { before: 80 },
+    alignment: AlignmentType.CENTER,
+    children: [new TextRun({ text: 'Generated by KAIT — Regulatory Scans', italics: true, size: 18, font: FONT, color: HAIR })],
+  }));
+
+  const doc = new Document({
+    styles: {
+      default: { document: { run: { font: FONT, size: 22 } } },
+    },
+    sections: [{
+      properties: {
+        page: {
+          size: { width: 12240, height: 15840 },
+          margin: { top: 1080, right: 1296, bottom: 1080, left: 1296 },
+        },
+      },
+      children,
+    }],
+  });
+
+  return await Packer.toBlob(doc);
 }
 
 // ── Settings ──
