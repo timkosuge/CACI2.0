@@ -127,24 +127,21 @@ export default {
     if (path.startsWith('/files/') && path.endsWith('/demote-to-document') && method === 'POST') return handleDemoteToDocument(path, request, env);
 
     // ── Watchtower (Regulatory Update Response) ──
+    // ── Watchtower (legacy — kept for backward compat with existing UI; will be removed) ──
     if (path === '/watchtower/watchlist' && method === 'GET')    return handleWatchlistList(env);
     if (path === '/watchtower/watchlist' && method === 'POST')   return handleWatchlistAdd(request, env);
     if (path.startsWith('/watchtower/watchlist/') && method === 'PATCH')  return handleWatchlistUpdate(path, request, env);
     if (path.startsWith('/watchtower/watchlist/') && method === 'DELETE') return handleWatchlistDelete(path, env);
-    if (path === '/watchtower/findings' && method === 'GET')     return handleFindingsList(url, env);
-    if (path.startsWith('/watchtower/findings/') && path.endsWith('/status') && method === 'PATCH') return handleFindingStatus(path, request, env);
-    if (path.startsWith('/watchtower/findings/') && method === 'GET' && path.split('/').length === 4) return handleFindingGet(path, env);
-    if (path.startsWith('/watchtower/findings/') && method === 'DELETE') return handleFindingDelete(path, env);
-    if (path === '/watchtower/scan' && method === 'POST')        return handleWatchtowerScan(request, env);
-    if (path === '/watchtower/config' && method === 'GET')       return handleWatchtowerConfigGet(env);
-    if (path === '/watchtower/config' && method === 'POST')      return handleWatchtowerConfigSet(request, env);
-    if (path === '/watchtower/scan-plan' && method === 'POST')   return handleWatchtowerScanPlan(request, env);
-    if (path === '/watchtower/reset-scans' && method === 'POST') return handleWatchtowerResetScans(request, env);
-    if (path === '/watchtower/scans' && method === 'GET')        return handleScansList(url, env);
-    if (path.startsWith('/watchtower/scans/') && method === 'GET') return handleScanGet(path, env);
-    if (path.startsWith('/watchtower/doc-history/') && method === 'GET') return handleDocHistory(path, env);
-    if (path.startsWith('/watchtower/finding-history/') && method === 'GET') return handleFindingHistory(path, env);
-    if (path === '/watchtower/ask' && method === 'POST')         return handleWatchtowerAsk(request, env);
+
+    // ── Regulatory Scans (replaces Watchtower's per-document analysis layer) ──
+    if (path === '/regscan/config' && method === 'GET')          return handleRegscanConfigGet(env);
+    if (path === '/regscan/config' && method === 'POST')         return handleRegscanConfigSet(request, env);
+    if (path === '/regscan/run' && method === 'POST')            return handleRegscanRun(request, env);
+    if (path === '/regscan/reports' && method === 'GET')         return handleRegscanReportsList(env);
+    if (path === '/regscan/reports' && method === 'POST')        return handleRegscanReportSave(request, env);
+    if (path.startsWith('/regscan/reports/') && method === 'GET'    && path.split('/').length === 4) return handleRegscanReportGet(path, env);
+    if (path.startsWith('/regscan/reports/') && method === 'DELETE') return handleRegscanReportDelete(path, env);
+    if (path.startsWith('/regscan/reports/') && path.endsWith('/status') && method === 'PATCH') return handleRegscanReportStatus(path, request, env);
     if (path.startsWith('/files/') && method === 'DELETE') return handleDeleteFile(path.replace('/files/', ''), env, url, verifyToken(request, env));
     if (path === '/collections' && method === 'GET')  return handleListCollections(url, env);
     if (path === '/collections/create' && method === 'POST') return handleCreateCollection(request, env);
@@ -6387,5 +6384,243 @@ ${findingsContext}`;
     const data = await res.json();
     const text = (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n').trim();
     return json({ ok: true, response: text });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// REGULATORY SCANS — uses the chat engine for analysis instead of per-document calls
+// ═══════════════════════════════════════════════════════════════
+
+const REGSCAN_CONFIG_DEFAULTS = {
+  dept: 'compliance',
+  collection: 'Ohio Cannabis Regulations',
+  state: 'Ohio',
+};
+
+async function regscanGetConfig(env) {
+  const stored = await env.CACI_KV.get('regscan:config', 'json');
+  return { ...REGSCAN_CONFIG_DEFAULTS, ...(stored || {}) };
+}
+
+async function handleRegscanConfigGet(env) {
+  try {
+    const cfg = await regscanGetConfig(env);
+    const reg = await env.CACI_KV.get(`colreg:${cfg.dept}`, 'json') || [];
+    const collections = Array.isArray(reg)
+      ? reg.map(c => typeof c === 'string' ? c : (c.name || c.collection || '')).filter(Boolean)
+      : [];
+    const depts = ['retail', 'compliance', 'commercial', 'finance', 'marketing', 'grower', 'processor', 'it', 'hr', 'learning', 'admin'];
+    return json({ ok: true, config: cfg, availableCollections: collections, availableDepartments: depts });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+async function handleRegscanConfigSet(request, env) {
+  try {
+    const body = await request.json();
+    const current = await regscanGetConfig(env);
+    const next = { ...current };
+    if (typeof body.dept === 'string' && body.dept.trim()) next.dept = body.dept.trim();
+    if (typeof body.collection === 'string' && body.collection.trim()) next.collection = body.collection.trim();
+    if (typeof body.state === 'string' && body.state.trim()) next.state = body.state.trim();
+    await env.CACI_KV.put('regscan:config', JSON.stringify(next));
+    return json({ ok: true, config: next });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+// ── Run a regulatory scan: builds a structured prompt, sends to Claude with full retrieval ──
+async function handleRegscanRun(request, env) {
+  try {
+    const body = await request.json().catch(() => ({}));
+    const apiKey = (await env.CACI_KV.get('config:ANTHROPIC_API_KEY')) || env.ANTHROPIC_API_KEY;
+    if (!apiKey) return json({ error: 'Anthropic API key not configured' }, 400);
+
+    const cfg = await regscanGetConfig(env);
+    const dept = body.dept || cfg.dept;
+    const collection = body.collection || cfg.collection;
+    const stateName = body.state || cfg.state;
+    const customInstruction = (body.customInstruction || '').trim();
+    const clientDatetime = body.clientDatetime;
+    const clientTimezone = body.clientTimezone;
+
+    const watchlist = await wtGetWatchlist(env);
+    const watchlistText = watchlist.map((w, i) => `${i+1}. [${w.category}] ${w.item} — Why: ${w.why}`).join('\n');
+
+    // Build a retrieval query that pulls broadly from the regulatory collection.
+    // We pull across the collection — the chat engine retrieves the most relevant chunks.
+    const sourceFilter = stateName.toLowerCase() === 'ohio' ? ['ohio', 'oh_', 'oh-', 'dcc', '1301', 'oac'] : [stateName.toLowerCase()];
+    const retrieveQuery = `${stateName} cannabis regulations operational changes requirements compliance deadlines packaging labeling testing transport licensing fees inventory training reporting`;
+    const { text: contextText } = await harvestRetrieveContext(env, retrieveQuery, 30, sourceFilter);
+
+    const today = clientDatetime || new Date().toLocaleString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric', hour:'numeric', minute:'2-digit', hour12:true });
+
+    const departments = WT_DEPARTMENTS.join(', ');
+
+    const system = `You are Kait, performing a Regulatory Scan for a multi-state cannabis operator. Your job: read the available regulatory documents and produce a structured report of every operational requirement or change that could affect this organization.
+
+Today is ${today}${clientTimezone ? ` (${clientTimezone})` : ''}.
+
+DATE REASONING: When a date appears in a document — a deadline, an effective date, a compliance milestone — that date may be in the past, present, or future relative to TODAY. Do not absorb the document's tense. Compute it. If a deadline is upcoming, say upcoming. If it has passed, say so.
+
+Departments at this organization: ${departments}.
+
+THE OPERATIONAL WATCHLIST — things this organization specifically cares about:
+${watchlistText}
+
+YOUR OUTPUT FORMAT — strict markdown structure:
+
+# Regulatory Scan: ${stateName}
+*Generated [today's date]. Scope: ${stateName} regulatory environment.*
+
+## Summary
+A 2-3 sentence overview: what was scanned, how many findings, key high-tier items.
+
+## Findings
+
+For each requirement or change, output a section in this exact format:
+
+### [N]. [Short descriptive title]
+**Tier:** 🔴 (or 🟡 or 🟢)
+**State:** ${stateName}
+**Source:** [Filename of the source document, exactly as it appears]
+**Effective:** [date if known, else "—"]
+**Deadline:** [date if known, else "—"]
+
+**What it requires/changes:** [1-3 sentences]
+
+**Why it matters operationally:** [2-4 sentences explaining downstream impact — financial models, packaging, training, systems, etc. Be specific about why this is operationally significant, the way the Ohio METRC unit-of-measure change would have been described.]
+
+**Departments to investigate:**
+- **[Department Name]:** [Concrete instruction — what they should specifically check or update. Not "review this" — something actionable like "verify whether month-end COGS calculations use the unit-of-measure that's changing."]
+- **[Department Name]:** [Same shape]
+
+(Include only departments genuinely affected. Most findings affect 2-4 departments.)
+
+**Watchlist matches:** [comma-separated list of watchlist categories this touches, or "—"]
+
+---
+
+TIER RULES:
+🔴 = affects financial models, system integrations, license compliance, or product safety; OR has a hard deadline within 30 days
+🟡 = affects operations or procedures but not critical systems; OR deadline 30-90 days out
+🟢 = informational, advisory, or narrow scope; no imminent deadline
+
+PRINCIPLES:
+1. Be exhaustive within the retrieved context. Don't summarize "and many more" — list everything you can identify from the documents.
+2. One finding per discrete requirement or change. A document covering 5 topics produces 5 findings. A document covering 1 topic produces 1.
+3. Cite source filenames exactly as they appear in the retrieved context. Do not invent filenames.
+4. Be specific about department impacts. "Finance/Accounting should verify whether COGS calculations rely on the unit-of-measure that's changing" — not "Finance should review."
+5. When the formal code (OAC, ORC) and DCC guidance say different things, surface both. Note the tension.
+6. Honesty about gaps: if you reach the end of the retrieved context and know the library is larger, say so explicitly at the bottom: "Coverage note: this scan reviewed [N] documents from the retrieved context. [State] regulations are extensive; additional findings may exist in documents not surfaced by this retrieval pass."`;
+
+    const userMsg = customInstruction
+      ? `${customInstruction}\n\nRegulatory documents available for this scan:\n\n${contextText}\n\nProduce the structured Regulatory Scan report as instructed.`
+      : `Produce a comprehensive Regulatory Scan for ${stateName}. Identify every operational requirement or change in the retrieved documents. Use the structured format defined in your system prompt.\n\nRegulatory documents:\n\n${contextText}`;
+
+    const startedAt = new Date().toISOString();
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 16000,
+        system,
+        messages: [{ role: 'user', content: userMsg }],
+      }),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      return json({ error: `Anthropic API ${res.status}: ${errText.slice(0, 300)}` }, 500);
+    }
+    const data = await res.json();
+    const reportText = (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n').trim();
+    const completedAt = new Date().toISOString();
+
+    return json({
+      ok: true,
+      report: reportText,
+      meta: {
+        startedAt, completedAt,
+        dept, collection, state: stateName,
+        watchlistCount: watchlist.length,
+        usage: data.usage || null,
+      },
+    });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+// ── Save a report ──
+async function handleRegscanReportSave(request, env) {
+  try {
+    const body = await request.json();
+    if (!body.report || typeof body.report !== 'string') return json({ error: 'report text required' }, 400);
+    const id = 'rr_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+    const cfg = await regscanGetConfig(env);
+    const record = {
+      id,
+      createdAt: new Date().toISOString(),
+      title: body.title || `${body.meta?.state || cfg.state} Regulatory Scan — ${new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`,
+      state: body.meta?.state || cfg.state,
+      dept: body.meta?.dept || cfg.dept,
+      collection: body.meta?.collection || cfg.collection,
+      report: body.report,
+      meta: body.meta || {},
+      status: 'New',
+    };
+    await env.CACI_KV.put(`regscan:report:${id}`, JSON.stringify(record));
+    const idx = await env.CACI_KV.get('regscan:reports:index', 'json') || [];
+    idx.unshift({
+      id, createdAt: record.createdAt, title: record.title,
+      state: record.state, status: record.status,
+    });
+    if (idx.length > 500) idx.splice(500);
+    await env.CACI_KV.put('regscan:reports:index', JSON.stringify(idx));
+    return json({ ok: true, id, record });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+async function handleRegscanReportsList(env) {
+  try {
+    const idx = await env.CACI_KV.get('regscan:reports:index', 'json') || [];
+    return json({ ok: true, items: idx });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+async function handleRegscanReportGet(path, env) {
+  try {
+    const id = path.split('/')[3];
+    const r = await env.CACI_KV.get(`regscan:report:${id}`, 'json');
+    if (!r) return json({ error: 'not found' }, 404);
+    return json({ ok: true, report: r });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+async function handleRegscanReportDelete(path, env) {
+  try {
+    const id = path.split('/')[3];
+    await env.CACI_KV.delete(`regscan:report:${id}`);
+    const idx = await env.CACI_KV.get('regscan:reports:index', 'json') || [];
+    await env.CACI_KV.put('regscan:reports:index', JSON.stringify(idx.filter(r => r.id !== id)));
+    return json({ ok: true });
+  } catch (e) { return json({ error: e.message }, 500); }
+}
+
+async function handleRegscanReportStatus(path, request, env) {
+  try {
+    const parts = path.split('/');
+    const id = parts[3];
+    const { status } = await request.json();
+    if (!['New','In Review','Acknowledged','Resolved','Archived'].includes(status)) {
+      return json({ error: 'invalid status' }, 400);
+    }
+    const r = await env.CACI_KV.get(`regscan:report:${id}`, 'json');
+    if (!r) return json({ error: 'not found' }, 404);
+    r.status = status;
+    r.statusUpdatedAt = new Date().toISOString();
+    await env.CACI_KV.put(`regscan:report:${id}`, JSON.stringify(r));
+    const idx = await env.CACI_KV.get('regscan:reports:index', 'json') || [];
+    const i = idx.findIndex(x => x.id === id);
+    if (i >= 0) { idx[i].status = status; await env.CACI_KV.put('regscan:reports:index', JSON.stringify(idx)); }
+    return json({ ok: true });
   } catch (e) { return json({ error: e.message }, 500); }
 }
